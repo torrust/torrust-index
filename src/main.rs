@@ -1,18 +1,36 @@
-use actix_web::{web, App, HttpRequest, HttpServer, Responder};
+use std::sync::Arc;
 
-async fn greet(req: HttpRequest) -> impl Responder {
-    let name = req.match_info().get("name").unwrap_or("World");
-    format!("Hello {}!", &name)
+use actix_web::{App, HttpServer, middleware};
+use lazy_static::lazy_static;
+
+pub use crate::config::TorrustConfig;
+pub use crate::data::Data;
+
+mod handlers;
+mod data;
+mod config;
+mod errors;
+mod models;
+
+pub type AppData = actix_web::web::Data<Arc<crate::data::Data>>;
+
+lazy_static! {
+    pub static ref CONFIG: TorrustConfig = TorrustConfig::new().unwrap();
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| {
+    let data = Data::new().await;
+    sqlx::migrate!().run(&data.db).await.unwrap();
+    let data = actix_web::web::Data::new(data);
+
+    HttpServer::new(move || {
         App::new()
-            .route("/", web::get().to(greet))
-            .route("/{name}", web::get().to(greet))
+            .app_data(data.clone())
+            .wrap(middleware::Logger::default())
+            .configure(handlers::init_routes)
     })
-        .bind(("127.0.0.1", 8080))?
+        .bind(("0.0.0.0", 8080))?
         .run()
         .await
 }

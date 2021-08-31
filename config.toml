@@ -1,0 +1,6 @@
+[database]
+connect_url = "sqlite://target/data/data.db"
+
+[auth]
+min_password_length = 6
+max_password_length = 64

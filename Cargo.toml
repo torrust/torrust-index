@@ -1,10 +1,26 @@
 [package]
 name = "torrust"
 version = "0.1.0"
-authors = ["Mick <mick@dutchbits.nl>"]
+authors = ["Mick <mick@dutchbits.nl>", "Wesley <wesley@dutchbits.nl"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-actix-web = "3"
+actix-web = "4.0.0-beta.8"
+
+lazy_static = "1.4"
+
+sqlx = { version = "0.5.5", features = [ "runtime-actix-rustls", "sqlite", "migrate", "time" ] }
+
+config = "0.11"
+
+derive_builder = "0.10"
+derive_more = "0.99"
+
+serde = "1"
+serde_json = "1"
+serde_yaml = "0.8.17"
+
+pbkdf2 = "0.9"
+rand_core = { version = "0.6", features = ["std"] }
