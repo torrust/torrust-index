@@ -11,6 +11,7 @@ mod data;
 mod config;
 mod errors;
 mod models;
+mod utils;
 
 pub type AppData = actix_web::web::Data<Arc<crate::data::Data>>;
 
@@ -23,6 +24,8 @@ async fn main() -> std::io::Result<()> {
     let data = Data::new().await;
     sqlx::migrate!().run(&data.db).await.unwrap();
     let data = actix_web::web::Data::new(data);
+
+    async_std::fs::create_dir_all(&CONFIG.storage.upload_path).await?;
 
     HttpServer::new(move || {
         App::new()

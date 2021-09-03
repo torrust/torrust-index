@@ -2,6 +2,7 @@ use derive_more::{Display, Error};
 use actix_web::{ResponseError, HttpResponse, HttpResponseBuilder};
 use actix_web::http::{header, StatusCode};
 use serde::{Deserialize, Serialize};
+use std::error;
 
 pub type ServiceResult<V> = std::result::Result<V, ServiceError>;
 
@@ -63,6 +64,12 @@ pub enum ServiceError {
     /// token not found
     #[display(fmt = "Token not found. Is token registered?")]
     TokenNotFound,
+
+    #[display(fmt = "Uploaded torrent is not valid")]
+    InvalidTorrentFile,
+
+    #[display(fmt = "Only .torrent files can be uploaded")]
+    InvalidFileType,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -94,6 +101,9 @@ impl ResponseError for ServiceError {
             ServiceError::EmailTaken => StatusCode::BAD_REQUEST,
 
             ServiceError::TokenNotFound => StatusCode::NOT_FOUND,
+
+            ServiceError::InvalidTorrentFile => StatusCode::BAD_REQUEST,
+            ServiceError::InvalidFileType => StatusCode::BAD_REQUEST,
         }
     }
 
@@ -111,13 +121,29 @@ impl ResponseError for ServiceError {
 }
 
 impl From<sqlx::Error> for ServiceError {
-    fn from(_e: sqlx::Error) -> Self {
+    fn from(e: sqlx::Error) -> Self {
+        eprintln!("{}", e);
         ServiceError::InternalServerError
     }
 }
 
 impl From<pbkdf2::password_hash::Error> for ServiceError {
-    fn from(_e: pbkdf2::password_hash::Error) -> Self {
+    fn from(e: pbkdf2::password_hash::Error) -> Self {
+        eprintln!("{}", e);
+        ServiceError::InternalServerError
+    }
+}
+
+impl From<std::io::Error> for ServiceError {
+    fn from(e: std::io::Error) -> Self {
+        eprintln!("{}", e);
+        ServiceError::InternalServerError
+    }
+}
+
+impl From<Box<dyn error::Error>> for ServiceError {
+    fn from(e: Box<dyn error::Error>) -> Self {
+        eprintln!("{}", e);
         ServiceError::InternalServerError
     }
 }

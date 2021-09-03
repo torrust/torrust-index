@@ -14,9 +14,15 @@ pub struct Database {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct Storage {
+    pub upload_path: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct TorrustConfig {
     pub auth: Auth,
     pub database: Database,
+    pub storage: Storage,
 }
 
 impl TorrustConfig {
