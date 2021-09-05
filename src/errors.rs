@@ -22,8 +22,8 @@ pub enum ServiceError {
     #[display(fmt = "The value you entered for URL is not a URL")] //405j
     NotAUrl,
 
-    #[display(fmt = "Wrong password")]
-    WrongPassword,
+    #[display(fmt = "Invalid username/email or password")]
+    WrongPasswordOrUsername,
     #[display(fmt = "Username not found")]
     UsernameNotFound,
     #[display(fmt = "Account not found")]
@@ -92,7 +92,7 @@ impl ResponseError for ServiceError {
             ServiceError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceError::NotAnEmail => StatusCode::BAD_REQUEST,
             ServiceError::NotAUrl => StatusCode::BAD_REQUEST,
-            ServiceError::WrongPassword => StatusCode::UNAUTHORIZED,
+            ServiceError::WrongPasswordOrUsername => StatusCode::UNAUTHORIZED,
             ServiceError::UsernameNotFound => StatusCode::NOT_FOUND,
             ServiceError::AccountNotFound => StatusCode::NOT_FOUND,
 
