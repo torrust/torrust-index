@@ -1,5 +1,3 @@
-use std::env;
-
 use actix_multipart::Multipart;
 use actix_web::{HttpRequest, HttpResponse, Responder, web};
 use actix_web::web::Query;
@@ -7,17 +5,11 @@ use async_std::fs::create_dir_all;
 use async_std::prelude::*;
 use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-
-use crate::common::{Username, WebAppData};
-use crate::config::TorrustConfig;
 use crate::errors::{ServiceError, ServiceResult};
 use crate::models::response::{NewTorrentResponse, OkResponse};
-use crate::models::user::{Claims, User};
 use crate::models::torrent_listing::TorrentListing;
 use crate::utils::parse_torrent;
 use crate::common::{WebAppData, Username};
-use std::env;
-use crate::config::TorrustConfig;
 use crate::models::user::{User, Claims};
 use std::io::Cursor;
 use std::io::{Write};
@@ -112,7 +104,7 @@ pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> Service
     }?;
 
     if user.is_ok() {
-        let personal_announce_url = app_data.auth.get_personal_announce_url(&user.unwrap()).await;
+        let personal_announce_url = app_data.tracker.get_personal_announce_url(&user.unwrap()).await;
         // this would mean the connection with the tracker is not ok
         if personal_announce_url.is_none() { return Err(ServiceError::InternalServerError) }
         torrent.announce = Some(personal_announce_url.unwrap());
@@ -134,19 +126,6 @@ pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> Service
     )
 }
 
-pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let torrent_id = req.match_info().get("id").unwrap();
-    // todo: get Torrent by id
-
-    let bencode_bytes = match parse_torrent::encode_torrent(&torrent) {
-        Ok(bencode_bytes) => Ok(bencode_bytes),
-        Err(e) => Err(ServiceError::InternalServerError)
-    }?;
-
-    // todo: add tracker key to announce url
-    // todo: stream bytes to client
-}
-
 pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let user = app_data.auth.get_user_from_request(&req).await?;
 
@@ -164,9 +143,13 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
 
     let filepath = format!("{}/{}", app_data.cfg.storage.upload_path, torrent_id.to_string() + ".torrent");
 
-    save_torrent_file(&filepath, &torrent).await?;
+    // add info hash to torrent listing in database
+    app_data.database.update_torrent_info_hash(torrent_id, torrent.info_hash()).await?;
 
-    let _res = app_data.database.update_torrent_info_hash(torrent_id, torrent.info_hash()).await?;
+    // whitelist info hash on tracker
+    let _r = app_data.tracker.whitelist_info_hash(torrent.info_hash()).await;
+
+    save_torrent_file(&filepath, &torrent).await?;
 
     Ok(HttpResponse::Ok())
 }

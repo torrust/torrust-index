@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS torrust_torrents (
     torrent_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     uploader_id INTEGER NOT NULL,
-    info_hash VARCHAR(20),
+    info_hash VARCHAR(20) UNIQUE,
     title VARCHAR(256) NOT NULL,
     category_id INTEGER NOT NULL,
     description TEXT,

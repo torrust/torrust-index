@@ -1,0 +1,75 @@
+use crate::config::TorrustConfig;
+use std::sync::Arc;
+use crate::database::Database;
+use crate::models::tracker_key::TrackerKey;
+use crate::errors::ServiceError;
+use crate::models::user::User;
+
+pub struct TrackerService {
+    cfg: Arc<TorrustConfig>,
+    database: Arc<Database>,
+}
+
+impl TrackerService {
+    pub fn new(cfg: Arc<TorrustConfig>, database: Arc<Database>) -> TrackerService {
+        TrackerService {
+            cfg,
+            database
+        }
+    }
+
+    pub async fn whitelist_info_hash(&self, info_hash: String) -> Result<(), ServiceError> {
+        let request_url =
+            format!("{}/api/whitelist/{}?token={}", self.cfg.tracker.api_url, info_hash, self.cfg.tracker.token);
+
+        let client = reqwest::Client::new();
+
+        let response = match client.post(request_url).send().await {
+            Ok(v) => Ok(v),
+            Err(_) => Err(ServiceError::InternalServerError)
+        }?;
+
+        if response.status().is_success() {
+            return Ok(())
+        }
+
+        Err(ServiceError::InternalServerError)
+    }
+
+    pub async fn get_personal_announce_url(&self, user: &User) -> Option<String> {
+        let mut tracker_key = self.database.get_valid_tracker_key(user.user_id).await;
+
+        if tracker_key.is_none() {
+            match self.retrieve_new_tracker_key(user.user_id).await {
+                Ok(v) => { tracker_key = Some(v) },
+                Err(_) => { return None }
+            }
+        }
+
+        Some(format!("{}/{}", self.cfg.tracker.url, tracker_key.unwrap().key))
+    }
+
+    pub async fn retrieve_new_tracker_key(&self, user_id: i64) -> Result<TrackerKey, ServiceError> {
+        let request_url =
+            format!("{}/api/key/{}?token={}", self.cfg.tracker.api_url, self.cfg.tracker.token_valid_seconds, self.cfg.tracker.token);
+
+        let client = reqwest::Client::new();
+        let response = match client.post(request_url)
+            .send()
+            .await {
+            Ok(v) => Ok(v),
+            Err(_) => Err(ServiceError::InternalServerError)
+        }?;
+
+        let tracker_key: TrackerKey = match response.json::<TrackerKey>().await {
+            Ok(v) => Ok(v),
+            Err(_) => Err(ServiceError::InternalServerError)
+        }?;
+
+        println!("{:?}", tracker_key);
+
+        self.database.issue_tracker_key(&tracker_key, user_id).await?;
+
+        Ok(tracker_key)
+    }
+}

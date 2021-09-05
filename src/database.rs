@@ -8,6 +8,7 @@ use crate::models::torrent_listing::TorrentListing;
 use crate::utils::time::current_time;
 use std::time::Duration;
 use crate::models::tracker_key::TrackerKey;
+use std::borrow::Cow;
 
 pub struct Database {
     pub pool: SqlitePool
@@ -64,10 +65,19 @@ impl Database {
             .execute(&self.pool)
             .await;
 
-        match res {
-            Ok(_) => Ok(()),
-            _ => Err(ServiceError::TorrentNotFound)
+        if let Err(sqlx::Error::Database(err)) = res {
+            return if err.code() == Some(Cow::from("2067")) {
+                if err.message().contains("torrust_torrents.info_hash") {
+                    Err(ServiceError::InfoHashAlreadyExists)
+                } else {
+                    Err(ServiceError::InternalServerError)
+                }
+            } else {
+                Err(ServiceError::TorrentNotFound)
+            }
         }
+
+        Ok(())
     }
 
     pub async fn get_torrent_by_id(&self, torrent_id: i64) -> Option<TorrentListing> {

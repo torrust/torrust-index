@@ -90,6 +90,9 @@ pub enum ServiceError {
 
     #[display(fmt = "Unauthorized action.")]
     Unauthorized,
+
+    #[display(fmt = "This torrent already exists in our database.")]
+    InfoHashAlreadyExists
 }
 
 #[derive(Serialize, Deserialize)]
@@ -134,6 +137,8 @@ impl ResponseError for ServiceError {
             ServiceError::InvalidCategory => StatusCode::BAD_REQUEST,
 
             ServiceError::Unauthorized => StatusCode::UNAUTHORIZED,
+
+            ServiceError::InfoHashAlreadyExists => StatusCode::BAD_REQUEST,
         }
     }
 
