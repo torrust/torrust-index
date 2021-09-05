@@ -1,9 +1,10 @@
 [database]
-connect_url = "sqlite://target/data/data.db"
+connect_url = "sqlite://data.db?mode=rwc"
 
 [auth]
 min_password_length = 6
 max_password_length = 64
+secret_key = "verstappennumbahwan"
 
 [storage]
 upload_path = "./uploads"

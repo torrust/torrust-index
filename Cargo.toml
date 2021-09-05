@@ -33,3 +33,5 @@ pbkdf2 = "0.9"
 rand_core = { version = "0.6", features = ["std"] }
 
 sanitize-filename = "0.3.0"
+
+jsonwebtoken = "7.2.0"

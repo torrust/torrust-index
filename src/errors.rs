@@ -62,8 +62,16 @@ pub enum ServiceError {
 
     /// when the a token name is already taken
     /// token not found
-    #[display(fmt = "Token not found. Is token registered?")]
+    #[display(fmt = "Token not found. Please sign in.")]
     TokenNotFound,
+
+    /// token expired
+    #[display(fmt = "Token expired. Please sign in again.")]
+    TokenExpired,
+
+    #[display(fmt = "Token invalid.")]
+    /// token invalid
+    TokenInvalid,
 
     #[display(fmt = "Uploaded torrent is not valid")]
     InvalidTorrentFile,
@@ -100,7 +108,9 @@ impl ResponseError for ServiceError {
             ServiceError::UsernameInvalid => StatusCode::BAD_REQUEST,
             ServiceError::EmailTaken => StatusCode::BAD_REQUEST,
 
-            ServiceError::TokenNotFound => StatusCode::NOT_FOUND,
+            ServiceError::TokenNotFound => StatusCode::UNAUTHORIZED,
+            ServiceError::TokenExpired => StatusCode::UNAUTHORIZED,
+            ServiceError::TokenInvalid => StatusCode::UNAUTHORIZED,
 
             ServiceError::InvalidTorrentFile => StatusCode::BAD_REQUEST,
             ServiceError::InvalidFileType => StatusCode::BAD_REQUEST,
