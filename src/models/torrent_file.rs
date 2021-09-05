@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
+use crate::config::TorrustConfig;
+use serde_bencode::ser;
+use sha1::{Digest, Sha1};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Node(String, i64);
@@ -35,7 +38,7 @@ pub struct Info {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Torrent {
-    pub info: Info,
+    pub info: Info, //
     #[serde(default)]
     pub announce: Option<String>,
     #[serde(default)]
@@ -55,4 +58,29 @@ pub struct Torrent {
     #[serde(default)]
     #[serde(rename="created by")]
     pub created_by: Option<String>,
+}
+
+impl Torrent {
+    pub fn set_torrust_config(&mut self, cfg: &TorrustConfig) {
+        self.announce = Some(cfg.tracker.url.clone());
+        self.announce_list = None;
+    }
+
+    pub fn calculate_info_hash_as_bytes(&self) -> [u8; 20] {
+        let info_bencoded = ser::to_bytes(&self.info).unwrap();
+        let mut hasher = Sha1::new();
+        hasher.update(info_bencoded);
+        let sum_hex = hasher.finalize();
+        let mut sum_bytes: [u8; 20] = Default::default();
+        sum_bytes.copy_from_slice(sum_hex.as_slice());
+        sum_bytes
+    }
+
+
+    pub fn info_hash(&self) -> String {
+        let mut buffer = [0u8; 40];
+        let input = &self.calculate_info_hash_as_bytes();
+        let bytes_out = binascii::bin2hex(input, &mut buffer).ok().unwrap();
+        String::from(std::str::from_utf8(bytes_out).unwrap())
+    }
 }
