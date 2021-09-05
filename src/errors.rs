@@ -73,6 +73,9 @@ pub enum ServiceError {
     /// token invalid
     TokenInvalid,
 
+    #[display(fmt = "Torrent not found.")]
+    TorrentNotFound,
+
     #[display(fmt = "Uploaded torrent is not valid")]
     InvalidTorrentFile,
 
@@ -111,6 +114,8 @@ impl ResponseError for ServiceError {
             ServiceError::TokenNotFound => StatusCode::UNAUTHORIZED,
             ServiceError::TokenExpired => StatusCode::UNAUTHORIZED,
             ServiceError::TokenInvalid => StatusCode::UNAUTHORIZED,
+
+            ServiceError::TorrentNotFound => StatusCode::BAD_REQUEST,
 
             ServiceError::InvalidTorrentFile => StatusCode::BAD_REQUEST,
             ServiceError::InvalidFileType => StatusCode::BAD_REQUEST,

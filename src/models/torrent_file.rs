@@ -4,10 +4,10 @@ use crate::config::TorrustConfig;
 use serde_bencode::ser;
 use sha1::{Digest, Sha1};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
 pub struct Node(String, i64);
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
 pub struct File {
     pub path: Vec<String>,
     pub length: i64,
@@ -15,7 +15,7 @@ pub struct File {
     pub md5sum: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
 pub struct Info {
     pub name: String,
     pub pieces: ByteBuf,
@@ -36,7 +36,7 @@ pub struct Info {
     pub root_hash: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Serialize, Deserialize)]
 pub struct Torrent {
     pub info: Info, //
     #[serde(default)]

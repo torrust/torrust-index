@@ -20,8 +20,10 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/torrent")
             .service(web::resource("/new")
                 .route(web::post().to(create_torrent)))
-            .service(web::resource("/upload")
+            .service(web::resource("/upload/{id}")
                 .route(web::post().to(upload_torrent)))
+            .service(web::resource("/download/{id}")
+                .route(web::get().to(download_torrent)))
     );
 }
 
@@ -42,14 +44,30 @@ pub async fn create_torrent(req: HttpRequest, payload: web::Json<CreateTorrent>,
     Ok(HttpResponse::Ok())
 }
 
+pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let torrent_id = req.match_info().get("id").unwrap();
+    // todo: get Torrent by id
+
+    let bencode_bytes = match parse_torrent::encode_torrent(&torrent) {
+        Ok(bencode_bytes) => Ok(bencode_bytes),
+        Err(e) => Err(ServiceError::InternalServerError)
+    }?;
+
+    // todo: add tracker key to announce url
+    // todo: stream bytes to client
+}
+
 pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    // let torrent_id = req.match_info().get("id").unwrap();
+    let torrent_id = req.match_info().get("id").unwrap();
 
     let mut torrent = get_torrent_from_payload(payload).await?;
     torrent.set_torrust_config(&app_data.cfg);
 
-    println!("{:?}", torrent);
-    println!("{:?}", torrent.info_hash());
+    // todo: update info hash
+    if app_data.database.update_torrent_bencode(torrent_id.parse().unwrap(), bencode).await.is_err() {
+        println!("Error while inserting bencode.");
+        return Err(ServiceError::InternalServerError)
+    }
 
     Ok(HttpResponse::Ok())
 }
