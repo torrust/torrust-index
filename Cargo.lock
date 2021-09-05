@@ -19,6 +19,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "actix-cors"
+version = "0.6.0-beta.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "01552b8facccd5d7a4cc5d8e2b07d306160c97a4968181c2db965533389c8725"
+dependencies = [
+ "actix-service",
+ "actix-web",
+ "derive_more",
+ "futures-util",
+ "log",
+ "once_cell",
+ "smallvec",
+]
+
+[[package]]
 name = "actix-http"
 version = "3.0.0-beta.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2227,6 +2242,7 @@ dependencies = [
 name = "torrust"
 version = "0.1.0"
 dependencies = [
+ "actix-cors",
  "actix-multipart",
  "actix-web",
  "async-std",

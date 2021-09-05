@@ -1,4 +1,4 @@
-use actix_web::{web, Responder, HttpResponse};
+use actix_web::{web, Responder, HttpResponse, HttpRequest};
 use serde::{Deserialize, Serialize};
 use pbkdf2::{
     password_hash::{
@@ -106,17 +106,36 @@ pub async fn login(payload: web::Json<Login>, app_data: WebAppData) -> ServiceRe
             let parsed_hash = PasswordHash::new(&user.password)?;
 
             if !Pbkdf2.verify_password(payload.password.as_bytes(), &parsed_hash).is_ok() {
-                return Err(ServiceError::WrongPassword);
+                return Err(ServiceError::WrongPasswordOrUsername);
             }
 
+            let username = user.username.clone();
             let token = app_data.auth.sign_jwt(user);
 
             Ok(HttpResponse::Ok().json(OkResponse {
                 data: TokenResponse {
-                    token
+                    token,
+                    username
                 }
             }))
         }
-        None => Err(ServiceError::AccountNotFound)
+        None => Err(ServiceError::WrongPasswordOrUsername)
     }
+}
+
+pub async fn me(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let user = match app_data.auth.get_user_from_request(&req).await {
+        Ok(user) => Ok(user),
+        Err(e) => Err(e)
+    }?;
+
+    let username = user.username.clone();
+    let token = app_data.auth.sign_jwt(user);
+
+    Ok(HttpResponse::Ok().json(OkResponse {
+        data: TokenResponse {
+            token,
+            username
+        }
+    }))
 }
