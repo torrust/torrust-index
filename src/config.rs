@@ -3,6 +3,17 @@ use std::path::Path;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct Tracker {
+    pub url: String,
+    pub api_url: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Network {
+    pub port: u16,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct Auth {
     pub min_password_length: usize,
     pub max_password_length: usize,
@@ -21,6 +32,8 @@ pub struct Storage {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct TorrustConfig {
+    pub tracker: Tracker,
+    pub net: Network,
     pub auth: Auth,
     pub database: Database,
     pub storage: Storage,

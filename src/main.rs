@@ -28,7 +28,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .configure(handlers::init_routes)
     })
-        .bind(("0.0.0.0", 8000))?
+        .bind(("0.0.0.0", cfg.net.port))?
         .run()
         .await
 }
