@@ -426,6 +426,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a32fd6af2b5827bce66c29053ba0e7c42b9dcab01835835058558c10851a46b"
 
 [[package]]
+name = "binascii"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "383d29d513d8764dcdc42ea295d979eb99c3c9f00607b3692cf68a431f7dca72"
+
+[[package]]
 name = "bitflags"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -581,15 +587,6 @@ dependencies = [
  "percent-encoding",
  "time 0.2.27",
  "version_check",
-]
-
-[[package]]
-name = "cpufeatures"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66c99696f6c9dd7f35d486b9d04d7e6e202aa3e8c40d553f2fdf5e7e0c6a71ef"
-dependencies = [
- "libc",
 ]
 
 [[package]]
@@ -1816,13 +1813,13 @@ dependencies = [
 
 [[package]]
 name = "sha-1"
-version = "0.9.6"
+version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c4cfa741c5832d0ef7fab46cabed29c2aae926db0b11bb2069edd8db5e64e16"
+checksum = "99cd6713db3cf16b6c84e06321e049a9b9f699826e16096d23bbcc44d15d51a6"
 dependencies = [
  "block-buffer",
  "cfg-if",
- "cpufeatures 0.1.5",
+ "cpufeatures",
  "digest",
  "opaque-debug",
 ]
@@ -1841,7 +1838,7 @@ checksum = "9204c41a1597a8c5af23c82d1c921cb01ec0a4c59e07a9c7306062829a3903f3"
 dependencies = [
  "block-buffer",
  "cfg-if",
- "cpufeatures 0.2.1",
+ "cpufeatures",
  "digest",
  "opaque-debug",
 ]
@@ -2246,6 +2243,7 @@ dependencies = [
  "actix-multipart",
  "actix-web",
  "async-std",
+ "binascii",
  "config",
  "derive_builder",
  "derive_more",
@@ -2261,6 +2259,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml",
+ "sha-1",
  "sqlx",
 ]
 
