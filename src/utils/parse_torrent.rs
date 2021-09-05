@@ -34,3 +34,25 @@ pub fn encode_torrent(torrent: &Torrent) -> Result<Vec<u8>, Error> {
         }
     }
 }
+
+pub fn encode_torrent(torrent: &Torrent) -> Result<Vec<u8>, Error> {
+    match serde_bencode::to_bytes(torrent) {
+        Ok(bencode_bytes) => Ok(bencode_bytes),
+        Err(e) => {
+            println!("{:?}", e);
+            Err(e)
+        }
+    }
+}
+
+pub fn encode_torrent_as_string(torrent: &Torrent) -> Result<String, Error> {
+    let bencode_bytes = encode_torrent(torrent)?;
+
+    match serde_bencode::to_string(&bencode_bytes) {
+        Ok(bencode_string) => Ok(bencode_string),
+        Err(e) => {
+            println!("{:?}", e);
+            Err(e)
+        }
+    }
+}

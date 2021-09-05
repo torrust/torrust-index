@@ -15,6 +15,10 @@ use crate::models::response::{NewTorrentResponse, OkResponse};
 use crate::models::user::{Claims, User};
 use crate::models::torrent_listing::TorrentListing;
 use crate::utils::parse_torrent;
+use crate::common::{WebAppData, Username};
+use std::env;
+use crate::config::TorrustConfig;
+use crate::models::user::{User, Claims};
 use std::io::Cursor;
 use std::io::{Write};
 use crate::models::torrent_file::Torrent;
@@ -128,6 +132,19 @@ pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> Service
         .content_type("application/x-bittorrent")
         .body(buffer)
     )
+}
+
+pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let torrent_id = req.match_info().get("id").unwrap();
+    // todo: get Torrent by id
+
+    let bencode_bytes = match parse_torrent::encode_torrent(&torrent) {
+        Ok(bencode_bytes) => Ok(bencode_bytes),
+        Err(e) => Err(ServiceError::InternalServerError)
+    }?;
+
+    // todo: add tracker key to announce url
+    // todo: stream bytes to client
 }
 
 pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebAppData) -> ServiceResult<impl Responder> {
