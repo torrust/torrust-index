@@ -1,24 +1,52 @@
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use sqlx::sqlite::SqlitePoolOptions;
+use std::env;
+use crate::models::user::User;
 
-use crate::CONFIG;
-
-pub struct Data {
-    pub db: SqlitePool
+pub struct Database {
+    pub pool: SqlitePool
 }
 
-impl Data {
-    pub async fn new() -> Arc<Self> {
+impl Database {
+    pub async fn new(database_url: &str) -> Database {
         let db = SqlitePoolOptions::new()
-            .connect(&CONFIG.database.connect_url)
+            .connect(database_url)
             .await
             .expect("Unable to create database pool");
 
-        let data: Data = Data {
-            db
-        };
+        Database {
+            pool: db
+        }
+    }
 
-        Arc::new(data)
+    pub async fn get_user_with_username(&self, username: &str) -> Option<User> {
+        let res = sqlx::query_as!(
+            User,
+            "SELECT * FROM torrust_users WHERE username = ?",
+            username,
+        )
+            .fetch_one(&self.pool)
+            .await;
+
+        match res {
+            Ok(user) => Some(user),
+            _ => None
+        }
+    }
+
+    pub async fn get_user_with_email(&self, email: &str) -> Option<User> {
+        let res = sqlx::query_as!(
+            User,
+            "SELECT * FROM torrust_users WHERE email = ?",
+            email,
+        )
+            .fetch_one(&self.pool)
+            .await;
+
+        match res {
+            Ok(user) => Some(user),
+            _ => None
+        }
     }
 }

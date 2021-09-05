@@ -2,20 +2,22 @@ use actix_web::{web, Responder, HttpResponse, HttpRequest};
 use actix_multipart::Multipart;
 use async_std::fs::create_dir_all;
 use async_std::prelude::*;
-use futures::{StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt, AsyncWriteExt};
 use serde::{Deserialize, Serialize};
-
-use crate::AppData;
-use crate::errors::{ServiceResult, ServiceError};
-use crate::CONFIG;
+use crate::errors::{ServiceError, ServiceResult};
 use crate::utils::parse_torrent;
-
+use crate::common::{WebAppData, Username};
+use std::env;
+use crate::config::TorrustConfig;
+use crate::models::user::{User, Claims};
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/torrent")
-            .service(web::resource("/new").route(web::post().to(create_torrent)))
-            .service(web::resource("/upload/{id}").route(web::post().to(upload_torrent)))
+            .service(web::resource("/new")
+                .route(web::post().to(create_torrent)))
+            .service(web::resource("/upload/{id}")
+                .route(web::post().to(upload_torrent)))
     );
 }
 
@@ -26,15 +28,21 @@ pub struct CreateTorrent {
     pub categories: Vec<String>,
 }
 
-pub async fn create_torrent(payload: web::Json<CreateTorrent>, data: AppData) -> ServiceResult<impl Responder> {
+pub async fn create_torrent(req: HttpRequest, payload: web::Json<CreateTorrent>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let user = match app_data.auth.get_user_from_request(&req).await {
+        Ok(user) => Ok(user),
+        Err(e) => Err(e)
+    }?;
+
+    println!("{:?}", user.username);
     Ok(HttpResponse::Ok())
 }
 
-pub async fn upload_torrent(req: HttpRequest, payload: Multipart, data: AppData) -> ServiceResult<impl Responder> {
+pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let torrent_id = req.match_info().get("id").unwrap();
 
     let filepath =
-        format!("{}/{}", CONFIG.storage.upload_path, torrent_id);
+        format!("{}/{}", app_data.cfg.storage.upload_path, torrent_id);
 
     create_dir_all(&filepath).await?;
     save_torrent_file(&filepath, payload).await?;
@@ -64,7 +72,7 @@ async fn save_torrent_file(path: &str, mut payload: Multipart) -> Result<(), Ser
         // Field in turn is stream of *Bytes* object
         while let Some(chunk) = field.next().await {
             let data = chunk.unwrap();
-            f.write_all(&data).await?;
+            AsyncWriteExt::write_all(&mut f, &data).await?;
         }
 
         let torrent = parse_torrent::read_torrent(&filepath)?;

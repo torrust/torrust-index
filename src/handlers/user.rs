@@ -7,12 +7,19 @@ use pbkdf2::{
     },
     Pbkdf2,
 };
-
-use crate::models::User;
-use crate::AppData;
-use crate::errors::{ServiceError, ServiceResult};
-use crate::CONFIG;
 use std::borrow::Cow;
+use std::collections::BTreeMap;
+use std::time::Duration;
+use crate::errors::{ServiceResult, ServiceError};
+use crate::utils::time::current_time;
+use crate::common::WebAppData;
+use std::env;
+use crate::models::user::Claims;
+use crate::config::TorrustConfig;
+use crate::models::user::User;
+use jsonwebtoken::{encode, Header, EncodingKey};
+use crate::models::response::OkResponse;
+use crate::models::response::TokenResponse;
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -36,16 +43,16 @@ pub struct Login {
     pub password: String,
 }
 
-pub async fn register(payload: web::Json<Register>, data: AppData) -> ServiceResult<impl Responder> {
+pub async fn register(payload: web::Json<Register>, app_data: WebAppData) -> ServiceResult<impl Responder> {
     if payload.password != payload.confirm_password {
         return Err(ServiceError::PasswordsDontMatch);
     }
 
     let password_length = payload.password.len();
-    if password_length <= CONFIG.auth.min_password_length {
+    if password_length <= app_data.cfg.auth.min_password_length {
         return Err(ServiceError::PasswordTooShort);
     }
-    if password_length >= CONFIG.auth.max_password_length {
+    if password_length >= app_data.cfg.auth.max_password_length {
         return Err(ServiceError::PasswordTooLong);
     }
 
@@ -67,7 +74,7 @@ pub async fn register(payload: web::Json<Register>, data: AppData) -> ServiceRes
         payload.email,
         password_hash,
     )
-        .execute(&data.db)
+        .execute(&app_data.database.pool)
         .await;
 
     if let Err(sqlx::Error::Database(err)) = res {
@@ -87,37 +94,29 @@ pub async fn register(payload: web::Json<Register>, data: AppData) -> ServiceRes
     Ok(HttpResponse::Ok())
 }
 
-pub async fn login(payload: web::Json<Login>, data: AppData) -> ServiceResult<impl Responder> {
-    let res;
-    if payload.login.contains('@') {
-        res = sqlx::query_as!(
-            User,
-            "SELECT * FROM torrust_users WHERE email = ?",
-            payload.login,
-        )
-            .fetch_one(&data.db)
-            .await
+pub async fn login(payload: web::Json<Login>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let res = if payload.login.contains('@') {
+        app_data.database.get_user_with_email(&payload.login).await
     } else {
-        res = sqlx::query_as!(
-            User,
-            "SELECT * FROM torrust_users WHERE username = ?",
-            payload.login,
-        )
-            .fetch_one(&data.db)
-            .await
-    }
+        app_data.database.get_user_with_username(&payload.login).await
+    };
 
     match res {
-        Ok(user) => {
+        Some(user) => {
             let parsed_hash = PasswordHash::new(&user.password)?;
 
             if !Pbkdf2.verify_password(payload.password.as_bytes(), &parsed_hash).is_ok() {
                 return Err(ServiceError::WrongPassword);
             }
 
-            return Ok(HttpResponse::Ok());
+            let token = app_data.auth.sign_jwt(user);
+
+            Ok(HttpResponse::Ok().json(OkResponse {
+                data: TokenResponse {
+                    token
+                }
+            }))
         }
-        Err(sqlx::Error::RowNotFound) => Err(ServiceError::AccountNotFound),
-        Err(_) => Err(ServiceError::InternalServerError),
+        None => Err(ServiceError::AccountNotFound)
     }
 }

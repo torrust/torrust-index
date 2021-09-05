@@ -6,6 +6,7 @@ use serde::Deserialize;
 pub struct Auth {
     pub min_password_length: usize,
     pub max_password_length: usize,
+    pub secret_key: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
