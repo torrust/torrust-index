@@ -21,3 +21,14 @@ pub struct TokenResponse {
     pub token: String,
     pub username: String,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NewTorrentResponse {
+    pub torrent_id: i64,
+}
+
+#[derive(Serialize, Deserialize, Debug, sqlx::FromRow)]
+pub struct CategoryResponse {
+    pub name: String,
+    pub num_torrents: Option<i64>,
+}

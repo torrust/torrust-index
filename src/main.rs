@@ -12,7 +12,7 @@ use torrust::auth::AuthorizationService;
 async fn main() -> std::io::Result<()> {
     let cfg = Arc::new(TorrustConfig::new().unwrap());
     let database = Arc::new(Database::new(&cfg.database.connect_url).await);
-    let auth = Arc::new(AuthorizationService::new(cfg.auth.secret_key.clone(), database.clone()));
+    let auth = Arc::new(AuthorizationService::new(cfg.clone(), database.clone()));
     let app_data = Arc::new(AppData::new(cfg.clone(), database.clone(), auth.clone()));
 
     // create/update database tables

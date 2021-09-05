@@ -6,6 +6,8 @@ use serde::Deserialize;
 pub struct Tracker {
     pub url: String,
     pub api_url: String,
+    pub token: String,
+    pub token_valid_seconds: u64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
