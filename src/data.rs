@@ -3,6 +3,7 @@ use std::sync::Arc;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::env;
 use crate::models::user::User;
+use crate::errors::ServiceError;
 
 pub struct Database {
     pub pool: SqlitePool
@@ -47,6 +48,21 @@ impl Database {
         match res {
             Ok(user) => Some(user),
             _ => None
+        }
+    }
+
+    pub async fn update_torrent_bencode(&self, torrent_id: i64, bencode: String) -> Result<(), ServiceError> {
+        let res = sqlx::query!(
+            "UPDATE torrust_torrents SET bencode = $1 WHERE torrent_id = $2",
+            bencode,
+            torrent_id
+        )
+            .execute(&self.pool)
+            .await;
+
+        match res {
+            Ok(_) => Ok(()),
+            _ => Err(ServiceError::TorrentNotFound)
         }
     }
 }
