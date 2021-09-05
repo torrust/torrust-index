@@ -82,8 +82,14 @@ pub enum ServiceError {
     #[display(fmt = "Only .torrent files can be uploaded")]
     InvalidFileType,
 
+    #[display(fmt = "Bad request.")]
+    BadRequest,
+
     #[display(fmt = "Selected category does not exist")]
-    InvalidCategory
+    InvalidCategory,
+
+    #[display(fmt = "Unauthorized action.")]
+    Unauthorized,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -122,7 +128,12 @@ impl ResponseError for ServiceError {
 
             ServiceError::InvalidTorrentFile => StatusCode::BAD_REQUEST,
             ServiceError::InvalidFileType => StatusCode::BAD_REQUEST,
+
+            ServiceError::BadRequest => StatusCode::BAD_REQUEST,
+
             ServiceError::InvalidCategory => StatusCode::BAD_REQUEST,
+
+            ServiceError::Unauthorized => StatusCode::UNAUTHORIZED,
         }
     }
 

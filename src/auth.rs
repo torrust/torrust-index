@@ -7,23 +7,27 @@ use std::sync::Arc;
 use crate::data::Database;
 use jsonwebtoken::errors::Error;
 use std::future::Future;
+use crate::config::TorrustConfig;
+use crate::models::tracker_key::TrackerKey;
+use std::error;
+use reqwest::Response;
 
 pub struct AuthorizationService {
-    secret: String,
+    cfg: Arc<TorrustConfig>,
     database: Arc<Database>,
 }
 
 impl AuthorizationService {
-    pub fn new(secret: String, database: Arc<Database>) -> AuthorizationService {
+    pub fn new(cfg: Arc<TorrustConfig>, database: Arc<Database>) -> AuthorizationService {
         AuthorizationService {
-            secret,
+            cfg,
             database
         }
     }
 
     pub fn sign_jwt(&self, user: User) -> String {
         // create JWT that expires in two weeks
-        let key = self.secret.as_bytes();
+        let key = self.cfg.auth.secret_key.as_bytes();
         let exp_date = current_time() + 1_209_600; // two weeks from now
 
         let claims = Claims {
@@ -44,7 +48,7 @@ impl AuthorizationService {
     pub fn verify_jwt(&self, token: &str) -> Result<Claims, ServiceError> {
         match decode::<Claims>(
             token,
-            &DecodingKey::from_secret(self.secret.as_bytes()),
+            &DecodingKey::from_secret(self.cfg.auth.secret_key.as_bytes()),
             &Validation::new(Algorithm::HS256),
         ) {
             Ok(token_data) => {
@@ -83,5 +87,42 @@ impl AuthorizationService {
             Some(user) => Ok(user),
             None => Err(ServiceError::AccountNotFound)
         }
+    }
+
+    pub async fn get_personal_announce_url(&self, user: &User) -> Option<String> {
+        let mut tracker_key = self.database.get_valid_tracker_key(user.user_id).await;
+
+        if tracker_key.is_none() {
+            match self.retrieve_new_tracker_key(user.user_id).await {
+                Ok(v) => { tracker_key = Some(v) },
+                Err(_) => { return None }
+            }
+        }
+
+        Some(format!("{}/{}", self.cfg.tracker.url, tracker_key.unwrap().key))
+    }
+
+    pub async fn retrieve_new_tracker_key(&self, user_id: i64) -> Result<TrackerKey, ServiceError> {
+        let request_url =
+            format!("{}/api/key/{}?token={}", self.cfg.tracker.api_url, self.cfg.tracker.token_valid_seconds, self.cfg.tracker.token);
+
+        let client = reqwest::Client::new();
+        let response = match client.post(request_url)
+            .send()
+            .await {
+            Ok(v) => Ok(v),
+            Err(_) => Err(ServiceError::InternalServerError)
+        }?;
+
+        let tracker_key: TrackerKey = match response.json::<TrackerKey>().await {
+            Ok(v) => Ok(v),
+            Err(_) => Err(ServiceError::InternalServerError)
+        }?;
+
+        println!("{:?}", tracker_key);
+
+        self.database.issue_tracker_key(&tracker_key, user_id).await?;
+
+        Ok(tracker_key)
     }
 }

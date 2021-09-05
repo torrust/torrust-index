@@ -63,7 +63,7 @@ pub struct Torrent {
 impl Torrent {
     pub fn set_torrust_config(&mut self, cfg: &TorrustConfig) {
         self.announce = Some(cfg.tracker.url.clone());
-        self.announce_list = None;
+        //self.announce_list = None;
     }
 
     pub fn calculate_info_hash_as_bytes(&self) -> [u8; 20] {

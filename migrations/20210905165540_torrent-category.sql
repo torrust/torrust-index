@@ -1,1 +1,0 @@
-ALTER TABLE torrust_torrents ADD category_id INTEGER NOT NULL REFERENCES torrust_categories(category_id)
