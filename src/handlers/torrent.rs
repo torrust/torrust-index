@@ -1,18 +1,20 @@
-use actix_web::{web, Responder, HttpResponse, HttpRequest};
+use std::env;
+
 use actix_multipart::Multipart;
+use actix_web::{HttpRequest, HttpResponse, Responder, web};
+use actix_web::web::Query;
 use async_std::fs::create_dir_all;
 use async_std::prelude::*;
-use futures::{StreamExt, TryStreamExt, AsyncWriteExt};
+use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use crate::errors::{ServiceError, ServiceResult};
-use crate::utils::parse_torrent;
-use crate::common::{WebAppData, Username};
-use std::env;
+
+use crate::common::{Username, WebAppData};
 use crate::config::TorrustConfig;
+use crate::errors::{ServiceError, ServiceResult};
+use crate::models::response::{NewTorrentResponse, OkResponse};
+use crate::models::user::{Claims, User};
 use crate::models::torrent_listing::TorrentListing;
-use crate::models::user::{User, Claims};
-use crate::models::response::{OkResponse, NewTorrentResponse};
-use actix_web::web::Query;
+use crate::utils::parse_torrent;
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -21,15 +23,9 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
                 .route(web::post().to(create_torrent)))
             .service(web::resource("/upload/{id}")
                 .route(web::post().to(upload_torrent)))
-            .service(web::resource("/")
-                .route(web::get().to(get_torrents)))
+            .service(web::resource("/{id}")
+                .route(web::get().to(get_torrent)))
     );
-}
-
-#[derive(Debug, Deserialize)]
-pub struct DisplayInfo {
-    page_size: Option<i32>,
-    page: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -39,16 +35,14 @@ pub struct CreateTorrent {
     pub category: String,
 }
 
-pub async fn get_torrents(info: Query<DisplayInfo>, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let page = info.page.unwrap_or(0);
-    let page_size = info.page_size.unwrap_or(30);
-    let offset = page * page_size;
+pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let torrent_id = req.match_info().get("id").unwrap();
 
     let res = sqlx::query_as!(
         TorrentListing,
-        r#"SELECT * FROM torrust_torrents LIMIT $1, $2"#,
-        offset,
-        page_size
+        r#"SELECT * FROM torrust_torrents
+           WHERE torrent_id = ?"#,
+        torrent_id
     )
         .fetch_all(&app_data.database.pool)
         .await?;
@@ -62,13 +56,25 @@ pub async fn create_torrent(req: HttpRequest, payload: web::Json<CreateTorrent>,
     let user = app_data.auth.get_user_from_request(&req).await?;
 
     let res = sqlx::query!(
-        r#"INSERT INTO torrust_torrents (uploader_id, title, description, category)
+        "SELECT category_id FROM torrust_categories WHERE name = ?",
+        payload.category
+    )
+        .fetch_one(&app_data.database.pool)
+        .await;
+
+    let row = match res {
+        Ok(row) => row,
+        Err(e) => return Err(ServiceError::InvalidCategory),
+    };
+
+    let res = sqlx::query!(
+        r#"INSERT INTO torrust_torrents (uploader_id, title, description, category_id)
         VALUES ($1, $2, $3, $4)
         RETURNING torrent_id as "torrent_id: i64""#,
         user.user_id,
         payload.title,
         payload.description,
-        payload.category
+        row.category_id
     )
         .fetch_one(&app_data.database.pool)
         .await?;
