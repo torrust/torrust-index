@@ -21,3 +21,8 @@ pub struct TokenResponse {
     pub token: String,
     pub username: String,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NewTorrentResponse {
+    pub torrent_id: i64,
+}

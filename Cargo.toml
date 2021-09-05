@@ -16,7 +16,7 @@ futures = "0.3.5"
 
 lazy_static = "1.4"
 
-sqlx = { version = "0.5.5", features = [ "runtime-actix-rustls", "sqlite", "migrate", "time" ] }
+sqlx = { version = "0.5.7", features = [ "runtime-actix-rustls", "sqlite", "migrate", "time" ] }
 
 config = "0.11"
 

@@ -9,7 +9,10 @@ use crate::utils::parse_torrent;
 use crate::common::{WebAppData, Username};
 use std::env;
 use crate::config::TorrustConfig;
+use crate::models::torrent_listing::TorrentListing;
 use crate::models::user::{User, Claims};
+use crate::models::response::{OkResponse, NewTorrentResponse};
+use actix_web::web::Query;
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -18,24 +21,63 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
                 .route(web::post().to(create_torrent)))
             .service(web::resource("/upload/{id}")
                 .route(web::post().to(upload_torrent)))
+            .service(web::resource("/")
+                .route(web::get().to(get_torrents)))
     );
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize)]
+pub struct DisplayInfo {
+    page_size: Option<i32>,
+    page: Option<i32>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct CreateTorrent {
-    pub name: String,
+    pub title: String,
     pub description: String,
-    pub categories: Vec<String>,
+    pub category: String,
+}
+
+pub async fn get_torrents(info: Query<DisplayInfo>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let page = info.page.unwrap_or(0);
+    let page_size = info.page_size.unwrap_or(30);
+    let offset = page * page_size;
+
+    let res = sqlx::query_as!(
+        TorrentListing,
+        r#"SELECT * FROM torrust_torrents LIMIT $1, $2"#,
+        offset,
+        page_size
+    )
+        .fetch_all(&app_data.database.pool)
+        .await?;
+
+    Ok(HttpResponse::Ok().json(OkResponse {
+        data: res
+    }))
 }
 
 pub async fn create_torrent(req: HttpRequest, payload: web::Json<CreateTorrent>, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let user = match app_data.auth.get_user_from_request(&req).await {
-        Ok(user) => Ok(user),
-        Err(e) => Err(e)
-    }?;
+    let user = app_data.auth.get_user_from_request(&req).await?;
 
-    println!("{:?}", user.username);
-    Ok(HttpResponse::Ok())
+    let res = sqlx::query!(
+        r#"INSERT INTO torrust_torrents (uploader_id, title, description, category)
+        VALUES ($1, $2, $3, $4)
+        RETURNING torrent_id as "torrent_id: i64""#,
+        user.user_id,
+        payload.title,
+        payload.description,
+        payload.category
+    )
+        .fetch_one(&app_data.database.pool)
+        .await?;
+
+    Ok(HttpResponse::Ok().json(OkResponse {
+        data: NewTorrentResponse {
+            torrent_id: res.torrent_id
+        }
+    }))
 }
 
 pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebAppData) -> ServiceResult<impl Responder> {
@@ -53,7 +95,7 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
 async fn save_torrent_file(path: &str, mut payload: Multipart) -> Result<(), ServiceError> {
     while let Ok(Some(mut field)) = payload.try_next().await {
         if field.content_type().to_string() != "application/x-bittorrent" {
-            return Err(ServiceError::InvalidFileType)
+            return Err(ServiceError::InvalidFileType);
         }
 
         let content_type = field
