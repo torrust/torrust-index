@@ -7,5 +7,5 @@ pub struct TorrentListing {
     pub uploader_id: Option<i64>,
     pub title: String,
     pub description: Option<String>,
-    pub category: String,
+    pub category_id: i64,
 }

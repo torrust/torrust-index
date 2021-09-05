@@ -1,1 +1,0 @@
-ALTER TABLE torrust_torrents ADD category VARCHAR(64) NOT NULL
