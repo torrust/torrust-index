@@ -59,7 +59,10 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
         .fetch_one(&app_data.database.pool)
         .await?;
 
+    let torrent_info = app_data.tracker.get_torrent_info(&res.info_hash).await?;
 
+    res.seeders = torrent_info.seeders;
+    res.leechers = torrent_info.leechers;
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: res
