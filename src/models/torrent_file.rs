@@ -63,6 +63,12 @@ pub struct Torrent {
 impl Torrent {
     pub fn set_torrust_config(&mut self, cfg: &TorrustConfig) {
         self.announce = Some(cfg.tracker.url.clone());
+        if let Some(list) = &mut self.announce_list {
+            let mut vec = Vec::new();
+            vec.push(cfg.tracker.url.clone());
+            list.insert(0, vec);
+        }
+
         // todo: config option to remove other trackers from uploaded torrent files
         // self.announce_list = None;
     }

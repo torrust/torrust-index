@@ -30,6 +30,23 @@ async fn main() -> std::io::Result<()> {
     // create torrent upload folder
     async_std::fs::create_dir_all(&cfg.storage.upload_path).await?;
 
+    let weak_tracker_service = std::sync::Arc::downgrade(&tracker_service);
+
+    // repeating task
+    tokio::spawn(async move {
+        let interval = std::time::Duration::from_secs(10); // hourly update all seeders and leechers info
+        let mut interval = tokio::time::interval(interval);
+        interval.tick().await; // first tick is immediate...
+        loop {
+            interval.tick().await;
+            if let Some(tracker) = weak_tracker_service.upgrade() {
+                tracker_service.update_torrents().await;
+            } else {
+                break;
+            }
+        }
+    });
+
     HttpServer::new(move || {
         App::new()
             .wrap(Cors::permissive())

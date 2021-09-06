@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS torrust_torrents (
     description TEXT,
     upload_date INT(10) NOT NULL,
     file_size BIGINT NOT NULL,
+    seeders INTEGER NOT NULL,
+    leechers INTEGER NOT NULL,
     FOREIGN KEY(uploader) REFERENCES torrust_users(username),
     FOREIGN KEY(category_id) REFERENCES torrust_categories(category_id)
 )

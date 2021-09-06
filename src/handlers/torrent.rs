@@ -52,17 +52,17 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
 
     let mut res: TorrentResponse = sqlx::query_as!(
         TorrentResponse,
-        r#"SELECT *, 0 as seeders, 0 as leechers FROM torrust_torrents
+        r#"SELECT * FROM torrust_torrents
            WHERE torrent_id = ?"#,
         torrent_id
     )
         .fetch_one(&app_data.database.pool)
         .await?;
 
-    let torrent_info = app_data.tracker.get_torrent_info(&res.info_hash).await?;
-
-    res.seeders = torrent_info.seeders;
-    res.leechers = torrent_info.leechers;
+    if let Ok(torrent_info) = app_data.tracker.get_torrent_info(&res.info_hash).await {
+        res.seeders = torrent_info.seeders;
+        res.leechers = torrent_info.leechers;
+    }
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: res
@@ -73,6 +73,8 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
     let user = app_data.auth.get_user_from_request(&req).await?;
 
     let mut torrent_request = get_torrent_request_from_payload(payload).await?;
+
+    // println!("{:?}", torrent_request.torrent);
 
     // update announce url to our own tracker url
     torrent_request.torrent.set_torrust_config(&app_data.cfg);
@@ -96,10 +98,17 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
     let description = torrent_request.fields.description;
     let current_time = current_time() as i64;
     let file_size = torrent_request.torrent.file_size();
+    let mut seeders = 0;
+    let mut leechers = 0;
+
+    if let Ok(torrent_info) = app_data.tracker.get_torrent_info(&info_hash).await {
+        seeders = torrent_info.seeders;
+        leechers = torrent_info.leechers;
+    }
 
     // println!("{:?}", (&username, &info_hash, &title, &category, &description, &current_time, &file_size));
 
-    let torrent_id = app_data.database.insert_torrent_and_get_id(username, info_hash, title, row.category_id, description, file_size).await?;
+    let torrent_id = app_data.database.insert_torrent_and_get_id(username, info_hash, title, row.category_id, description, file_size, seeders, leechers).await?;
 
     // whitelist info hash on tracker
     let _r = app_data.tracker.whitelist_info_hash(torrent_request.torrent.info_hash()).await;
@@ -132,9 +141,13 @@ pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> Service
 
     if user.is_ok() {
         let unwrapped_user = user.unwrap();
-        println!("{:?}", &unwrapped_user.username);
         let personal_announce_url = app_data.tracker.get_personal_announce_url(&unwrapped_user).await?;
-        torrent.announce = Some(personal_announce_url);
+        torrent.announce = Some(personal_announce_url.clone());
+        if let Some(list) = &mut torrent.announce_list {
+            let mut vec = Vec::new();
+            vec.push(personal_announce_url);
+            list.insert(0, vec);
+        }
     } else {
         torrent.announce = Some(app_data.cfg.tracker.url.clone());
     }
@@ -206,6 +219,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
         match name {
             "title" | "description" | "category" => {
                 let data = field.next().await;
+                if data.is_none() { continue }
                 let wrapped_data = &data.unwrap().unwrap();
                 let parsed_data = std::str::from_utf8(&wrapped_data).unwrap();
 

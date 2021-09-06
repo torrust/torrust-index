@@ -118,4 +118,9 @@ impl TrackerService {
 
         Ok(torrent_info)
     }
+
+    pub async fn update_torrents(&self) -> Result<(), ()> {
+        println!("Updating torrents..");
+        Ok(())
+    }
 }

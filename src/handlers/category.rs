@@ -47,7 +47,7 @@ pub async fn get_torrents(req: HttpRequest, info: Query<DisplayInfo>, app_data: 
 
     let mut res: Vec<TorrentResponse> = sqlx::query_as!(
         TorrentResponse,
-        r#"SELECT tt.*, 0 as seeders, 0 as leechers FROM torrust_torrents tt
+        r#"SELECT tt.* FROM torrust_torrents tt
                INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND tc.name = $1
                LIMIT $2, $3"#,
         category,
@@ -58,13 +58,13 @@ pub async fn get_torrents(req: HttpRequest, info: Query<DisplayInfo>, app_data: 
         .await?;
 
     for tr in res.iter_mut() {
-        let torrent_info = app_data.tracker.get_torrent_info(&tr.info_hash).await?;
+        if let Ok(torrent_info) = app_data.tracker.get_torrent_info(&tr.info_hash).await {
+            // not needed in this response
+            tr.description = Some("".to_string());
 
-        // not needed in this response
-        tr.description = Some("".to_string());
-
-        tr.seeders = torrent_info.seeders;
-        tr.leechers = torrent_info.leechers;
+            tr.seeders = torrent_info.seeders;
+            tr.leechers = torrent_info.leechers;
+        }
     }
 
     Ok(HttpResponse::Ok().json(OkResponse {

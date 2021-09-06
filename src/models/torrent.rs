@@ -13,6 +13,8 @@ pub struct TorrentListing {
     pub category_id: i64,
     pub upload_date: i64,
     pub file_size: i64,
+    pub seeders: i64,
+    pub leechers: i64,
 }
 
 #[derive(Debug)]

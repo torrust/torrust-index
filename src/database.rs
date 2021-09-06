@@ -56,12 +56,12 @@ impl Database {
         }
     }
 
-    pub async fn insert_torrent_and_get_id(&self, username: String, info_hash: String, title: String, category_id: i64, description: String, file_size: i64) -> Result<i64, ServiceError> {
+    pub async fn insert_torrent_and_get_id(&self, username: String, info_hash: String, title: String, category_id: i64, description: String, file_size: i64, seeders: i64, leechers: i64) -> Result<i64, ServiceError> {
         let current_time = current_time() as i64;
 
         let res = sqlx::query!(
-            r#"INSERT INTO torrust_torrents (uploader, info_hash, title, category_id, description, upload_date, file_size)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            r#"INSERT INTO torrust_torrents (uploader, info_hash, title, category_id, description, upload_date, file_size, seeders, leechers)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             RETURNING torrent_id as "torrent_id: i64""#,
             username,
             info_hash,
@@ -69,7 +69,9 @@ impl Database {
             category_id,
             description,
             current_time,
-            file_size
+            file_size,
+            seeders,
+            leechers
         )
             .fetch_one(&self.pool)
             .await;
