@@ -92,7 +92,7 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
     let current_time = current_time() as i64;
     let file_size = torrent_request.torrent.file_size();
 
-    println!("{:?}", (&username, &info_hash, &title, &category, &description, &current_time, &file_size));
+    // println!("{:?}", (&username, &info_hash, &title, &category, &description, &current_time, &file_size));
 
     let torrent_id = app_data.database.insert_torrent_and_get_id(username, info_hash, title, row.category_id, description, file_size).await?;
 

@@ -20,7 +20,7 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
 pub async fn get_categories(app_data: WebAppData) -> ServiceResult<impl Responder> {
     // Count torrents with category
     let res = sqlx::query_as::<_, CategoryResponse>(
-        r#"SELECT name, COUNT(tc.category_id) as num_torrents
+        r#"SELECT name, COUNT(tt.category_id) as num_torrents
            FROM torrust_categories tc
            LEFT JOIN torrust_torrents tt on tc.category_id = tt.category_id
            GROUP BY tc.name"#
