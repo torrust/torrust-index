@@ -63,7 +63,8 @@ pub struct Torrent {
 impl Torrent {
     pub fn set_torrust_config(&mut self, cfg: &TorrustConfig) {
         self.announce = Some(cfg.tracker.url.clone());
-        self.announce_list = None;
+        // todo: config option to remove other trackers from uploaded torrent files
+        // self.announce_list = None;
     }
 
     pub fn calculate_info_hash_as_bytes(&self) -> [u8; 20] {
@@ -82,5 +83,22 @@ impl Torrent {
         let input = &self.calculate_info_hash_as_bytes();
         let bytes_out = binascii::bin2hex(input, &mut buffer).ok().unwrap();
         String::from(std::str::from_utf8(bytes_out).unwrap())
+    }
+
+    pub fn file_size(&self) -> i64 {
+        if self.info.length.is_some() {
+            return self.info.length.unwrap()
+        } else {
+            match &self.info.files {
+                None => 0,
+                Some(files) => {
+                    let mut file_size = 0;
+                    for file in files.iter() {
+                        file_size += file.length;
+                    }
+                    file_size
+                }
+            }
+        }
     }
 }

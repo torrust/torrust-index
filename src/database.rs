@@ -4,7 +4,7 @@ use sqlx::sqlite::SqlitePoolOptions;
 use std::env;
 use crate::models::user::User;
 use crate::errors::ServiceError;
-use crate::models::torrent_listing::TorrentListing;
+use crate::models::torrent::TorrentListing;
 use crate::utils::time::current_time;
 use std::time::Duration;
 use crate::models::tracker_key::TrackerKey;
@@ -56,13 +56,22 @@ impl Database {
         }
     }
 
-    pub async fn update_torrent_info_hash(&self, torrent_id: i64, info_hash: String) -> Result<(), ServiceError> {
+    pub async fn insert_torrent_and_get_id(&self, username: String, info_hash: String, title: String, category_id: i64, description: String, file_size: i64) -> Result<i64, ServiceError> {
+        let current_time = current_time() as i64;
+
         let res = sqlx::query!(
-            "UPDATE torrust_torrents SET info_hash = $1 WHERE torrent_id = $2",
+            r#"INSERT INTO torrust_torrents (uploader, info_hash, title, category_id, description, upload_date, file_size)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING torrent_id as "torrent_id: i64""#,
+            username,
             info_hash,
-            torrent_id
+            title,
+            category_id,
+            description,
+            current_time,
+            file_size
         )
-            .execute(&self.pool)
+            .fetch_one(&self.pool)
             .await;
 
         if let Err(sqlx::Error::Database(err)) = res {
@@ -77,7 +86,7 @@ impl Database {
             }
         }
 
-        Ok(())
+        Ok(res.unwrap().torrent_id)
     }
 
     pub async fn get_torrent_by_id(&self, torrent_id: i64) -> Option<TorrentListing> {
