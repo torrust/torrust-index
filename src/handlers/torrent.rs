@@ -7,7 +7,7 @@ use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use crate::errors::{ServiceError, ServiceResult};
 use crate::models::response::{NewTorrentResponse, OkResponse};
-use crate::models::torrent::{TorrentListing, TorrentRequest};
+use crate::models::torrent::{TorrentListing, TorrentRequest, TorrentResponse};
 use crate::utils::parse_torrent;
 use crate::common::{WebAppData, Username};
 use crate::models::user::{User, Claims};
@@ -50,14 +50,16 @@ impl CreateTorrent {
 pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let torrent_id = req.match_info().get("id").unwrap();
 
-    let res = sqlx::query_as!(
-        TorrentListing,
-        r#"SELECT * FROM torrust_torrents
+    let mut res: TorrentResponse = sqlx::query_as!(
+        TorrentResponse,
+        r#"SELECT *, 0 as seeders, 0 as leechers FROM torrust_torrents
            WHERE torrent_id = ?"#,
         torrent_id
     )
-        .fetch_all(&app_data.database.pool)
+        .fetch_one(&app_data.database.pool)
         .await?;
+
+
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: res
@@ -112,6 +114,7 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
 pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let torrent_id = get_torrent_id_from_request(&req)?;
 
+    // optional
     let user = app_data.auth.get_user_from_request(&req).await;
 
     let filepath = format!("{}/{}", app_data.cfg.storage.upload_path, torrent_id.to_string() + ".torrent");
@@ -125,10 +128,10 @@ pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> Service
     }?;
 
     if user.is_ok() {
-        let personal_announce_url = app_data.tracker.get_personal_announce_url(&user.unwrap()).await;
-        // this would mean the connection with the tracker is not ok
-        if personal_announce_url.is_none() { return Err(ServiceError::InternalServerError) }
-        torrent.announce = Some(personal_announce_url.unwrap());
+        let unwrapped_user = user.unwrap();
+        println!("{:?}", &unwrapped_user.username);
+        let personal_announce_url = app_data.tracker.get_personal_announce_url(&unwrapped_user).await?;
+        torrent.announce = Some(personal_announce_url);
     } else {
         torrent.announce = Some(app_data.cfg.tracker.url.clone());
     }

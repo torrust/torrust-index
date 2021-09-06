@@ -92,7 +92,10 @@ pub enum ServiceError {
     Unauthorized,
 
     #[display(fmt = "This torrent already exists in our database.")]
-    InfoHashAlreadyExists
+    InfoHashAlreadyExists,
+
+    #[display(fmt = "Sorry, we have an error with our tracker connection.")]
+    TrackerOffline,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -139,6 +142,8 @@ impl ResponseError for ServiceError {
             ServiceError::Unauthorized => StatusCode::UNAUTHORIZED,
 
             ServiceError::InfoHashAlreadyExists => StatusCode::BAD_REQUEST,
+
+            ServiceError::TrackerOffline => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
