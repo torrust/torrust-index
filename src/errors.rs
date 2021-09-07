@@ -60,6 +60,9 @@ pub enum ServiceError {
     #[display(fmt = "Email not available")]
     EmailTaken,
 
+    #[display(fmt = "Please verify your email before logging in")]
+    EmailNotVerified,
+
     /// when the a token name is already taken
     /// token not found
     #[display(fmt = "Token not found. Please sign in.")]
@@ -113,7 +116,7 @@ impl ResponseError for ServiceError {
             ServiceError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceError::NotAnEmail => StatusCode::BAD_REQUEST,
             ServiceError::NotAUrl => StatusCode::BAD_REQUEST,
-            ServiceError::WrongPasswordOrUsername => StatusCode::UNAUTHORIZED,
+            ServiceError::WrongPasswordOrUsername => StatusCode::FORBIDDEN,
             ServiceError::UsernameNotFound => StatusCode::NOT_FOUND,
             ServiceError::AccountNotFound => StatusCode::NOT_FOUND,
 
@@ -128,6 +131,7 @@ impl ResponseError for ServiceError {
             ServiceError::UsernameTaken => StatusCode::BAD_REQUEST,
             ServiceError::UsernameInvalid => StatusCode::BAD_REQUEST,
             ServiceError::EmailTaken => StatusCode::BAD_REQUEST,
+            ServiceError::EmailNotVerified => StatusCode::FORBIDDEN,
 
             ServiceError::TokenNotFound => StatusCode::UNAUTHORIZED,
             ServiceError::TokenExpired => StatusCode::UNAUTHORIZED,

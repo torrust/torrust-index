@@ -126,6 +126,10 @@ pub async fn login(payload: web::Json<Login>, app_data: WebAppData) -> ServiceRe
 
     match res {
         Some(user) => {
+            if !user.email_verified {
+                return Err(ServiceError::EmailNotVerified)
+            }
+
             let parsed_hash = PasswordHash::new(&user.password)?;
 
             if !Pbkdf2.verify_password(payload.password.as_bytes(), &parsed_hash).is_ok() {
