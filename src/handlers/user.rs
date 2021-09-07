@@ -17,15 +17,17 @@ use std::env;
 use crate::models::user::Claims;
 use crate::config::TorrustConfig;
 use crate::models::user::User;
-use jsonwebtoken::{encode, Header, EncodingKey};
+use jsonwebtoken::{encode, Header, EncodingKey, DecodingKey, decode, Validation, Algorithm};
 use crate::models::response::OkResponse;
 use crate::models::response::TokenResponse;
+use crate::mailer::VerifyClaims;
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/user")
             .service(web::resource("/register").route(web::post().to(register)))
             .service(web::resource("/login").route(web::post().to(login)))
+            .service(web::resource("/verify/{token}").route(web::get().to(verify_user)))
     );
 }
 
@@ -142,6 +144,38 @@ pub async fn login(payload: web::Json<Login>, app_data: WebAppData) -> ServiceRe
         }
         None => Err(ServiceError::WrongPasswordOrUsername)
     }
+}
+
+pub async fn verify_user(req: HttpRequest, app_data: WebAppData) -> String {
+    let token = req.match_info().get("token").unwrap();
+
+    let token_data = match decode::<VerifyClaims>(
+        token,
+        &DecodingKey::from_secret(app_data.cfg.auth.secret_key.as_bytes()),
+        &Validation::new(Algorithm::HS256),
+    ) {
+        Ok(token_data) => {
+            if !token_data.claims.iss.eq("email-verification") {
+                return ServiceError::TokenInvalid.to_string()
+            }
+
+            token_data.claims
+        },
+        Err(e) => return ServiceError::TokenInvalid.to_string()
+    };
+
+    let res = sqlx::query!(
+        "UPDATE torrust_users SET email_verified = TRUE WHERE username = ?",
+        token_data.sub
+    )
+        .execute(&app_data.database.pool)
+        .await;
+
+    if let Err(_) = res {
+        return ServiceError::InternalServerError.to_string()
+    }
+
+    String::from("Email verified, you can close this page.")
 }
 
 pub async fn me(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {

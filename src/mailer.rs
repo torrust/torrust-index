@@ -12,10 +12,18 @@ use jsonwebtoken::{encode, Header, EncodingKey};
 use lettre::transport::smtp::extension::Extension::StartTls;
 use lettre::transport::smtp::client::{Tls, TlsParameters};
 use sailfish::TemplateOnce;
+use crate::utils::time::current_time;
 
 pub struct MailerService {
     cfg: Arc<TorrustConfig>,
     mailer: Arc<Mailer>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VerifyClaims {
+    pub iss: String,
+    pub sub: String,
+    pub exp: u64,
 }
 
 #[derive(TemplateOnce)]
@@ -106,18 +114,14 @@ If this account wasn't made by you, you can ignore this email.
     }
 
     fn get_verification_url(&self, username: &str, base_url: &str) -> String {
-        #[derive(Debug, Serialize, Deserialize)]
-        struct Claims {
-            iss: String,
-            sub: String,
-        }
-
         // create verification JWT
         let key = self.cfg.auth.secret_key.as_bytes();
 
-        let claims = Claims {
+        // Create non expiring token that is only valid for email-verification
+        let claims = VerifyClaims {
             iss: String::from("email-verification"),
             sub: String::from(username),
+            exp: current_time() + 315_569_260 // 10 years from now
         };
 
         let token = encode(
