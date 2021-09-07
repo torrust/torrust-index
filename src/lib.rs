@@ -7,3 +7,4 @@ pub mod errors;
 pub mod common;
 pub mod auth;
 pub mod tracker;
+pub mod mailer;
