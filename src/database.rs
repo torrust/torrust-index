@@ -133,11 +133,11 @@ impl Database {
         }
     }
 
-    pub async fn update_tracker_info(&self, torrent_id: i64, torrent_info: TorrentInfo) -> Result<(), ()> {
+    pub async fn update_tracker_info(&self, torrent_id: i64, seeders: i64, leechers: i64) -> Result<(), ()> {
         let res = sqlx::query!(
             "UPDATE torrust_torrents SET seeders = $1, leechers = $2 WHERE torrent_id = $3",
-            torrent_info.seeders,
-            torrent_info.leechers,
+            seeders,
+            leechers,
             torrent_id
         )
             .execute(&self.pool)

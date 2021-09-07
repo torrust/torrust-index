@@ -125,7 +125,9 @@ impl TrackerService {
         for torrent in torrents {
             let torrent_info = self.get_torrent_info(&torrent.info_hash).await;
             if let Ok(torrent_info) = torrent_info {
-                let _res = self.database.update_tracker_info(torrent.torrent_id, torrent_info).await;
+                let _res = self.database.update_tracker_info(torrent.torrent_id, torrent_info.seeders, torrent_info.leechers).await;
+            } else {
+                let _res = self.database.update_tracker_info(torrent.torrent_id, 0, 0).await;
             }
         }
 
