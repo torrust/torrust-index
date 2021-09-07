@@ -11,6 +11,7 @@ use crate::models::tracker_key::TrackerKey;
 use std::borrow::Cow;
 use crate::tracker::TorrentInfo;
 use serde::Serialize;
+use crate::models::response::TorrentResponse;
 
 #[derive(Debug, Serialize)]
 pub struct TorrentCompact {
@@ -182,5 +183,74 @@ impl Database {
             Ok(_) => Ok(()),
             Err(_) => Err(ServiceError::InternalServerError)
         }
+    }
+
+    pub async fn get_torrents_order_by_seeders_desc(&self, category: &str, offset: i32, page_size: i32) -> Result<Vec<TorrentResponse>, ServiceError> {
+        let res = sqlx::query_as!(
+            TorrentResponse,
+            r#"
+            SELECT tt.* FROM torrust_torrents tt
+            INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND tc.name = $1
+            ORDER BY seeders DESC
+            LIMIT $2, $3
+            "#,
+            category,
+            offset,
+            page_size
+        )
+            .fetch_all(&self.pool)
+            .await;
+
+        if res.is_ok() {
+            return Ok(res.unwrap())
+        }
+
+        Err(ServiceError::InternalServerError)
+    }
+
+    pub async fn get_torrents_order_by_leechers_desc(&self, category: &str, offset: i32, page_size: i32) -> Result<Vec<TorrentResponse>, ServiceError> {
+        let res = sqlx::query_as!(
+            TorrentResponse,
+            r#"
+            SELECT tt.* FROM torrust_torrents tt
+            INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND tc.name = $1
+            ORDER BY leechers DESC
+            LIMIT $2, $3
+            "#,
+            category,
+            offset,
+            page_size
+        )
+            .fetch_all(&self.pool)
+            .await;
+
+        if res.is_ok() {
+            return Ok(res.unwrap())
+        }
+
+        Err(ServiceError::InternalServerError)
+    }
+
+    pub async fn get_torrents_order_by_upload_date_desc(&self, category: &str, offset: i32, page_size: i32) -> Result<Vec<TorrentResponse>, ServiceError> {
+        let res = sqlx::query_as!(
+            TorrentResponse,
+            r#"
+            SELECT tt.* FROM torrust_torrents tt
+            INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND tc.name = $1
+            ORDER BY upload_date DESC
+            LIMIT $2, $3
+            "#,
+            category,
+            offset,
+            page_size
+        )
+            .fetch_all(&self.pool)
+            .await;
+
+        if res.is_ok() {
+            return Ok(res.unwrap())
+        }
+
+        Err(ServiceError::InternalServerError)
     }
 }

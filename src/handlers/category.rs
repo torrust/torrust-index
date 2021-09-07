@@ -4,8 +4,8 @@ use serde::{Deserialize};
 
 use crate::common::WebAppData;
 use crate::errors::ServiceResult;
-use crate::models::response::{CategoryResponse, OkResponse};
-use crate::models::torrent::{TorrentListing, TorrentResponse};
+use crate::models::response::{CategoryResponse, OkResponse, TorrentsResponse, TorrentResponse};
+use crate::models::torrent::{TorrentListing};
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -37,6 +37,11 @@ pub async fn get_categories(app_data: WebAppData) -> ServiceResult<impl Responde
 pub struct DisplayInfo {
     page_size: Option<i32>,
     page: Option<i32>,
+    sort: Option<String>,
+}
+
+pub struct TorrentCount {
+    pub count: i32,
 }
 
 pub async fn get_torrents(req: HttpRequest, info: Query<DisplayInfo>, app_data: WebAppData) -> ServiceResult<impl Responder> {
@@ -45,25 +50,37 @@ pub async fn get_torrents(req: HttpRequest, info: Query<DisplayInfo>, app_data: 
     let page_size = info.page_size.unwrap_or(30);
     let offset = page * page_size;
 
-    let mut res: Vec<TorrentResponse> = sqlx::query_as!(
-        TorrentResponse,
-        r#"SELECT tt.* FROM torrust_torrents tt
+
+    let mut count: TorrentCount = sqlx::query_as!(
+        TorrentCount,
+        r#"SELECT COUNT(torrent_id) as count FROM torrust_torrents tt
                INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND tc.name = $1
-               LIMIT $2, $3"#,
-        category,
-        offset,
-        page_size
+        "#,
+        category
     )
-        .fetch_all(&app_data.database.pool)
+        .fetch_one(&app_data.database.pool)
         .await?;
 
-    // todo: move this action to query
-    for tr in res.iter_mut() {
-        // not needed in this response
-        tr.description = Some("".to_string());
-    }
+    let res = match &info.sort {
+        None => app_data.database.get_torrents_order_by_upload_date_desc(category, offset, page_size).await,
+        Some(sort) => {
+            match sort.as_str() {
+                "uploaded" => app_data.database.get_torrents_order_by_upload_date_desc(category, offset, page_size).await,
+                "seeders" => app_data.database.get_torrents_order_by_seeders_desc(category, offset, page_size).await,
+                "leechers" => app_data.database.get_torrents_order_by_leechers_desc(category, offset, page_size).await,
+                _ => app_data.database.get_torrents_order_by_upload_date_desc(category, offset, page_size).await
+            }
+        }
+    }?;
+
+    // app_data.database.get_torrents_order_by_seeders_desc(category, offset, page_size).await?;
+
+    let torrents_response = TorrentsResponse {
+        total: count.count,
+        results: res
+    };
 
     Ok(HttpResponse::Ok().json(OkResponse {
-        data: res
+        data: torrents_response
     }))
 }
