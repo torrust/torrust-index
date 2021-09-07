@@ -19,6 +19,18 @@ connect_url = "sqlite://data.db?mode=rwc"
 # interval should increase with amount of torrents.
 torrent_info_update_interval = 3600
 
+[mail]
+# SMTP server and port
+server = ""
+port = 25
+# username and password for authenticating with the SMTP server
+username = ""
+password = ""
+# email address where mail is sent from
+from = ""
+# email address to which a reply can be sent
+reply_to = ""
+
 [auth]
 min_password_length = 6
 max_password_length = 64

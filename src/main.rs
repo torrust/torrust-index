@@ -8,6 +8,7 @@ use torrust::config::TorrustConfig;
 use torrust::common::AppData;
 use torrust::auth::AuthorizationService;
 use torrust::tracker::TrackerService;
+use torrust::mailer::MailerService;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -15,12 +16,14 @@ async fn main() -> std::io::Result<()> {
     let database = Arc::new(Database::new(&cfg.database.connect_url).await);
     let auth = Arc::new(AuthorizationService::new(cfg.clone(), database.clone()));
     let tracker_service = Arc::new(TrackerService::new(cfg.clone(), database.clone()));
+    let mailer_service = Arc::new(MailerService::new(cfg.clone()));
     let app_data = Arc::new(
         AppData::new(
             cfg.clone(),
             database.clone(),
             auth.clone(),
-            tracker_service.clone()
+            tracker_service.clone(),
+            mailer_service.clone(),
         )
     );
 
@@ -47,6 +50,8 @@ async fn main() -> std::io::Result<()> {
             }
         }
     });
+
+    println!("Listening on 0.0.0.0:{}", cfg.net.port);
 
     HttpServer::new(move || {
         App::new()

@@ -43,7 +43,7 @@ pub struct Login {
     pub password: String,
 }
 
-pub async fn register(payload: web::Json<Register>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+pub async fn register(req: HttpRequest, payload: web::Json<Register>, app_data: WebAppData) -> ServiceResult<impl Responder> {
     if payload.password != payload.confirm_password {
         return Err(ServiceError::PasswordsDontMatch);
     }
@@ -89,6 +89,27 @@ pub async fn register(payload: web::Json<Register>, app_data: WebAppData) -> Ser
         } else {
             Err(sqlx::Error::Database(err).into())
         };
+    }
+
+    let conn_info = req.connection_info();
+    let mail_res = app_data.mailer.send_verification_mail(
+        &payload.email,
+        &payload.username,
+        format!("{}://{}", conn_info.scheme(), conn_info.host()).as_str()
+    )
+        .await;
+
+    let row_id = res.unwrap().last_insert_rowid();
+
+    if let Err(e) = mail_res {
+        sqlx::query!(
+            "DELETE FROM torrust_users WHERE rowid = ?",
+            row_id
+        )
+            .execute(&app_data.database.pool)
+            .await?;
+
+        return Err(e)
     }
 
     Ok(HttpResponse::Ok())

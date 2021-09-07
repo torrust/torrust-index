@@ -34,12 +34,23 @@ pub struct Storage {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct Mail {
+    pub from: String,
+    pub reply_to: String,
+    pub username: String,
+    pub password: String,
+    pub server: String,
+    pub port: u16,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct TorrustConfig {
     pub tracker: Tracker,
     pub net: Network,
     pub auth: Auth,
     pub database: Database,
     pub storage: Storage,
+    pub mail: Mail,
 }
 
 impl TorrustConfig {

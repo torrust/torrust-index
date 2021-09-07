@@ -96,6 +96,9 @@ pub enum ServiceError {
 
     #[display(fmt = "Sorry, we have an error with our tracker connection.")]
     TrackerOffline,
+
+    #[display(fmt = "Failed to send the verification email.")]
+    FailedToSendVerificationEmail,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -144,6 +147,8 @@ impl ResponseError for ServiceError {
             ServiceError::InfoHashAlreadyExists => StatusCode::BAD_REQUEST,
 
             ServiceError::TrackerOffline => StatusCode::INTERNAL_SERVER_ERROR,
+
+            ServiceError::FailedToSendVerificationEmail => StatusCode::INTERNAL_SERVER_ERROR
         }
     }
 
