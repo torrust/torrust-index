@@ -1,0 +1,14 @@
+[book]
+authors = ["Mick van Dijke", "Wesley Bijleveld"]
+title = "Torrust v1"
+description = "Torrust Backend v1 Documentation"
+
+[build]
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/torrust/torrust"
+default-theme = "coal"
+
+[output.html.search]
+enable = false
