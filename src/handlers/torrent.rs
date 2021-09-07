@@ -48,26 +48,27 @@ impl CreateTorrent {
 }
 
 pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let torrent_id = req.match_info().get("id").unwrap();
+    let torrent_id = get_torrent_id_from_request(&req)?;
 
-    let mut res: TorrentResponse = sqlx::query_as!(
-        TorrentResponse,
-        r#"SELECT * FROM torrust_torrents
-           WHERE torrent_id = ?"#,
-        torrent_id
-    )
-        .fetch_one(&app_data.database.pool)
-        .await?;
+    let torrent_listing = app_data.database.get_torrent_by_id(torrent_id).await?;
+    let mut torrent_response = TorrentResponse::from_listing(torrent_listing);
+
+    let filepath = format!("{}/{}", app_data.cfg.storage.upload_path, torrent_response.torrent_id.to_string() + ".torrent");
+    if let Ok(torrent) = parse_torrent::read_torrent_from_file(&filepath) {
+        if let Some(files) = torrent.info.files {
+            torrent_response.files = Some(files);
+        }
+    }
 
     // get realtime seeders and leechers
     // todo: config option to disable realtime tracker info
-    if let Ok(torrent_info) = app_data.tracker.get_torrent_info(&res.info_hash).await {
-        res.seeders = torrent_info.seeders;
-        res.leechers = torrent_info.leechers;
+    if let Ok(torrent_info) = app_data.tracker.get_torrent_info(&torrent_response.info_hash).await {
+        torrent_response.seeders = torrent_info.seeders;
+        torrent_response.leechers = torrent_info.leechers;
     }
 
     Ok(HttpResponse::Ok().json(OkResponse {
-        data: res
+        data: torrent_response
     }))
 }
 

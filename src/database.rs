@@ -100,7 +100,7 @@ impl Database {
         Ok(res.unwrap().torrent_id)
     }
 
-    pub async fn get_torrent_by_id(&self, torrent_id: i64) -> Option<TorrentListing> {
+    pub async fn get_torrent_by_id(&self, torrent_id: i64) -> Result<TorrentListing, ServiceError> {
         let res = sqlx::query_as!(
             TorrentListing,
             r#"SELECT * FROM torrust_torrents
@@ -111,8 +111,8 @@ impl Database {
             .await;
 
         match res {
-            Ok(torrent) => Some(torrent),
-            _ => None
+            Ok(torrent) => Ok(torrent),
+            _ => Err(ServiceError::TorrentNotFound)
         }
     }
 
@@ -185,9 +185,9 @@ impl Database {
         }
     }
 
-    pub async fn get_torrents_order_by_seeders_desc(&self, category: &str, offset: i32, page_size: i32) -> Result<Vec<TorrentResponse>, ServiceError> {
+    pub async fn get_torrents_order_by_seeders_desc(&self, category: &str, offset: i32, page_size: i32) -> Result<Vec<TorrentListing>, ServiceError> {
         let res = sqlx::query_as!(
-            TorrentResponse,
+            TorrentListing,
             r#"
             SELECT tt.* FROM torrust_torrents tt
             INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND tc.name = $1
@@ -208,9 +208,9 @@ impl Database {
         Err(ServiceError::InternalServerError)
     }
 
-    pub async fn get_torrents_order_by_leechers_desc(&self, category: &str, offset: i32, page_size: i32) -> Result<Vec<TorrentResponse>, ServiceError> {
+    pub async fn get_torrents_order_by_leechers_desc(&self, category: &str, offset: i32, page_size: i32) -> Result<Vec<TorrentListing>, ServiceError> {
         let res = sqlx::query_as!(
-            TorrentResponse,
+            TorrentListing,
             r#"
             SELECT tt.* FROM torrust_torrents tt
             INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND tc.name = $1
@@ -231,9 +231,9 @@ impl Database {
         Err(ServiceError::InternalServerError)
     }
 
-    pub async fn get_torrents_order_by_upload_date_desc(&self, category: &str, offset: i32, page_size: i32) -> Result<Vec<TorrentResponse>, ServiceError> {
+    pub async fn get_torrents_order_by_upload_date_desc(&self, category: &str, offset: i32, page_size: i32) -> Result<Vec<TorrentListing>, ServiceError> {
         let res = sqlx::query_as!(
-            TorrentResponse,
+            TorrentListing,
             r#"
             SELECT tt.* FROM torrust_torrents tt
             INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND tc.name = $1

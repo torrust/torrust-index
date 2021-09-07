@@ -73,7 +73,6 @@ pub async fn get_torrents(req: HttpRequest, info: Query<DisplayInfo>, app_data: 
         }
     }?;
 
-    // app_data.database.get_torrents_order_by_seeders_desc(category, offset, page_size).await?;
 
     let torrents_response = TorrentsResponse {
         total: count.count,
