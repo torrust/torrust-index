@@ -25,6 +25,7 @@ pub struct Auth {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Database {
     pub connect_url: String,
+    pub torrent_info_update_interval: u64,
 }
 
 #[derive(Debug, Clone, Deserialize)]

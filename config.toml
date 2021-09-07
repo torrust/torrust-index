@@ -1,19 +1,31 @@
 [tracker]
+# tracker UDP url with PORT.
 url = "udp://localhost:6969"
+# tracker REST API url with PORT.
 api_url = "http://localhost:1212"
+# token needs to be set to use the tracker REST API.
 token = "MyAccessToken"
-token_valid_seconds = 7257600 # 12 weeks
+# 12 weeks
+token_valid_seconds = 7257600
 
 [net]
 port = 3000
 
 [database]
+# mode rwc means read/write/create.
+# without create, you'll have to manually create the database.
 connect_url = "sqlite://data.db?mode=rwc"
+# recommended to keep it at least at 1800 seconds.
+# interval should increase with amount of torrents.
+torrent_info_update_interval = 3600
 
 [auth]
 min_password_length = 6
 max_password_length = 64
-secret_key = "verstappennumbahwan"
+# IMPORTANT: change to some random chars.
+# DO NOT KEEP THIS DEFAULT SECRET.
+secret_key = "MaxVerstappenWC2021"
 
 [storage]
+# storage path for uploaded torrent files.
 upload_path = "./uploads"

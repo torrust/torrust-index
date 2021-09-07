@@ -9,6 +9,14 @@ use crate::utils::time::current_time;
 use std::time::Duration;
 use crate::models::tracker_key::TrackerKey;
 use std::borrow::Cow;
+use crate::tracker::TorrentInfo;
+use serde::Serialize;
+
+#[derive(Debug, Serialize)]
+pub struct TorrentCompact {
+    pub torrent_id: i64,
+    pub info_hash: String,
+}
 
 pub struct Database {
     pub pool: SqlitePool
@@ -104,6 +112,39 @@ impl Database {
         match res {
             Ok(torrent) => Some(torrent),
             _ => None
+        }
+    }
+
+    pub async fn get_all_torrent_ids(&self) -> Result<Vec<TorrentCompact>, ()> {
+        let res = sqlx::query_as!(
+            TorrentCompact,
+            r#"SELECT torrent_id, info_hash FROM torrust_torrents"#
+        )
+            .fetch_all(&self.pool)
+            .await;
+
+        match res {
+            Ok(torrents) => Ok(torrents),
+            Err(e) => {
+                println!("{:?}", e);
+                Err(())
+            }
+        }
+    }
+
+    pub async fn update_tracker_info(&self, torrent_id: i64, torrent_info: TorrentInfo) -> Result<(), ()> {
+        let res = sqlx::query!(
+            "UPDATE torrust_torrents SET seeders = $1, leechers = $2 WHERE torrent_id = $3",
+            torrent_info.seeders,
+            torrent_info.leechers,
+            torrent_id
+        )
+            .execute(&self.pool)
+            .await;
+
+        match res {
+            Ok(_) => Ok(()),
+            _ => Err(())
         }
     }
 

@@ -57,14 +57,10 @@ pub async fn get_torrents(req: HttpRequest, info: Query<DisplayInfo>, app_data: 
         .fetch_all(&app_data.database.pool)
         .await?;
 
+    // todo: move this action to query
     for tr in res.iter_mut() {
-        if let Ok(torrent_info) = app_data.tracker.get_torrent_info(&tr.info_hash).await {
-            // not needed in this response
-            tr.description = Some("".to_string());
-
-            tr.seeders = torrent_info.seeders;
-            tr.leechers = torrent_info.leechers;
-        }
+        // not needed in this response
+        tr.description = Some("".to_string());
     }
 
     Ok(HttpResponse::Ok().json(OkResponse {

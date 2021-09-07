@@ -111,8 +111,7 @@ impl TrackerService {
         let torrent_info = match response.json::<TorrentInfo>().await {
             Ok(v) => Ok(v),
             Err(e) => {
-                println!("{:?}", e);
-                Err(ServiceError::InternalServerError)
+                Err(ServiceError::TorrentNotFound)
             }
         }?;
 
@@ -121,6 +120,15 @@ impl TrackerService {
 
     pub async fn update_torrents(&self) -> Result<(), ()> {
         println!("Updating torrents..");
+        let torrents = self.database.get_all_torrent_ids().await?;
+
+        for torrent in torrents {
+            let torrent_info = self.get_torrent_info(&torrent.info_hash).await;
+            if let Ok(torrent_info) = torrent_info {
+                let _res = self.database.update_tracker_info(torrent.torrent_id, torrent_info).await;
+            }
+        }
+
         Ok(())
     }
 }
