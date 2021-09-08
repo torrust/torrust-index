@@ -17,6 +17,7 @@ cd torrust/target
 
 2. Create a file called `config.toml` with the following contents and change the [configuration](https://torrust.github.io/torrust-tracker/CONFIG.html) according to your liking.
 
+
 3. And run __Torrust__:
 ```bash
 ./torrust
