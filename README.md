@@ -1,11 +1,9 @@
 # Torrust
 
-[![Build Status](https://app.travis-ci.com/torrust/torrust.svg?branch=master)](https://app.travis-ci.com/torrust/torrust)
-
 Torrust is an open source web based BitTorrent tracker developed in Rust.
 It allows users to upload and download torrents on a web UI, and tracks peers with an UDP BitTorrent tracker.
 
-[Torrust Documentation](https://torrust.github.io/torrust/)
+[Torrust Documentation](https://torrust.github.io/torrust-documentation/torrust-web-backend/about/)
 
 ## Project structure
 - [__Torrust__](https://github.com/torrust/torrust) (This repo): A REST API that acts as a backend for Torrust Web.
