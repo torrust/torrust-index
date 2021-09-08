@@ -16,6 +16,8 @@ Torrust's configuration is a simple TOML file. If no TOML file is found, it will
 
 ### `REQUIRED` `[net]` Section
 - `REQUIRED` `port`: The port the API will listen on. It's not advised to use ports under 1024 because root access is required for these ports.
+- `base_url`: The URL this application is accesible from. Used to build the email verification URL. If not set it uses the hostname the endpoint was called from.
+
 
 ### `REQUIRED` `[database]` Section
 - `REQUIRED` `connect_url`: The connection URL of the database. Should always start with `sqlite:`, no other databases are supported as of now.Including `mode=rwc` allows the database to be `Read / Writed / Created`. Example: `sqlite://data.db?mode=rwc`

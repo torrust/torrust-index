@@ -13,6 +13,7 @@ pub struct Tracker {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Network {
     pub port: u16,
+    pub base_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

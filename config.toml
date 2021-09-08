@@ -10,6 +10,7 @@ token_valid_seconds = 7257600
 
 [net]
 port = 3000
+#base_url = "https://localhost:3000/api"
 
 [database]
 # mode rwc means read/write/create.
@@ -27,9 +28,9 @@ port = 25
 username = ""
 password = ""
 # email address where mail is sent from
-from = ""
+from = "example@email.com"
 # email address to which a reply can be sent
-reply_to = ""
+reply_to = "noreply@email.com"
 
 [auth]
 min_password_length = 6
