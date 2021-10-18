@@ -14,6 +14,8 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
                 .route(web::get().to(get_categories)))
             .service(web::resource("/popular/torrents")
                 .route(web::get().to(get_popular_torrents)))
+            .service(web::resource("/recent/torrents")
+                .route(web::get().to(get_recent_torrents)))
             .service(web::resource("/{category}/torrents")
                 .route(web::get().to(get_torrents)))
     );
@@ -99,6 +101,30 @@ pub async fn get_popular_torrents(req: HttpRequest, info: Query<DisplayInfo>, ap
         .await?;
 
     let res = app_data.database.get_popular_torrents(offset, page_size).await?;
+
+    let torrents_response = TorrentsResponse {
+        total: count.count,
+        results: res
+    };
+
+    Ok(HttpResponse::Ok().json(OkResponse {
+        data: torrents_response
+    }))
+}
+
+pub async fn get_recent_torrents(req: HttpRequest, info: Query<DisplayInfo>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let page = info.page.unwrap_or(0);
+    let page_size = info.page_size.unwrap_or(30);
+    let offset = page * page_size;
+
+    let mut count: TorrentCount = sqlx::query_as!(
+        TorrentCount,
+        r#"SELECT COUNT(torrent_id) as count FROM torrust_torrents"#
+    )
+        .fetch_one(&app_data.database.pool)
+        .await?;
+
+    let res = app_data.database.get_recent_torrents(offset, page_size).await?;
 
     let torrents_response = TorrentsResponse {
         total: count.count,
