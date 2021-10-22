@@ -253,4 +253,46 @@ impl Database {
 
         Err(ServiceError::InternalServerError)
     }
+
+    pub async fn get_popular_torrents(&self, offset: i32, page_size: i32) -> Result<Vec<TorrentListing>, ServiceError> {
+        let res = sqlx::query_as!(
+            TorrentListing,
+            r#"
+            SELECT * FROM torrust_torrents
+            ORDER BY leechers DESC
+            LIMIT $1, $2
+            "#,
+            offset,
+            page_size
+        )
+            .fetch_all(&self.pool)
+            .await;
+
+        if res.is_ok() {
+            return Ok(res.unwrap())
+        }
+
+        Err(ServiceError::InternalServerError)
+    }
+
+    pub async fn get_recent_torrents(&self, offset: i32, page_size: i32) -> Result<Vec<TorrentListing>, ServiceError> {
+        let res = sqlx::query_as!(
+            TorrentListing,
+            r#"
+            SELECT * FROM torrust_torrents
+            ORDER BY upload_date DESC
+            LIMIT $1, $2
+            "#,
+            offset,
+            page_size
+        )
+            .fetch_all(&self.pool)
+            .await;
+
+        if res.is_ok() {
+            return Ok(res.unwrap())
+        }
+
+        Err(ServiceError::InternalServerError)
+    }
 }
