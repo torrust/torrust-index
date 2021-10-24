@@ -13,7 +13,7 @@ use crate::common::{WebAppData, Username};
 use crate::models::user::{User, Claims};
 use std::io::Cursor;
 use std::io::{Write};
-use crate::models::torrent_file::Torrent;
+use crate::models::torrent_file::{Torrent, File};
 use std::error::Error;
 use crate::utils::time::current_time;
 use std::collections::HashMap;
@@ -57,6 +57,15 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
     if let Ok(torrent) = parse_torrent::read_torrent_from_file(&filepath) {
         if let Some(files) = torrent.info.files {
             torrent_response.files = Some(files);
+        } else {
+            // todo: tidy up this code, it's error prone
+            let file = File {
+                path: vec![torrent.info.name],
+                length: torrent.info.length.unwrap_or(0),
+                md5sum: None
+            };
+
+            torrent_response.files = Some(vec![file]);
         }
     }
 
