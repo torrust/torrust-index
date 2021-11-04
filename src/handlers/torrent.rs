@@ -6,7 +6,7 @@ use async_std::prelude::*;
 use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use crate::errors::{ServiceError, ServiceResult};
-use crate::models::response::{NewTorrentResponse, OkResponse, TorrentResponse};
+use crate::models::response::{NewTorrentResponse, OkResponse, TorrentResponse, TorrentsResponse};
 use crate::models::torrent::{TorrentListing, TorrentRequest};
 use crate::utils::parse_torrent;
 use crate::common::{WebAppData, Username};
@@ -28,6 +28,22 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
             .service(web::resource("/{id}")
                 .route(web::get().to(get_torrent)))
     );
+    cfg.service(
+        web::scope("/torrents")
+            .service(web::resource("/")
+                .route(web::get().to(get_torrents)))
+    );
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DisplayInfo {
+    page_size: Option<i32>,
+    page: Option<i32>,
+    sort: Option<String>,
+}
+
+pub struct TorrentCount {
+    pub count: i32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -46,6 +62,58 @@ impl CreateTorrent {
         Err(ServiceError::BadRequest)
     }
 }
+
+pub async fn get_torrents(req: HttpRequest, info: Query<DisplayInfo>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let category = req.match_info().get("category").unwrap_or("");
+    let page = info.page.unwrap_or(0);
+    let page_size = info.page_size.unwrap_or(30);
+    let offset = page * page_size;
+
+
+    // let mut count: TorrentCount = sqlx::query_as!(
+    //     TorrentCount,
+    //     r#"SELECT COUNT(torrent_id) as count FROM torrust_torrents"#,
+    //     category
+    // )
+    //     .fetch_one(&app_data.database.pool)
+    //     .await?;
+
+    // let res = match &info.sort {
+    //     None => app_data.database.get_torrents_order_by_upload_date_desc(category, offset, page_size).await,
+    //     Some(sort) => {
+    //         match sort.as_str() {
+    //             "uploaded" => app_data.database.get_torrents_order_by_upload_date_desc(category, offset, page_size).await,
+    //             "seeders" => app_data.database.get_torrents_order_by_seeders_desc(category, offset, page_size).await,
+    //             "leechers" => app_data.database.get_torrents_order_by_leechers_desc(category, offset, page_size).await,
+    //             _ => app_data.database.get_torrents_order_by_upload_date_desc(category, offset, page_size).await
+    //         }
+    //     }
+    // }?;
+
+    // INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND tc.name = $1
+
+    let res: Vec<TorrentListing> = sqlx::query_as::<_, TorrentListing>("
+            SELECT tt.* FROM torrust_torrents tt
+            ORDER BY upload_date DESC
+            LIMIT ?, ?
+            "
+    )
+        .bind(offset)
+        .bind(page_size)
+        .fetch_all(&app_data.database.pool).await?;
+
+    println!("{:?}", res);
+
+    let torrents_response = TorrentsResponse {
+        total: 0,
+        results: res
+    };
+
+    Ok(HttpResponse::Ok().json(OkResponse {
+        data: torrents_response
+    }))
+}
+
 
 pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let torrent_id = get_torrent_id_from_request(&req)?;

@@ -12,12 +12,6 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/category")
             .service(web::resource("/")
                 .route(web::get().to(get_categories)))
-            .service(web::resource("/popular/torrents")
-                .route(web::get().to(get_popular_torrents)))
-            .service(web::resource("/recent/torrents")
-                .route(web::get().to(get_recent_torrents)))
-            .service(web::resource("/{category}/torrents")
-                .route(web::get().to(get_torrents)))
     );
 }
 
@@ -37,101 +31,50 @@ pub async fn get_categories(app_data: WebAppData) -> ServiceResult<impl Responde
     }))
 }
 
-#[derive(Debug, Deserialize)]
-pub struct DisplayInfo {
-    page_size: Option<i32>,
-    page: Option<i32>,
-    sort: Option<String>,
-}
-
-pub struct TorrentCount {
-    pub count: i32,
-}
-
-pub async fn get_torrents(req: HttpRequest, info: Query<DisplayInfo>, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let category = req.match_info().get("category").unwrap();
-    let page = info.page.unwrap_or(0);
-    let page_size = info.page_size.unwrap_or(30);
-    let offset = page * page_size;
-
-
-    let mut count: TorrentCount = sqlx::query_as!(
-        TorrentCount,
-        r#"SELECT COUNT(torrent_id) as count FROM torrust_torrents tt
-               INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND tc.name = $1
-        "#,
-        category
-    )
-        .fetch_one(&app_data.database.pool)
-        .await?;
-
-    let res = match &info.sort {
-        None => app_data.database.get_torrents_order_by_upload_date_desc(category, offset, page_size).await,
-        Some(sort) => {
-            match sort.as_str() {
-                "uploaded" => app_data.database.get_torrents_order_by_upload_date_desc(category, offset, page_size).await,
-                "seeders" => app_data.database.get_torrents_order_by_seeders_desc(category, offset, page_size).await,
-                "leechers" => app_data.database.get_torrents_order_by_leechers_desc(category, offset, page_size).await,
-                _ => app_data.database.get_torrents_order_by_upload_date_desc(category, offset, page_size).await
-            }
-        }
-    }?;
-
-
-    let torrents_response = TorrentsResponse {
-        total: count.count,
-        results: res
-    };
-
-    Ok(HttpResponse::Ok().json(OkResponse {
-        data: torrents_response
-    }))
-}
-
-pub async fn get_popular_torrents(req: HttpRequest, info: Query<DisplayInfo>, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let page = info.page.unwrap_or(0);
-    let page_size = info.page_size.unwrap_or(30);
-    let offset = page * page_size;
-
-    let mut count: TorrentCount = sqlx::query_as!(
-        TorrentCount,
-        r#"SELECT COUNT(torrent_id) as count FROM torrust_torrents"#
-    )
-        .fetch_one(&app_data.database.pool)
-        .await?;
-
-    let res = app_data.database.get_popular_torrents(offset, page_size).await?;
-
-    let torrents_response = TorrentsResponse {
-        total: count.count,
-        results: res
-    };
-
-    Ok(HttpResponse::Ok().json(OkResponse {
-        data: torrents_response
-    }))
-}
-
-pub async fn get_recent_torrents(req: HttpRequest, info: Query<DisplayInfo>, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let page = info.page.unwrap_or(0);
-    let page_size = info.page_size.unwrap_or(30);
-    let offset = page * page_size;
-
-    let mut count: TorrentCount = sqlx::query_as!(
-        TorrentCount,
-        r#"SELECT COUNT(torrent_id) as count FROM torrust_torrents"#
-    )
-        .fetch_one(&app_data.database.pool)
-        .await?;
-
-    let res = app_data.database.get_recent_torrents(offset, page_size).await?;
-
-    let torrents_response = TorrentsResponse {
-        total: count.count,
-        results: res
-    };
-
-    Ok(HttpResponse::Ok().json(OkResponse {
-        data: torrents_response
-    }))
-}
+// pub async fn get_popular_torrents(req: HttpRequest, info: Query<DisplayInfo>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+//     let page = info.page.unwrap_or(0);
+//     let page_size = info.page_size.unwrap_or(30);
+//     let offset = page * page_size;
+//
+//     let mut count: TorrentCount = sqlx::query_as!(
+//         TorrentCount,
+//         r#"SELECT COUNT(torrent_id) as count FROM torrust_torrents"#
+//     )
+//         .fetch_one(&app_data.database.pool)
+//         .await?;
+//
+//     let res = app_data.database.get_popular_torrents(offset, page_size).await?;
+//
+//     let torrents_response = TorrentsResponse {
+//         total: count.count,
+//         results: res
+//     };
+//
+//     Ok(HttpResponse::Ok().json(OkResponse {
+//         data: torrents_response
+//     }))
+// }
+//
+// pub async fn get_recent_torrents(req: HttpRequest, info: Query<DisplayInfo>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+//     let page = info.page.unwrap_or(0);
+//     let page_size = info.page_size.unwrap_or(30);
+//     let offset = page * page_size;
+//
+//     let mut count: TorrentCount = sqlx::query_as!(
+//         TorrentCount,
+//         r#"SELECT COUNT(torrent_id) as count FROM torrust_torrents"#
+//     )
+//         .fetch_one(&app_data.database.pool)
+//         .await?;
+//
+//     let res = app_data.database.get_recent_torrents(offset, page_size).await?;
+//
+//     let torrents_response = TorrentsResponse {
+//         total: count.count,
+//         results: res
+//     };
+//
+//     Ok(HttpResponse::Ok().json(OkResponse {
+//         data: torrents_response
+//     }))
+// }
