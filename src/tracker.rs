@@ -109,8 +109,12 @@ impl TrackerService {
         }?;
 
         let torrent_info = match response.json::<TorrentInfo>().await {
-            Ok(v) => Ok(v),
+            Ok(torrent_info) => {
+                self.database.update_tracker_info(info_hash, torrent_info.seeders, torrent_info.leechers).await;
+                Ok(torrent_info)
+            },
             Err(e) => {
+                self.database.update_tracker_info(info_hash, 0, 0).await;
                 Err(ServiceError::TorrentNotFound)
             }
         }?;
@@ -123,12 +127,7 @@ impl TrackerService {
         let torrents = self.database.get_all_torrent_ids().await?;
 
         for torrent in torrents {
-            let torrent_info = self.get_torrent_info(&torrent.info_hash).await;
-            if let Ok(torrent_info) = torrent_info {
-                let _res = self.database.update_tracker_info(torrent.torrent_id, torrent_info.seeders, torrent_info.leechers).await;
-            } else {
-                let _res = self.database.update_tracker_info(torrent.torrent_id, 0, 0).await;
-            }
+            self.get_torrent_info(&torrent.info_hash).await;
         }
 
         Ok(())

@@ -12,6 +12,7 @@ use std::borrow::Cow;
 use crate::tracker::TorrentInfo;
 use serde::Serialize;
 use crate::models::response::TorrentResponse;
+use sha1::digest::generic_array::typenum::uint::SetBit;
 
 #[derive(Debug, Serialize)]
 pub struct TorrentCompact {
@@ -21,6 +22,10 @@ pub struct TorrentCompact {
 
 pub struct Database {
     pub pool: SqlitePool
+}
+
+pub struct Category {
+    pub name: String
 }
 
 impl Database {
@@ -133,12 +138,12 @@ impl Database {
         }
     }
 
-    pub async fn update_tracker_info(&self, torrent_id: i64, seeders: i64, leechers: i64) -> Result<(), ()> {
+    pub async fn update_tracker_info(&self, info_hash: &str, seeders: i64, leechers: i64) -> Result<(), ()> {
         let res = sqlx::query!(
-            "UPDATE torrust_torrents SET seeders = $1, leechers = $2 WHERE torrent_id = $3",
+            "UPDATE torrust_torrents SET seeders = $1, leechers = $2 WHERE info_hash = $3",
             seeders,
             leechers,
-            torrent_id
+            info_hash
         )
             .execute(&self.pool)
             .await;
@@ -185,114 +190,18 @@ impl Database {
         }
     }
 
-    pub async fn get_torrents_order_by_seeders_desc(&self, category: &str, offset: i32, page_size: i32) -> Result<Vec<TorrentListing>, ServiceError> {
+    pub async fn verify_category(&self, category: &str) -> Option<String> {
         let res = sqlx::query_as!(
-            TorrentListing,
-            r#"
-            SELECT tt.* FROM torrust_torrents tt
-            INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND tc.name = $1
-            ORDER BY seeders DESC
-            LIMIT $2, $3
-            "#,
-            category,
-            offset,
-            page_size
+            Category,
+            "SELECT name FROM torrust_categories WHERE name = ?",
+            category
         )
-            .fetch_all(&self.pool)
+            .fetch_one(&self.pool)
             .await;
 
-        if res.is_ok() {
-            return Ok(res.unwrap())
+        match res {
+            Ok(v) => Some(v.name),
+            Err(_) => None
         }
-
-        Err(ServiceError::InternalServerError)
-    }
-
-    pub async fn get_torrents_order_by_leechers_desc(&self, category: &str, offset: i32, page_size: i32) -> Result<Vec<TorrentListing>, ServiceError> {
-        let res = sqlx::query_as!(
-            TorrentListing,
-            r#"
-            SELECT tt.* FROM torrust_torrents tt
-            INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND tc.name = $1
-            ORDER BY leechers DESC
-            LIMIT $2, $3
-            "#,
-            category,
-            offset,
-            page_size
-        )
-            .fetch_all(&self.pool)
-            .await;
-
-        if res.is_ok() {
-            return Ok(res.unwrap())
-        }
-
-        Err(ServiceError::InternalServerError)
-    }
-
-    pub async fn get_torrents_order_by_upload_date_desc(&self, category: &str, offset: i32, page_size: i32) -> Result<Vec<TorrentListing>, ServiceError> {
-        let res = sqlx::query_as!(
-            TorrentListing,
-            r#"
-            SELECT tt.* FROM torrust_torrents tt
-            INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND tc.name = $1
-            ORDER BY upload_date DESC
-            LIMIT $2, $3
-            "#,
-            category,
-            offset,
-            page_size
-        )
-            .fetch_all(&self.pool)
-            .await;
-
-        if res.is_ok() {
-            return Ok(res.unwrap())
-        }
-
-        Err(ServiceError::InternalServerError)
-    }
-
-    pub async fn get_popular_torrents(&self, offset: i32, page_size: i32) -> Result<Vec<TorrentListing>, ServiceError> {
-        let res = sqlx::query_as!(
-            TorrentListing,
-            r#"
-            SELECT * FROM torrust_torrents
-            ORDER BY leechers DESC
-            LIMIT $1, $2
-            "#,
-            offset,
-            page_size
-        )
-            .fetch_all(&self.pool)
-            .await;
-
-        if res.is_ok() {
-            return Ok(res.unwrap())
-        }
-
-        Err(ServiceError::InternalServerError)
-    }
-
-    pub async fn get_recent_torrents(&self, offset: i32, page_size: i32) -> Result<Vec<TorrentListing>, ServiceError> {
-        let res = sqlx::query_as!(
-            TorrentListing,
-            r#"
-            SELECT * FROM torrust_torrents
-            ORDER BY upload_date DESC
-            LIMIT $1, $2
-            "#,
-            offset,
-            page_size
-        )
-            .fetch_all(&self.pool)
-            .await;
-
-        if res.is_ok() {
-            return Ok(res.unwrap())
-        }
-
-        Err(ServiceError::InternalServerError)
     }
 }

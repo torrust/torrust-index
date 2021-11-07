@@ -70,6 +70,6 @@ impl TorrentResponse {
 
 #[derive(Serialize, Deserialize, Debug, sqlx::FromRow)]
 pub struct TorrentsResponse {
-    pub total: i32,
+    pub total: u32,
     pub results: Vec<TorrentListing>,
 }
