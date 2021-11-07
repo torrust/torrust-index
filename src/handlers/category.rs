@@ -10,7 +10,7 @@ use crate::models::torrent::{TorrentListing};
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/category")
-            .service(web::resource("/")
+            .service(web::resource("")
                 .route(web::get().to(get_categories)))
     );
 }
