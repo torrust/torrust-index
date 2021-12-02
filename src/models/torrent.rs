@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use crate::models::torrent_file::Torrent;
 use crate::handlers::torrent::CreateTorrent;
+use sqlx::{FromRow};
 
 #[allow(dead_code)]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct TorrentListing {
     pub torrent_id: i64,
     pub uploader: String,
