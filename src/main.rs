@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use actix_web::{App, HttpServer, middleware, web};
 use actix_cors::Cors;
-use std::env;
 use torrust::database::Database;
 use torrust::{handlers};
 use torrust::config::TorrustConfig;
@@ -44,7 +43,7 @@ async fn main() -> std::io::Result<()> {
         loop {
             interval.tick().await;
             if let Some(tracker) = weak_tracker_service.upgrade() {
-                tracker_service.update_torrents().await;
+                let _ = tracker.update_torrents().await;
             } else {
                 break;
             }

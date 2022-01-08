@@ -1,23 +1,16 @@
 use actix_multipart::Multipart;
 use actix_web::{HttpRequest, HttpResponse, Responder, web};
-use actix_web::web::{Query, Form, Json};
-use async_std::fs::create_dir_all;
-use async_std::prelude::*;
+use actix_web::web::{Query};
 use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
-use serde::{Deserialize, Serialize, Deserializer};
+use serde::{Deserialize};
 use crate::errors::{ServiceError, ServiceResult};
 use crate::models::response::{NewTorrentResponse, OkResponse, TorrentResponse, TorrentsResponse};
 use crate::models::torrent::{TorrentListing, TorrentRequest};
 use crate::utils::parse_torrent;
-use crate::common::{WebAppData, Username};
-use crate::models::user::{User, Claims};
+use crate::common::{WebAppData};
 use std::io::Cursor;
 use std::io::{Write};
 use crate::models::torrent_file::{Torrent, File};
-use std::error::Error;
-use crate::utils::time::current_time;
-use std::collections::HashMap;
-use std::iter::FromIterator;
 use crate::AsCSV;
 use std::option::Option::Some;
 use sqlx::{FromRow};
@@ -30,7 +23,8 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
             .service(web::resource("/download/{id}")
                 .route(web::get().to(download_torrent)))
             .service(web::resource("/{id}")
-                .route(web::get().to(get_torrent)))
+                .route(web::get().to(get_torrent))
+                .route(web::delete().to(delete_torrent)))
     );
     cfg.service(
         web::scope("/torrents")
@@ -82,8 +76,6 @@ pub async fn get_torrents(params: Query<DisplayInfo>, app_data: WebAppData) -> S
         Some(v) => format!("%{}%", v)
     };
 
-    println!("{:?}", categories);
-
     let sort_query: String = match &params.sort {
         Some(sort) => {
             match sort.as_str() {
@@ -113,7 +105,6 @@ pub async fn get_torrents(params: Query<DisplayInfo>, app_data: WebAppData) -> S
                 if i > 0 { str = format!(" OR {}", str); }
                 category_filters.push_str(&str);
                 i += 1;
-                println!("{}", category_filters);
             }
         }
         if category_filters.len() > 0 {
@@ -125,7 +116,7 @@ pub async fn get_torrents(params: Query<DisplayInfo>, app_data: WebAppData) -> S
         String::new()
     };
 
-    let mut query_string = format!("SELECT tt.* FROM torrust_torrents tt {} WHERE title LIKE ?", category_filter_query);
+    let mut query_string = format!("SELECT tt.* FROM torrust_torrents tt {} WHERE hidden = false AND title LIKE ?", category_filter_query);
     let count_query_string = format!("SELECT COUNT(torrent_id) as count FROM ({})", query_string);
 
     let count: TorrentCount = sqlx::query_as::<_, TorrentCount>(&count_query_string)
@@ -185,6 +176,33 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
     }))
 }
 
+pub async fn delete_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let user = app_data.auth.get_user_from_request(&req).await?;
+
+    // check if user is administrator
+    if !user.administrator { return Err(ServiceError::Unauthorized) }
+
+    let torrent_id = get_torrent_id_from_request(&req)?;
+
+    let res = sqlx::query!(
+        "UPDATE torrust_torrents SET hidden = true WHERE torrent_id = ?",
+        torrent_id
+    )
+        .execute(&app_data.database.pool)
+        .await;
+
+    match res {
+        Ok(_) => (),
+        Err(_) => return Err(ServiceError::InternalServerError),
+    };
+
+    Ok(HttpResponse::Ok().json(OkResponse {
+        data: NewTorrentResponse {
+            torrent_id
+        }
+    }))
+}
+
 pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let user = app_data.auth.get_user_from_request(&req).await?;
 
@@ -202,15 +220,15 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
 
     let row = match res {
         Ok(row) => row,
-        Err(e) => return Err(ServiceError::InvalidCategory),
+        Err(_) => return Err(ServiceError::InvalidCategory),
     };
 
     let username = user.username;
     let info_hash = torrent_request.torrent.info_hash();
     let title = torrent_request.fields.title;
-    let category = torrent_request.fields.category;
+    //let category = torrent_request.fields.category;
     let description = torrent_request.fields.description;
-    let current_time = current_time() as i64;
+    //let current_time = current_time() as i64;
     let file_size = torrent_request.torrent.file_size();
     let mut seeders = 0;
     let mut leechers = 0;
@@ -280,12 +298,12 @@ pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> Service
     )
 }
 
-async fn verify_torrent_ownership(user: &User, torrent_listing: &TorrentListing) -> Result<(), ServiceError> {
-    match torrent_listing.uploader == user.username {
-        true => Ok(()),
-        false => Err(ServiceError::BadRequest)
-    }
-}
+// async fn verify_torrent_ownership(user: &User, torrent_listing: &TorrentListing) -> Result<(), ServiceError> {
+//     match torrent_listing.uploader == user.username {
+//         true => Ok(()),
+//         false => Err(ServiceError::BadRequest)
+//     }
+// }
 
 async fn save_torrent_file(filepath: &str, torrent: &Torrent) -> Result<(), ServiceError> {
     let torrent_bytes = match parse_torrent::encode_torrent(torrent) {

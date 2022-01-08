@@ -1,7 +1,6 @@
 use std::{fs, error};
 use serde_bencode::{de, Error};
 use crate::models::torrent_file::Torrent;
-use crate::errors::ServiceError;
 
 pub fn read_torrent_from_file(path: &str) -> Result<Torrent, Box<dyn error::Error>> {
     let contents = match fs::read(path) {

@@ -16,6 +16,7 @@ pub struct TorrentListing {
     pub file_size: i64,
     pub seeders: i64,
     pub leechers: i64,
+    pub hidden: bool
 }
 
 #[derive(Debug)]

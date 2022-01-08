@@ -1,16 +1,11 @@
 use actix_web::HttpRequest;
 use crate::models::user::{Claims, User};
-use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm, encode, Header, EncodingKey, TokenData};
+use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm, encode, Header, EncodingKey};
 use crate::utils::time::current_time;
 use crate::errors::ServiceError;
 use std::sync::Arc;
 use crate::database::Database;
-use jsonwebtoken::errors::Error;
-use std::future::Future;
 use crate::config::TorrustConfig;
-use crate::models::tracker_key::TrackerKey;
-use std::error;
-use reqwest::Response;
 
 pub struct AuthorizationService {
     cfg: Arc<TorrustConfig>,
@@ -32,6 +27,7 @@ impl AuthorizationService {
 
         let claims = Claims {
             sub: user.username,
+            admin: user.administrator,
             exp: exp_date,
         };
 
@@ -57,7 +53,7 @@ impl AuthorizationService {
                 }
                 Ok(token_data.claims)
             },
-            Err(e) => Err(ServiceError::TokenInvalid)
+            Err(_) => Err(ServiceError::TokenInvalid)
         }
     }
 

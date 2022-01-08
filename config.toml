@@ -14,7 +14,7 @@ port = 3000
 
 [database]
 # mode rwc means read/write/create.
-# without create, you'll have to manually create the database.
+# without "c" (create) in "rwc", you'll have to manually create the database.
 connect_url = "sqlite://data.db?mode=rwc"
 # recommended to keep it at least at 1800 seconds.
 # interval should increase with amount of torrents.

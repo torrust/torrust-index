@@ -59,7 +59,7 @@ impl TrackerService {
     }
 
     pub async fn get_personal_announce_url(&self, user: &User) -> Result<String, ServiceError> {
-        let mut tracker_key = self.database.get_valid_tracker_key(user.user_id).await;
+        let tracker_key = self.database.get_valid_tracker_key(user.user_id).await;
 
         match tracker_key {
             Some(v) => { Ok(format!("{}/{}", self.cfg.tracker.url, v.key)) }
@@ -110,11 +110,11 @@ impl TrackerService {
 
         let torrent_info = match response.json::<TorrentInfo>().await {
             Ok(torrent_info) => {
-                self.database.update_tracker_info(info_hash, torrent_info.seeders, torrent_info.leechers).await;
+                let _ = self.database.update_tracker_info(info_hash, torrent_info.seeders, torrent_info.leechers).await;
                 Ok(torrent_info)
             },
-            Err(e) => {
-                self.database.update_tracker_info(info_hash, 0, 0).await;
+            Err(_) => {
+                let _ = self.database.update_tracker_info(info_hash, 0, 0).await;
                 Err(ServiceError::TorrentNotFound)
             }
         }?;
@@ -127,7 +127,7 @@ impl TrackerService {
         let torrents = self.database.get_all_torrent_ids().await?;
 
         for torrent in torrents {
-            self.get_torrent_info(&torrent.info_hash).await;
+            let _ = self.get_torrent_info(&torrent.info_hash).await;
         }
 
         Ok(())

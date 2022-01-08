@@ -1,16 +1,11 @@
 use crate::config::TorrustConfig;
 use std::sync::Arc;
-use crate::database::Database;
-use crate::models::tracker_key::TrackerKey;
 use crate::errors::ServiceError;
-use crate::models::user::User;
 use serde::{Serialize, Deserialize};
 use lettre::{AsyncSmtpTransport, Tokio1Executor, Message, AsyncTransport};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::message::{MessageBuilder, MultiPart, SinglePart};
 use jsonwebtoken::{encode, Header, EncodingKey};
-use lettre::transport::smtp::extension::Extension::StartTls;
-use lettre::transport::smtp::client::{Tls, TlsParameters};
 use sailfish::TemplateOnce;
 use crate::utils::time::current_time;
 

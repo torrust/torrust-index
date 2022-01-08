@@ -8,16 +8,9 @@ use pbkdf2::{
     Pbkdf2,
 };
 use std::borrow::Cow;
-use std::collections::BTreeMap;
-use std::time::Duration;
 use crate::errors::{ServiceResult, ServiceError};
-use crate::utils::time::current_time;
 use crate::common::WebAppData;
-use std::env;
-use crate::models::user::Claims;
-use crate::config::TorrustConfig;
-use crate::models::user::User;
-use jsonwebtoken::{encode, Header, EncodingKey, DecodingKey, decode, Validation, Algorithm};
+use jsonwebtoken::{DecodingKey, decode, Validation, Algorithm};
 use crate::models::response::OkResponse;
 use crate::models::response::TokenResponse;
 use crate::mailer::VerifyClaims;
@@ -137,12 +130,14 @@ pub async fn login(payload: web::Json<Login>, app_data: WebAppData) -> ServiceRe
             }
 
             let username = user.username.clone();
-            let token = app_data.auth.sign_jwt(user);
+            let token = app_data.auth.sign_jwt(user.clone());
+
 
             Ok(HttpResponse::Ok().json(OkResponse {
                 data: TokenResponse {
                     token,
-                    username
+                    username,
+                    admin: user.administrator
                 }
             }))
         }
@@ -165,7 +160,7 @@ pub async fn verify_user(req: HttpRequest, app_data: WebAppData) -> String {
 
             token_data.claims
         },
-        Err(e) => return ServiceError::TokenInvalid.to_string()
+        Err(_) => return ServiceError::TokenInvalid.to_string()
     };
 
     let res = sqlx::query!(
@@ -189,12 +184,13 @@ pub async fn me(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Re
     }?;
 
     let username = user.username.clone();
-    let token = app_data.auth.sign_jwt(user);
+    let token = app_data.auth.sign_jwt(user.clone());
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: TokenResponse {
             token,
-            username
+            username,
+            admin: user.administrator
         }
     }))
 }

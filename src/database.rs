@@ -1,18 +1,12 @@
 use sqlx::SqlitePool;
-use std::sync::Arc;
 use sqlx::sqlite::SqlitePoolOptions;
-use std::env;
 use crate::models::user::User;
 use crate::errors::ServiceError;
 use crate::models::torrent::TorrentListing;
 use crate::utils::time::current_time;
-use std::time::Duration;
 use crate::models::tracker_key::TrackerKey;
 use std::borrow::Cow;
-use crate::tracker::TorrentInfo;
 use serde::Serialize;
-use crate::models::response::TorrentResponse;
-use sha1::digest::generic_array::typenum::uint::SetBit;
 
 #[derive(Debug, Serialize)]
 pub struct TorrentCompact {
@@ -109,7 +103,7 @@ impl Database {
         let res = sqlx::query_as!(
             TorrentListing,
             r#"SELECT * FROM torrust_torrents
-               WHERE torrent_id = ?"#,
+               WHERE torrent_id = ? AND hidden = false"#,
             torrent_id
         )
             .fetch_one(&self.pool)

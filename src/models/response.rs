@@ -1,6 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::any::Any;
-use crate::models::user::User;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::File;
 
@@ -22,6 +20,7 @@ pub struct ErrorResponse<T> {
 pub struct TokenResponse {
     pub token: String,
     pub username: String,
+    pub admin: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
