@@ -1,17 +1,11 @@
-# Torrust Web Backend
+# Torrust Index Backend
 
-Torrust is an open source web based BitTorrent tracker developed in Rust.
-It allows users to upload and download torrents on a web UI, and tracks peers with an UDP BitTorrent tracker.
+This repository serves as the backend for the [Torrust Index](https://github.com/torrust/torrust) project.
 
-[Documentation](https://torrust.github.io/torrust-documentation/torrust-web-backend/about/)
+## Documentation
+You can read the documentation [here](https://torrust.github.io/torrust-documentation/torrust-web-backend/about/).
 
-## Features
-* [X] Login / Register
-* [X] Authentication using JWT tokens
-* [X] E-mail verification
-* [X] Torrent Uploading / Downloading
-
-## Getting started
+## Installation
 The easiest way is to get built binaries from [Releases](https://github.com/torrust/torrust-web-backend/releases),
 but building from sources is also possible:
 
@@ -37,5 +31,4 @@ cd torrust/target
 ```
 
 ## Contributing
-Please report any bugs you find to our issue tracker. Ideas and feature requests are welcome as well!
-Any pull request targeting existing issues would be very much appreciated.
+Please report any Torrust Index backend specific bugs you find to the issue tracker of this repository. Torrust Index frontend specific issues can be submitted [here](https://github.com/torrust/torrust-index-frontend). Universal issues with the Torrust Index can be submitted [here](https://github.com/torrust/torrust). Ideas and feature requests are welcome as well!
