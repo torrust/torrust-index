@@ -2,7 +2,10 @@
 name = "torrust-index-backend"
 version = "1.0.0"
 authors = ["Mick <mick@dutchbits.nl>", "Wesley <wesley@dutchbits.nl"]
-edition = "2018"
+edition = "2021"
+
+[profile.dev.package.sqlx-macros]
+opt-level = 3
 
 [dependencies]
 actix-web = "4.0.0-beta.8"
