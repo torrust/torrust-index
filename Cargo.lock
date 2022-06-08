@@ -2679,7 +2679,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "torrust-index-backend"
+name = "torrust"
 version = "1.0.0"
 dependencies = [
  "actix-cors",

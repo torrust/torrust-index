@@ -1,13 +1,13 @@
 use std::sync::Arc;
 use actix_web::{App, HttpServer, middleware, web};
 use actix_cors::Cors;
-use torrust_index_backend::database::Database;
-use torrust_index_backend::{handlers};
-use torrust_index_backend::config::{Configuration};
-use torrust_index_backend::common::AppData;
-use torrust_index_backend::auth::AuthorizationService;
-use torrust_index_backend::tracker::TrackerService;
-use torrust_index_backend::mailer::MailerService;
+use torrust::database::Database;
+use torrust::{handlers};
+use torrust::config::{Configuration};
+use torrust::common::AppData;
+use torrust::auth::AuthorizationService;
+use torrust::tracker::TrackerService;
+use torrust::mailer::MailerService;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
