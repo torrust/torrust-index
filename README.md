@@ -1,50 +1,41 @@
-# Torrust Index Backend
+# Torrust Web Backend
 
-This repository serves as the backend for the [Torrust Index](https://github.com/torrust/torrust) project.
+Torrust is an open source web based BitTorrent tracker developed in Rust.
+It allows users to upload and download torrents on a web UI, and tracks peers with an UDP BitTorrent tracker.
 
-## Documentation
-You can read the documentation [here](https://torrust.github.io/torrust-documentation/torrust-web-backend/about/).
+[Documentation](https://torrust.github.io/torrust-documentation/torrust-web-backend/about/)
 
-## Installation
-1. Install prerequisites:
-- [Rust/Cargo](https://www.rust-lang.org/) - Compiler toolchain & Package Manager (cargo).
+## Features
+* [X] Login / Register
+* [X] Authentication using JWT tokens
+* [X] E-mail verification
+* [X] Torrent Uploading / Downloading
 
-2. Clone the repository:
+## Getting started
+The easiest way is to get built binaries from [Releases](https://github.com/torrust/torrust-web-backend/releases),
+but building from sources is also possible:
+
 ```bash
-git clone https://github.com/torrust/torrust-index-backend.git
-```
-
-3. Open the project directory and create a file called: `.env`:
-```bash
-cd torrust-index-backend
-echo "DATABASE_URL=sqlite://data.db?mode=rwc" > .env
-```
-
-4. Install sqlx-cli and build the sqlite database:
-```bash
-cargo install sqlx-cli
-sqlx db setup
-```
-
-5. Build the binaries:
-```bash
+git clone https://github.com/torrust/torrust.git
+cd torrust
 cargo build --release
 ```
 
-6. Run the backend once to generate the `config.toml` file:
+__Notice:__ Skip the first step if you've downloaded the binaries directly.
+
+1. After building __Torrust__, navigate to the folder.
 ```bash
-./target/torrust-index-backend
+cd torrust/target
 ```
 
-7. Edit the newly generated `config.toml` file ([config.toml documentation](https://torrust.github.io/torrust-tracker/CONFIG.html)):
-```bash
-nano config.toml
-```
+2. Create a file called `config.toml` with the following contents and change the [configuration](https://torrust.github.io/torrust-tracker/CONFIG.html) according to your liking.
 
-8. Run the backend again:
+
+3. And run __Torrust__:
 ```bash
-./target/torrust-index-backend
+./torrust
 ```
 
 ## Contributing
-Please report any Torrust Index backend specific bugs you find to the issue tracker of this repository. Torrust Index frontend specific issues can be submitted [here](https://github.com/torrust/torrust-index-frontend). Universal issues with the Torrust Index can be submitted [here](https://github.com/torrust/torrust). Ideas and feature requests are welcome as well!
+Please report any bugs you find to our issue tracker. Ideas and feature requests are welcome as well!
+Any pull request targeting existing issues would be very much appreciated.
