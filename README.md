@@ -1,6 +1,6 @@
 # Torrust Index Backend
 
-This repository serves as the backend for the [Torrust Index](https://github.com/torrust/torrust) project.
+This repository serves as the backend for the [Torrust Index](https://github.com/torrust/torrust-index) project.
 
 ## Documentation
 You can read the documentation [here](https://torrust.github.io/torrust-documentation/torrust-web-backend/about/).
@@ -47,4 +47,4 @@ nano config.toml
 ```
 
 ## Contributing
-Please report any Torrust Index backend specific bugs you find to the issue tracker of this repository. Torrust Index frontend specific issues can be submitted [here](https://github.com/torrust/torrust-index-frontend). Universal issues with the Torrust Index can be submitted [here](https://github.com/torrust/torrust). Ideas and feature requests are welcome as well!
+Please report any Torrust Index backend specific bugs you find to the issue tracker of this repository. Torrust Index frontend specific issues can be submitted [here](https://github.com/torrust/torrust-index-frontend). Universal issues with the Torrust Index can be submitted [here](https://github.com/torrust/torrust-index). Ideas and feature requests are welcome as well!
