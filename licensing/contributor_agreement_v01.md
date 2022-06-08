@@ -20,7 +20,7 @@ Second, the main provision of the NCCA specifies that a default license will app
 
 ### Section 1 – Definitions
 
-__"Acceptable License For Nautilus"__ means a license selected from the appropriate categorical sublist of the full list of acceptable licenses for Nautilus, currently located at <https://github.com/torrust/torrust/tree/main/licensing>, as that list may be revised from time to time by Nautilus Cyberneering GmbH. "Acceptable Licenses For Nautilus" means that full list.
+__"Acceptable License For Nautilus"__ means a license selected from the appropriate categorical sublist of the full list of acceptable licenses for Nautilus, currently located at <https://github.com/torrust/torrust-index/tree/main/licensing>, as that list may be revised from time to time by Nautilus Cyberneering GmbH. "Acceptable Licenses For Nautilus" means that full list.
 
 __"AGPLv3"__ means the license identified as "Affero General Public License 3.0", as published at <https://www.gnu.org/licenses/agpl-3.0.en.html>.
 

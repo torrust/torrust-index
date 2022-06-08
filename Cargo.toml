@@ -1,7 +1,7 @@
 [package]
 name = "torrust-index-backend"
 version = "1.0.0"
-authors = ["Mick <mick@dutchbits.nl>", "Wesley <wesley@dutchbits.nl"]
+authors = ["Mick van Dijke <mick@dutchbits.nl>", "Wesley Bijleveld <wesley@dutchbits.nl>"]
 edition = "2021"
 
 [profile.dev.package.sqlx-macros]
