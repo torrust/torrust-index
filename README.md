@@ -46,5 +46,19 @@ nano config.toml
 ./target/torrust-index-backend
 ```
 
+### Project Roadmap
+
+* [ ] Feedback Form
+* [ ] Comments Section (can be powered by disqus)
+* [ ] Age Restricted Option for Torrent
+* [ ] Allow custom favicon for website
+* [ ] User Profile and his posts
+* [ ] Trusted Uploaders Badge for users
+* [ ] Seeders and Leechers Amount from external and Internet trackers
+* [ ] RSS feed of torrents
+* [ ] Tags for torrent
+* [ ] Bookmark for torrent
+* [ ] Personal RSS with custom option
+
 ## Contributing
 Please report any Torrust Index backend specific bugs you find to the issue tracker of this repository. Torrust Index frontend specific issues can be submitted [here](https://github.com/torrust/torrust-index-frontend). Universal issues with the Torrust Index can be submitted [here](https://github.com/torrust/torrust). Ideas and feature requests are welcome as well!
