@@ -1,6 +1,6 @@
 # Torrust Index Backend
 
-This repository serves as the backend for the [Torrust Index](https://github.com/torrust/torrust) project.
+This repository serves as the backend for the [Torrust Index](https://github.com/torrust/torrust-index) project.
 
 ## Documentation
 You can read the documentation [here](https://torrust.github.io/torrust-documentation/torrust-web-backend/about/).
@@ -46,19 +46,5 @@ nano config.toml
 ./target/torrust-index-backend
 ```
 
-### Project Roadmap
-
-* [ ] Feedback Form
-* [ ] Comments Section (can be powered by disqus)
-* [ ] Age Restricted Option for Torrent
-* [ ] Allow custom favicon for website
-* [ ] User Profile and his posts
-* [ ] Trusted Uploaders Badge for users
-* [ ] Seeders and Leechers Amount from external and Internet trackers
-* [ ] RSS feed of torrents
-* [ ] Tags for torrent
-* [ ] Bookmark for torrent
-* [ ] Personal RSS with custom option
-
 ## Contributing
-Please report any Torrust Index backend specific bugs you find to the issue tracker of this repository. Torrust Index frontend specific issues can be submitted [here](https://github.com/torrust/torrust-index-frontend). Universal issues with the Torrust Index can be submitted [here](https://github.com/torrust/torrust). Ideas and feature requests are welcome as well!
+Please report any Torrust Index backend specific bugs you find to the issue tracker of this repository. Torrust Index frontend specific issues can be submitted [here](https://github.com/torrust/torrust-index-frontend). Universal issues with the Torrust Index can be submitted [here](https://github.com/torrust/torrust-index). Ideas and feature requests are welcome as well!
