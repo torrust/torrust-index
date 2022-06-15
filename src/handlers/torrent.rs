@@ -101,8 +101,8 @@ pub async fn get_torrents(params: Query<DisplayInfo>, app_data: WebAppData) -> S
         let mut category_filters = String::new();
         for category in c.iter() {
             // don't take user input in the db query
-            if let Some(sanitized_category) = &app_data.database.verify_category(category).await {
-                let mut str = format!("tc.name = '{}'", sanitized_category);
+            if let Some(sanitized_category) = &app_data.database.get_category_by_name(category).await {
+                let mut str = format!("tc.name = '{}'", sanitized_category.name);
                 if i > 0 { str = format!(" OR {}", str); }
                 category_filters.push_str(&str);
                 i += 1;
@@ -152,7 +152,9 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
     let torrent_id = get_torrent_id_from_request(&req)?;
 
     let torrent_listing = app_data.database.get_torrent_by_id(torrent_id).await?;
+    let category = app_data.database.get_category(torrent_listing.category_id).await.unwrap();
     let mut torrent_response = TorrentResponse::from_listing(torrent_listing);
+    torrent_response.category = category;
 
     let filepath = format!("{}/{}", settings.storage.upload_path, torrent_response.torrent_id.to_string() + ".torrent");
 
@@ -215,7 +217,8 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
 
 #[derive(Debug, Deserialize)]
 pub struct TorrentUpdate {
-    description: String
+    title: Option<String>,
+    description: Option<String>
 }
 
 pub async fn update_torrent(req: HttpRequest, payload: web::Json<TorrentUpdate>, app_data: WebAppData) -> ServiceResult<impl Responder> {
@@ -228,21 +231,36 @@ pub async fn update_torrent(req: HttpRequest, payload: web::Json<TorrentUpdate>,
     // check if user is owner or administrator
     if torrent_listing.uploader != user.username && !user.administrator { return Err(ServiceError::Unauthorized) }
 
-    // update torrent
-    let res = sqlx::query!(
-        "UPDATE torrust_torrents SET description = $1 WHERE torrent_id = $2",
-        payload.description,
-        torrent_id
-    )
-        .execute(&app_data.database.pool)
-        .await;
+    // update torrent title
+    if let Some(title) = &payload.title {
+        let res = sqlx::query!(
+            "UPDATE torrust_torrents SET title = $1 WHERE torrent_id = $2",
+            title,
+            torrent_id
+        )
+            .execute(&app_data.database.pool)
+            .await;
 
-    if let Err(_) = res { return Err(ServiceError::TorrentNotFound) }
+        if let Err(_) = res { return Err(ServiceError::TorrentNotFound) }
+        if res.unwrap().rows_affected() == 0 { return Err(ServiceError::TorrentNotFound) }
+    }
 
-    if res.unwrap().rows_affected() == 0 { return Err(ServiceError::TorrentNotFound) }
+    // update torrent description
+    if let Some(description) = &payload.description {
+        let res = sqlx::query!(
+            "UPDATE torrust_torrents SET description = $1 WHERE torrent_id = $2",
+            description,
+            torrent_id
+        )
+            .execute(&app_data.database.pool)
+            .await;
 
-    let mut torrent_response = TorrentResponse::from_listing(torrent_listing);
-    torrent_response.description = Some(payload.description.clone());
+        if let Err(_) = res { return Err(ServiceError::TorrentNotFound) }
+        if res.unwrap().rows_affected() == 0 { return Err(ServiceError::TorrentNotFound) }
+    }
+
+    let torrent_listing = app_data.database.get_torrent_by_id(torrent_id).await?;
+    let torrent_response = TorrentResponse::from_listing(torrent_listing);
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: torrent_response
@@ -257,6 +275,9 @@ pub async fn delete_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceRe
 
     let torrent_id = get_torrent_id_from_request(&req)?;
 
+    // needed later for removing torrent from tracker whitelist
+    let torrent_listing = app_data.database.get_torrent_by_id(torrent_id).await?;
+
     let res = sqlx::query!(
         "DELETE FROM torrust_torrents WHERE torrent_id = ?",
         torrent_id
@@ -266,6 +287,9 @@ pub async fn delete_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceRe
 
     if let Err(_) = res { return Err(ServiceError::TorrentNotFound) }
     if res.unwrap().rows_affected() == 0 { return Err(ServiceError::TorrentNotFound) }
+
+    // remove info_hash from tracker whitelist
+    let _ = app_data.tracker.remove_info_hash_from_whitelist(torrent_listing.info_hash).await;
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: NewTorrentResponse {
