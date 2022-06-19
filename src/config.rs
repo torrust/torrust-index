@@ -50,6 +50,7 @@ pub struct Mail {
     pub password: String,
     pub server: String,
     pub port: u16,
+    pub feedback_mail: String
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,7 +111,8 @@ impl Configuration {
                 username: "".to_string(),
                 password: "".to_string(),
                 server: "".to_string(),
-                port: 25
+                port: 25,
+                feedback_mail: "example@email.com".to_string()
             }
         };
 

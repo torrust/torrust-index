@@ -28,6 +28,12 @@ struct VerifyTemplate {
     verification_url: String,
 }
 
+#[derive(TemplateOnce)]
+#[template(path = "../templates/feedback.html")]
+struct FeedbackTemplate {
+    username: String,
+    description: String,
+}
 
 impl MailerService {
     pub async fn new(cfg: Arc<Configuration>) -> MailerService {
@@ -54,6 +60,57 @@ impl MailerService {
             ])
             .build()
     }
+    pub async fn send_feedback(&self, username: Option<&str>, email: Option<&str>, description: &str) -> Result<(), ServiceError> {
+        
+        let username=username.unwrap_or("Anonimous");
+        let email=email.unwrap_or("<not provided>");
+        let settings = self.cfg.settings.read().await;
+        let to = &settings.mail.feedback_mail;
+
+        let builder = self.get_builder(&to).await;
+        let mail_body = format!(
+            r#"
+Feedback from, {}!
+Email {},
+
+"{}"
+            "#,
+            username,
+            email,
+            description
+        );
+
+        let ctx = FeedbackTemplate {
+            username: String::from(username),
+            description: description.to_string(),
+        };
+
+        let mail = builder
+            .subject("Torrust - Feedback")
+            .multipart(
+                MultiPart::alternative()
+                    .singlepart(
+                        SinglePart::builder()
+                            .header(lettre::message::header::ContentType::TEXT_PLAIN)
+                            .body(mail_body)
+                    )
+                    .singlepart(
+                        SinglePart::builder()
+                            .header(lettre::message::header::ContentType::TEXT_HTML)
+                            .body(ctx.render_once().unwrap())
+                    )
+            )
+            .unwrap();
+
+        match self.mailer.send(mail).await {
+            Ok(_res) => Ok(()),
+            Err(e) => {
+                eprintln!("Failed to send email: {}", e);
+                Err(ServiceError::FailedToSendVerificationEmail)
+            },
+        }
+    }
+
 
     pub async fn send_verification_mail(&self, to: &str, username: &str, base_url: &str) -> Result<(), ServiceError> {
         let builder = self.get_builder(to).await;

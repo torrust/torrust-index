@@ -1,3 +1,4 @@
 /.env
 /data.db*
 /config.toml
+/target
