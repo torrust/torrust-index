@@ -34,7 +34,7 @@ This repository serves as the backend for the [Torrust Index](https://github.com
 
 ## Documentation
 
-You can read the documentation [here](https://torrust.github.io/torrust-documentation/torrust-web-backend/about/).
+You can read the documentation [here](https://torrust.com/torrust-index/install/#installing-the-backend).
 
 ## Installation
 
@@ -71,7 +71,7 @@ You can read the documentation [here](https://torrust.github.io/torrust-document
 6. Run the backend once to generate the `config.toml` file:
 
     ```bash
-    ./target/torrust-index-backend
+    ./target/release/torrust-index-backend
     ```
 
 7. Edit the newly generated `config.toml` file ([config.toml documentation](https://torrust.github.io/torrust-tracker/CONFIG.html)):
