@@ -4,16 +4,16 @@ use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm, encode, Header, E
 use crate::utils::time::current_time;
 use crate::errors::ServiceError;
 use std::sync::Arc;
-use crate::database::Database;
 use crate::config::Configuration;
+use crate::databases::database::Database;
 
 pub struct AuthorizationService {
     cfg: Arc<Configuration>,
-    database: Arc<Database>,
+    database: Arc<Box<dyn Database>>
 }
 
 impl AuthorizationService {
-    pub fn new(cfg: Arc<Configuration>, database: Arc<Database>) -> AuthorizationService {
+    pub fn new(cfg: Arc<Configuration>, database: Arc<Box<dyn Database>>) -> AuthorizationService {
         AuthorizationService {
             cfg,
             database

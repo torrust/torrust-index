@@ -1,10 +1,12 @@
-use crate::config::Configuration;
 use std::sync::Arc;
-use crate::database::Database;
+
+use serde::{Serialize, Deserialize};
+
+use crate::config::Configuration;
+use crate::databases::database::Database;
 use crate::models::tracker_key::TrackerKey;
 use crate::errors::ServiceError;
 use crate::models::user::User;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TorrentInfo {
@@ -34,11 +36,11 @@ pub struct PeerId {
 
 pub struct TrackerService {
     cfg: Arc<Configuration>,
-    database: Arc<Database>,
+    database: Arc<Box<dyn Database>>
 }
 
 impl TrackerService {
-    pub fn new(cfg: Arc<Configuration>, database: Arc<Database>) -> TrackerService {
+    pub fn new(cfg: Arc<Configuration>, database: Arc<Box<dyn Database>>) -> TrackerService {
         TrackerService {
             cfg,
             database

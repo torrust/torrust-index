@@ -4,8 +4,8 @@ use actix_web::web::{Query};
 use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
 use serde::{Deserialize};
 use crate::errors::{ServiceError, ServiceResult};
-use crate::models::response::{NewTorrentResponse, OkResponse, TorrentResponse, TorrentsResponse};
-use crate::models::torrent::{TorrentListing, TorrentRequest};
+use crate::models::response::{NewTorrentResponse, OkResponse, TorrentResponse};
+use crate::models::torrent::TorrentRequest;
 use crate::utils::parse_torrent;
 use crate::common::{WebAppData};
 use std::io::Cursor;
@@ -14,6 +14,7 @@ use crate::models::torrent_file::{Torrent, File};
 use crate::AsCSV;
 use std::option::Option::Some;
 use sqlx::{FromRow};
+use crate::databases::database::Sorting;
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -32,16 +33,6 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
             .service(web::resource("")
                 .route(web::get().to(get_torrents)))
     );
-}
-
-#[derive(Debug, Deserialize)]
-pub struct DisplayInfo {
-    page_size: Option<i32>,
-    page: Option<i32>,
-    sort: Option<String>,
-    // expects comma separated string, eg: "?categories=movie,other,app"
-    categories: Option<String>,
-    search: Option<String>,
 }
 
 #[derive(FromRow)]
@@ -66,77 +57,29 @@ impl CreateTorrent {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct TorrentSearch {
+    page_size: Option<i16>,
+    page: Option<i32>,
+    sort: Option<Sorting>,
+    // expects comma separated string, eg: "?categories=movie,other,app"
+    categories: Option<String>,
+    search: Option<String>,
+}
+
 // eg: /torrents?categories=music,other,movie&search=bunny&sort=size_DESC
-pub async fn get_torrents(params: Query<DisplayInfo>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+pub async fn get_torrents(params: Query<TorrentSearch>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let sort = params.sort.unwrap_or(Sorting::uploaded_DESC);
     let page = params.page.unwrap_or(0);
     let page_size = params.page_size.unwrap_or(30);
-    let offset = page * page_size;
+    let offset = (page * page_size as i32) as u64;
     let categories = params.categories.as_csv::<String>().unwrap_or(None);
     let search = match &params.search {
         None => "%".to_string(),
         Some(v) => format!("%{}%", v)
     };
 
-    let sort_query: String = match &params.sort {
-        Some(sort) => {
-            match sort.as_str() {
-                "uploaded_ASC" => "upload_date ASC".to_string(),
-                "uploaded_DESC" => "upload_date DESC".to_string(),
-                "seeders_ASC" => "seeders ASC".to_string(),
-                "seeders_DESC" => "seeders DESC".to_string(),
-                "leechers_ASC" => "leechers ASC".to_string(),
-                "leechers_DESC" => "leechers DESC".to_string(),
-                "name_ASC" => "title ASC".to_string(),
-                "name_DESC" => "title DESC".to_string(),
-                "size_ASC" => "file_size ASC".to_string(),
-                "size_DESC" => "file_size DESC".to_string(),
-                _ => "upload_date DESC".to_string()
-            }
-        }
-        None => "upload_date DESC".to_string()
-    };
-
-    let category_filter_query = if let Some(c) = categories {
-        let mut i = 0;
-        let mut category_filters = String::new();
-        for category in c.iter() {
-            // don't take user input in the db query
-            if let Some(sanitized_category) = &app_data.database.get_category_by_name(category).await {
-                let mut str = format!("tc.name = '{}'", sanitized_category.name);
-                if i > 0 { str = format!(" OR {}", str); }
-                category_filters.push_str(&str);
-                i += 1;
-            }
-        }
-        if category_filters.len() > 0 {
-            format!("INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND ({})", category_filters)
-        } else {
-            String::new()
-        }
-    } else {
-        String::new()
-    };
-
-    let mut query_string = format!("SELECT tt.* FROM torrust_torrents tt {} WHERE title LIKE ?", category_filter_query);
-    let count_query_string = format!("SELECT COUNT(torrent_id) as count FROM ({})", query_string);
-
-    let count: TorrentCount = sqlx::query_as::<_, TorrentCount>(&count_query_string)
-        .bind(search.clone())
-        .fetch_one(&app_data.database.pool)
-        .await?;
-
-    query_string = format!("{} ORDER BY {} LIMIT ?, ?", query_string, sort_query);
-
-    let res: Vec<TorrentListing> = sqlx::query_as::<_, TorrentListing>(&query_string)
-        .bind(search)
-        .bind(offset)
-        .bind(page_size)
-        .fetch_all(&app_data.database.pool).await?;
-
-    let torrents_response = TorrentsResponse {
-        total: count.count as u32,
-        results: res
-    };
+    let torrents_response = app_data.database.get_torrents_search_sorted_paginated(&search, &categories, &sort, offset, page_size as u8).await?;
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: torrents_response
@@ -233,30 +176,12 @@ pub async fn update_torrent(req: HttpRequest, payload: web::Json<TorrentUpdate>,
 
     // update torrent title
     if let Some(title) = &payload.title {
-        let res = sqlx::query!(
-            "UPDATE torrust_torrents SET title = $1 WHERE torrent_id = $2",
-            title,
-            torrent_id
-        )
-            .execute(&app_data.database.pool)
-            .await;
-
-        if let Err(_) = res { return Err(ServiceError::TorrentNotFound) }
-        if res.unwrap().rows_affected() == 0 { return Err(ServiceError::TorrentNotFound) }
+        let _res = app_data.database.update_torrent_title(torrent_id, title).await?;
     }
 
     // update torrent description
     if let Some(description) = &payload.description {
-        let res = sqlx::query!(
-            "UPDATE torrust_torrents SET description = $1 WHERE torrent_id = $2",
-            description,
-            torrent_id
-        )
-            .execute(&app_data.database.pool)
-            .await;
-
-        if let Err(_) = res { return Err(ServiceError::TorrentNotFound) }
-        if res.unwrap().rows_affected() == 0 { return Err(ServiceError::TorrentNotFound) }
+        let _res = app_data.database.update_torrent_description(torrent_id, description).await?;
     }
 
     let torrent_listing = app_data.database.get_torrent_by_id(torrent_id).await?;
@@ -278,15 +203,7 @@ pub async fn delete_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceRe
     // needed later for removing torrent from tracker whitelist
     let torrent_listing = app_data.database.get_torrent_by_id(torrent_id).await?;
 
-    let res = sqlx::query!(
-        "DELETE FROM torrust_torrents WHERE torrent_id = ?",
-        torrent_id
-    )
-        .execute(&app_data.database.pool)
-        .await;
-
-    if let Err(_) = res { return Err(ServiceError::TorrentNotFound) }
-    if res.unwrap().rows_affected() == 0 { return Err(ServiceError::TorrentNotFound) }
+    let _res = app_data.database.delete_torrent(torrent_id).await?;
 
     // remove info_hash from tracker whitelist
     let _ = app_data.tracker.remove_info_hash_from_whitelist(torrent_listing.info_hash).await;
@@ -306,17 +223,8 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
     // update announce url to our own tracker url
     torrent_request.torrent.set_torrust_config(&app_data.cfg).await;
 
-    let res = sqlx::query!(
-        "SELECT category_id FROM torrust_categories WHERE name = ?",
-        torrent_request.fields.category
-    )
-        .fetch_one(&app_data.database.pool)
-        .await;
-
-    let row = match res {
-        Ok(row) => row,
-        Err(_) => return Err(ServiceError::InvalidCategory),
-    };
+    let category = app_data.database.get_category_by_name(&torrent_request.fields.category).await
+        .map_err(|_| ServiceError::InvalidCategory)?;
 
     let username = user.username;
     let info_hash = torrent_request.torrent.info_hash();
@@ -333,7 +241,7 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
         leechers = torrent_info.leechers;
     }
 
-    let torrent_id = app_data.database.insert_torrent_and_get_id(username, info_hash, title, row.category_id, description, file_size, seeders, leechers).await?;
+    let torrent_id = app_data.database.insert_torrent_and_get_id(username, info_hash, title, category.category_id, description, file_size, seeders, leechers).await?;
 
     // whitelist info hash on tracker
     let _ = app_data.tracker.whitelist_info_hash(torrent_request.torrent.info_hash()).await;

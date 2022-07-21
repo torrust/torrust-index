@@ -4,6 +4,8 @@ use actix_web::{ResponseError, HttpResponse, HttpResponseBuilder};
 use actix_web::http::{header, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::error;
+use crate::databases::database;
+use crate::databases::database::Error;
 
 pub type ServiceResult<V> = std::result::Result<V, ServiceError>;
 
@@ -30,6 +32,9 @@ pub enum ServiceError {
     WrongPasswordOrUsername,
     #[display(fmt = "Username not found")]
     UsernameNotFound,
+    #[display(fmt = "User not found")]
+    UserNotFound,
+
     #[display(fmt = "Account not found")]
     AccountNotFound,
 
@@ -124,6 +129,7 @@ impl ResponseError for ServiceError {
             ServiceError::NotAUrl => StatusCode::BAD_REQUEST,
             ServiceError::WrongPasswordOrUsername => StatusCode::FORBIDDEN,
             ServiceError::UsernameNotFound => StatusCode::NOT_FOUND,
+            ServiceError::UserNotFound => StatusCode::NOT_FOUND,
             ServiceError::AccountNotFound => StatusCode::NOT_FOUND,
 
             ServiceError::ProfainityError => StatusCode::BAD_REQUEST,
@@ -194,6 +200,20 @@ impl From<sqlx::Error> for ServiceError {
         }
 
         ServiceError::InternalServerError
+    }
+}
+
+impl From<database::Error> for ServiceError {
+    fn from(e: database::Error) -> Self {
+        match e {
+            Error::Error => ServiceError::InternalServerError,
+            Error::UsernameTaken => ServiceError::UsernameTaken,
+            Error::EmailTaken => ServiceError::EmailTaken,
+            Error::UserNotFound => ServiceError::UserNotFound,
+            Error::CategoryAlreadyExists => ServiceError::CategoryExists,
+            Error::CategoryNotFound => ServiceError::InvalidCategory,
+            Error::TorrentNotFound => ServiceError::TorrentNotFound,
+        }
     }
 }
 

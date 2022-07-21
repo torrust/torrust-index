@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::database::Category;
+use crate::databases::database::Category;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::File;
 
@@ -62,7 +62,7 @@ impl TorrentResponse {
             info_hash: torrent_listing.info_hash,
             title: torrent_listing.title,
             description: torrent_listing.description,
-            category: Category { name: "".to_string(), icon: None, num_torrents: 0 },
+            category: Category { category_id: 0, name: "".to_string(), icon: None, num_torrents: 0 },
             upload_date: torrent_listing.upload_date,
             file_size: torrent_listing.file_size,
             seeders: torrent_listing.seeders,

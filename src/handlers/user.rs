@@ -1,16 +1,11 @@
 use actix_web::{web, Responder, HttpResponse, HttpRequest};
 use serde::{Deserialize, Serialize};
-use pbkdf2::{
-    password_hash::{
-        rand_core::OsRng,
-        PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
-    },
-    Pbkdf2,
-};
-use std::borrow::Cow;
+use jsonwebtoken::{DecodingKey, decode, Validation, Algorithm};
+use pbkdf2::password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+use pbkdf2::Pbkdf2;
+
 use crate::errors::{ServiceResult, ServiceError};
 use crate::common::WebAppData;
-use jsonwebtoken::{DecodingKey, decode, Validation, Algorithm};
 use crate::config::EmailOnSignup;
 use crate::models::response::OkResponse;
 use crate::models::response::TokenResponse;
@@ -85,40 +80,7 @@ pub async fn register(req: HttpRequest, mut payload: web::Json<Register>, app_da
     // can't drop not null constraint on sqlite, so we fill the email with unique junk :)
     let email = payload.email.as_ref().unwrap_or(&format!("EMPTY_EMAIL_{}", random_string(16))).to_string();
 
-    let res = sqlx::query!(
-        "INSERT INTO torrust_users (username, email, password) VALUES ($1, $2, $3)",
-        payload.username,
-        email,
-        password_hash,
-    )
-        .execute(&app_data.database.pool)
-        .await;
-
-    if let Err(sqlx::Error::Database(err)) = res {
-        return if err.code() == Some(Cow::from("2067")) {
-            if err.message().contains("torrust_users.username") {
-                Err(ServiceError::UsernameTaken)
-            } else if err.message().contains("torrust_users.email") {
-                Err(ServiceError::EmailTaken)
-            } else {
-                Err(ServiceError::InternalServerError)
-            }
-        } else {
-            Err(sqlx::Error::Database(err).into())
-        };
-    }
-
-    // count accounts
-    let res_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM torrust_users")
-        .fetch_one(&app_data.database.pool)
-        .await?;
-
-    // make admin if first account
-    if res_count.0 == 1 {
-        let _res_make_admin = sqlx::query!("UPDATE torrust_users SET administrator = 1")
-            .execute(&app_data.database.pool)
-            .await;
-    }
+    let new_user_id = app_data.database.insert_user_and_get_id(&payload.username, &email, &password_hash).await?;
 
     let conn_info = req.connection_info();
 
@@ -130,18 +92,23 @@ pub async fn register(req: HttpRequest, mut payload: web::Json<Register>, app_da
         )
             .await;
 
-        // get user id from user insert res
-        let user_id = res.unwrap().last_insert_rowid();
-
         if mail_res.is_err() {
-            let _ = app_data.database.delete_user(user_id).await;
+            let _ = app_data.database.delete_user(new_user_id).await;
             return Err(ServiceError::FailedToSendVerificationEmail)
         }
-    } else {
-
     }
 
     Ok(HttpResponse::Ok())
+}
+
+async fn grant_admin_role(app_data: &WebAppData, user_id: i64) {
+    // count accounts
+    let user_count = app_data.database.count_users().await;
+
+    // make admin if first account
+    if let Ok(1) = user_count {
+        let _ = app_data.database.grant_admin_role(user_id).await;
+    }
 }
 
 pub async fn login(payload: web::Json<Login>, app_data: WebAppData) -> ServiceResult<impl Responder> {
@@ -200,16 +167,9 @@ pub async fn verify_user(req: HttpRequest, app_data: WebAppData) -> String {
 
     drop(settings);
 
-    let res = sqlx::query!(
-        "UPDATE torrust_users SET email_verified = TRUE WHERE username = ?",
-        token_data.sub
-    )
-        .execute(&app_data.database.pool)
-        .await;
-
-    if let Err(_) = res {
+    if app_data.database.verify_email(&token_data.sub).await.is_err() {
         return ServiceError::InternalServerError.to_string()
-    }
+    };
 
     String::from("Email verified, you can close this page.")
 }
@@ -222,15 +182,7 @@ pub async fn ban_user(req: HttpRequest, app_data: WebAppData) -> ServiceResult<i
 
     let to_be_banned_username = req.match_info().get("user").unwrap();
 
-    let res = sqlx::query!(
-        "DELETE FROM torrust_users WHERE username = ? AND administrator = 0",
-        to_be_banned_username
-    )
-        .execute(&app_data.database.pool)
-        .await;
-
-    if let Err(_) = res { return Err(ServiceError::UsernameNotFound) }
-    if res.unwrap().rows_affected() == 0 { return Err(ServiceError::UsernameNotFound) }
+    let _ = app_data.database.ban_user(&to_be_banned_username).await?;
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: format!("Banned user: {}", to_be_banned_username)

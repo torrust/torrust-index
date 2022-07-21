@@ -1,13 +1,13 @@
 pub mod handlers;
 pub mod models;
 pub mod utils;
-pub mod database;
 pub mod config;
 pub mod errors;
 pub mod common;
 pub mod auth;
 pub mod tracker;
 pub mod mailer;
+pub mod databases;
 
 trait AsCSV {
     fn as_csv<T>(&self) -> Result<Option<Vec<T>>, ()>
