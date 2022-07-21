@@ -94,7 +94,7 @@ impl TrackerService {
     pub async fn get_personal_announce_url(&self, user: &User) -> Result<String, ServiceError> {
         let settings = self.cfg.settings.read().await;
 
-        let tracker_key = self.database.get_valid_tracker_key(user.user_id).await;
+        let tracker_key = self.database.get_user_tracker_key(user.user_id).await;
 
         match tracker_key {
             Some(v) => { Ok(format!("{}/{}", settings.tracker.url, v.key)) }
@@ -169,7 +169,7 @@ impl TrackerService {
 
     pub async fn update_torrents(&self) -> Result<(), ()> {
         println!("Updating torrents..");
-        let torrents = self.database.get_all_torrent_ids().await?;
+        let torrents = self.database.get_all_torrents_compact().await?;
 
         for torrent in torrents {
             let _ = self.get_torrent_info(&torrent.info_hash).await;

@@ -83,7 +83,7 @@ impl AuthorizationService {
             Err(e) => Err(e)
         }?;
 
-        match self.database.get_user_with_username(&claims.sub).await {
+        match self.database.get_user_from_username(&claims.sub).await {
             Some(user) => Ok(user),
             None => Err(ServiceError::AccountNotFound)
         }

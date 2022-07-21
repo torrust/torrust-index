@@ -12,10 +12,9 @@ actix-web = "4.0.0-beta.8"
 actix-multipart = "0.4.0-beta.5"
 actix-cors = "0.6.0-beta.2"
 
+async-trait = "0.1.52"
 async-std = "1.10.0"
 futures = "0.3.5"
-
-lazy_static = "1.4"
 
 sqlx = { version = "0.5.7", features = [ "runtime-actix-rustls", "sqlite", "migrate", "time" ] }
 

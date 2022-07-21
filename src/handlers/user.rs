@@ -58,20 +58,17 @@ pub async fn register(req: HttpRequest, mut payload: web::Json<Register>, app_da
     }
 
     let password_length = payload.password.len();
+
     if password_length <= settings.auth.min_password_length {
         return Err(ServiceError::PasswordTooShort);
     }
+
     if password_length >= settings.auth.max_password_length {
         return Err(ServiceError::PasswordTooLong);
     }
 
     let salt = SaltString::generate(&mut OsRng);
-    let password_hash;
-    if let Ok(password) = Pbkdf2.hash_password(payload.password.as_bytes(), &salt) {
-        password_hash = password.to_string();
-    } else {
-        return Err(ServiceError::InternalServerError);
-    }
+    let password_hash = Pbkdf2.hash_password(payload.password.as_bytes(), &salt)?.to_string();
 
     if payload.username.contains('@') {
         return Err(ServiceError::UsernameInvalid)
@@ -80,7 +77,7 @@ pub async fn register(req: HttpRequest, mut payload: web::Json<Register>, app_da
     // can't drop not null constraint on sqlite, so we fill the email with unique junk :)
     let email = payload.email.as_ref().unwrap_or(&format!("EMPTY_EMAIL_{}", random_string(16))).to_string();
 
-    let new_user_id = app_data.database.insert_user_and_get_id(&payload.username, &email, &password_hash).await?;
+    let user_id = app_data.database.insert_user_and_get_id(&payload.username, &email, &password_hash).await?;
 
     let conn_info = req.connection_info();
 
@@ -88,12 +85,13 @@ pub async fn register(req: HttpRequest, mut payload: web::Json<Register>, app_da
         let mail_res = app_data.mailer.send_verification_mail(
             &payload.email.as_ref().unwrap(),
             &payload.username,
+            user_id,
             format!("{}://{}", conn_info.scheme(), conn_info.host()).as_str()
         )
             .await;
 
         if mail_res.is_err() {
-            let _ = app_data.database.delete_user(new_user_id).await;
+            let _ = app_data.database.delete_user(user_id).await;
             return Err(ServiceError::FailedToSendVerificationEmail)
         }
     }
@@ -114,7 +112,7 @@ async fn grant_admin_role(app_data: &WebAppData, user_id: i64) {
 pub async fn login(payload: web::Json<Login>, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let settings = app_data.cfg.settings.read().await;
 
-    let res = app_data.database.get_user_with_username(&payload.login).await;
+    let res = app_data.database.get_user_from_username(&payload.login).await;
 
     match res {
         Some(user) => {
@@ -167,7 +165,7 @@ pub async fn verify_user(req: HttpRequest, app_data: WebAppData) -> String {
 
     drop(settings);
 
-    if app_data.database.verify_email(&token_data.sub).await.is_err() {
+    if app_data.database.verify_email(token_data.sub).await.is_err() {
         return ServiceError::InternalServerError.to_string()
     };
 

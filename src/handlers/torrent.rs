@@ -59,8 +59,8 @@ impl CreateTorrent {
 
 #[derive(Debug, Deserialize)]
 pub struct TorrentSearch {
-    page_size: Option<i16>,
-    page: Option<i32>,
+    page_size: Option<u8>,
+    page: Option<u32>,
     sort: Option<Sorting>,
     // expects comma separated string, eg: "?categories=movie,other,app"
     categories: Option<String>,
@@ -71,15 +71,15 @@ pub struct TorrentSearch {
 pub async fn get_torrents(params: Query<TorrentSearch>, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let sort = params.sort.unwrap_or(Sorting::uploaded_DESC);
     let page = params.page.unwrap_or(0);
-    let page_size = params.page_size.unwrap_or(30);
-    let offset = (page * page_size as i32) as u64;
-    let categories = params.categories.as_csv::<String>().unwrap_or(None);
-    let search = match &params.search {
-        None => "%".to_string(),
-        Some(v) => format!("%{}%", v)
+    // make sure the min page size = 10
+    let page_size = match params.page_size.unwrap_or(30) {
+        0 ..= 9 => 10,
+        v => v
     };
+    let offset = (page * page_size as u32) as u64;
+    let categories = params.categories.as_csv::<String>().unwrap_or(None);
 
-    let torrents_response = app_data.database.get_torrents_search_sorted_paginated(&search, &categories, &sort, offset, page_size as u8).await?;
+    let torrents_response = app_data.database.get_torrents_search_sorted_paginated(&params.search, &categories, &sort, offset, page_size as u8).await?;
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: torrents_response
@@ -94,8 +94,8 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
 
     let torrent_id = get_torrent_id_from_request(&req)?;
 
-    let torrent_listing = app_data.database.get_torrent_by_id(torrent_id).await?;
-    let category = app_data.database.get_category(torrent_listing.category_id).await.unwrap();
+    let torrent_listing = app_data.database.get_torrent_from_id(torrent_id).await?;
+    let category = app_data.database.get_category_from_id(torrent_listing.category_id).await.unwrap();
     let mut torrent_response = TorrentResponse::from_listing(torrent_listing);
     torrent_response.category = category;
 
@@ -169,7 +169,7 @@ pub async fn update_torrent(req: HttpRequest, payload: web::Json<TorrentUpdate>,
 
     let torrent_id = get_torrent_id_from_request(&req)?;
 
-    let torrent_listing = app_data.database.get_torrent_by_id(torrent_id).await?;
+    let torrent_listing = app_data.database.get_torrent_from_id(torrent_id).await?;
 
     // check if user is owner or administrator
     if torrent_listing.uploader != user.username && !user.administrator { return Err(ServiceError::Unauthorized) }
@@ -184,7 +184,7 @@ pub async fn update_torrent(req: HttpRequest, payload: web::Json<TorrentUpdate>,
         let _res = app_data.database.update_torrent_description(torrent_id, description).await?;
     }
 
-    let torrent_listing = app_data.database.get_torrent_by_id(torrent_id).await?;
+    let torrent_listing = app_data.database.get_torrent_from_id(torrent_id).await?;
     let torrent_response = TorrentResponse::from_listing(torrent_listing);
 
     Ok(HttpResponse::Ok().json(OkResponse {
@@ -201,7 +201,7 @@ pub async fn delete_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceRe
     let torrent_id = get_torrent_id_from_request(&req)?;
 
     // needed later for removing torrent from tracker whitelist
-    let torrent_listing = app_data.database.get_torrent_by_id(torrent_id).await?;
+    let torrent_listing = app_data.database.get_torrent_from_id(torrent_id).await?;
 
     let _res = app_data.database.delete_torrent(torrent_id).await?;
 
@@ -223,7 +223,7 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
     // update announce url to our own tracker url
     torrent_request.torrent.set_torrust_config(&app_data.cfg).await;
 
-    let category = app_data.database.get_category_by_name(&torrent_request.fields.category).await
+    let category = app_data.database.get_category_from_name(&torrent_request.fields.category).await
         .map_err(|_| ServiceError::InvalidCategory)?;
 
     let username = user.username;
