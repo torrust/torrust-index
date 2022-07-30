@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS torrust_users (
+    user_id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    date_registered DATETIME NULL
+)
