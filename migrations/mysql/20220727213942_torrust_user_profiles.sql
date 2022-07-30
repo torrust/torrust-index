@@ -5,5 +5,5 @@ CREATE TABLE IF NOT EXISTS torrust_user_profiles (
     email_verified BOOL DEFAULT FALSE,
     bio TEXT,
     avatar TEXT,
-    FOREIGN KEY(user_id) REFERENCES torrust_users(user_id)
+    FOREIGN KEY(user_id) REFERENCES torrust_users(user_id) ON DELETE CASCADE
 )

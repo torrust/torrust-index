@@ -5,5 +5,5 @@ CREATE TABLE IF NOT EXISTS torrust_user_public_keys (
     date_registered DATETIME NOT NULL,
     date_expiry DATETIME NOT NULL,
     revoked BOOLEAN NOT NULL DEFAULT FALSE,
-    FOREIGN KEY(user_id) REFERENCES torrust_users(user_id)
+    FOREIGN KEY(user_id) REFERENCES torrust_users(user_id) ON DELETE CASCADE
 )

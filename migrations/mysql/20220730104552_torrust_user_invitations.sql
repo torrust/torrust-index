@@ -7,6 +7,6 @@ CREATE TABLE IF NOT EXISTS torrust_user_invitations (
     date_expiry DATETIME NOT NULL,
     max_uses INTEGER NOT NULL,
     personal_message VARCHAR(512),
-    FOREIGN KEY(user_id) REFERENCES torrust_users(user_id),
-    FOREIGN KEY(public_key) REFERENCES torrust_user_public_keys(public_key)
+    FOREIGN KEY(user_id) REFERENCES torrust_users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY(public_key) REFERENCES torrust_user_public_keys(public_key) ON DELETE CASCADE
 )
