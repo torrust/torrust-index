@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS torrust_user_profiles (
     user_id INTEGER NOT NULL PRIMARY KEY,
-    username TEXT NOT NULL,
-    email TEXT,
+    username TEXT NOT NULL UNIQUE,
+    email TEXT UNIQUE,
     email_verified BOOL DEFAULT FALSE,
     bio TEXT,
     avatar TEXT,
