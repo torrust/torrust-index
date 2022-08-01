@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS torrust_users (
     user_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    date_registered TEXT NULL
+    date_registered TEXT NOT NULL,
+    administrator BOOL NOT NULL DEFAULT FALSE
 )
