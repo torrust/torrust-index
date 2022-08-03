@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::database::Category;
+use crate::databases::database::Category;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::File;
 
@@ -29,14 +29,6 @@ pub struct NewTorrentResponse {
     pub torrent_id: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug, sqlx::FromRow)]
-pub struct CategoryResponse {
-    pub category_id: i64,
-    pub name: String,
-    pub icon: Option<String>,
-    pub num_torrents: Option<i64>,
-}
-
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct TorrentResponse {
     pub torrent_id: i64,
@@ -62,7 +54,7 @@ impl TorrentResponse {
             info_hash: torrent_listing.info_hash,
             title: torrent_listing.title,
             description: torrent_listing.description,
-            category: Category { name: "".to_string(), icon: None, num_torrents: 0 },
+            category: Category { category_id: 0, name: "".to_string(), num_torrents: 0 },
             upload_date: torrent_listing.upload_date,
             file_size: torrent_listing.file_size,
             seeders: torrent_listing.seeders,

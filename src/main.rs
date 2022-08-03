@@ -1,11 +1,11 @@
 use std::sync::Arc;
 use actix_web::{App, HttpServer, middleware, web};
 use actix_cors::Cors;
-use torrust_index_backend::database::Database;
 use torrust_index_backend::{handlers};
 use torrust_index_backend::config::{Configuration};
 use torrust_index_backend::common::AppData;
 use torrust_index_backend::auth::AuthorizationService;
+use torrust_index_backend::databases::database::connect_database;
 use torrust_index_backend::tracker::TrackerService;
 use torrust_index_backend::mailer::MailerService;
 
@@ -20,7 +20,7 @@ async fn main() -> std::io::Result<()> {
 
     let settings = cfg.settings.read().await;
 
-    let database = Arc::new(Database::new(&settings.database.connect_url).await);
+    let database = Arc::new(connect_database(&settings.database.db_driver, &settings.database.connect_url).await);
     let auth = Arc::new(AuthorizationService::new(cfg.clone(), database.clone()));
     let tracker_service = Arc::new(TrackerService::new(cfg.clone(), database.clone()));
     let mailer_service = Arc::new(MailerService::new(cfg.clone()).await);
@@ -33,9 +33,6 @@ async fn main() -> std::io::Result<()> {
             mailer_service.clone(),
         )
     );
-
-    // create/update database tables
-    let _ = sqlx::migrate!().run(&database.pool).await;
 
     // create torrent upload folder
     async_std::fs::create_dir_all(&settings.storage.upload_path).await?;
