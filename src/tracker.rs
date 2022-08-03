@@ -6,7 +6,6 @@ use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::models::tracker_key::TrackerKey;
 use crate::errors::ServiceError;
-use crate::models::user::User;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TorrentInfo {
@@ -91,15 +90,15 @@ impl TrackerService {
         Err(ServiceError::InternalServerError)
     }
 
-    pub async fn get_personal_announce_url(&self, user: &User) -> Result<String, ServiceError> {
+    pub async fn get_personal_announce_url(&self, user_id: i64) -> Result<String, ServiceError> {
         let settings = self.cfg.settings.read().await;
 
-        let tracker_key = self.database.get_user_tracker_key(user.user_id).await;
+        let tracker_key = self.database.get_user_tracker_key(user_id).await;
 
         match tracker_key {
             Some(v) => { Ok(format!("{}/{}", settings.tracker.url, v.key)) }
             None => {
-                match self.retrieve_new_tracker_key(user.user_id).await {
+                match self.retrieve_new_tracker_key(user_id).await {
                     Ok(v) => { Ok(format!("{}/{}", settings.tracker.url, v.key)) },
                     Err(_) => { Err(ServiceError::TrackerOffline) }
                 }
@@ -130,7 +129,7 @@ impl TrackerService {
 
         println!("{:?}", tracker_key);
 
-        self.database.issue_tracker_key(&tracker_key, user_id).await?;
+        self.database.add_tracker_key(user_id, &tracker_key).await?;
 
         Ok(tracker_key)
     }
@@ -167,7 +166,7 @@ impl TrackerService {
         Ok(torrent_info)
     }
 
-    pub async fn update_torrents(&self) -> Result<(), ()> {
+    pub async fn update_torrents(&self) -> Result<(), ServiceError> {
         println!("Updating torrents..");
         let torrents = self.database.get_all_torrents_compact().await?;
 

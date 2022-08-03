@@ -1,28 +1,28 @@
-use sqlx::{Acquire, query, query_as, SqlitePool};
-use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::{Acquire, MySqlPool, query, query_as};
 use async_trait::async_trait;
 use chrono::{NaiveDateTime};
+use sqlx::mysql::MySqlPoolOptions;
 
+use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 use crate::models::torrent::TorrentListing;
 use crate::utils::time::current_time;
 use crate::models::tracker_key::TrackerKey;
 use crate::databases::database::{Category, Database, DatabaseError, Sorting, TorrentCompact};
 use crate::handlers::torrent::TorrentCount;
 use crate::models::response::{TorrentsResponse};
-use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 
-pub struct SqliteDatabase {
-    pub pool: SqlitePool
+pub struct MysqlDatabase {
+    pub pool: MySqlPool
 }
 
-impl SqliteDatabase {
+impl MysqlDatabase {
     pub async fn new(database_url: &str) -> Self {
-        let db = SqlitePoolOptions::new()
+        let db = MySqlPoolOptions::new()
             .connect(database_url)
             .await
             .expect("Unable to create database pool.");
 
-        sqlx::migrate!("migrations/sqlite3")
+        sqlx::migrate!("migrations/mysql")
             .run(&db)
             .await
             .expect("Could not run database migrations.");
@@ -34,7 +34,7 @@ impl SqliteDatabase {
 }
 
 #[async_trait]
-impl Database for SqliteDatabase {
+impl Database for MysqlDatabase {
     async fn insert_user_and_get_id(&self, username: &str, email: &str, password_hash: &str) -> Result<i64, DatabaseError> {
 
         // open pool connection
@@ -48,10 +48,10 @@ impl Database for SqliteDatabase {
             .map_err(|_| DatabaseError::Error)?;
 
         // create the user account and get the user id
-        let user_id = query("INSERT INTO torrust_users (date_registered) VALUES (strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
+        let user_id = query("INSERT INTO torrust_users (date_registered) VALUES (UTC_TIMESTAMP())")
             .execute(&mut tx)
             .await
-            .map(|v| v.last_insert_rowid())
+            .map(|v| v.last_insert_id())
             .map_err(|_| DatabaseError::Error)?;
 
         // add password hash for account
@@ -118,7 +118,7 @@ impl Database for SqliteDatabase {
     }
 
     async fn get_user_profile_from_username(&self, username: &str) -> Result<UserProfile, DatabaseError> {
-        query_as::<_, UserProfile>("SELECT * FROM torrust_user_profiles WHERE username = ?")
+        query_as::<_, UserProfile>(r#"SELECT user_id, username, COALESCE(email, "") as email, email_verified, COALESCE(bio, "") as bio, COALESCE(avatar, "") as avatar FROM torrust_user_profiles WHERE username = ?"#)
             .bind(username)
             .fetch_one(&self.pool)
             .await
@@ -140,7 +140,7 @@ impl Database for SqliteDatabase {
         let current_time_plus_hour = (current_time() as i64) + HOUR_IN_SECONDS;
 
         // get tracker key that is valid for at least one hour from now
-        query_as::<_, TrackerKey>("SELECT tracker_key, date_expiry FROM torrust_tracker_keys WHERE user_id = $1 AND date_expiry > $2 ORDER BY date_expiry DESC")
+        query_as::<_, TrackerKey>("SELECT tracker_key, date_expiry FROM torrust_tracker_keys WHERE user_id = ? AND date_expiry > ? ORDER BY date_expiry DESC")
             .bind(user_id)
             .bind(current_time_plus_hour)
             .fetch_one(&self.pool)
@@ -160,7 +160,7 @@ impl Database for SqliteDatabase {
         // date needs to be in ISO 8601 format
         let date_expiry_string = date_expiry.format("%Y-%m-%d %H:%M:%S").to_string();
 
-        query("INSERT INTO torrust_user_bans (user_id, reason, date_expiry) VALUES ($1, $2, $3)")
+        query("INSERT INTO torrust_user_bans (user_id, reason, date_expiry) VALUES (?, ?, ?)")
             .bind(user_id)
             .bind(reason)
             .bind(date_expiry_string)
@@ -188,8 +188,12 @@ impl Database for SqliteDatabase {
             .bind(user_id)
             .execute(&self.pool)
             .await
-            .map(|_| ())
             .map_err(|_| DatabaseError::Error)
+            .and_then(|v| if v.rows_affected() > 0 {
+                Ok(())
+            } else {
+                Err(DatabaseError::UserNotFound)
+            })
     }
 
     async fn add_tracker_key(&self, user_id: i64, tracker_key: &TrackerKey) -> Result<(), DatabaseError> {
@@ -200,7 +204,7 @@ impl Database for SqliteDatabase {
             .format("%Y-%m-%d %H:%M:%S")
             .to_string();
 
-        query("INSERT INTO torrust_tracker_keys (user_id, tracker_key, date_expiry) VALUES ($1, $2, $3)")
+        query("INSERT INTO torrust_tracker_keys (user_id, tracker_key, date_expiry) VALUES (?, ?, ?)")
             .bind(user_id)
             .bind(key)
             .bind(date_expiry)
@@ -350,7 +354,7 @@ impl Database for SqliteDatabase {
     async fn insert_torrent_and_get_id(&self, username: String, info_hash: String, title: String, category_id: i64, description: String, file_size: i64, seeders: i64, leechers: i64) -> Result<i64, DatabaseError> {
         let current_time = current_time() as i64;
 
-        query("INSERT INTO torrust_torrents (uploader, info_hash, title, category_id, description, upload_date, file_size, seeders, leechers) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)")
+        query(r#"INSERT INTO torrust_torrents (uploader, info_hash, title, category_id, description, upload_date, file_size, seeders, leechers) VALUES (?, ?, ?, NULLIF(?, ""), ?, ?, ?, ?, ?)"#)
             .bind(username)
             .bind(info_hash)
             .bind(title)
@@ -362,19 +366,19 @@ impl Database for SqliteDatabase {
             .bind(leechers)
             .execute(&self.pool)
             .await
-            .map(|v| v.last_insert_rowid())
+            .map(|v| v.last_insert_id() as i64)
             .map_err(|e| match e {
-            sqlx::Error::Database(err) => {
-                if err.message().contains("info_hash") {
-                    DatabaseError::TorrentAlreadyExists
-                } else if err.message().contains("title") {
-                    DatabaseError::TorrentTitleAlreadyExists
-                } else {
-                    DatabaseError::Error
+                sqlx::Error::Database(err) => {
+                    if err.message().contains("info_hash") {
+                        DatabaseError::TorrentAlreadyExists
+                    } else if err.message().contains("title") {
+                        DatabaseError::TorrentTitleAlreadyExists
+                    } else {
+                        DatabaseError::Error
+                    }
                 }
-            }
-            _ => DatabaseError::Error
-        })
+                _ => DatabaseError::Error
+            })
     }
 
     async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<TorrentListing, DatabaseError> {
@@ -393,7 +397,7 @@ impl Database for SqliteDatabase {
     }
 
     async fn update_torrent_title(&self, torrent_id: i64, title: &str) -> Result<(), DatabaseError> {
-        query("UPDATE torrust_torrents SET title = $1 WHERE torrent_id = $2")
+        query("UPDATE torrust_torrents SET title = ? WHERE torrent_id = ?")
             .bind(title)
             .bind(torrent_id)
             .execute(&self.pool)
@@ -416,7 +420,7 @@ impl Database for SqliteDatabase {
     }
 
     async fn update_torrent_description(&self, torrent_id: i64, description: &str) -> Result<(), DatabaseError> {
-        query("UPDATE torrust_torrents SET description = $1 WHERE torrent_id = $2")
+        query("UPDATE torrust_torrents SET description = ? WHERE torrent_id = ?")
             .bind(description)
             .bind(torrent_id)
             .execute(&self.pool)
@@ -430,7 +434,7 @@ impl Database for SqliteDatabase {
     }
 
     async fn update_tracker_info(&self, info_hash: &str, seeders: i64, leechers: i64) -> Result<(), DatabaseError> {
-        query("UPDATE torrust_torrents SET seeders = $1, leechers = $2 WHERE info_hash = $3")
+        query("UPDATE torrust_torrents SET seeders = ?, leechers = ? WHERE info_hash = ?")
             .bind(seeders)
             .bind(leechers)
             .bind(info_hash)

@@ -32,12 +32,12 @@ pub struct Category {
 
 pub async fn add_category(req: HttpRequest, payload: web::Json<Category>, app_data: WebAppData) -> ServiceResult<impl Responder> {
     // check for user
-    let user = app_data.auth.get_user_from_request(&req).await?;
+    let user = app_data.auth.get_user_compact_from_request(&req).await?;
 
     // check if user is administrator
     if !user.administrator { return Err(ServiceError::Unauthorized) }
 
-    let _ = app_data.database.insert_category(&payload.name).await?;
+    let _ = app_data.database.add_category(&payload.name).await?;
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: payload.name.clone()
@@ -46,7 +46,7 @@ pub async fn add_category(req: HttpRequest, payload: web::Json<Category>, app_da
 
 pub async fn delete_category(req: HttpRequest, payload: web::Json<Category>, app_data: WebAppData) -> ServiceResult<impl Responder> {
     // check for user
-    let user = app_data.auth.get_user_from_request(&req).await?;
+    let user = app_data.auth.get_user_compact_from_request(&req).await?;
 
     // check if user is administrator
     if !user.administrator { return Err(ServiceError::Unauthorized) }

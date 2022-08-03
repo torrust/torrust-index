@@ -16,7 +16,7 @@ async-trait = "0.1.52"
 async-std = "1.10.0"
 futures = "0.3.5"
 
-sqlx = { version = "0.5.7", features = [ "runtime-actix-rustls", "sqlite", "migrate", "time" ] }
+sqlx = { version = "0.5.7", features = [ "runtime-actix-rustls", "sqlite", "mysql", "migrate", "time" ] }
 
 config = "0.11"
 toml = "0.5"
@@ -35,7 +35,8 @@ urlencoding = "2.1.0"
 
 pbkdf2 = "0.9"
 rand_core = { version = "0.6", features = ["std"] }
-rand = "0.8.5"
+
+chrono = "0.4.19"
 
 sanitize-filename = "0.3.0"
 
