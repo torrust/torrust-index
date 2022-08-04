@@ -7,7 +7,6 @@ use crate::models::torrent::TorrentListing;
 use crate::utils::time::current_time;
 use crate::models::tracker_key::TrackerKey;
 use crate::databases::database::{Category, Database, DatabaseError, Sorting, TorrentCompact};
-use crate::handlers::torrent::TorrentCount;
 use crate::models::response::{TorrentsResponse};
 use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 
