@@ -3,7 +3,7 @@ use config::{ConfigError, Config, File};
 use std::path::Path;
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
-use crate::databases::database::DatabaseDrivers;
+use crate::databases::database::DatabaseDriver;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Website {
@@ -50,7 +50,7 @@ pub struct Auth {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Database {
-    pub db_driver: DatabaseDrivers,
+    pub db_driver: DatabaseDriver,
     pub connect_url: String,
     pub torrent_info_update_interval: u64,
 }
@@ -111,7 +111,7 @@ impl Configuration {
                 secret_key: "MaxVerstappenWC2021".to_string()
             },
             database: Database {
-                db_driver: DatabaseDrivers::Sqlite3,
+                db_driver: DatabaseDriver::Sqlite3,
                 connect_url: "sqlite://data.db?mode=rwc".to_string(),
                 torrent_info_update_interval: 3600
             },

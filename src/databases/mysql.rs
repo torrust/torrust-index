@@ -7,7 +7,7 @@ use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 use crate::models::torrent::TorrentListing;
 use crate::utils::time::current_time;
 use crate::models::tracker_key::TrackerKey;
-use crate::databases::database::{Category, Database, DatabaseError, Sorting, TorrentCompact};
+use crate::databases::database::{Category, Database, DatabaseDriver, DatabaseError, Sorting, TorrentCompact};
 use crate::models::response::{TorrentsResponse};
 
 pub struct MysqlDatabase {
@@ -34,6 +34,10 @@ impl MysqlDatabase {
 
 #[async_trait]
 impl Database for MysqlDatabase {
+    fn get_database_driver(&self) -> DatabaseDriver {
+        DatabaseDriver::Mysql
+    }
+
     async fn insert_user_and_get_id(&self, username: &str, email: &str, password_hash: &str) -> Result<i64, DatabaseError> {
 
         // open pool connection

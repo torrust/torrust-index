@@ -6,7 +6,7 @@ use chrono::{NaiveDateTime};
 use crate::models::torrent::TorrentListing;
 use crate::utils::time::current_time;
 use crate::models::tracker_key::TrackerKey;
-use crate::databases::database::{Category, Database, DatabaseError, Sorting, TorrentCompact};
+use crate::databases::database::{Category, Database, DatabaseDriver, DatabaseError, Sorting, TorrentCompact};
 use crate::models::response::{TorrentsResponse};
 use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 
@@ -34,6 +34,10 @@ impl SqliteDatabase {
 
 #[async_trait]
 impl Database for SqliteDatabase {
+    fn get_database_driver(&self) -> DatabaseDriver {
+        DatabaseDriver::Sqlite3
+    }
+
     async fn insert_user_and_get_id(&self, username: &str, email: &str, password_hash: &str) -> Result<i64, DatabaseError> {
 
         // open pool connection

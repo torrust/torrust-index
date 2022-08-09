@@ -8,8 +8,8 @@ use crate::models::torrent::TorrentListing;
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum DatabaseDrivers {
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub enum DatabaseDriver {
     Sqlite3,
     Mysql
 }
@@ -54,7 +54,7 @@ pub enum DatabaseError {
     TorrentTitleAlreadyExists,
 }
 
-pub async fn connect_database(db_driver: &DatabaseDrivers, db_path: &str) -> Box<dyn Database> {
+pub async fn connect_database(db_driver: &DatabaseDriver, db_path: &str) -> Box<dyn Database> {
     // match &db_path.chars().collect::<Vec<char>>() as &[char] {
     //     ['s', 'q', 'l', 'i', 't', 'e', ..] => {
     //         let db = SqliteDatabase::new(db_path).await;
@@ -70,11 +70,11 @@ pub async fn connect_database(db_driver: &DatabaseDrivers, db_path: &str) -> Box
     // }
 
     match db_driver {
-        DatabaseDrivers::Sqlite3 => {
+        DatabaseDriver::Sqlite3 => {
             let db = SqliteDatabase::new(db_path).await;
             Box::new(db)
         }
-        DatabaseDrivers::Mysql => {
+        DatabaseDriver::Mysql => {
             let db = MysqlDatabase::new(db_path).await;
             Box::new(db)
         }
@@ -83,6 +83,9 @@ pub async fn connect_database(db_driver: &DatabaseDrivers, db_path: &str) -> Box
 
 #[async_trait]
 pub trait Database: Sync + Send {
+    // return current database driver
+    fn get_database_driver(&self) -> DatabaseDriver;
+
     // add new user and get the newly inserted user_id
     async fn insert_user_and_get_id(&self, username: &str, email: &str, password: &str) -> Result<i64, DatabaseError>;
 
