@@ -162,4 +162,7 @@ pub trait Database: Sync + Send {
 
     // delete a torrent
     async fn delete_torrent(&self, torrent_id: i64) -> Result<(), DatabaseError>;
+
+    // DELETES ALL DATABASE ROWS, ONLY CALL THIS IF YOU KNOW WHAT YOU'RE DOING!
+    async fn delete_all_database_rows(&self) -> Result<(), DatabaseError>;
 }

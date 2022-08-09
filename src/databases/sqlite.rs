@@ -455,4 +455,21 @@ impl Database for SqliteDatabase {
                 Err(DatabaseError::TorrentNotFound)
             })
     }
+
+    async fn delete_all_database_rows(&self) -> Result<(), DatabaseError> {
+        query("DELETE FROM torrust_categories;
+            DELETE FROM torrust_torrents;
+            DELETE FROM torrust_tracker_keys;
+            DELETE FROM torrust_users;
+            DELETE FROM torrust_user_authentication;
+            DELETE FROM torrust_user_bans;
+            DELETE FROM torrust_user_invitations;
+            DELETE FROM torrust_user_profiles;
+            DELETE FROM torrust_user_public_keys;"
+        )
+            .execute(&self.pool)
+            .await
+            .map(|_| ())
+            .map_err(|_| DatabaseError::Error)
+    }
 }

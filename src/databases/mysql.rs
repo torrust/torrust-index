@@ -459,4 +459,24 @@ impl Database for MysqlDatabase {
                 Err(DatabaseError::TorrentNotFound)
             })
     }
+
+    async fn delete_all_database_rows(&self) -> Result<(), DatabaseError> {
+        query("
+            SET SQL_SAFE_UPDATES = 0;
+            DELETE FROM torrust_categories;
+            DELETE FROM torrust_torrents;
+            DELETE FROM torrust_tracker_keys;
+            DELETE FROM torrust_users;
+            DELETE FROM torrust_user_authentication;
+            DELETE FROM torrust_user_bans;
+            DELETE FROM torrust_user_invitations;
+            DELETE FROM torrust_user_profiles;
+            DELETE FROM torrust_user_public_keys;
+            SET SQL_SAFE_UPDATES = 1;"
+        )
+            .execute(&self.pool)
+            .await
+            .map(|_| ())
+            .map_err(|_| DatabaseError::Error)
+    }
 }
