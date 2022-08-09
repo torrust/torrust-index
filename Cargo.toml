@@ -16,7 +16,7 @@ async-trait = "0.1.52"
 async-std = "1.10.0"
 futures = "0.3.5"
 
-sqlx = { version = "0.5.7", features = [ "runtime-actix-rustls", "sqlite", "mysql", "migrate", "time" ] }
+sqlx = { version = "0.5.7", features = [ "runtime-tokio-native-tls", "sqlite", "mysql", "migrate", "time" ] }
 
 config = "0.11"
 toml = "0.5"

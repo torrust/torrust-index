@@ -2440,7 +2440,6 @@ dependencies = [
  "percent-encoding",
  "rand",
  "rsa",
- "rustls",
  "sha-1",
  "sha2",
  "smallvec",
@@ -2451,8 +2450,6 @@ dependencies = [
  "time 0.2.27",
  "tokio-stream",
  "url",
- "webpki",
- "webpki-roots",
  "whoami",
 ]
 
@@ -2482,10 +2479,10 @@ version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14302b678d9c76b28f2e60115211e25e0aabc938269991745a169753dc00e35c"
 dependencies = [
- "actix-rt",
+ "native-tls",
  "once_cell",
  "tokio",
- "tokio-rustls",
+ "tokio-native-tls",
 ]
 
 [[package]]

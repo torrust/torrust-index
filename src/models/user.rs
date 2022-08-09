@@ -13,7 +13,7 @@ pub struct UserAuthentication {
     pub password_hash: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct UserProfile {
     pub user_id: i64,
     pub username: String,
