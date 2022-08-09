@@ -457,19 +457,56 @@ impl Database for SqliteDatabase {
     }
 
     async fn delete_all_database_rows(&self) -> Result<(), DatabaseError> {
-        query("DELETE FROM torrust_categories;
-            DELETE FROM torrust_torrents;
-            DELETE FROM torrust_tracker_keys;
-            DELETE FROM torrust_users;
-            DELETE FROM torrust_user_authentication;
-            DELETE FROM torrust_user_bans;
-            DELETE FROM torrust_user_invitations;
-            DELETE FROM torrust_user_profiles;
-            DELETE FROM torrust_user_public_keys;"
-        )
+        query("DELETE FROM torrust_categories;")
             .execute(&self.pool)
             .await
-            .map(|_| ())
-            .map_err(|_| DatabaseError::Error)
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_torrents;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_tracker_keys;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_users;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_user_authentication;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_user_bans;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_user_invitations;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_user_profiles;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_torrents;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_user_public_keys;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        Ok(())
     }
 }
