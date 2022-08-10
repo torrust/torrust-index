@@ -226,12 +226,12 @@ impl Database for SqliteDatabase {
             })
     }
 
-    async fn add_category(&self, category_name: &str) -> Result<(), DatabaseError> {
+    async fn insert_category_and_get_id(&self, category_name: &str) -> Result<i64, DatabaseError> {
         query("INSERT INTO torrust_categories (name) VALUES (?)")
             .bind(category_name)
             .execute(&self.pool)
             .await
-            .map(|_| ())
+            .map(|v| v.last_insert_rowid())
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
                     if err.message().contains("UNIQUE") {

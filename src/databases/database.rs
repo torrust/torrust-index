@@ -125,7 +125,7 @@ pub trait Database: Sync + Send {
     async fn delete_user(&self, user_id: i64) -> Result<(), DatabaseError>;
 
     // add new category
-    async fn add_category(&self, category_name: &str) -> Result<(), DatabaseError>;
+    async fn insert_category_and_get_id(&self, category_name: &str) -> Result<i64, DatabaseError>;
 
     // get category by id
     async fn get_category_from_id(&self, id: i64) -> Result<Category, DatabaseError>;
