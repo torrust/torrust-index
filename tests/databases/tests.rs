@@ -1,21 +1,13 @@
-use torrust_index_backend::databases::database::{connect_database, Database, DatabaseDriver};
+use torrust_index_backend::databases::database::Database;
 use torrust_index_backend::models::user::UserProfile;
-
-pub async fn setup(db_driver: DatabaseDriver, db_path: &str) -> Result<Box<dyn Database>, ()> {
-    let db = connect_database(&db_driver, db_path).await;
-
-    Ok(db)
-}
-
-pub async fn run_tests(db: &Box<dyn Database>) {
-    it_can_add_a_user(&db).await;
-    it_can_upload_a_torrent(&db).await;
-}
 
 pub async fn it_can_add_a_user(db: &Box<dyn Database>) {
     const USERNAME: &str = "luckythelab";
     const EMAIL: &str = "lucky@labradormail.com";
     const PASSWORD: &str = "imagoodboy";
+
+    // cleanup database
+    assert!(db.delete_all_database_rows().await.is_ok());
 
     let insert_user_and_get_id_result = db.insert_user_and_get_id(USERNAME, EMAIL, PASSWORD).await;
 
@@ -40,10 +32,6 @@ pub async fn it_can_add_a_user(db: &Box<dyn Database>) {
         bio: returned_user_profile.bio.clone(),
         avatar: returned_user_profile.avatar.clone()
     });
-
-
-    // cleanup database
-    let _ = db.delete_all_database_rows().await;
 }
 
 pub async fn it_can_upload_a_torrent(db: &Box<dyn Database>) {

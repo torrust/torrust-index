@@ -9,4 +9,4 @@ services:
     environment:
       MYSQL_ROOT_HOST: '%'
       MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: torrust-index
+      MYSQL_DATABASE: torrust-index_test
