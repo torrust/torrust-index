@@ -37,7 +37,7 @@ pub async fn add_category(req: HttpRequest, payload: web::Json<Category>, app_da
     // check if user is administrator
     if !user.administrator { return Err(ServiceError::Unauthorized) }
 
-    let _ = app_data.database.add_category(&payload.name).await?;
+    let _ = app_data.database.insert_category_and_get_id(&payload.name).await?;
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: payload.name.clone()

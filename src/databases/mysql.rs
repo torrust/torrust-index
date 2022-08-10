@@ -7,8 +7,7 @@ use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 use crate::models::torrent::TorrentListing;
 use crate::utils::time::current_time;
 use crate::models::tracker_key::TrackerKey;
-use crate::databases::database::{Category, Database, DatabaseError, Sorting, TorrentCompact};
-use crate::handlers::torrent::TorrentCount;
+use crate::databases::database::{Category, Database, DatabaseDriver, DatabaseError, Sorting, TorrentCompact};
 use crate::models::response::{TorrentsResponse};
 
 pub struct MysqlDatabase {
@@ -35,6 +34,10 @@ impl MysqlDatabase {
 
 #[async_trait]
 impl Database for MysqlDatabase {
+    fn get_database_driver(&self) -> DatabaseDriver {
+        DatabaseDriver::Mysql
+    }
+
     async fn insert_user_and_get_id(&self, username: &str, email: &str, password_hash: &str) -> Result<i64, DatabaseError> {
 
         // open pool connection
@@ -227,12 +230,12 @@ impl Database for MysqlDatabase {
             })
     }
 
-    async fn add_category(&self, category_name: &str) -> Result<(), DatabaseError> {
+    async fn insert_category_and_get_id(&self, category_name: &str) -> Result<i64, DatabaseError> {
         query("INSERT INTO torrust_categories (name) VALUES (?)")
             .bind(category_name)
             .execute(&self.pool)
             .await
-            .map(|_| ())
+            .map(|v| v.last_insert_id() as i64)
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
                     if err.message().contains("UNIQUE") {
@@ -455,5 +458,59 @@ impl Database for MysqlDatabase {
             } else {
                 Err(DatabaseError::TorrentNotFound)
             })
+    }
+
+    async fn delete_all_database_rows(&self) -> Result<(), DatabaseError> {
+        query("DELETE FROM torrust_categories;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_torrents;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_tracker_keys;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_users;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_user_authentication;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_user_bans;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_user_invitations;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_user_profiles;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_torrents;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        query("DELETE FROM torrust_user_public_keys;")
+            .execute(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        Ok(())
     }
 }
