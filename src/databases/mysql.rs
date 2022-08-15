@@ -9,7 +9,8 @@ use crate::utils::time::current_time;
 use crate::models::tracker_key::TrackerKey;
 use crate::databases::database::{Category, Database, DatabaseDriver, DatabaseError, Sorting, TorrentCompact};
 use crate::models::response::{TorrentsResponse};
-use crate::models::torrent_file::{DbTorrentInfo, Torrent, DbTorrentFile, DbTorrentAnnounceUrl};
+use crate::models::torrent_file::{DbTorrentInfo, Torrent, DbTorrentFile, DbTorrentAnnounceUrl, TorrentFile};
+use crate::utils::hex::bytes_to_hex;
 
 pub struct MysqlDatabase {
     pub pool: MySqlPool
@@ -285,7 +286,7 @@ impl Database for MysqlDatabase {
             })
     }
 
-    // todo: refactor this
+    // TODO: refactor this
     async fn get_torrents_search_sorted_paginated(&self, search: &Option<String>, categories: &Option<Vec<String>>, sort: &Sorting, offset: u64, page_size: u8) -> Result<TorrentsResponse, DatabaseError> {
         let title = match search {
             None => "%".to_string(),
@@ -293,16 +294,16 @@ impl Database for MysqlDatabase {
         };
 
         let sort_query: String = match sort {
-            Sorting::UploadedAsc => "upload_date ASC".to_string(),
-            Sorting::UploadedDesc => "upload_date DESC".to_string(),
+            Sorting::UploadedAsc => "date_uploaded ASC".to_string(),
+            Sorting::UploadedDesc => "date_uploaded DESC".to_string(),
             Sorting::SeedersAsc => "seeders ASC".to_string(),
             Sorting::SeedersDesc => "seeders DESC".to_string(),
             Sorting::LeechersAsc => "leechers ASC".to_string(),
             Sorting::LeechersDesc => "leechers DESC".to_string(),
             Sorting::NameAsc => "title ASC".to_string(),
             Sorting::NameDesc => "title DESC".to_string(),
-            Sorting::SizeAsc => "file_size ASC".to_string(),
-            Sorting::SizeDesc => "file_size DESC".to_string(),
+            Sorting::SizeAsc => "size ASC".to_string(),
+            Sorting::SizeDesc => "size DESC".to_string(),
         };
 
         let category_filter_query = if let Some(c) = categories {
@@ -326,7 +327,18 @@ impl Database for MysqlDatabase {
             String::new()
         };
 
-        let mut query_string = format!("SELECT tt.* FROM torrust_torrents tt {}WHERE title LIKE ?", category_filter_query);
+        let mut query_string = format!(
+            "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, DATE_FORMAT(tt.date_uploaded, '%Y-%m-%d %H:%i:%s') AS date_uploaded, tt.size AS file_size,
+            CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
+            CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
+            FROM torrust_torrents tt {}
+            INNER JOIN torrust_user_profiles tp ON tt.uploader_id = tp.user_id
+            INNER JOIN torrust_torrent_info ti ON tt.torrent_id = ti.torrent_id
+            LEFT JOIN torrust_torrent_tracker_stats ts ON tt.torrent_id = ts.torrent_id
+            WHERE title LIKE ?
+            GROUP BY torrent_id",
+            category_filter_query
+        );
 
         let count_query = format!("SELECT COUNT(*) as count FROM ({}) AS count_table", query_string);
 
@@ -370,7 +382,7 @@ impl Database for MysqlDatabase {
 
         // torrent file can only hold a pieces key or a root hash key: http://www.bittorrent.org/beps/bep_0030.html
         let (pieces, root_hash): (String, bool) = if let Some(pieces) = &torrent.info.pieces {
-            (pieces.to_string(), false)
+            (bytes_to_hex(pieces.as_ref()), false)
         } else {
             let root_hash = torrent.info.root_hash.as_ref().ok_or(DatabaseError::Error)?;
             (root_hash.to_string(), true)
@@ -503,15 +515,27 @@ impl Database for MysqlDatabase {
     }
 
     async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<Torrent, DatabaseError> {
-        let torrent_info = query_as::<_, DbTorrentInfo>(
+        let torrent_info = self.get_torrent_info_from_id(torrent_id).await?;
+
+        let torrent_files = self.get_torrent_files_from_id(torrent_id).await?;
+
+        let torrent_announce_urls = self.get_torrent_announce_urls_from_id(torrent_id).await?;
+
+        Ok(Torrent::from_db_info_files_and_announce_urls(torrent_info, torrent_files, torrent_announce_urls))
+    }
+
+    async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, DatabaseError> {
+        query_as::<_, DbTorrentInfo>(
             "SELECT name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE torrent_id = ?"
         )
             .bind(torrent_id)
             .fetch_one(&self.pool)
             .await
-            .map_err(|_| DatabaseError::TorrentNotFound)?;
+            .map_err(|_| DatabaseError::TorrentNotFound)
+    }
 
-        let torrent_files = query_as::<_, DbTorrentFile>(
+    async fn get_torrent_files_from_id(&self, torrent_id: i64) -> Result<Vec<TorrentFile>, DatabaseError> {
+        let db_torrent_files = query_as::<_, DbTorrentFile>(
             "SELECT md5sum, length, path FROM torrust_torrent_files WHERE torrent_id = ?"
         )
             .bind(torrent_id)
@@ -519,15 +543,26 @@ impl Database for MysqlDatabase {
             .await
             .map_err(|_| DatabaseError::TorrentNotFound)?;
 
-        let torrent_announce_urls = query_as::<_, DbTorrentAnnounceUrl>(
+        let torrent_files: Vec<TorrentFile> = db_torrent_files.into_iter().map(|tf| {
+            TorrentFile {
+                path: tf.path.unwrap_or("".to_string()).split('/').map(|v| v.to_string()).collect(),
+                length: tf.length,
+                md5sum: tf.md5sum
+            }
+        }).collect();
+
+        Ok(torrent_files)
+    }
+
+    async fn get_torrent_announce_urls_from_id(&self, torrent_id: i64) -> Result<Vec<Vec<String>>, DatabaseError> {
+        query_as::<_, DbTorrentAnnounceUrl>(
             "SELECT tracker_url FROM torrust_torrent_announce_urls WHERE torrent_id = ?"
         )
             .bind(torrent_id)
             .fetch_all(&self.pool)
             .await
-            .map_err(|_| DatabaseError::TorrentNotFound)?;
-
-        Ok(Torrent::from_db_info_files_and_announce_urls(torrent_info, torrent_files, torrent_announce_urls))
+            .map(|v| v.iter().map(|a| vec![a.tracker_url.to_string()]).collect())
+            .map_err(|_| DatabaseError::TorrentNotFound)
     }
 
     async fn get_torrent_listing_from_id(&self, torrent_id: i64) -> Result<TorrentListing, DatabaseError> {

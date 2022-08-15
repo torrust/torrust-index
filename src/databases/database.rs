@@ -5,7 +5,7 @@ use crate::databases::mysql::MysqlDatabase;
 use crate::databases::sqlite::SqliteDatabase;
 use crate::models::response::{TorrentsResponse};
 use crate::models::torrent::TorrentListing;
-use crate::models::torrent_file::Torrent;
+use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 
@@ -148,6 +148,15 @@ pub trait Database: Sync + Send {
 
     // get torrent by id
     async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<Torrent, DatabaseError>;
+
+    // get torrent info by id
+    async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, DatabaseError>;
+
+    // get torrent files by id
+    async fn get_torrent_files_from_id(&self, torrent_id: i64) -> Result<Vec<TorrentFile>, DatabaseError>;
+
+    // get torrent announce urls by id
+    async fn get_torrent_announce_urls_from_id(&self, torrent_id: i64) -> Result<Vec<Vec<String>>, DatabaseError>;
 
     // get torrent listing by id
     async fn get_torrent_listing_from_id(&self, torrent_id: i64) -> Result<TorrentListing, DatabaseError>;

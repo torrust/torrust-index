@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use crate::config::Configuration;
 use serde_bencode::ser;
+use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
+use crate::utils::hex::{bytes_to_hex, hex_to_bytes};
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct TorrentNode(String, i64);
@@ -18,7 +20,7 @@ pub struct TorrentFile {
 pub struct TorrentInfo {
     pub name: String,
     #[serde(default)]
-    pub pieces: Option<String>,
+    pub pieces: Option<ByteBuf>,
     #[serde(rename="piece length")]
     pub piece_length: i64,
     #[serde(default)]
@@ -61,7 +63,7 @@ pub struct Torrent {
 }
 
 impl Torrent {
-    pub fn from_db_info_files_and_announce_urls(torrent_info: DbTorrentInfo, torrent_files: Vec<DbTorrentFile>, torrent_announce_urls: Vec<DbTorrentAnnounceUrl>) -> Self {
+    pub fn from_db_info_files_and_announce_urls(torrent_info: DbTorrentInfo, torrent_files: Vec<TorrentFile>, torrent_announce_urls: Vec<Vec<String>>) -> Self {
         let private = if let Some(private_i64) = torrent_info.private {
             // must fit in a byte
             let private = if (0..256).contains(&private_i64) { private_i64 } else { 0 };
@@ -87,7 +89,8 @@ impl Torrent {
         if torrent_info.root_hash > 0 {
             info.root_hash = Some(torrent_info.pieces);
         } else {
-            info.pieces = Some(torrent_info.pieces);
+            let pieces = hex_to_bytes(&torrent_info.pieces).unwrap();
+            info.pieces = Some(ByteBuf::from(pieces));
         }
 
         // either set the single file or the multiple files information
@@ -95,36 +98,19 @@ impl Torrent {
             // can safely unwrap because we know there is 1 element
             let torrent_file = torrent_files.first().unwrap();
 
-            let path: Option<Vec<String>> = torrent_file.path.as_ref().map(|path| path.split('/').map(|s| s.to_string()).collect());
-
             info.md5sum = torrent_file.md5sum.clone();
 
             info.length = Some(torrent_file.length);
 
-            // when storing the path in the database, we join the elements on '/'. So now they have to be separated again.
+            let path = if torrent_file.path.first().as_ref().unwrap().is_empty() {
+                None
+            } else {
+                Some(torrent_file.path.clone())
+            };
+
             info.path = path;
         } else {
-            let mut files: Vec<TorrentFile> = vec![];
-
-            for torrent_file in torrent_files.iter() {
-                let file = TorrentFile {
-                    // path must be set when there are multiple files, so we can safely unwrap
-                    path: torrent_file.path.as_ref().unwrap().split('/').map(|s| s.to_string()).collect(),
-                    length: torrent_file.length,
-                    md5sum: torrent_file.md5sum.clone()
-                };
-
-                files.push(file);
-            }
-
-            info.files = Some(files);
-        }
-
-        // form the tracker announce-list
-        let mut tracker_urls: Vec<Vec<String>> = vec![];
-
-        for torrent_announce_url in torrent_announce_urls.iter() {
-            tracker_urls.push(vec![torrent_announce_url.tracker_url.to_string()]);
+            info.files = Some(torrent_files);
         }
 
         Self {
@@ -133,7 +119,7 @@ impl Torrent {
             nodes: None,
             encoding: None,
             httpseeds: None,
-            announce_list: Some(tracker_urls),
+            announce_list: Some(torrent_announce_urls),
             creation_date: None,
             comment: None,
             created_by: None
@@ -163,12 +149,8 @@ impl Torrent {
         sum_bytes
     }
 
-
     pub fn info_hash(&self) -> String {
-        let mut buffer = [0u8; 40];
-        let input = &self.calculate_info_hash_as_bytes();
-        let bytes_out = binascii::bin2hex(input, &mut buffer).ok().unwrap();
-        String::from(std::str::from_utf8(bytes_out).unwrap())
+        bytes_to_hex(&self.calculate_info_hash_as_bytes())
     }
 
     pub fn file_size(&self) -> i64 {

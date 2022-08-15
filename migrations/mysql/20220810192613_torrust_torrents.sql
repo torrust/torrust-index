@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS torrust_torrents (
     info_hash CHAR(40) UNIQUE NOT NULL,
     size BIGINT NOT NULL,
     name TEXT NOT NULL,
-    pieces TEXT NOT NULL,
+    pieces LONGTEXT NOT NULL,
     piece_length BIGINT NOT NULL,
     private BOOLEAN NULL DEFAULT NULL,
     root_hash BOOLEAN NOT NULL DEFAULT FALSE,

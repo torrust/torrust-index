@@ -1,3 +1,4 @@
+use serde_bytes::ByteBuf;
 use torrust_index_backend::databases::database::{Database, DatabaseError};
 use torrust_index_backend::models::torrent::TorrentListing;
 use torrust_index_backend::models::torrent_file::{TorrentInfo, Torrent};
@@ -73,7 +74,7 @@ pub async fn it_can_add_a_torrent_and_tracker_stats_to_that_torrent(db: &Box<dyn
     let torrent = Torrent {
         info: TorrentInfo {
             name: TEST_TORRENT_TITLE.to_string(),
-            pieces: Some("1234567890123456789012345678901234567890".to_string()),
+            pieces: Some(ByteBuf::from("1234567890123456789012345678901234567890".as_bytes())),
             piece_length: 256000,
             md5sum: None,
             length: Some(TEST_TORRENT_FILE_SIZE),
