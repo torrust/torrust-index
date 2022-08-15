@@ -10,7 +10,7 @@ use crate::utils::parse_torrent;
 use crate::common::{WebAppData};
 use std::io::Cursor;
 use std::io::{Write};
-use crate::models::torrent_file::{Torrent, File};
+use crate::models::torrent_file::{Torrent, TorrentFile};
 use crate::AsCSV;
 use std::option::Option::Some;
 use sqlx::{FromRow};
@@ -193,7 +193,7 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
             torrent_response.files = Some(files);
         } else {
             // todo: tidy up this code, it's error prone
-            let file = File {
+            let file = TorrentFile {
                 path: vec![torrent.info.name],
                 length: torrent.info.length.unwrap_or(0),
                 md5sum: None

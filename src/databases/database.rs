@@ -146,6 +146,9 @@ pub trait Database: Sync + Send {
     // add new torrent and get the newly inserted torrent_id
     async fn insert_torrent_and_get_id(&self, torrent: &Torrent, uploader_id: i64, category_id: i64, title: &str, description: &str) -> Result<i64, DatabaseError>;
 
+    // get torrent by id
+    async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<Torrent, DatabaseError>;
+
     // get torrent listing by id
     async fn get_torrent_listing_from_id(&self, torrent_id: i64) -> Result<TorrentListing, DatabaseError>;
 

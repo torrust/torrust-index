@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use crate::databases::database::Category;
 use crate::models::torrent::TorrentListing;
-use crate::models::torrent_file::File;
+use crate::models::torrent_file::TorrentFile;
 
 pub enum OkResponses {
     TokenResponse(TokenResponse)
@@ -41,7 +41,7 @@ pub struct TorrentResponse {
     pub file_size: i64,
     pub seeders: i64,
     pub leechers: i64,
-    pub files: Option<Vec<File>>,
+    pub files: Option<Vec<TorrentFile>>,
     pub trackers: Vec<String>,
     pub magnet_link: String,
 }

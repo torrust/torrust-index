@@ -1,6 +1,6 @@
 use torrust_index_backend::databases::database::{Database, DatabaseError};
 use torrust_index_backend::models::torrent::TorrentListing;
-use torrust_index_backend::models::torrent_file::{Info, Torrent};
+use torrust_index_backend::models::torrent_file::{TorrentInfo, Torrent};
 use torrust_index_backend::models::user::UserProfile;
 
 // test user options
@@ -71,14 +71,14 @@ pub async fn it_can_add_a_torrent_and_tracker_stats_to_that_torrent(db: &Box<dyn
     let torrent_category_id = add_test_torrent_category(&db).await.expect("add_test_torrent_category failed.");
 
     let torrent = Torrent {
-        info: Info {
+        info: TorrentInfo {
             name: TEST_TORRENT_TITLE.to_string(),
             pieces: Some("1234567890123456789012345678901234567890".to_string()),
             piece_length: 256000,
             md5sum: None,
             length: Some(TEST_TORRENT_FILE_SIZE),
             files: None,
-            private: None,
+            private: Some(1),
             path: None,
             root_hash: None
         },
@@ -113,22 +113,31 @@ pub async fn it_can_add_a_torrent_and_tracker_stats_to_that_torrent(db: &Box<dyn
 
     assert!(insert_torrent_tracker_stats_result.is_ok());
 
-    let get_torrent_from_id_result = db.get_torrent_listing_from_id(torrent_id).await;
+    let get_torrent_listing_from_id_result = db.get_torrent_listing_from_id(torrent_id).await;
+
+    assert!(get_torrent_listing_from_id_result.is_ok());
+
+    let returned_torrent_listing = get_torrent_listing_from_id_result.unwrap();
+
+    assert_eq!(returned_torrent_listing, TorrentListing {
+        torrent_id,
+        uploader: TEST_USER_USERNAME.to_string(),
+        info_hash: returned_torrent_listing.info_hash.to_string(),
+        title: TEST_TORRENT_TITLE.to_string(),
+        description: Some(TEST_TORRENT_DESCRIPTION.to_string()),
+        category_id: torrent_category_id,
+        date_uploaded: returned_torrent_listing.date_uploaded.to_string(),
+        file_size: TEST_TORRENT_FILE_SIZE,
+        seeders: TEST_TORRENT_SEEDERS,
+        leechers: TEST_TORRENT_LEECHERS
+    });
+
+    // check if we get the same info hash on the retrieved torrent from database
+    let get_torrent_from_id_result = db.get_torrent_from_id(torrent_id).await;
 
     assert!(get_torrent_from_id_result.is_ok());
 
     let returned_torrent = get_torrent_from_id_result.unwrap();
 
-    assert_eq!(returned_torrent, TorrentListing {
-        torrent_id,
-        uploader: TEST_USER_USERNAME.to_string(),
-        info_hash: torrent.info_hash(),
-        title: TEST_TORRENT_TITLE.to_string(),
-        description: Some(TEST_TORRENT_DESCRIPTION.to_string()),
-        category_id: torrent_category_id,
-        date_uploaded: returned_torrent.date_uploaded.clone(),
-        file_size: TEST_TORRENT_FILE_SIZE,
-        seeders: TEST_TORRENT_SEEDERS,
-        leechers: TEST_TORRENT_LEECHERS
-    });
+    assert_eq!(returned_torrent.info_hash(), torrent.info_hash());
 }

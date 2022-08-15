@@ -8,7 +8,7 @@ use crate::utils::time::current_time;
 use crate::models::tracker_key::TrackerKey;
 use crate::databases::database::{Category, Database, DatabaseDriver, DatabaseError, Sorting, TorrentCompact};
 use crate::models::response::{TorrentsResponse};
-use crate::models::torrent_file::Torrent;
+use crate::models::torrent_file::{DbTorrentAnnounceUrl, DbTorrentFile, DbTorrentInfo, Torrent};
 use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 
 pub struct SqliteDatabase {
@@ -372,14 +372,18 @@ impl Database for SqliteDatabase {
             (root_hash.to_string(), true)
         };
 
+        let private = torrent.info.private.unwrap_or(0);
+
         // add torrent
-        let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, piece_length, pieces, root_hash, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
+        let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, name, pieces, piece_length, private, root_hash, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
             .bind(uploader_id)
             .bind(category_id)
             .bind(info_hash)
             .bind(torrent.file_size())
-            .bind(torrent.info.piece_length)
+            .bind(torrent.info.name.to_string())
             .bind(pieces)
+            .bind(torrent.info.piece_length)
+            .bind(private)
             .bind(root_hash)
             .execute(&self.pool)
             .await
@@ -398,7 +402,8 @@ impl Database for SqliteDatabase {
             })?;
 
         let insert_torrent_files_result = if let Some(length) = torrent.info.length {
-            query("INSERT INTO torrust_torrent_files (torrent_id, length) VALUES (?, ?)")
+            query("INSERT INTO torrust_torrent_files (md5sum, torrent_id, length) VALUES (?, ?, ?)")
+                .bind(torrent.info.md5sum.clone())
                 .bind(torrent_id)
                 .bind(length)
                 .execute(&mut tx)
@@ -411,7 +416,8 @@ impl Database for SqliteDatabase {
             for file in files.iter() {
                 let path = file.path.join("/");
 
-                let _ = query("INSERT INTO torrust_torrent_files (torrent_id, length, path) VALUES (?, ?, ?)")
+                let _ = query("INSERT INTO torrust_torrent_files (md5sum, torrent_id, length, path) VALUES (?, ?, ?, ?)")
+                    .bind(file.md5sum.clone())
                     .bind(torrent_id)
                     .bind(file.length)
                     .bind(path)
@@ -490,6 +496,34 @@ impl Database for SqliteDatabase {
                 Err(e)
             }
         }
+    }
+
+    async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<Torrent, DatabaseError> {
+        let torrent_info = query_as::<_, DbTorrentInfo>(
+            "SELECT name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE torrent_id = ?"
+        )
+            .bind(torrent_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::TorrentNotFound)?;
+
+        let torrent_files = query_as::<_, DbTorrentFile>(
+            "SELECT md5sum, length, path FROM torrust_torrent_files WHERE torrent_id = ?"
+        )
+            .bind(torrent_id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::TorrentNotFound)?;
+
+        let torrent_announce_urls = query_as::<_, DbTorrentAnnounceUrl>(
+            "SELECT tracker_url FROM torrust_torrent_announce_urls WHERE torrent_id = ?"
+        )
+            .bind(torrent_id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::TorrentNotFound)?;
+
+        Ok(Torrent::from_db_info_files_and_announce_urls(torrent_info, torrent_files, torrent_announce_urls))
     }
 
     async fn get_torrent_listing_from_id(&self, torrent_id: i64) -> Result<TorrentListing, DatabaseError> {
