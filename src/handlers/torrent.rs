@@ -1,20 +1,19 @@
 use actix_multipart::Multipart;
 use actix_web::{HttpRequest, HttpResponse, Responder, web};
 use actix_web::web::{Query};
-use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize};
+use std::io::Cursor;
+use std::io::{Write};
+use sqlx::{FromRow};
+
+use crate::AsCSV;
+use crate::databases::database::Sorting;
 use crate::errors::{ServiceError, ServiceResult};
 use crate::models::response::{NewTorrentResponse, OkResponse, TorrentResponse};
 use crate::models::torrent::TorrentRequest;
 use crate::utils::parse_torrent;
 use crate::common::{WebAppData};
-use std::io::Cursor;
-use std::io::{Write};
-use crate::models::torrent_file::{Torrent, File};
-use crate::AsCSV;
-use std::option::Option::Some;
-use sqlx::{FromRow};
-use crate::databases::database::Sorting;
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -84,39 +83,14 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
     let category = app_data.database.get_category_from_name(&torrent_request.fields.category).await
         .map_err(|_| ServiceError::InvalidCategory)?;
 
-    let username = user.username;
-    let info_hash = torrent_request.torrent.info_hash();
     let title = torrent_request.fields.title;
-    //let category = torrent_request.fields.category;
     let description = torrent_request.fields.description;
-    //let current_time = current_time() as i64;
-    let file_size = torrent_request.torrent.file_size();
-    let mut seeders = 0;
-    let mut leechers = 0;
 
-    if let Ok(torrent_info) = app_data.tracker.get_torrent_info(&info_hash).await {
-        seeders = torrent_info.seeders;
-        leechers = torrent_info.leechers;
-    }
-
-    let torrent_id = app_data.database.insert_torrent_and_get_id(username, info_hash, title, category.category_id, description, file_size, seeders, leechers).await?;
+    // insert entire torrent in database
+    let torrent_id = app_data.database.insert_torrent_and_get_id(&torrent_request.torrent, user.user_id, category.category_id, &title, &description).await?;
 
     // whitelist info hash on tracker
     let _ = app_data.tracker.whitelist_info_hash(torrent_request.torrent.info_hash()).await;
-
-    let settings = app_data.cfg.settings.read().await;
-
-    let upload_folder = settings.storage.upload_path.clone();
-    let filepath = format!("{}/{}", upload_folder, torrent_id.to_string() + ".torrent");
-
-    drop(settings);
-
-    // save torrent file to uploads folder
-    // if fails, delete torrent from database and return error
-    if save_torrent_file(&upload_folder, &filepath, &torrent_request.torrent).await.is_err() {
-        let _ = app_data.database.delete_torrent(torrent_id).await;
-        return Err(ServiceError::InternalServerError)
-    }
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: NewTorrentResponse {
@@ -128,20 +102,12 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
 pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let torrent_id = get_torrent_id_from_request(&req)?;
 
-    let settings = app_data.cfg.settings.read().await;
-
     // optional
     let user = app_data.auth.get_user_compact_from_request(&req).await;
 
-    let filepath = format!("{}/{}", settings.storage.upload_path, torrent_id.to_string() + ".torrent");
+    let mut torrent = app_data.database.get_torrent_from_id(torrent_id).await?;
 
-    let mut torrent = match parse_torrent::read_torrent_from_file(&filepath) {
-        Ok(torrent) => Ok(torrent),
-        Err(e) => {
-            println!("{:?}", e);
-            Err(ServiceError::InternalServerError)
-        }
-    }?;
+    let settings = app_data.cfg.settings.read().await;
 
     let tracker_url = settings.tracker.url.clone();
 
@@ -156,19 +122,13 @@ pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> Service
                 let vec = vec![personal_announce_url];
                 list.insert(0, vec);
             }
-        },
+        }
         Err(_) => {
             torrent.announce = Some(tracker_url);
         }
     }
 
-    let buffer = match parse_torrent::encode_torrent(&torrent) {
-        Ok(v) => Ok(v),
-        Err(e) => {
-            println!("{:?}", e);
-            Err(ServiceError::InternalServerError)
-        }
-    }?;
+    let buffer = parse_torrent::encode_torrent(&torrent).map_err(|_| ServiceError::InternalServerError)?;
 
     Ok(HttpResponse::Ok()
         .content_type("application/x-bittorrent")
@@ -184,7 +144,7 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
 
     let torrent_id = get_torrent_id_from_request(&req)?;
 
-    let torrent_listing = app_data.database.get_torrent_from_id(torrent_id).await?;
+    let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
 
     let category = app_data.database.get_category_from_id(torrent_listing.category_id).await?;
 
@@ -192,36 +152,23 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
 
     torrent_response.category = category;
 
-    let filepath = format!("{}/{}", settings.storage.upload_path, torrent_response.torrent_id.to_string() + ".torrent");
-
     let tracker_url = settings.tracker.url.clone();
 
     drop(settings);
 
-    if let Ok(torrent) = parse_torrent::read_torrent_from_file(&filepath) {
-        // add torrent file/files to response
-        if let Some(files) = torrent.info.files {
-            torrent_response.files = Some(files);
-        } else {
-            // todo: tidy up this code, it's error prone
-            let file = File {
-                path: vec![torrent.info.name],
-                length: torrent.info.length.unwrap_or(0),
-                md5sum: None
-            };
+    torrent_response.files = app_data.database.get_torrent_files_from_id(torrent_id).await?;
 
-            torrent_response.files = Some(vec![file]);
-        }
+    if torrent_response.files.len() == 1 {
+        let torrent_info = app_data.database.get_torrent_info_from_id(torrent_id).await?;
 
-        // add additional torrent tracker/trackers to response
-        if let Some(trackers) = torrent.announce_list {
-            for tracker in trackers {
-                torrent_response.trackers.push(tracker[0].clone());
-            }
-        }
+        torrent_response.files.iter_mut().for_each(|v| v.path = vec![torrent_info.name.to_string()]);
     }
 
-    // add self-hosted tracker url
+    torrent_response.trackers = app_data.database.get_torrent_announce_urls_from_id(torrent_id)
+        .await
+        .map(|v| v.into_iter().flatten().collect())?;
+
+    // add tracker url
     match user {
         Ok(user) => {
             // if no user owned tracker key can be found, use default tracker url
@@ -245,7 +192,7 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
     torrent_response.magnet_link = magnet;
 
     // get realtime seeders and leechers
-    if let Ok(torrent_info) = app_data.tracker.get_torrent_info(&torrent_response.info_hash).await {
+    if let Ok(torrent_info) = app_data.tracker.get_torrent_info(torrent_response.torrent_id, &torrent_response.info_hash).await {
         torrent_response.seeders = torrent_info.seeders;
         torrent_response.leechers = torrent_info.leechers;
     }
@@ -260,7 +207,7 @@ pub async fn update_torrent(req: HttpRequest, payload: web::Json<TorrentUpdate>,
 
     let torrent_id = get_torrent_id_from_request(&req)?;
 
-    let torrent_listing = app_data.database.get_torrent_from_id(torrent_id).await?;
+    let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
 
     // check if user is owner or administrator
     if torrent_listing.uploader != user.username && !user.administrator { return Err(ServiceError::Unauthorized) }
@@ -275,7 +222,8 @@ pub async fn update_torrent(req: HttpRequest, payload: web::Json<TorrentUpdate>,
         let _res = app_data.database.update_torrent_description(torrent_id, description).await?;
     }
 
-    let torrent_listing = app_data.database.get_torrent_from_id(torrent_id).await?;
+    let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
+
     let torrent_response = TorrentResponse::from_listing(torrent_listing);
 
     Ok(HttpResponse::Ok().json(OkResponse {
@@ -292,7 +240,7 @@ pub async fn delete_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceRe
     let torrent_id = get_torrent_id_from_request(&req)?;
 
     // needed later for removing torrent from tracker whitelist
-    let torrent_listing = app_data.database.get_torrent_from_id(torrent_id).await?;
+    let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
 
     let _res = app_data.database.delete_torrent(torrent_id).await?;
 
@@ -327,28 +275,6 @@ pub async fn get_torrents(params: Query<TorrentSearch>, app_data: WebAppData) ->
     Ok(HttpResponse::Ok().json(OkResponse {
         data: torrents_response
     }))
-}
-
-async fn save_torrent_file(upload_folder: &str, filepath: &str, torrent: &Torrent) -> Result<(), ServiceError> {
-    let torrent_bytes = match parse_torrent::encode_torrent(torrent) {
-        Ok(v) => Ok(v),
-        Err(_) => Err(ServiceError::InternalServerError)
-    }?;
-
-    // create torrent upload folder if it does not exist
-    async_std::fs::create_dir_all(&upload_folder).await?;
-
-    let mut f = match async_std::fs::File::create(&filepath).await {
-        Ok(v) => Ok(v),
-        Err(_) => Err(ServiceError::InternalServerError)
-    }?;
-
-    match AsyncWriteExt::write_all(&mut f, &torrent_bytes.as_slice()).await {
-        Ok(v) => Ok(v),
-        Err(_) => Err(ServiceError::InternalServerError)
-    }?;
-
-    Ok(())
 }
 
 fn get_torrent_id_from_request(req: &HttpRequest) -> Result<i64, ServiceError> {
@@ -390,7 +316,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
                 }
             }
             "torrent" => {
-                if field.content_type().to_string() != "application/x-bittorrent" {
+                if *field.content_type() != "application/x-bittorrent" {
                     return Err(ServiceError::InvalidFileType)
                 }
 
@@ -414,10 +340,12 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
     let position = torrent_cursor.position() as usize;
     let inner = torrent_cursor.get_ref();
 
-    let torrent = match parse_torrent::decode_torrent(&inner[..position]) {
-        Ok(torrent) => Ok(torrent),
-        Err(_) => Err(ServiceError::InvalidTorrentFile)
-    }?;
+    let torrent = parse_torrent::decode_torrent(&inner[..position]).map_err(|_| ServiceError::InvalidTorrentFile)?;
+
+    // make sure that the pieces key has a length that is a multiple of 20
+    if let Some(pieces) = torrent.info.pieces.as_ref() {
+        if pieces.as_ref().len() % 20 != 0 { return Err(ServiceError::InvalidTorrentPiecesLength); }
+    }
 
     Ok(TorrentRequest {
         fields,

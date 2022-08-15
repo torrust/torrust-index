@@ -34,11 +34,8 @@ async fn main() -> std::io::Result<()> {
         )
     );
 
-    // create torrent upload folder
-    async_std::fs::create_dir_all(&settings.storage.upload_path).await?;
-
     let interval = settings.database.torrent_info_update_interval;
-    let weak_tracker_service = std::sync::Arc::downgrade(&tracker_service);
+    let weak_tracker_service = Arc::downgrade(&tracker_service);
 
     // repeating task, update all seeders and leechers info
     tokio::spawn(async move {

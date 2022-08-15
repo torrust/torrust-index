@@ -5,6 +5,7 @@ use crate::databases::mysql::MysqlDatabase;
 use crate::databases::sqlite::SqliteDatabase;
 use crate::models::response::{TorrentsResponse};
 use crate::models::torrent::TorrentListing;
+use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 
@@ -143,10 +144,22 @@ pub trait Database: Sync + Send {
     async fn get_torrents_search_sorted_paginated(&self, search: &Option<String>, categories: &Option<Vec<String>>, sort: &Sorting, offset: u64, page_size: u8) -> Result<TorrentsResponse, DatabaseError>;
 
     // add new torrent and get the newly inserted torrent_id
-    async fn insert_torrent_and_get_id(&self, username: String, info_hash: String, title: String, category_id: i64, description: String, file_size: i64, seeders: i64, leechers: i64) -> Result<i64, DatabaseError>;
+    async fn insert_torrent_and_get_id(&self, torrent: &Torrent, uploader_id: i64, category_id: i64, title: &str, description: &str) -> Result<i64, DatabaseError>;
 
     // get torrent by id
-    async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<TorrentListing, DatabaseError>;
+    async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<Torrent, DatabaseError>;
+
+    // get torrent info by id
+    async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, DatabaseError>;
+
+    // get torrent files by id
+    async fn get_torrent_files_from_id(&self, torrent_id: i64) -> Result<Vec<TorrentFile>, DatabaseError>;
+
+    // get torrent announce urls by id
+    async fn get_torrent_announce_urls_from_id(&self, torrent_id: i64) -> Result<Vec<Vec<String>>, DatabaseError>;
+
+    // get torrent listing by id
+    async fn get_torrent_listing_from_id(&self, torrent_id: i64) -> Result<TorrentListing, DatabaseError>;
 
     // get all torrents (torrent_id + info_hash)
     async fn get_all_torrents_compact(&self) -> Result<Vec<TorrentCompact>, DatabaseError>;
@@ -158,7 +171,7 @@ pub trait Database: Sync + Send {
     async fn update_torrent_description(&self, torrent_id: i64, description: &str) -> Result<(), DatabaseError>;
 
     // update the seeders and leechers info for a particular torrent
-    async fn update_tracker_info(&self, info_hash: &str, seeders: i64, leechers: i64) -> Result<(), DatabaseError>;
+    async fn update_tracker_info(&self, torrent_id: i64, tracker_url: &str, seeders: i64, leechers: i64) -> Result<(), DatabaseError>;
 
     // delete a torrent
     async fn delete_torrent(&self, torrent_id: i64) -> Result<(), DatabaseError>;

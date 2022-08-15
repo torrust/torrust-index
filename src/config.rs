@@ -56,11 +56,6 @@ pub struct Database {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Storage {
-    pub upload_path: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mail {
     pub email_verification_enabled: bool,
     pub from: String,
@@ -78,7 +73,6 @@ pub struct TorrustConfig {
     pub net: Network,
     pub auth: Auth,
     pub database: Database,
-    pub storage: Storage,
     pub mail: Mail,
 }
 
@@ -114,9 +108,6 @@ impl Configuration {
                 db_driver: DatabaseDriver::Sqlite3,
                 connect_url: "sqlite://data.db?mode=rwc".to_string(),
                 torrent_info_update_interval: 3600
-            },
-            storage: Storage {
-                upload_path: "./uploads".to_string()
             },
             mail: Mail {
                 email_verification_enabled: false,

@@ -87,16 +87,19 @@ pub enum ServiceError {
     #[display(fmt = "Torrent not found.")]
     TorrentNotFound,
 
-    #[display(fmt = "Uploaded torrent is not valid")]
+    #[display(fmt = "Uploaded torrent is not valid.")]
     InvalidTorrentFile,
 
-    #[display(fmt = "Only .torrent files can be uploaded")]
+    #[display(fmt = "Uploaded torrent has an invalid pieces key.")]
+    InvalidTorrentPiecesLength,
+
+    #[display(fmt = "Only .torrent files can be uploaded.")]
     InvalidFileType,
 
     #[display(fmt = "Bad request.")]
     BadRequest,
 
-    #[display(fmt = "Selected category does not exist")]
+    #[display(fmt = "Selected category does not exist.")]
     InvalidCategory,
 
     #[display(fmt = "Unauthorized action.")]
@@ -154,6 +157,7 @@ impl ResponseError for ServiceError {
             ServiceError::TorrentNotFound => StatusCode::BAD_REQUEST,
 
             ServiceError::InvalidTorrentFile => StatusCode::BAD_REQUEST,
+            ServiceError::InvalidTorrentPiecesLength => StatusCode::BAD_REQUEST,
             ServiceError::InvalidFileType => StatusCode::BAD_REQUEST,
 
             ServiceError::BadRequest => StatusCode::BAD_REQUEST,

@@ -135,8 +135,10 @@ impl TrackerService {
     }
 
     // get torrent info from tracker api
-    pub async fn get_torrent_info(&self, info_hash: &str) -> Result<TorrentInfo, ServiceError> {
+    pub async fn get_torrent_info(&self, torrent_id: i64, info_hash: &str) -> Result<TorrentInfo, ServiceError> {
         let settings = self.cfg.settings.read().await;
+
+        let tracker_url = settings.tracker.url.clone();
 
         let request_url =
             format!("{}/api/torrent/{}?token={}", settings.tracker.api_url, info_hash, settings.tracker.token);
@@ -153,12 +155,12 @@ impl TrackerService {
 
         let torrent_info = match response.json::<TorrentInfo>().await {
             Ok(torrent_info) => {
-                let _ = self.database.update_tracker_info(info_hash, torrent_info.seeders, torrent_info.leechers).await;
+                let _ = self.database.update_tracker_info(torrent_id, &tracker_url, torrent_info.seeders, torrent_info.leechers).await;
                 Ok(torrent_info)
             },
             Err(e) => {
                 eprintln!("{:?}", e);
-                let _ = self.database.update_tracker_info(info_hash, 0, 0).await;
+                let _ = self.database.update_tracker_info(torrent_id, &tracker_url, 0, 0).await;
                 Err(ServiceError::TorrentNotFound)
             }
         }?;
@@ -171,7 +173,7 @@ impl TrackerService {
         let torrents = self.database.get_all_torrents_compact().await?;
 
         for torrent in torrents {
-            let _ = self.get_torrent_info(&torrent.info_hash).await;
+            let _ = self.get_torrent_info(torrent.torrent_id, &torrent.info_hash).await;
         }
 
         Ok(())

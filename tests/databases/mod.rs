@@ -24,6 +24,6 @@ pub async fn run_tests(db_driver: DatabaseDriver, db_path: &str) {
 
     run_test(tests::it_can_add_a_user, &db).await;
     run_test(tests::it_can_add_a_torrent_category, &db).await;
-    run_test(tests::it_can_add_a_torrent, &db).await;
+    run_test(tests::it_can_add_a_torrent_and_tracker_stats_to_that_torrent, &db).await;
 }
 
