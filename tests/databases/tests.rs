@@ -1,5 +1,6 @@
 use torrust_index_backend::databases::database::{Database, DatabaseError};
 use torrust_index_backend::models::torrent::TorrentListing;
+use torrust_index_backend::models::torrent_file::{Info, Torrent};
 use torrust_index_backend::models::user::UserProfile;
 
 // test user options
@@ -11,7 +12,6 @@ const TEST_USER_PASSWORD: &str = "imagoodboy";
 const TEST_CATEGORY_NAME: &str = "Labrador Retrievers";
 
 // test torrent options
-const TEST_TORRENT_INFO_HASH: &str = "BC03E1A08565F8F09BED7C10AAD3E6E7771A88FC";
 const TEST_TORRENT_TITLE: &str = "Picture of dog treat";
 const TEST_TORRENT_DESCRIPTION: &str = "This is a picture of a dog treat.";
 const TEST_TORRENT_FILE_SIZE: i64 = 128_000;
@@ -65,29 +65,55 @@ pub async fn it_can_add_a_torrent_category(db: &Box<dyn Database>) {
     assert_eq!(category.name, TEST_CATEGORY_NAME.to_string());
 }
 
-pub async fn it_can_add_a_torrent(db: &Box<dyn Database>) {
+pub async fn it_can_add_a_torrent_and_tracker_stats_to_that_torrent(db: &Box<dyn Database>) {
     // set pre-conditions
-    let _ = add_test_user(&db).await;
+    let user_id = add_test_user(&db).await.expect("add_test_user failed.");
     let torrent_category_id = add_test_torrent_category(&db).await.expect("add_test_torrent_category failed.");
 
-    let insert_torrent_and_get_id_result = db.insert_torrent_and_get_id(
-        TEST_USER_USERNAME.to_string(),
-        TEST_TORRENT_INFO_HASH.to_string(),
-        TEST_TORRENT_TITLE.to_string(),
-        torrent_category_id,
-        TEST_TORRENT_DESCRIPTION.to_string(),
-        TEST_TORRENT_FILE_SIZE,
-        TEST_TORRENT_SEEDERS,
-        TEST_TORRENT_LEECHERS
-    ).await;
+    let torrent = Torrent {
+        info: Info {
+            name: TEST_TORRENT_TITLE.to_string(),
+            pieces: Some("1234567890123456789012345678901234567890".to_string()),
+            piece_length: 256000,
+            md5sum: None,
+            length: Some(TEST_TORRENT_FILE_SIZE),
+            files: None,
+            private: None,
+            path: None,
+            root_hash: None
+        },
+        announce: Some("https://tracker.dutchbits.nl/announce".to_string()),
+        nodes: None,
+        encoding: None,
+        httpseeds: None,
+        announce_list: None,
+        creation_date: None,
+        comment: None,
+        created_by: None
+    };
 
-    eprintln!("{:?}", insert_torrent_and_get_id_result.as_ref().unwrap());
+    let insert_torrent_and_get_id_result = db.insert_torrent_and_get_id(
+        &torrent,
+        user_id,
+        torrent_category_id,
+        TEST_TORRENT_TITLE,
+        TEST_TORRENT_DESCRIPTION
+    ).await;
 
     assert!(insert_torrent_and_get_id_result.is_ok());
 
     let torrent_id = insert_torrent_and_get_id_result.unwrap();
 
-    let get_torrent_from_id_result = db.get_torrent_from_id(torrent_id).await;
+    // add tracker stats to the torrent
+    let insert_torrent_tracker_stats_result = db.update_tracker_info(
+        torrent_id,
+        "https://tracker.torrust.com",
+        TEST_TORRENT_SEEDERS,
+        TEST_TORRENT_LEECHERS).await;
+
+    assert!(insert_torrent_tracker_stats_result.is_ok());
+
+    let get_torrent_from_id_result = db.get_torrent_listing_from_id(torrent_id).await;
 
     assert!(get_torrent_from_id_result.is_ok());
 
@@ -96,13 +122,13 @@ pub async fn it_can_add_a_torrent(db: &Box<dyn Database>) {
     assert_eq!(returned_torrent, TorrentListing {
         torrent_id,
         uploader: TEST_USER_USERNAME.to_string(),
-        info_hash: TEST_TORRENT_INFO_HASH.to_string(),
+        info_hash: torrent.info_hash(),
         title: TEST_TORRENT_TITLE.to_string(),
         description: Some(TEST_TORRENT_DESCRIPTION.to_string()),
         category_id: torrent_category_id,
-        upload_date: returned_torrent.upload_date,
+        date_uploaded: returned_torrent.date_uploaded.clone(),
         file_size: TEST_TORRENT_FILE_SIZE,
         seeders: TEST_TORRENT_SEEDERS,
         leechers: TEST_TORRENT_LEECHERS
-    })
+    });
 }

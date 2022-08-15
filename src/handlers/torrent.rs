@@ -84,22 +84,11 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
     let category = app_data.database.get_category_from_name(&torrent_request.fields.category).await
         .map_err(|_| ServiceError::InvalidCategory)?;
 
-    let username = user.username;
-    let info_hash = torrent_request.torrent.info_hash();
     let title = torrent_request.fields.title;
-    //let category = torrent_request.fields.category;
     let description = torrent_request.fields.description;
-    //let current_time = current_time() as i64;
-    let file_size = torrent_request.torrent.file_size();
-    let mut seeders = 0;
-    let mut leechers = 0;
 
-    if let Ok(torrent_info) = app_data.tracker.get_torrent_info(&info_hash).await {
-        seeders = torrent_info.seeders;
-        leechers = torrent_info.leechers;
-    }
-
-    let torrent_id = app_data.database.insert_torrent_and_get_id(username, info_hash, title, category.category_id, description, file_size, seeders, leechers).await?;
+    // insert entire torrent in database
+    let torrent_id = app_data.database.insert_torrent_and_get_id(&torrent_request.torrent, user.user_id, category.category_id, &title, &description).await?;
 
     // whitelist info hash on tracker
     let _ = app_data.tracker.whitelist_info_hash(torrent_request.torrent.info_hash()).await;
@@ -184,7 +173,7 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
 
     let torrent_id = get_torrent_id_from_request(&req)?;
 
-    let torrent_listing = app_data.database.get_torrent_from_id(torrent_id).await?;
+    let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
 
     let category = app_data.database.get_category_from_id(torrent_listing.category_id).await?;
 
@@ -245,7 +234,7 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
     torrent_response.magnet_link = magnet;
 
     // get realtime seeders and leechers
-    if let Ok(torrent_info) = app_data.tracker.get_torrent_info(&torrent_response.info_hash).await {
+    if let Ok(torrent_info) = app_data.tracker.get_torrent_info(torrent_response.torrent_id, &torrent_response.info_hash).await {
         torrent_response.seeders = torrent_info.seeders;
         torrent_response.leechers = torrent_info.leechers;
     }
@@ -260,7 +249,7 @@ pub async fn update_torrent(req: HttpRequest, payload: web::Json<TorrentUpdate>,
 
     let torrent_id = get_torrent_id_from_request(&req)?;
 
-    let torrent_listing = app_data.database.get_torrent_from_id(torrent_id).await?;
+    let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
 
     // check if user is owner or administrator
     if torrent_listing.uploader != user.username && !user.administrator { return Err(ServiceError::Unauthorized) }
@@ -275,7 +264,7 @@ pub async fn update_torrent(req: HttpRequest, payload: web::Json<TorrentUpdate>,
         let _res = app_data.database.update_torrent_description(torrent_id, description).await?;
     }
 
-    let torrent_listing = app_data.database.get_torrent_from_id(torrent_id).await?;
+    let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
     let torrent_response = TorrentResponse::from_listing(torrent_listing);
 
     Ok(HttpResponse::Ok().json(OkResponse {
@@ -292,7 +281,7 @@ pub async fn delete_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceRe
     let torrent_id = get_torrent_id_from_request(&req)?;
 
     // needed later for removing torrent from tracker whitelist
-    let torrent_listing = app_data.database.get_torrent_from_id(torrent_id).await?;
+    let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
 
     let _res = app_data.database.delete_torrent(torrent_id).await?;
 

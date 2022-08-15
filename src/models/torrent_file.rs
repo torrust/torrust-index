@@ -1,13 +1,12 @@
 use serde::{Deserialize, Serialize};
-use serde_bytes::ByteBuf;
 use crate::config::Configuration;
 use serde_bencode::ser;
 use sha1::{Digest, Sha1};
 
-#[derive(PartialEq, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct Node(String, i64);
 
-#[derive(PartialEq, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct File {
     pub path: Vec<String>,
     pub length: i64,
@@ -15,10 +14,11 @@ pub struct File {
     pub md5sum: Option<String>,
 }
 
-#[derive(PartialEq, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct Info {
     pub name: String,
-    pub pieces: ByteBuf,
+    #[serde(default)]
+    pub pieces: Option<String>,
     #[serde(rename="piece length")]
     pub piece_length: i64,
     #[serde(default)]
@@ -36,7 +36,7 @@ pub struct Info {
     pub root_hash: Option<String>,
 }
 
-#[derive(PartialEq, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct Torrent {
     pub info: Info, //
     #[serde(default)]

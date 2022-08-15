@@ -8,6 +8,7 @@ use crate::utils::time::current_time;
 use crate::models::tracker_key::TrackerKey;
 use crate::databases::database::{Category, Database, DatabaseDriver, DatabaseError, Sorting, TorrentCompact};
 use crate::models::response::{TorrentsResponse};
+use crate::models::torrent_file::Torrent;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 
 pub struct SqliteDatabase {
@@ -350,38 +351,159 @@ impl Database for SqliteDatabase {
         })
     }
 
-    async fn insert_torrent_and_get_id(&self, username: String, info_hash: String, title: String, category_id: i64, description: String, file_size: i64, seeders: i64, leechers: i64) -> Result<i64, DatabaseError> {
-        let current_time = current_time() as i64;
+    async fn insert_torrent_and_get_id(&self, torrent: &Torrent, uploader_id: i64, category_id: i64, title: &str, description: &str) -> Result<i64, DatabaseError> {
+        let info_hash = torrent.info_hash();
 
-        query("INSERT INTO torrust_torrents (uploader, info_hash, title, category_id, description, upload_date, file_size, seeders, leechers) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)")
-            .bind(username)
-            .bind(info_hash)
-            .bind(title)
+        // open pool connection
+        let mut conn = self.pool.acquire()
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        // start db transaction
+        let mut tx = conn.begin()
+            .await
+            .map_err(|_| DatabaseError::Error)?;
+
+        // torrent file can only hold a pieces key or a root hash key: http://www.bittorrent.org/beps/bep_0030.html
+        let (pieces, root_hash): (String, bool) = if let Some(pieces) = &torrent.info.pieces {
+            (pieces.to_string(), false)
+        } else {
+            let root_hash = torrent.info.root_hash.as_ref().ok_or(DatabaseError::Error)?;
+            (root_hash.to_string(), true)
+        };
+
+        // add torrent
+        let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, piece_length, pieces, root_hash, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
+            .bind(uploader_id)
             .bind(category_id)
-            .bind(description)
-            .bind(current_time)
-            .bind(file_size)
-            .bind(seeders)
-            .bind(leechers)
+            .bind(info_hash)
+            .bind(torrent.file_size())
+            .bind(torrent.info.piece_length)
+            .bind(pieces)
+            .bind(root_hash)
             .execute(&self.pool)
             .await
-            .map(|v| v.last_insert_rowid())
+            .map(|v| v.last_insert_rowid() as i64)
             .map_err(|e| match e {
-            sqlx::Error::Database(err) => {
-                if err.message().contains("info_hash") {
-                    DatabaseError::TorrentAlreadyExists
-                } else if err.message().contains("title") {
-                    DatabaseError::TorrentTitleAlreadyExists
-                } else {
-                    DatabaseError::Error
+                sqlx::Error::Database(err) => {
+                    if err.message().contains("info_hash") {
+                        DatabaseError::TorrentAlreadyExists
+                    } else if err.message().contains("title") {
+                        DatabaseError::TorrentTitleAlreadyExists
+                    } else {
+                        DatabaseError::Error
+                    }
                 }
+                _ => DatabaseError::Error
+            })?;
+
+        let insert_torrent_files_result = if let Some(length) = torrent.info.length {
+            query("INSERT INTO torrust_torrent_files (torrent_id, length) VALUES (?, ?)")
+                .bind(torrent_id)
+                .bind(length)
+                .execute(&mut tx)
+                .await
+                .map(|_| ())
+                .map_err(|_| DatabaseError::Error)
+        } else {
+            let files = torrent.info.files.as_ref().unwrap();
+
+            for file in files.iter() {
+                let path = file.path.join("/");
+
+                let _ = query("INSERT INTO torrust_torrent_files (torrent_id, length, path) VALUES (?, ?, ?)")
+                    .bind(torrent_id)
+                    .bind(file.length)
+                    .bind(path)
+                    .execute(&mut tx)
+                    .await
+                    .map_err(|_| DatabaseError::Error)?;
             }
-            _ => DatabaseError::Error
-        })
+
+            Ok(())
+        };
+
+        // rollback transaction on error
+        if let Err(e) = insert_torrent_files_result {
+            let _ = tx.rollback().await;
+            return Err(e)
+        }
+
+        let insert_torrent_announce_urls_result: Result<(), DatabaseError> = if let Some(tracker_url) = &torrent.announce {
+            query("INSERT INTO torrust_torrent_announce_urls (torrent_id, tracker_url) VALUES (?, ?)")
+                .bind(torrent_id)
+                .bind(tracker_url)
+                .execute(&mut tx)
+                .await
+                .map(|_| ())
+                .map_err(|_| DatabaseError::Error)
+        } else {
+            // flatten the nested vec (this will however remove the)
+            let announce_urls = torrent.announce_list.clone().unwrap().into_iter().flatten().collect::<Vec<String>>();
+
+            for tracker_url in announce_urls.iter() {
+                let _ = query("INSERT INTO torrust_torrent_announce_urls (torrent_id, tracker_url) VALUES (?, ?)")
+                    .bind(torrent_id)
+                    .bind(tracker_url)
+                    .execute(&mut tx)
+                    .await
+                    .map(|_| ())
+                    .map_err(|_| DatabaseError::Error)?;
+            }
+
+            Ok(())
+        };
+
+        // rollback transaction on error
+        if let Err(e) = insert_torrent_announce_urls_result {
+            let _ = tx.rollback().await;
+            return Err(e)
+        }
+
+        let insert_torrent_info_result = query(r#"INSERT INTO torrust_torrent_info (torrent_id, title, description) VALUES (?, ?, NULLIF(?, ""))"#)
+            .bind(torrent_id)
+            .bind(title)
+            .bind(description)
+            .execute(&mut tx)
+            .await
+            .map_err(|e| match e {
+                sqlx::Error::Database(err) => {
+                    if err.message().contains("info_hash") {
+                        DatabaseError::TorrentAlreadyExists
+                    } else if err.message().contains("title") {
+                        DatabaseError::TorrentTitleAlreadyExists
+                    } else {
+                        DatabaseError::Error
+                    }
+                }
+                _ => DatabaseError::Error
+            });
+
+        // commit or rollback transaction and return user_id on success
+        match insert_torrent_info_result {
+            Ok(_) => {
+                let _ = tx.commit().await;
+                Ok(torrent_id as i64)
+            }
+            Err(e) => {
+                let _ = tx.rollback().await;
+                Err(e)
+            }
+        }
     }
 
-    async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<TorrentListing, DatabaseError> {
-        query_as::<_, TorrentListing>("SELECT * FROM torrust_torrents WHERE torrent_id = ?")
+    async fn get_torrent_listing_from_id(&self, torrent_id: i64) -> Result<TorrentListing, DatabaseError> {
+        query_as::<_, TorrentListing>(
+            "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, tt.date_uploaded, tt.size AS file_size,
+            CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
+            CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
+            FROM torrust_torrents tt
+            INNER JOIN torrust_user_profiles tp ON tt.uploader_id = tp.user_id
+            INNER JOIN torrust_torrent_info ti ON tt.torrent_id = ti.torrent_id
+            LEFT JOIN torrust_torrent_tracker_stats ts ON tt.torrent_id = ts.torrent_id
+            WHERE tt.torrent_id = ?
+            GROUP BY ts.torrent_id"
+        )
             .bind(torrent_id)
             .fetch_one(&self.pool)
             .await
@@ -396,7 +518,7 @@ impl Database for SqliteDatabase {
     }
 
     async fn update_torrent_title(&self, torrent_id: i64, title: &str) -> Result<(), DatabaseError> {
-        query("UPDATE torrust_torrents SET title = $1 WHERE torrent_id = $2")
+        query("UPDATE torrust_torrent_info SET title = $1 WHERE torrent_id = $2")
             .bind(title)
             .bind(torrent_id)
             .execute(&self.pool)
@@ -419,7 +541,7 @@ impl Database for SqliteDatabase {
     }
 
     async fn update_torrent_description(&self, torrent_id: i64, description: &str) -> Result<(), DatabaseError> {
-        query("UPDATE torrust_torrents SET description = $1 WHERE torrent_id = $2")
+        query("UPDATE torrust_torrent_info SET description = $1 WHERE torrent_id = $2")
             .bind(description)
             .bind(torrent_id)
             .execute(&self.pool)
@@ -432,11 +554,12 @@ impl Database for SqliteDatabase {
             })
     }
 
-    async fn update_tracker_info(&self, info_hash: &str, seeders: i64, leechers: i64) -> Result<(), DatabaseError> {
-        query("UPDATE torrust_torrents SET seeders = $1, leechers = $2 WHERE info_hash = $3")
+    async fn update_tracker_info(&self, torrent_id: i64, tracker_url: &str, seeders: i64, leechers: i64) -> Result<(), DatabaseError> {
+        query("REPLACE INTO torrust_torrent_tracker_stats (torrent_id, tracker_url, seeders, leechers) VALUES ($1, $2, $3, $4)")
+            .bind(torrent_id)
+            .bind(tracker_url)
             .bind(seeders)
             .bind(leechers)
-            .bind(info_hash)
             .execute(&self.pool)
             .await
             .map(|_| ())

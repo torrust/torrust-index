@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS torrust_user_invitations (
+CREATE TABLE IF NOT EXISTS torrust_user_invitation_uses (
     invitation_use_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     invitation_id INTEGER NOT NULL,
     registered_user_id INTEGER NOT NULL,
