@@ -1,8 +1,9 @@
 use actix_web::{web, Responder, HttpResponse, HttpRequest};
+use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
+use argon2::password_hash::SaltString;
 use serde::{Deserialize, Serialize};
 use jsonwebtoken::{DecodingKey, decode, Validation, Algorithm};
-use pbkdf2::password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
-use pbkdf2::Pbkdf2;
+use rand_core::OsRng;
 
 use crate::errors::{ServiceResult, ServiceError};
 use crate::common::WebAppData;
@@ -67,7 +68,12 @@ pub async fn register(req: HttpRequest, mut payload: web::Json<Register>, app_da
     }
 
     let salt = SaltString::generate(&mut OsRng);
-    let password_hash = Pbkdf2.hash_password(payload.password.as_bytes(), &salt)?.to_string();
+
+    // Argon2 with default params (Argon2id v19)
+    let argon2 = Argon2::default();
+
+    // Hash password to PHC string ($argon2id$v=19$...)
+    let password_hash = argon2.hash_password(payload.password.as_bytes(), &salt)?.to_string();
 
     if payload.username.contains('@') {
         return Err(ServiceError::UsernameInvalid)
@@ -122,7 +128,7 @@ pub async fn login(payload: web::Json<Login>, app_data: WebAppData) -> ServiceRe
     let parsed_hash = PasswordHash::new(&user_authentication.password_hash)?;
 
     // verify if the user supplied and the database supplied passwords match
-    if Pbkdf2.verify_password(payload.password.as_bytes(), &parsed_hash).is_err() {
+    if Argon2::default().verify_password(payload.password.as_bytes(), &parsed_hash).is_err() {
         return Err(ServiceError::WrongPasswordOrUsername)
     }
 
