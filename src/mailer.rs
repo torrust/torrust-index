@@ -137,7 +137,7 @@ impl MailerService {
             base_url = cfg_base_url;
         }
 
-        format!("{}/user/verify/{}", base_url, token)
+        format!("{}/user/email/verify/{}", base_url, token)
     }
 }
 

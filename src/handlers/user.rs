@@ -21,8 +21,8 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
                 .route(web::post().to(login)))
             .service(web::resource("/ban/{user}")
                 .route(web::delete().to(ban_user)))
-            .service(web::resource("/verify/{token}")
-                .route(web::get().to(verify_user)))
+            .service(web::resource("/email/verify/{token}")
+                .route(web::get().to(verify_email)))
     );
 }
 
@@ -157,7 +157,7 @@ pub async fn login(payload: web::Json<Login>, app_data: WebAppData) -> ServiceRe
     }))
 }
 
-pub async fn verify_user(req: HttpRequest, app_data: WebAppData) -> String {
+pub async fn verify_email(req: HttpRequest, app_data: WebAppData) -> String {
     let settings = app_data.cfg.settings.read().await;
     let token = req.match_info().get("token").unwrap();
 
