@@ -227,8 +227,8 @@ impl From<DatabaseError> for ServiceError {
     }
 }
 
-impl From<pbkdf2::password_hash::Error> for ServiceError {
-    fn from(e: pbkdf2::password_hash::Error) -> Self {
+impl From<argon2::password_hash::Error> for ServiceError {
+    fn from(e: argon2::password_hash::Error) -> Self {
         eprintln!("{}", e);
         ServiceError::InternalServerError
     }
