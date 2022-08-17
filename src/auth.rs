@@ -25,6 +25,7 @@ impl AuthorizationService {
 
         // create JWT that expires in two weeks
         let key = settings.auth.secret_key.as_bytes();
+        // TODO: create config option for setting the token validity in seconds
         let exp_date = current_time() + 1_209_600; // two weeks from now
 
         let claims = UserClaims {

@@ -11,6 +11,7 @@ use crate::config::EmailOnSignup;
 use crate::models::response::OkResponse;
 use crate::models::response::TokenResponse;
 use crate::mailer::VerifyClaims;
+use crate::utils::time::current_time;
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -21,8 +22,12 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
                 .route(web::post().to(login)))
             .service(web::resource("/ban/{user}")
                 .route(web::delete().to(ban_user)))
-            .service(web::resource("/verify/{token}")
-                .route(web::get().to(verify_user)))
+            .service(web::resource("/token/verify")
+                .route(web::post().to(verify_token)))
+            .service(web::resource("/token/renew")
+                .route(web::post().to(renew_token)))
+            .service(web::resource("/email/verify/{token}")
+                .route(web::get().to(verify_email)))
     );
 }
 
@@ -38,6 +43,11 @@ pub struct Register {
 pub struct Login {
     pub login: String,
     pub password: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Token {
+    pub token: String,
 }
 
 pub async fn register(req: HttpRequest, mut payload: web::Json<Register>, app_data: WebAppData) -> ServiceResult<impl Responder> {
@@ -157,7 +167,39 @@ pub async fn login(payload: web::Json<Login>, app_data: WebAppData) -> ServiceRe
     }))
 }
 
-pub async fn verify_user(req: HttpRequest, app_data: WebAppData) -> String {
+pub async fn verify_token(payload: web::Json<Token>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    // verify if token is valid
+    let _claims = app_data.auth.verify_jwt(&payload.token).await?;
+
+    Ok(HttpResponse::Ok().json(OkResponse {
+        data: format!("Token is valid.")
+    }))
+}
+
+pub async fn renew_token(payload: web::Json<Token>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    // verify if token is valid
+    let claims = app_data.auth.verify_jwt(&payload.token).await?;
+
+    let user_compact = app_data.database.get_user_compact_from_id(claims.user.user_id).await?;
+
+    const ONE_WEEK_IN_SECONDS: u64 = 604_800;
+
+    // renew token if it is valid for less than one week
+    let token = match claims.exp - current_time() {
+        x if x < ONE_WEEK_IN_SECONDS => app_data.auth.sign_jwt(user_compact.clone()).await,
+        _ => payload.token.clone()
+    };
+
+    Ok(HttpResponse::Ok().json(OkResponse {
+        data: TokenResponse {
+            token,
+            username: user_compact.username,
+            admin: user_compact.administrator
+        }
+    }))
+}
+
+pub async fn verify_email(req: HttpRequest, app_data: WebAppData) -> String {
     let settings = app_data.cfg.settings.read().await;
     let token = req.match_info().get("token").unwrap();
 
@@ -185,7 +227,7 @@ pub async fn verify_user(req: HttpRequest, app_data: WebAppData) -> String {
     String::from("Email verified, you can close this page.")
 }
 
-// todo: add reason and date_expiry parameters to request
+// TODO: add reason and date_expiry parameters to request
 pub async fn ban_user(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let user = app_data.auth.get_user_compact_from_request(&req).await?;
 
