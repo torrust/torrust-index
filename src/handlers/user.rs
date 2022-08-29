@@ -11,6 +11,7 @@ use crate::config::EmailOnSignup;
 use crate::models::response::OkResponse;
 use crate::models::response::TokenResponse;
 use crate::mailer::VerifyClaims;
+use crate::utils::regex::validate_email_address;
 use crate::utils::time::current_time;
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
@@ -61,6 +62,13 @@ pub async fn register(req: HttpRequest, mut payload: web::Json<Register>, app_da
             payload.email = None
         }
         _ => {}
+    }
+
+    if let Some(email) = &payload.email {
+        // check if email address is valid
+        if !validate_email_address(email) {
+            return Err(ServiceError::EmailInvalid)
+        }
     }
 
     if payload.password != payload.confirm_password {

@@ -50,3 +50,5 @@ tokio = {version = "1.13", features = ["macros", "io-util", "net", "time", "rt-m
 
 lettre = { version = "0.10.0-rc.3", features = ["builder", "tokio1", "tokio1-rustls-tls", "smtp-transport"]}
 sailfish = "0.3.3"
+
+regex = "1.6.0"
