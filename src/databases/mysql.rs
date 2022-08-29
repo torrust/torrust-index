@@ -6,7 +6,7 @@ use sqlx::mysql::MySqlPoolOptions;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 use crate::models::torrent::TorrentListing;
 use crate::utils::time::current_time;
-use crate::models::tracker_key::TrackerKey;
+use crate::models::tracker_key::{TrackerKey};
 use crate::databases::database::{Category, Database, DatabaseDriver, DatabaseError, Sorting, TorrentCompact};
 use crate::models::response::{TorrentsResponse};
 use crate::models::torrent_file::{DbTorrentInfo, Torrent, DbTorrentFile, DbTorrentAnnounceUrl, TorrentFile};
@@ -145,7 +145,7 @@ impl Database for MysqlDatabase {
         let current_time_plus_hour = (current_time() as i64) + HOUR_IN_SECONDS;
 
         // get tracker key that is valid for at least one hour from now
-        query_as::<_, TrackerKey>("SELECT tracker_key, date_expiry FROM torrust_tracker_keys WHERE user_id = ? AND date_expiry > ? ORDER BY date_expiry DESC")
+        query_as::<_, TrackerKey>("SELECT tracker_key AS 'key', date_expiry AS valid_until FROM torrust_tracker_keys WHERE user_id = ? AND date_expiry > ? ORDER BY date_expiry DESC")
             .bind(user_id)
             .bind(current_time_plus_hour)
             .fetch_one(&self.pool)
@@ -204,15 +204,10 @@ impl Database for MysqlDatabase {
     async fn add_tracker_key(&self, user_id: i64, tracker_key: &TrackerKey) -> Result<(), DatabaseError> {
         let key = tracker_key.key.clone();
 
-        // date needs to be in ISO 8601 format
-        let date_expiry = NaiveDateTime::from_timestamp(tracker_key.valid_until, 0)
-            .format("%Y-%m-%d %H:%M:%S")
-            .to_string();
-
         query("INSERT INTO torrust_tracker_keys (user_id, tracker_key, date_expiry) VALUES (?, ?, ?)")
             .bind(user_id)
             .bind(key)
-            .bind(date_expiry)
+            .bind(tracker_key.valid_until)
             .execute(&self.pool)
             .await
             .map(|_| ())
