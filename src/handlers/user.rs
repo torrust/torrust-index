@@ -101,6 +101,11 @@ pub async fn register(req: HttpRequest, mut payload: web::Json<Register>, app_da
 
     let user_id = app_data.database.insert_user_and_get_id(&payload.username, &email, &password_hash).await?;
 
+    // if this is the first created account, give administrator rights
+    if user_id == 1 {
+        let _ = app_data.database.grant_admin_role(user_id).await;
+    }
+
     let conn_info = req.connection_info();
 
     if settings.mail.email_verification_enabled && payload.email.is_some() {
@@ -119,16 +124,6 @@ pub async fn register(req: HttpRequest, mut payload: web::Json<Register>, app_da
     }
 
     Ok(HttpResponse::Ok())
-}
-
-async fn grant_admin_role(app_data: &WebAppData, user_id: i64) {
-    // count accounts
-    let user_count = app_data.database.count_users().await;
-
-    // make admin if first account
-    if let Ok(1) = user_count {
-        let _ = app_data.database.grant_admin_role(user_id).await;
-    }
 }
 
 pub async fn login(payload: web::Json<Login>, app_data: WebAppData) -> ServiceResult<impl Responder> {
