@@ -2813,6 +2813,7 @@ dependencies = [
  "jsonwebtoken",
  "lettre",
  "rand_core",
+ "regex",
  "reqwest",
  "sailfish",
  "sanitize-filename",

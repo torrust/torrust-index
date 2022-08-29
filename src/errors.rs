@@ -21,8 +21,8 @@ pub enum ServiceError {
 
     #[display(fmt = "Email is required")] //405j
     EmailMissing,
-    #[display(fmt = "The value you entered for email is not an email")] //405j
-    NotAnEmail,
+    #[display(fmt = "Please enter a valid email address")] //405j
+    EmailInvalid,
 
     #[display(fmt = "The value you entered for URL is not a URL")] //405j
     NotAUrl,
@@ -130,7 +130,7 @@ impl ResponseError for ServiceError {
     fn status_code(&self) -> StatusCode {
         match self {
             ServiceError::ClosedForRegistration => StatusCode::FORBIDDEN,
-            ServiceError::NotAnEmail => StatusCode::BAD_REQUEST,
+            ServiceError::EmailInvalid => StatusCode::BAD_REQUEST,
             ServiceError::NotAUrl => StatusCode::BAD_REQUEST,
             ServiceError::WrongPasswordOrUsername => StatusCode::FORBIDDEN,
             ServiceError::UsernameNotFound => StatusCode::NOT_FOUND,
