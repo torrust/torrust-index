@@ -75,23 +75,33 @@ pub struct TorrentUpdate {
 pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let user = app_data.auth.get_user_compact_from_request(&req).await?;
 
+    // get torrent and fields from request
     let mut torrent_request = get_torrent_request_from_payload(payload).await?;
 
     // update announce url to our own tracker url
     torrent_request.torrent.set_torrust_config(&app_data.cfg).await;
 
+    // get the correct category name from database
     let category = app_data.database.get_category_from_name(&torrent_request.fields.category).await
         .map_err(|_| ServiceError::InvalidCategory)?;
 
-    let title = torrent_request.fields.title;
-    let description = torrent_request.fields.description;
-
     // insert entire torrent in database
-    let torrent_id = app_data.database.insert_torrent_and_get_id(&torrent_request.torrent, user.user_id, category.category_id, &title, &description).await?;
+    let torrent_id = app_data.database.insert_torrent_and_get_id(
+        &torrent_request.torrent,
+        user.user_id,
+        category.category_id,
+        &torrent_request.fields.title,
+        &torrent_request.fields.description
+    ).await?;
 
     // whitelist info hash on tracker
-    let _ = app_data.tracker.whitelist_info_hash(torrent_request.torrent.info_hash()).await;
+    if let Err(e) = app_data.tracker.whitelist_info_hash(torrent_request.torrent.info_hash()).await {
+        // if the torrent can't be whitelisted somehow, remove the torrent from database
+        let _ = app_data.database.delete_torrent(torrent_id).await;
+        return Err(e);
+    }
 
+    // respond with the newly uploaded torrent id
     Ok(HttpResponse::Ok().json(OkResponse {
         data: NewTorrentResponse {
             torrent_id

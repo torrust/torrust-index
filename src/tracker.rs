@@ -49,23 +49,19 @@ impl TrackerService {
     pub async fn whitelist_info_hash(&self, info_hash: String) -> Result<(), ServiceError> {
         let settings = self.cfg.settings.read().await;
 
-        let request_url =
-            format!("{}/api/whitelist/{}?token={}", settings.tracker.api_url, info_hash, settings.tracker.token);
+        let request_url = format!("{}/api/whitelist/{}?token={}", settings.tracker.api_url, info_hash, settings.tracker.token);
 
         drop(settings);
 
         let client = reqwest::Client::new();
 
-        let response = match client.post(request_url).send().await {
-            Ok(v) => Ok(v),
-            Err(_) => Err(ServiceError::InternalServerError)
-        }?;
+        let response = client.post(request_url).send().await.map_err(|_| ServiceError::TrackerOffline)?;
 
         if response.status().is_success() {
-            return Ok(())
+            Ok(())
+        } else {
+            Err(ServiceError::InternalServerError)
         }
-
-        Err(ServiceError::InternalServerError)
     }
 
     pub async fn remove_info_hash_from_whitelist(&self, info_hash: String) -> Result<(), ServiceError> {
