@@ -74,6 +74,7 @@ jobs:
     needs: [tag, build]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
       - name: Download builds
         uses: actions/download-artifact@v2
         with:
@@ -86,3 +87,4 @@ jobs:
           tag_name: ${{ needs.tag.outputs.release_tag }}
           files: |
             torrust-index-backend/*
+            LICENSE
