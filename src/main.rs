@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use actix_web::{App, HttpServer, middleware, web};
 use actix_cors::Cors;
-use torrust_index_backend::{handlers};
+use torrust_index_backend::{routes};
 use torrust_index_backend::config::{Configuration};
 use torrust_index_backend::common::AppData;
 use torrust_index_backend::auth::AuthorizationService;
@@ -63,7 +63,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(Cors::permissive())
             .app_data(web::Data::new(app_data.clone()))
             .wrap(middleware::Logger::default())
-            .configure(handlers::init_routes)
+            .configure(routes::init_routes)
     })
         .bind(("0.0.0.0", port))?
         .run()

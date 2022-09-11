@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::models::torrent_file::Torrent;
-use crate::handlers::torrent::CreateTorrent;
+use crate::routes::torrent::CreateTorrent;
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Serialize, Deserialize, sqlx::FromRow)]
