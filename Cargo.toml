@@ -1,6 +1,6 @@
 [package]
 name = "torrust-index-backend"
-version = "1.0.0"
+version = "2.0.0-dev.1"
 authors = ["Mick van Dijke <mick@dutchbits.nl>", "Wesley Bijleveld <wesley@dutchbits.nl>"]
 edition = "2021"
 
