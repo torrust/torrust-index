@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use crate::databases::database::Category;
 use crate::models::torrent::TorrentListing;
-use crate::models::torrent_file::File;
+use crate::models::torrent_file::TorrentFile;
 
 pub enum OkResponses {
     TokenResponse(TokenResponse)
@@ -28,12 +29,6 @@ pub struct NewTorrentResponse {
     pub torrent_id: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug, sqlx::FromRow)]
-pub struct CategoryResponse {
-    pub name: String,
-    pub num_torrents: Option<i64>,
-}
-
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct TorrentResponse {
     pub torrent_id: i64,
@@ -41,12 +36,12 @@ pub struct TorrentResponse {
     pub info_hash: String,
     pub title: String,
     pub description: Option<String>,
-    pub category_id: i64,
-    pub upload_date: i64,
+    pub category: Category,
+    pub upload_date: String,
     pub file_size: i64,
     pub seeders: i64,
     pub leechers: i64,
-    pub files: Option<Vec<File>>,
+    pub files: Vec<TorrentFile>,
     pub trackers: Vec<String>,
     pub magnet_link: String,
 }
@@ -59,12 +54,12 @@ impl TorrentResponse {
             info_hash: torrent_listing.info_hash,
             title: torrent_listing.title,
             description: torrent_listing.description,
-            category_id: torrent_listing.category_id,
-            upload_date: torrent_listing.upload_date,
+            category: Category { category_id: 0, name: "".to_string(), num_torrents: 0 },
+            upload_date: torrent_listing.date_uploaded,
             file_size: torrent_listing.file_size,
             seeders: torrent_listing.seeders,
             leechers: torrent_listing.leechers,
-            files: None,
+            files: vec![],
             trackers: vec![],
             magnet_link: "".to_string(),
         }

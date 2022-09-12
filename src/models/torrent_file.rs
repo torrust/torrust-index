@@ -1,24 +1,26 @@
 use serde::{Deserialize, Serialize};
-use serde_bytes::ByteBuf;
 use crate::config::Configuration;
 use serde_bencode::ser;
+use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
+use crate::utils::hex::{bytes_to_hex, hex_to_bytes};
 
-#[derive(PartialEq, Debug, Serialize, Deserialize)]
-pub struct Node(String, i64);
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub struct TorrentNode(String, i64);
 
-#[derive(PartialEq, Debug, Serialize, Deserialize)]
-pub struct File {
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub struct TorrentFile {
     pub path: Vec<String>,
     pub length: i64,
     #[serde(default)]
     pub md5sum: Option<String>,
 }
 
-#[derive(PartialEq, Debug, Serialize, Deserialize)]
-pub struct Info {
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub struct TorrentInfo {
     pub name: String,
-    pub pieces: ByteBuf,
+    #[serde(default)]
+    pub pieces: Option<ByteBuf>,
     #[serde(rename="piece length")]
     pub piece_length: i64,
     #[serde(default)]
@@ -26,7 +28,7 @@ pub struct Info {
     #[serde(default)]
     pub length: Option<i64>,
     #[serde(default)]
-    pub files: Option<Vec<File>>,
+    pub files: Option<Vec<TorrentFile>>,
     #[serde(default)]
     pub private: Option<u8>,
     #[serde(default)]
@@ -36,13 +38,13 @@ pub struct Info {
     pub root_hash: Option<String>,
 }
 
-#[derive(PartialEq, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct Torrent {
-    pub info: Info, //
+    pub info: TorrentInfo, //
     #[serde(default)]
     pub announce: Option<String>,
     #[serde(default)]
-    pub nodes: Option<Vec<Node>>,
+    pub nodes: Option<Vec<TorrentNode>>,
     #[serde(default)]
     pub encoding: Option<String>,
     #[serde(default)]
@@ -61,6 +63,69 @@ pub struct Torrent {
 }
 
 impl Torrent {
+    pub fn from_db_info_files_and_announce_urls(torrent_info: DbTorrentInfo, torrent_files: Vec<TorrentFile>, torrent_announce_urls: Vec<Vec<String>>) -> Self {
+        let private = if let Some(private_i64) = torrent_info.private {
+            // must fit in a byte
+            let private = if (0..256).contains(&private_i64) { private_i64 } else { 0 };
+            Some(private as u8)
+        } else {
+            None
+        };
+
+        // the info part of the torrent file
+        let mut info = TorrentInfo {
+            name: torrent_info.name.to_string(),
+            pieces: None,
+            piece_length: torrent_info.piece_length,
+            md5sum: None,
+            length: None,
+            files: None,
+            private,
+            path: None,
+            root_hash: None
+        };
+
+        // a torrent file has a root hash or a pieces key, but not both.
+        if torrent_info.root_hash > 0 {
+            info.root_hash = Some(torrent_info.pieces);
+        } else {
+            let pieces = hex_to_bytes(&torrent_info.pieces).unwrap();
+            info.pieces = Some(ByteBuf::from(pieces));
+        }
+
+        // either set the single file or the multiple files information
+        if torrent_files.len() == 1 {
+            // can safely unwrap because we know there is 1 element
+            let torrent_file = torrent_files.first().unwrap();
+
+            info.md5sum = torrent_file.md5sum.clone();
+
+            info.length = Some(torrent_file.length);
+
+            let path = if torrent_file.path.first().as_ref().unwrap().is_empty() {
+                None
+            } else {
+                Some(torrent_file.path.clone())
+            };
+
+            info.path = path;
+        } else {
+            info.files = Some(torrent_files);
+        }
+
+        Self {
+            info,
+            announce: None,
+            nodes: None,
+            encoding: None,
+            httpseeds: None,
+            announce_list: Some(torrent_announce_urls),
+            creation_date: None,
+            comment: None,
+            created_by: None
+        }
+    }
+
     pub async fn set_torrust_config(&mut self, cfg: &Configuration) {
         let settings = cfg.settings.read().await;
 
@@ -84,12 +149,8 @@ impl Torrent {
         sum_bytes
     }
 
-
     pub fn info_hash(&self) -> String {
-        let mut buffer = [0u8; 40];
-        let input = &self.calculate_info_hash_as_bytes();
-        let bytes_out = binascii::bin2hex(input, &mut buffer).ok().unwrap();
-        String::from(std::str::from_utf8(bytes_out).unwrap())
+        bytes_to_hex(&self.calculate_info_hash_as_bytes())
     }
 
     pub fn file_size(&self) -> i64 {
@@ -108,4 +169,27 @@ impl Torrent {
             }
         }
     }
+}
+
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DbTorrentFile {
+    pub path: Option<String>,
+    pub length: i64,
+    #[serde(default)]
+    pub md5sum: Option<String>,
+}
+
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DbTorrentInfo {
+    pub name: String,
+    pub pieces: String,
+    pub piece_length: i64,
+    #[serde(default)]
+    pub private: Option<i64>,
+    pub root_hash: i64,
+}
+
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DbTorrentAnnounceUrl {
+    pub tracker_url: String,
 }

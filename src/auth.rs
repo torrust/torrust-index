@@ -1,35 +1,35 @@
 use actix_web::HttpRequest;
-use crate::models::user::{Claims, User};
+use crate::models::user::{UserClaims, UserCompact};
 use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm, encode, Header, EncodingKey};
 use crate::utils::time::current_time;
 use crate::errors::ServiceError;
 use std::sync::Arc;
-use crate::database::Database;
 use crate::config::Configuration;
+use crate::databases::database::Database;
 
 pub struct AuthorizationService {
     cfg: Arc<Configuration>,
-    database: Arc<Database>,
+    database: Arc<Box<dyn Database>>
 }
 
 impl AuthorizationService {
-    pub fn new(cfg: Arc<Configuration>, database: Arc<Database>) -> AuthorizationService {
+    pub fn new(cfg: Arc<Configuration>, database: Arc<Box<dyn Database>>) -> AuthorizationService {
         AuthorizationService {
             cfg,
             database
         }
     }
 
-    pub async fn sign_jwt(&self, user: User) -> String {
+    pub async fn sign_jwt(&self, user: UserCompact) -> String {
         let settings = self.cfg.settings.read().await;
 
         // create JWT that expires in two weeks
         let key = settings.auth.secret_key.as_bytes();
+        // TODO: create config option for setting the token validity in seconds
         let exp_date = current_time() + 1_209_600; // two weeks from now
 
-        let claims = Claims {
-            sub: user.username,
-            admin: user.administrator,
+        let claims = UserClaims {
+            user,
             exp: exp_date,
         };
 
@@ -43,10 +43,10 @@ impl AuthorizationService {
         token
     }
 
-    pub async fn verify_jwt(&self, token: &str) -> Result<Claims, ServiceError> {
+    pub async fn verify_jwt(&self, token: &str) -> Result<UserClaims, ServiceError> {
         let settings = self.cfg.settings.read().await;
 
-        match decode::<Claims>(
+        match decode::<UserClaims>(
             token,
             &DecodingKey::from_secret(settings.auth.secret_key.as_bytes()),
             &Validation::new(Algorithm::HS256),
@@ -61,7 +61,7 @@ impl AuthorizationService {
         }
     }
 
-    pub async fn get_claims_from_request(&self, req: &HttpRequest) -> Result<Claims, ServiceError> {
+    pub async fn get_claims_from_request(&self, req: &HttpRequest) -> Result<UserClaims, ServiceError> {
         let _auth = req.headers().get("Authorization");
         match _auth {
             Some(_) => {
@@ -77,15 +77,11 @@ impl AuthorizationService {
         }
     }
 
-    pub async fn get_user_from_request(&self, req: &HttpRequest) -> Result<User, ServiceError> {
-        let claims = match self.get_claims_from_request(req).await {
-            Ok(claims) => Ok(claims),
-            Err(e) => Err(e)
-        }?;
+    pub async fn get_user_compact_from_request(&self, req: &HttpRequest) -> Result<UserCompact, ServiceError> {
+        let claims = self.get_claims_from_request(req).await?;
 
-        match self.database.get_user_with_username(&claims.sub).await {
-            Some(user) => Ok(user),
-            None => Err(ServiceError::AccountNotFound)
-        }
+        self.database.get_user_compact_from_id(claims.user.user_id)
+            .await
+            .map_err(|_| ServiceError::UserNotFound)
     }
 }

@@ -3,6 +3,7 @@ use config::{ConfigError, Config, File};
 use std::path::Path;
 use serde::{Serialize, Deserialize};
 use tokio::sync::RwLock;
+use crate::databases::database::DatabaseDriver;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Website {
@@ -10,8 +11,17 @@ pub struct Website {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TrackerMode {
+    Public,
+    Private,
+    Whitelisted,
+    PrivateWhitelisted
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tracker {
     pub url: String,
+    pub mode: TrackerMode,
     pub api_url: String,
     pub token: String,
     pub token_valid_seconds: u64,
@@ -24,7 +34,15 @@ pub struct Network {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum EmailOnSignup {
+    Required,
+    Optional,
+    None
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Auth {
+    pub email_on_signup: EmailOnSignup,
     pub min_password_length: usize,
     pub max_password_length: usize,
     pub secret_key: String,
@@ -32,13 +50,9 @@ pub struct Auth {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Database {
+    pub db_driver: DatabaseDriver,
     pub connect_url: String,
     pub torrent_info_update_interval: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Storage {
-    pub upload_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,19 +73,11 @@ pub struct TorrustConfig {
     pub net: Network,
     pub auth: Auth,
     pub database: Database,
-    pub storage: Storage,
     pub mail: Mail,
 }
 
 #[derive(Debug)]
 pub struct Configuration {
-    // pub website: Website,
-    // pub tracker: Tracker,
-    // pub net: Network,
-    // pub auth: Auth,
-    // pub database: Database,
-    // pub storage: Storage,
-    // pub mail: Mail,
     pub settings: RwLock<TorrustConfig>
 }
 
@@ -83,6 +89,7 @@ impl Configuration {
             },
             tracker: Tracker {
                 url: "udp://localhost:6969".to_string(),
+                mode: TrackerMode::Public,
                 api_url: "http://localhost:1212".to_string(),
                 token: "MyAccessToken".to_string(),
                 token_valid_seconds: 7257600
@@ -92,16 +99,15 @@ impl Configuration {
                 base_url: None
             },
             auth: Auth {
+                email_on_signup: EmailOnSignup::Optional,
                 min_password_length: 6,
                 max_password_length: 64,
                 secret_key: "MaxVerstappenWC2021".to_string()
             },
             database: Database {
+                db_driver: DatabaseDriver::Sqlite3,
                 connect_url: "sqlite://data.db?mode=rwc".to_string(),
                 torrent_info_update_interval: 3600
-            },
-            storage: Storage {
-                upload_path: "./uploads".to_string()
             },
             mail: Mail {
                 email_verification_enabled: false,
@@ -165,4 +171,25 @@ impl Configuration {
 
         Ok(())
     }
+}
+
+impl Configuration {
+    pub async fn get_public(&self) -> ConfigurationPublic {
+        let settings_lock = self.settings.read().await;
+
+        ConfigurationPublic {
+            website_name: settings_lock.website.name.clone(),
+            tracker_url: settings_lock.tracker.url.clone(),
+            tracker_mode: settings_lock.tracker.mode.clone(),
+            email_on_signup: settings_lock.auth.email_on_signup.clone()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConfigurationPublic {
+    website_name: String,
+    tracker_url: String,
+    tracker_mode: TrackerMode,
+    email_on_signup: EmailOnSignup
 }

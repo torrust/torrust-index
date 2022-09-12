@@ -17,7 +17,7 @@ pub struct MailerService {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VerifyClaims {
     pub iss: String,
-    pub sub: String,
+    pub sub: i64,
     pub exp: u64,
 }
 
@@ -55,18 +55,18 @@ impl MailerService {
             .build()
     }
 
-    pub async fn send_verification_mail(&self, to: &str, username: &str, base_url: &str) -> Result<(), ServiceError> {
+    pub async fn send_verification_mail(&self, to: &str, username: &str, user_id: i64, base_url: &str) -> Result<(), ServiceError> {
         let builder = self.get_builder(to).await;
-        let verification_url = self.get_verification_url(username, base_url).await;
+        let verification_url = self.get_verification_url(user_id, base_url).await;
 
         let mail_body = format!(
             r#"
-Welcome to Torrust, {}!
+                Welcome to Torrust, {}!
 
-Please click the confirmation link below to verify your account.
-{}
+                Please click the confirmation link below to verify your account.
+                {}
 
-If this account wasn't made by you, you can ignore this email.
+                If this account wasn't made by you, you can ignore this email.
             "#,
             username,
             verification_url
@@ -112,7 +112,7 @@ If this account wasn't made by you, you can ignore this email.
             .to(to.parse().unwrap())
     }
 
-    async fn get_verification_url(&self, username: &str, base_url: &str) -> String {
+    async fn get_verification_url(&self, user_id: i64, base_url: &str) -> String {
         let settings = self.cfg.settings.read().await;
 
         // create verification JWT
@@ -121,7 +121,7 @@ If this account wasn't made by you, you can ignore this email.
         // Create non expiring token that is only valid for email-verification
         let claims = VerifyClaims {
             iss: String::from("email-verification"),
-            sub: String::from(username),
+            sub: user_id,
             exp: current_time() + 315_569_260 // 10 years from now
         };
 
@@ -137,7 +137,7 @@ If this account wasn't made by you, you can ignore this email.
             base_url = cfg_base_url;
         }
 
-        format!("{}/user/verify/{}", base_url, token)
+        format!("{}/user/email/verify/{}", base_url, token)
     }
 }
 

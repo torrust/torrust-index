@@ -1,11 +1,11 @@
 use std::sync::Arc;
 use actix_web::{App, HttpServer, middleware, web};
 use actix_cors::Cors;
-use torrust_index_backend::database::Database;
-use torrust_index_backend::{handlers};
+use torrust_index_backend::{routes};
 use torrust_index_backend::config::{Configuration};
 use torrust_index_backend::common::AppData;
 use torrust_index_backend::auth::AuthorizationService;
+use torrust_index_backend::databases::database::connect_database;
 use torrust_index_backend::tracker::TrackerService;
 use torrust_index_backend::mailer::MailerService;
 
@@ -20,7 +20,7 @@ async fn main() -> std::io::Result<()> {
 
     let settings = cfg.settings.read().await;
 
-    let database = Arc::new(Database::new(&settings.database.connect_url).await);
+    let database = Arc::new(connect_database(&settings.database.db_driver, &settings.database.connect_url).await);
     let auth = Arc::new(AuthorizationService::new(cfg.clone(), database.clone()));
     let tracker_service = Arc::new(TrackerService::new(cfg.clone(), database.clone()));
     let mailer_service = Arc::new(MailerService::new(cfg.clone()).await);
@@ -34,14 +34,8 @@ async fn main() -> std::io::Result<()> {
         )
     );
 
-    // create/update database tables
-    let _ = sqlx::migrate!().run(&database.pool).await;
-
-    // create torrent upload folder
-    async_std::fs::create_dir_all(&settings.storage.upload_path).await?;
-
     let interval = settings.database.torrent_info_update_interval;
-    let weak_tracker_service = std::sync::Arc::downgrade(&tracker_service);
+    let weak_tracker_service = Arc::downgrade(&tracker_service);
 
     // repeating task, update all seeders and leechers info
     tokio::spawn(async move {
@@ -69,7 +63,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(Cors::permissive())
             .app_data(web::Data::new(app_data.clone()))
             .wrap(middleware::Logger::default())
-            .configure(handlers::init_routes)
+            .configure(routes::init_routes)
     })
         .bind(("0.0.0.0", port))?
         .run()
