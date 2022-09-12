@@ -8,4 +8,6 @@ The two main applicable license to most of its content are:
 
 - For Media (Images, etc.) -- [cc-by-sa](https://github.com/torrust/torrust-index/blob/main/licensing/cc-by-sa.md)
 
+We make the exception that projects that distribute this work only need to include the name and version of the license, instead of needing to include them verbatim in the package.
+
 If you want to read more about all the licenses and how they apply please refer to the [contributor agreement](https://github.com/torrust/torrust-index/blob/main/licensing/contributor_agreement_v01.md).
