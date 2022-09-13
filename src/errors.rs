@@ -222,7 +222,8 @@ impl From<DatabaseError> for ServiceError {
             DatabaseError::CategoryNotFound => ServiceError::InvalidCategory,
             DatabaseError::TorrentNotFound => ServiceError::TorrentNotFound,
             DatabaseError::TorrentAlreadyExists => ServiceError::InfoHashAlreadyExists,
-            DatabaseError::TorrentTitleAlreadyExists => ServiceError::TorrentTitleAlreadyExists
+            DatabaseError::TorrentTitleAlreadyExists => ServiceError::TorrentTitleAlreadyExists,
+            DatabaseError::UnrecognizedDatabaseDriver => ServiceError::InternalServerError,
         }
     }
 }
