@@ -20,7 +20,11 @@ async fn main() -> std::io::Result<()> {
 
     let settings = cfg.settings.read().await;
 
-    let database = Arc::new(connect_database(&settings.database.db_driver, &settings.database.connect_url).await);
+    let database = Arc::new(connect_database(&settings.database.connect_url)
+            .await
+            .expect("Database error.")
+    );
+
     let auth = Arc::new(AuthorizationService::new(cfg.clone(), database.clone()));
     let tracker_service = Arc::new(TrackerService::new(cfg.clone(), database.clone()));
     let mailer_service = Arc::new(MailerService::new(cfg.clone()).await);
