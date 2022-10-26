@@ -77,6 +77,22 @@ pub async fn connect_database(db_path: &str) -> Result<Box<dyn Database>, Databa
     }
 }
 
+/// Connect to a database without running migrations
+pub async fn connect_database_without_running_migrations(db_path: &str) -> Result<Box<dyn Database>, DatabaseError> {
+    match &db_path.chars().collect::<Vec<char>>() as &[char] {
+        ['s', 'q', 'l', 'i', 't', 'e', ..] => {
+            let db = SqliteDatabase::new_without_running_migrations(db_path).await;
+            Ok(Box::new(db))
+        }
+        ['m', 'y', 's', 'q', 'l', ..] => {
+            todo!()
+        }
+        _ => {
+            Err(DatabaseError::UnrecognizedDatabaseDriver)
+        }
+    }
+}
+
 /// Trait for database implementations.
 #[async_trait]
 pub trait Database: Sync + Send {
