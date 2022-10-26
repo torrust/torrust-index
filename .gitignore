@@ -1,4 +1,5 @@
 /.env
-/data.db*
 /config.toml
+/data.db*
+/target
 /uploads/
