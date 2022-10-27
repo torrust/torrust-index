@@ -30,14 +30,6 @@ impl SqliteDatabase {
 
         Self { pool: db }
     }
-
-    pub async fn new_without_running_migrations(database_url: &str) -> Self {
-        let db = SqlitePoolOptions::new()
-            .connect(database_url)
-            .await
-            .expect("Unable to create database pool.");
-        Self { pool: db }
-    }
 }
 
 #[async_trait]
