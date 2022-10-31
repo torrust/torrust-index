@@ -1,6 +1,6 @@
 # DB migration
 
-With the console command `cargo run --bin db_migrate` you can migrate data from `v1.0.0` to `v2.0.0`. This migration includes:
+With the console command `cargo run --bin upgrade` you can migrate data from `v1.0.0` to `v2.0.0`. This migration includes:
 
 - Changing the DB schema.
 - Transferring the torrent files in the dir `uploads` to the database.
@@ -22,8 +22,8 @@ and also:
 Run the docker container and connect using the console client:
 
 ```s
-./db_migrate/docker/start_mysql.sh
-./db_migrate/docker/mysql_client.sh
+./upgrades/from_v1_0_0_to_v2_0_0/docker/start_mysql.sh
+./upgrades/from_v1_0_0_to_v2_0_0/docker/mysql_client.sh
 ```
 
 Once you are connected to the client you can create databases with:
@@ -95,20 +95,20 @@ mysql> show tables;
 
 ### Create DB for backend `v1.0.0`
 
-The `db_migrate` command is going to import data from version `v1.0.0` (database and `uploads` folder) into the new empty database for `v2.0.0`.
+The `upgrade` command is going to import data from version `v1.0.0` (database and `uploads` folder) into the new empty database for `v2.0.0`.
 
 You can import data into the source database for testing with the `mysql` DB client or docker.
 
 Using `mysql` client:
 
 ```s
-mysql -h127.0.0.1 -uroot -pdb-root-password torrust_v1 < ./db_migrate/db_schemas/db_migrations_v1_for_mysql_8.sql
+mysql -h127.0.0.1 -uroot -pdb-root-password torrust_v1 < ./upgrades/from_v1_0_0_to_v2_0_0/db_schemas/db_migrations_v1_for_mysql_8.sql
 ```
 
 Using dockerized `mysql` client:
 
 ```s
-docker exec -i torrust-index-backend-mysql mysql torrust_v1 -uroot -pdb-root-password < ./db_migrate/db_schemas/db_migrations_v1_for_mysql_8.sql
+docker exec -i torrust-index-backend-mysql mysql torrust_v1 -uroot -pdb-root-password < ./upgrades/from_v1_0_0_to_v2_0_0/db_schemas/db_migrations_v1_for_mysql_8.sql
 ```
 
 ### Commands
@@ -128,6 +128,6 @@ docker exec -it torrust-index-backend-mysql mysql torrust_v1 -uroot -pdb-root-pa
 Backup DB:
 
 ```s
-mysqldump -h127.0.0.1 torrust_v1 -uroot -pdb-root-password > ./db_migrate/db_schemas/v1_schema_dump.sql
-mysqldump -h127.0.0.1 torrust_v2 -uroot -pdb-root-password > ./db_migrate/db_schemas/v2_schema_dump.sql
+mysqldump -h127.0.0.1 torrust_v1 -uroot -pdb-root-password > ./upgrades/from_v1_0_0_to_v2_0_0/db_schemas/v1_schema_dump.sql
+mysqldump -h127.0.0.1 torrust_v2 -uroot -pdb-root-password > ./upgrades/from_v1_0_0_to_v2_0_0/db_schemas/v2_schema_dump.sql
 ```

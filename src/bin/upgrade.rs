@@ -1,5 +1,5 @@
 //! Migration command to migrate data from v1.0.0 to v2.0.0
-//! Run it with `cargo run --bin db_migrate`
+//! Run it with `cargo run --bin upgrade`
 
 use std::sync::Arc;
 use torrust_index_backend::config::Configuration;
