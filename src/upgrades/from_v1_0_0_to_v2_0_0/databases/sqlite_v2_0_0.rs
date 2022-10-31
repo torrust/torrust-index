@@ -1,7 +1,8 @@
-use super::database::DatabaseError;
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqlitePoolOptions, SqliteQueryResult};
 use sqlx::{query, query_as, SqlitePool};
+
+use crate::databases::database::DatabaseError;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Category {
@@ -35,7 +36,10 @@ impl SqliteDatabaseV2_0_0 {
             .map_err(|_| DatabaseError::Error)
     }
 
-    pub async fn insert_category_and_get_id(&self, category_name: &str) -> Result<i64, DatabaseError> {
+    pub async fn insert_category_and_get_id(
+        &self,
+        category_name: &str,
+    ) -> Result<i64, DatabaseError> {
         query("INSERT INTO torrust_categories (name) VALUES (?)")
             .bind(category_name)
             .execute(&self.pool)
@@ -51,7 +55,7 @@ impl SqliteDatabaseV2_0_0 {
                 }
                 _ => DatabaseError::Error,
             })
-    }    
+    }
 
     pub async fn delete_all_database_rows(&self) -> Result<(), DatabaseError> {
         query("DELETE FROM torrust_categories;")

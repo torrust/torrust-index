@@ -7,6 +7,7 @@ pub mod mailer;
 pub mod models;
 pub mod routes;
 pub mod tracker;
+pub mod upgrades;
 pub mod utils;
 
 trait AsCSV {
