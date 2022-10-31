@@ -57,6 +57,44 @@ impl SqliteDatabaseV2_0_0 {
             })
     }
 
+    pub async fn insert_user(
+        &self,
+        user_id: i64,
+        date_registered: &str,
+        administrator: bool,
+    ) -> Result<i64, sqlx::Error> {
+        query(
+            "INSERT INTO torrust_users (user_id, date_registered, administrator) VALUES (?, ?, ?)",
+        )
+        .bind(user_id)
+        .bind(date_registered)
+        .bind(administrator)
+        .execute(&self.pool)
+        .await
+        .map(|v| v.last_insert_rowid())
+    }
+
+    pub async fn insert_user_profile(
+        &self,
+        user_id: i64,
+        username: &str,
+        email: &str,
+        email_verified: bool,
+        bio: &str,
+        avatar: &str,
+    ) -> Result<i64, sqlx::Error> {
+        query("INSERT INTO torrust_user_profiles (user_id, username, email, email_verified, bio, avatar) VALUES (?, ?, ?, ?, ?, ?)")
+            .bind(user_id)
+            .bind(username)
+            .bind(email)
+            .bind(email_verified)
+            .bind(bio)
+            .bind(avatar)
+            .execute(&self.pool)
+            .await
+            .map(|v| v.last_insert_rowid())
+    }
+
     pub async fn delete_all_database_rows(&self) -> Result<(), DatabaseError> {
         query("DELETE FROM torrust_categories;")
             .execute(&self.pool)

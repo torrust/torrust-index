@@ -1,8 +1,23 @@
+//! It updates the application from version v1.0.0 to v2.0.0.
+//!
+//! NOTES for `torrust_users` table transfer:
+//!
+//! - In v2, the table `torrust_user` contains a field `date_registered` non existing in v1.
+//!   It's used the day when the upgrade command is executed.
+//! - In v2, the table `torrust_user_profiles` contains two new fields: `bio` and `avatar`.
+//!   Empty string is used as default value.
+
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
-use std::sync::Arc;
+use chrono::prelude::{DateTime, Utc};
+use std::{sync::Arc, time::SystemTime};
 
 use crate::config::Configuration;
+
+fn today_iso8601() -> String {
+    let dt: DateTime<Utc> = SystemTime::now().into();
+    format!("{}", dt.format("%Y-%m-%d"))
+}
 
 async fn current_db() -> Arc<SqliteDatabaseV1_0_0> {
     // Connect to the old v1.0.0 DB
@@ -74,6 +89,65 @@ pub async fn upgrade() {
 
     reset_destiny_database(dest_database.clone()).await;
     transfer_categories(source_database.clone(), dest_database.clone()).await;
+
+    // Transfer `torrust_users`
+
+    let users = source_database.get_users().await.unwrap();
+
+    for user in &users {
+        // [v2] table torrust_users
+
+        println!(
+            "[v2][torrust_users] adding user: {:?} {:?} ...",
+            &user.user_id, &user.username
+        );
+
+        let default_data_registered = today_iso8601();
+
+        let id = dest_database
+            .insert_user(user.user_id, &default_data_registered, user.administrator)
+            .await
+            .unwrap();
+
+        if id != user.user_id {
+            panic!(
+                "Error copying user {:?} from source DB to destiny DB",
+                &user.user_id
+            );
+        }
+
+        println!(
+            "[v2][torrust_users] user: {:?} {:?} added.",
+            &user.user_id, &user.username
+        );
+
+        // [v2] table torrust_user_profiles
+
+        println!(
+            "[v2][torrust_user_profiles] adding user: {:?} {:?} ...",
+            &user.user_id, &user.username
+        );
+
+        let default_user_bio = "".to_string();
+        let default_user_avatar = "".to_string();
+
+        dest_database
+            .insert_user_profile(
+                user.user_id,
+                &user.username,
+                &user.email,
+                user.email_verified,
+                &default_user_bio,
+                &default_user_avatar,
+            )
+            .await
+            .unwrap();
+
+        println!(
+            "[v2][torrust_user_profiles] user: {:?} {:?} added.",
+            &user.user_id, &user.username
+        );
+    }
 
     // TODO: WIP. We have to transfer data from the 5 tables in V1 and the torrent files in folder `uploads`.
 }
