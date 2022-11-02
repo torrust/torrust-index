@@ -2,6 +2,7 @@ use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use pbkdf2::Pbkdf2;
 use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 
@@ -10,6 +11,7 @@ use crate::config::EmailOnSignup;
 use crate::errors::{ServiceError, ServiceResult};
 use crate::mailer::VerifyClaims;
 use crate::models::response::{OkResponse, TokenResponse};
+use crate::models::user::UserAuthentication;
 use crate::utils::regex::validate_email_address;
 use crate::utils::time::current_time;
 
@@ -139,16 +141,7 @@ pub async fn login(payload: web::Json<Login>, app_data: WebAppData) -> ServiceRe
         .await
         .map_err(|_| ServiceError::InternalServerError)?;
 
-    // wrap string of the hashed password into a PasswordHash struct for verification
-    let parsed_hash = PasswordHash::new(&user_authentication.password_hash)?;
-
-    // verify if the user supplied and the database supplied passwords match
-    if Argon2::default()
-        .verify_password(payload.password.as_bytes(), &parsed_hash)
-        .is_err()
-    {
-        return Err(ServiceError::WrongPasswordOrUsername);
-    }
+    verify_password(payload.password.as_bytes(), &user_authentication)?;
 
     let settings = app_data.cfg.settings.read().await;
 
@@ -172,6 +165,30 @@ pub async fn login(payload: web::Json<Login>, app_data: WebAppData) -> ServiceRe
             admin: user_compact.administrator,
         },
     }))
+}
+
+/// Verify if the user supplied and the database supplied passwords match
+pub fn verify_password(password: &[u8], user_authentication: &UserAuthentication) -> Result<(), ServiceError> {
+    // wrap string of the hashed password into a PasswordHash struct for verification
+    let parsed_hash = PasswordHash::new(&user_authentication.password_hash)?;
+
+    match parsed_hash.algorithm.as_str() {
+        "argon2id" => {
+            if Argon2::default().verify_password(password, &parsed_hash).is_err() {
+                return Err(ServiceError::WrongPasswordOrUsername);
+            }
+
+            Ok(())
+        }
+        "pbkdf2-sha256" => {
+            if Pbkdf2.verify_password(password, &parsed_hash).is_err() {
+                return Err(ServiceError::WrongPasswordOrUsername);
+            }
+
+            Ok(())
+        }
+        _ => Err(ServiceError::WrongPasswordOrUsername),
+    }
 }
 
 pub async fn verify_token(payload: web::Json<Token>, app_data: WebAppData) -> ServiceResult<impl Responder> {

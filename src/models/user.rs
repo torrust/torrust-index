@@ -10,7 +10,7 @@ pub struct User {
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct UserAuthentication {
     pub user_id: i64,
-    pub password_hash: String,
+    pub password_hash: String
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, sqlx::FromRow)]

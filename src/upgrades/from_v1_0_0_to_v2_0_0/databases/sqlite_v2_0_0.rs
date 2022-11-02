@@ -22,6 +22,13 @@ impl SqliteDatabaseV2_0_0 {
         Self { pool: db }
     }
 
+    pub async fn migrate(&self) {
+        sqlx::migrate!("migrations/sqlite3")
+            .run(&self.pool)
+            .await
+            .expect("Could not run database migrations.")
+    }
+
     pub async fn reset_categories_sequence(&self) -> Result<SqliteQueryResult, DatabaseError> {
         query("DELETE FROM `sqlite_sequence` WHERE `name` = 'torrust_categories'")
             .execute(&self.pool)
@@ -90,6 +97,19 @@ impl SqliteDatabaseV2_0_0 {
             .bind(email_verified)
             .bind(bio)
             .bind(avatar)
+            .execute(&self.pool)
+            .await
+            .map(|v| v.last_insert_rowid())
+    }
+
+    pub async fn insert_user_password_hash(
+        &self,
+        user_id: i64,
+        password_hash: &str,
+    ) -> Result<i64, sqlx::Error> {
+        query("INSERT INTO torrust_user_authentication (user_id, password_hash) VALUES (?, ?)")
+            .bind(user_id)
+            .bind(password_hash)
             .execute(&self.pool)
             .await
             .map(|v| v.last_insert_rowid())

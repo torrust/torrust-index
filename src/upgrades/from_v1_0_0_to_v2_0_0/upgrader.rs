@@ -7,8 +7,10 @@
 //! - In v2, the table `torrust_user_profiles` contains two new fields: `bio` and `avatar`.
 //!   Empty string is used as default value.
 
-use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
+use crate::{
+    upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0,
+};
 use chrono::prelude::{DateTime, Utc};
 use std::{sync::Arc, time::SystemTime};
 
@@ -36,6 +38,11 @@ async fn current_db() -> Arc<SqliteDatabaseV1_0_0> {
 async fn new_db(db_filename: String) -> Arc<SqliteDatabaseV2_0_0> {
     let dest_database_connect_url = format!("sqlite://{}?mode=rwc", db_filename);
     Arc::new(SqliteDatabaseV2_0_0::new(&dest_database_connect_url).await)
+}
+
+async fn migrate_destiny_database(dest_database: Arc<SqliteDatabaseV2_0_0>) {
+    println!("Running migrations ...");
+    dest_database.migrate().await;
 }
 
 async fn reset_destiny_database(dest_database: Arc<SqliteDatabaseV2_0_0>) {
@@ -80,16 +87,10 @@ async fn transfer_categories(
     println!("[v2] categories: {:?}", &dest_categories);
 }
 
-pub async fn upgrade() {
-    // Get connections to source adn destiny databases
-    let source_database = current_db().await;
-    let dest_database = new_db("data_v2.db".to_string()).await;
-
-    println!("Upgrading data from version v1.0.0 to v2.0.0 ...");
-
-    reset_destiny_database(dest_database.clone()).await;
-    transfer_categories(source_database.clone(), dest_database.clone()).await;
-
+async fn transfer_user_data(
+    source_database: Arc<SqliteDatabaseV1_0_0>,
+    dest_database: Arc<SqliteDatabaseV2_0_0>,
+) {
     // Transfer `torrust_users`
 
     let users = source_database.get_users().await.unwrap();
@@ -147,7 +148,37 @@ pub async fn upgrade() {
             "[v2][torrust_user_profiles] user: {:?} {:?} added.",
             &user.user_id, &user.username
         );
+
+        // [v2] table torrust_user_authentication
+
+        println!(
+            "[v2][torrust_user_authentication] adding password hash ({:?}) for user ({:?}) ...",
+            &user.password, &user.user_id
+        );
+
+        dest_database
+            .insert_user_password_hash(user.user_id, &user.password)
+            .await
+            .unwrap();
+
+        println!(
+            "[v2][torrust_user_authentication] password hash ({:?}) added for user ({:?}).",
+            &user.password, &user.user_id
+        );
     }
+}
+
+pub async fn upgrade() {
+    // Get connections to source adn destiny databases
+    let source_database = current_db().await;
+    let dest_database = new_db("data_v2.db".to_string()).await;
+
+    println!("Upgrading data from version v1.0.0 to v2.0.0 ...");
+
+    migrate_destiny_database(dest_database.clone()).await;
+    reset_destiny_database(dest_database.clone()).await;
+    transfer_categories(source_database.clone(), dest_database.clone()).await;
+    transfer_user_data(source_database.clone(), dest_database.clone()).await;
 
     // TODO: WIP. We have to transfer data from the 5 tables in V1 and the torrent files in folder `uploads`.
 }
