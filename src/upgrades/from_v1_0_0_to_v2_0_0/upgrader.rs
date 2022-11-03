@@ -16,7 +16,7 @@ use crate::config::Configuration;
 
 fn today_iso8601() -> String {
     let dt: DateTime<Utc> = SystemTime::now().into();
-    format!("{}", dt.format("%Y-%m-%d"))
+    format!("{}", dt.format("%Y-%m-%d %H:%M:%S"))
 }
 
 async fn current_db() -> Arc<SqliteDatabaseV1_0_0> {
