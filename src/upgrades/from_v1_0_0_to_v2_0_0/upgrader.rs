@@ -7,10 +7,8 @@
 //! - In v2, the table `torrust_user_profiles` contains two new fields: `bio` and `avatar`.
 //!   Empty string is used as default value.
 
+use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
-use crate::{
-    upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0,
-};
 use chrono::prelude::{DateTime, Utc};
 use std::{sync::Arc, time::SystemTime};
 
@@ -41,7 +39,7 @@ async fn new_db(db_filename: String) -> Arc<SqliteDatabaseV2_0_0> {
 }
 
 async fn migrate_destiny_database(dest_database: Arc<SqliteDatabaseV2_0_0>) {
-    println!("Running migrations ...");
+    println!("Running migrations in destiny database...");
     dest_database.migrate().await;
 }
 
@@ -57,6 +55,8 @@ async fn transfer_categories(
     source_database: Arc<SqliteDatabaseV1_0_0>,
     dest_database: Arc<SqliteDatabaseV2_0_0>,
 ) {
+    println!("Transferring categories ...");
+
     let source_categories = source_database.get_categories_order_by_id().await.unwrap();
     println!("[v1] categories: {:?}", &source_categories);
 
@@ -91,7 +91,9 @@ async fn transfer_user_data(
     source_database: Arc<SqliteDatabaseV1_0_0>,
     dest_database: Arc<SqliteDatabaseV2_0_0>,
 ) {
-    // Transfer `torrust_users`
+    println!("Transferring users ...");
+
+    // Transfer table `torrust_users`
 
     let users = source_database.get_users().await.unwrap();
 
@@ -168,6 +170,48 @@ async fn transfer_user_data(
     }
 }
 
+async fn transfer_tracker_keys(
+    source_database: Arc<SqliteDatabaseV1_0_0>,
+    dest_database: Arc<SqliteDatabaseV2_0_0>,
+) {
+    println!("Transferring tracker keys ...");
+
+    // Transfer table `torrust_tracker_keys`
+
+    let tracker_keys = source_database.get_tracker_keys().await.unwrap();
+
+    for tracker_key in &tracker_keys {
+        // [v2] table torrust_tracker_keys
+
+        println!(
+            "[v2][torrust_users] adding the tracker key: {:?} ...",
+            &tracker_key.key_id
+        );
+
+        let id = dest_database
+            .insert_tracker_key(
+                tracker_key.key_id,
+                tracker_key.user_id,
+                &tracker_key.key,
+                tracker_key.valid_until,
+            )
+            .await
+            .unwrap();
+
+        if id != tracker_key.key_id {
+            panic!(
+                "Error copying tracker key {:?} from source DB to destiny DB",
+                &tracker_key.key_id
+            );
+        }
+
+        println!(
+            "[v2][torrust_tracker_keys] tracker key: {:?} added.",
+            &tracker_key.key_id
+        );
+    }
+}
+
 pub async fn upgrade() {
     // Get connections to source adn destiny databases
     let source_database = current_db().await;
@@ -179,6 +223,7 @@ pub async fn upgrade() {
     reset_destiny_database(dest_database.clone()).await;
     transfer_categories(source_database.clone(), dest_database.clone()).await;
     transfer_user_data(source_database.clone(), dest_database.clone()).await;
+    transfer_tracker_keys(source_database.clone(), dest_database.clone()).await;
 
     // TODO: WIP. We have to transfer data from the 5 tables in V1 and the torrent files in folder `uploads`.
 }

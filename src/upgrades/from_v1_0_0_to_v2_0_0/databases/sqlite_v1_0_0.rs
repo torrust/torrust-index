@@ -20,6 +20,14 @@ pub struct User {
     pub administrator: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct TrackerKey {
+    pub key_id: i64,
+    pub user_id: i64,
+    pub key: String,
+    pub valid_until: i64,
+}
+
 pub struct SqliteDatabaseV1_0_0 {
     pub pool: SqlitePool,
 }
@@ -43,10 +51,14 @@ impl SqliteDatabaseV1_0_0 {
     }
 
     pub async fn get_users(&self) -> Result<Vec<User>, sqlx::Error> {
-        query_as::<_, User>(
-            "SELECT * FROM torrust_users ORDER BY user_id ASC",
-        )
-        .fetch_all(&self.pool)
-        .await
+        query_as::<_, User>("SELECT * FROM torrust_users ORDER BY user_id ASC")
+            .fetch_all(&self.pool)
+            .await
+    }
+
+    pub async fn get_tracker_keys(&self) -> Result<Vec<TrackerKey>, sqlx::Error> {
+        query_as::<_, TrackerKey>("SELECT * FROM torrust_tracker_keys ORDER BY key_id ASC")
+            .fetch_all(&self.pool)
+            .await
     }
 }
