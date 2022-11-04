@@ -7,20 +7,25 @@
 //! - In v2, the table `torrust_user_profiles` contains two new fields: `bio` and `avatar`.
 //!   Empty string is used as default value.
 
-use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
+use crate::utils::parse_torrent::decode_torrent;
+use crate::{
+    models::torrent_file::Torrent,
+    upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0,
+};
 use chrono::prelude::{DateTime, Utc};
+use chrono::NaiveDateTime;
+
+use std::{error, fs};
 use std::{sync::Arc, time::SystemTime};
 
 use crate::config::Configuration;
 
-fn today_iso8601() -> String {
-    let dt: DateTime<Utc> = SystemTime::now().into();
-    format!("{}", dt.format("%Y-%m-%d %H:%M:%S"))
-}
+pub async fn upgrade() {
+    // TODO: get from command arguments
+    let database_file = "data_v2.db".to_string(); // The new database
+    let upload_path = "./uploads".to_string(); // The relative dir where torrent files are stored
 
-async fn current_db() -> Arc<SqliteDatabaseV1_0_0> {
-    // Connect to the old v1.0.0 DB
     let cfg = match Configuration::load_from_file().await {
         Ok(config) => Arc::new(config),
         Err(error) => {
@@ -30,10 +35,29 @@ async fn current_db() -> Arc<SqliteDatabaseV1_0_0> {
 
     let settings = cfg.settings.read().await;
 
-    Arc::new(SqliteDatabaseV1_0_0::new(&settings.database.connect_url).await)
+    // Get connection to source database (current DB in settings)
+    let source_database = current_db(&settings.database.connect_url).await;
+
+    // Get connection to destiny database
+    let dest_database = new_db(&database_file).await;
+
+    println!("Upgrading data from version v1.0.0 to v2.0.0 ...");
+
+    migrate_destiny_database(dest_database.clone()).await;
+    reset_destiny_database(dest_database.clone()).await;
+    transfer_categories(source_database.clone(), dest_database.clone()).await;
+    transfer_user_data(source_database.clone(), dest_database.clone()).await;
+    transfer_tracker_keys(source_database.clone(), dest_database.clone()).await;
+    transfer_torrents(source_database.clone(), dest_database.clone(), &upload_path).await;
+
+    // TODO: WIP. We have to transfer data from the 5 tables in V1 and the torrent files in folder `uploads`.
 }
 
-async fn new_db(db_filename: String) -> Arc<SqliteDatabaseV2_0_0> {
+async fn current_db(connect_url: &str) -> Arc<SqliteDatabaseV1_0_0> {
+    Arc::new(SqliteDatabaseV1_0_0::new(connect_url).await)
+}
+
+async fn new_db(db_filename: &str) -> Arc<SqliteDatabaseV2_0_0> {
     let dest_database_connect_url = format!("sqlite://{}?mode=rwc", db_filename);
     Arc::new(SqliteDatabaseV2_0_0::new(&dest_database_connect_url).await)
 }
@@ -170,6 +194,11 @@ async fn transfer_user_data(
     }
 }
 
+fn today_iso8601() -> String {
+    let dt: DateTime<Utc> = SystemTime::now().into();
+    format!("{}", dt.format("%Y-%m-%d %H:%M:%S"))
+}
+
 async fn transfer_tracker_keys(
     source_database: Arc<SqliteDatabaseV1_0_0>,
     dest_database: Arc<SqliteDatabaseV2_0_0>,
@@ -212,18 +241,116 @@ async fn transfer_tracker_keys(
     }
 }
 
-pub async fn upgrade() {
-    // Get connections to source adn destiny databases
-    let source_database = current_db().await;
-    let dest_database = new_db("data_v2.db".to_string()).await;
+async fn transfer_torrents(
+    source_database: Arc<SqliteDatabaseV1_0_0>,
+    dest_database: Arc<SqliteDatabaseV2_0_0>,
+    upload_path: &str,
+) {
+    println!("Transferring torrents ...");
 
-    println!("Upgrading data from version v1.0.0 to v2.0.0 ...");
+    // Transfer table `torrust_torrents_files`
 
-    migrate_destiny_database(dest_database.clone()).await;
-    reset_destiny_database(dest_database.clone()).await;
-    transfer_categories(source_database.clone(), dest_database.clone()).await;
-    transfer_user_data(source_database.clone(), dest_database.clone()).await;
-    transfer_tracker_keys(source_database.clone(), dest_database.clone()).await;
+    // Although the The table `torrust_torrents_files` existed in version v1.0.0
+    // it was was not used.
 
-    // TODO: WIP. We have to transfer data from the 5 tables in V1 and the torrent files in folder `uploads`.
+    // Transfer table `torrust_torrents`
+
+    let torrents = source_database.get_torrents().await.unwrap();
+
+    for torrent in &torrents {
+        // [v2] table torrust_torrents
+
+        println!(
+            "[v2][torrust_torrents] adding the torrent: {:?} ...",
+            &torrent.torrent_id
+        );
+
+        // TODO: confirm with @WarmBeer that
+        // - All torrents were public in version v1.0.0
+        // - Infohashes were in lowercase en v1.0. and uppercase in version v2.0.0
+        let private = false;
+
+        let uploader = source_database
+            .get_user_by_username(&torrent.uploader)
+            .await
+            .unwrap();
+
+        if uploader.username != torrent.uploader {
+            panic!(
+                "Error copying torrent {:?}. Uploader in torrent does username",
+                &torrent.torrent_id
+            );
+        }
+
+        let filepath = format!("{}/{}.torrent", upload_path, &torrent.torrent_id);
+
+        let torrent_from_file = read_torrent_from_file(&filepath).unwrap();
+
+        let pieces = torrent_from_file.info.get_pieces_as_string();
+        let root_hash = torrent_from_file.info.get_root_hash_as_i64();
+
+        let id = dest_database
+            .insert_torrent(
+                torrent.torrent_id,
+                uploader.user_id,
+                torrent.category_id,
+                &torrent_from_file.info_hash(),
+                torrent.file_size,
+                &torrent_from_file.info.name,
+                &pieces,
+                torrent_from_file.info.piece_length,
+                private,
+                root_hash,
+                &convert_timestamp_to_datetime(torrent.upload_date),
+            )
+            .await
+            .unwrap();
+
+        if id != torrent.torrent_id {
+            panic!(
+                "Error copying torrent {:?} from source DB to destiny DB",
+                &torrent.torrent_id
+            );
+        }
+
+        println!(
+            "[v2][torrust_torrents] torrent: {:?} added.",
+            &torrent.torrent_id
+        );
+
+        // [v2] table torrust_torrent_files
+
+        // TODO
+
+        // [v2] table torrust_torrent_announce_urls
+
+        // TODO
+
+        // [v2] table torrust_torrent_info
+
+        // TODO
+    }
+}
+
+fn read_torrent_from_file(path: &str) -> Result<Torrent, Box<dyn error::Error>> {
+    let contents = match fs::read(path) {
+        Ok(contents) => contents,
+        Err(e) => return Err(e.into()),
+    };
+
+    match decode_torrent(&contents) {
+        Ok(torrent) => Ok(torrent),
+        Err(e) => Err(e),
+    }
+}
+
+fn convert_timestamp_to_datetime(timestamp: i64) -> String {
+    // The expected format in database is: 2022-11-04 09:53:57
+    // MySQL uses a DATETIME column and SQLite uses a TEXT column.
+
+    let naive_datetime = NaiveDateTime::from_timestamp(timestamp, 0);
+    let datetime_again: DateTime<Utc> = DateTime::from_utc(naive_datetime, Utc);
+
+    // Format without timezone
+    datetime_again.format("%Y-%m-%d %H:%M:%S").to_string()
 }

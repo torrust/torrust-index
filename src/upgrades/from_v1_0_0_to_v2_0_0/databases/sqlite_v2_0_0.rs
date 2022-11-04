@@ -132,6 +132,52 @@ impl SqliteDatabaseV2_0_0 {
             .map(|v| v.last_insert_rowid())
     }
 
+    pub async fn insert_torrent(
+        &self,
+        torrent_id: i64,
+        uploader_id: i64,
+        category_id: i64,
+        info_hash: &str,
+        size: i64,
+        name: &str,
+        pieces: &str,
+        piece_length: i64,
+        private: bool,
+        root_hash: i64,
+        date_uploaded: &str,
+    ) -> Result<i64, sqlx::Error> {
+        query(
+            "
+            INSERT INTO torrust_torrents (
+                torrent_id,
+                uploader_id,
+                category_id,
+                info_hash,
+                size,
+                name,
+                pieces,
+                piece_length,
+                private,
+                root_hash,
+                date_uploaded
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(torrent_id)
+        .bind(uploader_id)
+        .bind(category_id)
+        .bind(info_hash)
+        .bind(size)
+        .bind(name)
+        .bind(pieces)
+        .bind(piece_length)
+        .bind(private)
+        .bind(root_hash)
+        .bind(date_uploaded)
+        .execute(&self.pool)
+        .await
+        .map(|v| v.last_insert_rowid())
+    }
+
     pub async fn delete_all_database_rows(&self) -> Result<(), DatabaseError> {
         query("DELETE FROM torrust_categories;")
             .execute(&self.pool)

@@ -39,6 +39,24 @@ pub struct TorrentInfo {
     pub root_hash: Option<String>,
 }
 
+impl TorrentInfo {
+    /// torrent file can only hold a pieces key or a root hash key:
+    /// http://www.bittorrent.org/beps/bep_0030.html
+    pub fn get_pieces_as_string(&self) -> String {
+        match &self.pieces {
+            None => "".to_string(),
+            Some(byte_buf) => bytes_to_hex(byte_buf.as_ref())
+        }
+    }
+
+    pub fn get_root_hash_as_i64(&self) -> i64 {
+        match &self.root_hash {
+            None => 0i64,
+            Some(root_hash) => root_hash.parse::<i64>().unwrap()
+        }
+    }
+}
+
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct Torrent {
     pub info: TorrentInfo, //
