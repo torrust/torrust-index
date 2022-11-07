@@ -1,133 +1,34 @@
-# DB migration
+# Upgrade from v1.0.0 to v2.0.0
 
-With the console command `cargo run --bin upgrade` you can migrate data from `v1.0.0` to `v2.0.0`. This migration includes:
+## How-to
 
-- Changing the DB schema.
-- Transferring the torrent files in the dir `uploads` to the database.
+To upgrade from version `v1.0.0` to `v2.0.0` you have to follow these steps:
 
-## SQLite3
+- Back up your current database and the `uploads` folder. You can find which database and upload folder are you using in the `Config.toml` file in the root folder of your installation.
+- Set up a local environment exactly as you have it in production with your production data (DB and torrents folder).
+- Run the application locally with: `cargo run`.
+- Execute the upgrader command: `cargo run --bin upgrade`
+- A new SQLite file should have been created in the root folder: `data_v2.db`
+- Stop the running application and change the DB configuration to use the newly generated configuration:
 
-TODO
-
-## MySQL8
-
-Please,
-
-> WARNING: MySQL migration is not implemented yet. We also provide docker infrastructure to run mysql during implementation of a migration tool.
-
-and also:
-
-> WARNING: We are not using a persisted volume. If you remove the volume used by the container you lose the database data.
-
-Run the docker container and connect using the console client:
-
-```s
-./upgrades/from_v1_0_0_to_v2_0_0/docker/start_mysql.sh
-./upgrades/from_v1_0_0_to_v2_0_0/docker/mysql_client.sh
-```
-
-Once you are connected to the client you can create databases with:
-
-```s
-create database torrust_v1;
-create database torrust_v2;
-```
-
-After creating databases you should see something like this:
-
-```s
-mysql> show databases;
-+--------------------+
-| Database           |
-+--------------------+
-| information_schema |
-| mysql              |
-| performance_schema |
-| sys                |
-| torrust_v1         |
-| torrust_v2         |
-+--------------------+
-6 rows in set (0.001 sec)
-```
-
-How to connect from outside the container:
-
-```s
-mysql -h127.0.0.1 -uroot -pdb-root-password
-```
-
-## Create DB for backend `v2.0.0`
-
-You need to create an empty new database for v2.0.0.
-
-You need to change the configuration in `config.toml` file to use MySQL:
-
-```yml
+```toml
 [database]
-connect_url = "mysql://root:db-root-password@127.0.0.1/torrust_v2"
+connect_url = "sqlite://data_v2.db?mode=rwc"
 ```
 
-After running the backend with `cargo run` you should see the tables created by migrations:
+- Run the application again.
+- Perform some tests.
+- If all tests pass, stop the production service, replace the DB, and start it again.
 
-```s
-mysql> show tables;
-+-------------------------------+
-| Tables_in_torrust_v2          |
-+-------------------------------+
-| _sqlx_migrations              |
-| torrust_categories            |
-| torrust_torrent_announce_urls |
-| torrust_torrent_files         |
-| torrust_torrent_info          |
-| torrust_torrent_tracker_stats |
-| torrust_torrents              |
-| torrust_tracker_keys          |
-| torrust_user_authentication   |
-| torrust_user_bans             |
-| torrust_user_invitation_uses  |
-| torrust_user_invitations      |
-| torrust_user_profiles         |
-| torrust_user_public_keys      |
-| torrust_users                 |
-+-------------------------------+
-15 rows in set (0.001 sec)
-```
+## Tests
 
-### Create DB for backend `v1.0.0`
+Before replacing the DB in production you can make some tests like:
 
-The `upgrade` command is going to import data from version `v1.0.0` (database and `uploads` folder) into the new empty database for `v2.0.0`.
+- Try to log in with a preexisting user. If you do not know any you can create a new "test" user in production before starting with the upgrade process. Users had a different hash algorithm for the password in v1.
+- Try to create a new user.
+- Try to upload and download a new torrent containing a single file.
+- Try to upload and download a new torrent containing a folder.
 
-You can import data into the source database for testing with the `mysql` DB client or docker.
+## Notes
 
-Using `mysql` client:
-
-```s
-mysql -h127.0.0.1 -uroot -pdb-root-password torrust_v1 < ./upgrades/from_v1_0_0_to_v2_0_0/db_schemas/db_migrations_v1_for_mysql_8.sql
-```
-
-Using dockerized `mysql` client:
-
-```s
-docker exec -i torrust-index-backend-mysql mysql torrust_v1 -uroot -pdb-root-password < ./upgrades/from_v1_0_0_to_v2_0_0/db_schemas/db_migrations_v1_for_mysql_8.sql
-```
-
-### Commands
-
-Connect to `mysql` client:
-
-```s
-mysql -h127.0.0.1 -uroot -pdb-root-password torrust_v1
-```
-
-Connect to dockerized `mysql` client:
-
-```s
-docker exec -it torrust-index-backend-mysql mysql torrust_v1 -uroot -pdb-root-password
-```
-
-Backup DB:
-
-```s
-mysqldump -h127.0.0.1 torrust_v1 -uroot -pdb-root-password > ./upgrades/from_v1_0_0_to_v2_0_0/db_schemas/v1_schema_dump.sql
-mysqldump -h127.0.0.1 torrust_v2 -uroot -pdb-root-password > ./upgrades/from_v1_0_0_to_v2_0_0/db_schemas/v2_schema_dump.sql
-```
+The `db_schemas` contains the snapshots of the source and destiny databases for this upgrade.
