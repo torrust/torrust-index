@@ -231,6 +231,19 @@ impl SqliteDatabaseV2_0_0 {
         .map(|v| v.last_insert_rowid())
     }
 
+    pub async fn insert_torrent_announce_url(
+        &self,
+        torrent_id: i64,
+        tracker_url: &str,
+    ) -> Result<i64, sqlx::Error> {
+        query("INSERT INTO torrust_torrent_announce_urls (torrent_id, tracker_url) VALUES (?, ?)")
+            .bind(torrent_id)
+            .bind(tracker_url)
+            .execute(&self.pool)
+            .await
+            .map(|v| v.last_insert_rowid())
+    }
+
     pub async fn delete_all_database_rows(&self) -> Result<(), DatabaseError> {
         query("DELETE FROM torrust_categories;")
             .execute(&self.pool)

@@ -268,6 +268,8 @@ async fn transfer_torrents(
         // TODO: confirm with @WarmBeer that
         // - All torrents were public in version v1.0.0
         // - Infohashes were in lowercase en v1.0. and uppercase in version v2.0.0
+        // - Only one option is used for announce url if we have two the announce and the announce list.
+        //   And announce has priority over announce list.
         let private = false;
 
         let uploader = source_database
@@ -371,10 +373,6 @@ async fn transfer_torrents(
             }
         }
 
-        // [v2] table torrust_torrent_announce_urls
-
-        // TODO
-
         // [v2] table torrust_torrent_info
 
         println!(
@@ -389,8 +387,53 @@ async fn transfer_torrents(
             &id
         );
 
-        println!("Torrents transferred");
+        // [v2] table torrust_torrent_announce_urls
+
+        println!(
+            "[v2][torrust_torrent_announce_urls] adding the torrent announce url for torrent {:?} ...",
+            &torrent.torrent_id
+        );
+
+        if torrent_from_file.announce.is_some() {
+            println!("[v2][torrust_torrent_announce_urls] adding the torrent announce url for torrent {:?} ...", &torrent.torrent_id);
+
+            let announce_url_id = dest_database
+                .insert_torrent_announce_url(
+                    torrent.torrent_id,
+                    &torrent_from_file.announce.unwrap(),
+                )
+                .await;
+
+            println!(
+                "[v2][torrust_torrent_announce_urls] torrent announce url insert result {:?} ...",
+                &announce_url_id
+            );
+        } else if torrent_from_file.announce_list.is_some() {
+            // BEP-0012. Multiple trackers.
+
+            println!("[v2][torrust_torrent_announce_urls] adding the torrent announce url for torrent {:?} ...", &torrent.torrent_id);
+
+            // flatten the nested vec (this will however remove the)
+            let announce_urls = torrent_from_file
+                .announce_list
+                .clone()
+                .unwrap()
+                .into_iter()
+                .flatten()
+                .collect::<Vec<String>>();
+
+            for tracker_url in announce_urls.iter() {
+                println!("[v2][torrust_torrent_announce_urls] adding the torrent announce url (from announce list) for torrent {:?} ...", &torrent.torrent_id);
+
+                let announce_url_id = dest_database
+                    .insert_torrent_announce_url(torrent.torrent_id, tracker_url)
+                    .await;
+
+                println!("[v2][torrust_torrent_announce_urls] torrent announce url insert result {:?} ...", &announce_url_id);
+            }
+        }
     }
+    println!("Torrents transferred");
 }
 
 fn read_torrent_from_file(path: &str) -> Result<Torrent, Box<dyn error::Error>> {
