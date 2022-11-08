@@ -377,7 +377,19 @@ async fn transfer_torrents(
 
         // [v2] table torrust_torrent_info
 
-        // TODO
+        println!(
+            "[v2][torrust_torrent_info] adding the torrent info for torrent {:?} ...",
+            &torrent.torrent_id
+        );
+
+        let id = dest_database.insert_torrent_info(torrent).await;
+
+        println!(
+            "[v2][torrust_torrents] torrent info insert result: {:?}.",
+            &id
+        );
+
+        println!("Torrents transferred");
     }
 }
 
