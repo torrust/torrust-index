@@ -26,7 +26,7 @@ Before replacing the DB in production you can make some tests like:
 
 - Try to log in with a preexisting user. If you do not know any you can create a new "test" user in production before starting with the upgrade process. Users had a different hash algorithm for the password in v1.
 - Try to create a new user.
-- Try to upload and download a new torrent containing a single file.
+- Try to upload and download a new torrent containing a single file (with and without md5sum).
 - Try to upload and download a new torrent containing a folder.
 
 ## Notes

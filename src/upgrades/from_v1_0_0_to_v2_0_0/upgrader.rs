@@ -322,6 +322,55 @@ async fn transfer_torrents(
 
         // TODO
 
+        println!("[v2][torrust_torrent_files] adding torrent files");
+
+        let _is_torrent_with_multiple_files = torrent_from_file.info.files.is_some();
+        let is_torrent_with_a_single_file = torrent_from_file.info.length.is_some();
+
+        if is_torrent_with_a_single_file {
+            // Only one file is being shared:
+            // - "path" is NULL
+            // - "md5sum" can be NULL
+
+            println!(
+                "[v2][torrust_torrent_files][one] adding torrent file {:?} with length {:?} ...",
+                &torrent_from_file.info.name, &torrent_from_file.info.length,
+            );
+
+            let file_id = dest_database
+                .insert_torrent_file_for_torrent_with_one_file(
+                    torrent.torrent_id,
+                    // TODO: it seems med5sum can be None. Why? When?
+                    &torrent_from_file.info.md5sum.clone(),
+                    torrent_from_file.info.length.unwrap(),
+                )
+                .await;
+
+            println!(
+                "[v2][torrust_torrent_files][one] torrent file insert result: {:?}",
+                &file_id
+            );
+        } else {
+            // Multiple files are being shared
+            let files = torrent_from_file.info.files.as_ref().unwrap();
+
+            for file in files.iter() {
+                println!(
+                    "[v2][torrust_torrent_files][multiple] adding torrent file: {:?} ...",
+                    &file
+                );
+
+                let file_id = dest_database
+                    .insert_torrent_file_for_torrent_with_multiple_files(torrent, file)
+                    .await;
+
+                println!(
+                    "[v2][torrust_torrent_files][multiple] torrent file insert result: {:?}",
+                    &file_id
+                );
+            }
+        }
+
         // [v2] table torrust_torrent_announce_urls
 
         // TODO
