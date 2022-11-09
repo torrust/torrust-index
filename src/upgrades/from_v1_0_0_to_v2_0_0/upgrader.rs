@@ -24,25 +24,26 @@ use chrono::prelude::{DateTime, Utc};
 use std::{env, error, fs};
 use std::{sync::Arc, time::SystemTime};
 
-use crate::config::Configuration;
-
 use text_colorizer::*;
 
+const NUMBER_OF_ARGUMENTS: i64 = 3;
+
 #[derive(Debug)]
-struct Arguments {
-    database_file: String, // The new database
-    upload_path: String,   // The relative dir where torrent files are stored
+pub struct Arguments {
+    source_database_file: String, // The source database in version v1.0.0 we want to migrate
+    destiny_database_file: String, // The new migrated database in version v2.0.0
+    upload_path: String,          // The relative dir where torrent files are stored
 }
 
 fn print_usage() {
     eprintln!(
         "{} - migrates date from version v1.0.0 to v2.0.0.
 
-        cargo run --bin upgrade TARGET_SLQLITE_FILE_PATH TORRENT_UPLOAD_DIR
+        cargo run --bin upgrade SOURCE_DB_FILE DESTINY_DB_FILE TORRENT_UPLOAD_DIR
 
         For example:
 
-        cargo run --bin upgrade ./data_v2.db ./uploads
+        cargo run --bin upgrade ./data.db ./data_v2.db ./uploads
 
         ",
         "Upgrader".green()
@@ -52,38 +53,33 @@ fn print_usage() {
 fn parse_args() -> Arguments {
     let args: Vec<String> = env::args().skip(1).collect();
 
-    if args.len() != 2 {
+    if args.len() != 3 {
         eprintln!(
-            "{} wrong number of arguments: expected 2, got {}",
+            "{} wrong number of arguments: expected {}, got {}",
             "Error".red().bold(),
+            NUMBER_OF_ARGUMENTS,
             args.len()
         );
         print_usage();
     }
 
     Arguments {
-        database_file: args[0].clone(),
-        upload_path: args[1].clone(),
+        source_database_file: args[0].clone(),
+        destiny_database_file: args[1].clone(),
+        upload_path: args[2].clone(),
     }
 }
 
-pub async fn upgrade() {
-    let args = parse_args();
+pub async fn run_upgrader() {
+    upgrade(&parse_args()).await
+}
 
-    let cfg = match Configuration::load_from_file().await {
-        Ok(config) => Arc::new(config),
-        Err(error) => {
-            panic!("{}", error)
-        }
-    };
-
-    let settings = cfg.settings.read().await;
-
+pub async fn upgrade(args: &Arguments) {
     // Get connection to source database (current DB in settings)
-    let source_database = current_db(&settings.database.connect_url).await;
+    let source_database = current_db(&args.source_database_file).await;
 
     // Get connection to destiny database
-    let dest_database = new_db(&args.database_file).await;
+    let dest_database = new_db(&args.destiny_database_file).await;
 
     println!("Upgrading data from version v1.0.0 to v2.0.0 ...");
 
