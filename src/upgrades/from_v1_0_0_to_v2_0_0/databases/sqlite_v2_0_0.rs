@@ -5,10 +5,10 @@ use sqlx::{query, query_as, SqlitePool};
 use crate::databases::database::DatabaseError;
 use crate::models::torrent_file::TorrentFile;
 
-use super::sqlite_v1_0_0::Torrent;
+use super::sqlite_v1_0_0::TorrentRecord;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct Category {
+pub struct CategoryRecord {
     pub category_id: i64,
     pub name: String,
 }
@@ -39,8 +39,8 @@ impl SqliteDatabaseV2_0_0 {
             .map_err(|_| DatabaseError::Error)
     }
 
-    pub async fn get_categories(&self) -> Result<Vec<Category>, DatabaseError> {
-        query_as::<_, Category>("SELECT tc.category_id, tc.name, COUNT(tt.category_id) as num_torrents FROM torrust_categories tc LEFT JOIN torrust_torrents tt on tc.category_id = tt.category_id GROUP BY tc.name")
+    pub async fn get_categories(&self) -> Result<Vec<CategoryRecord>, DatabaseError> {
+        query_as::<_, CategoryRecord>("SELECT tc.category_id, tc.name, COUNT(tt.category_id) as num_torrents FROM torrust_categories tc LEFT JOIN torrust_torrents tt on tc.category_id = tt.category_id GROUP BY tc.name")
             .fetch_all(&self.pool)
             .await
             .map_err(|_| DatabaseError::Error)
@@ -73,15 +73,13 @@ impl SqliteDatabaseV2_0_0 {
         date_imported: &str,
         administrator: bool,
     ) -> Result<i64, sqlx::Error> {
-        query(
-            "INSERT INTO torrust_users (user_id, date_imported, administrator) VALUES (?, ?, ?)",
-        )
-        .bind(user_id)
-        .bind(date_imported)
-        .bind(administrator)
-        .execute(&self.pool)
-        .await
-        .map(|v| v.last_insert_rowid())
+        query("INSERT INTO torrust_users (user_id, date_imported, administrator) VALUES (?, ?, ?)")
+            .bind(user_id)
+            .bind(date_imported)
+            .bind(administrator)
+            .execute(&self.pool)
+            .await
+            .map(|v| v.last_insert_rowid())
     }
 
     pub async fn insert_user_profile(
@@ -202,7 +200,7 @@ impl SqliteDatabaseV2_0_0 {
 
     pub async fn insert_torrent_file_for_torrent_with_multiple_files(
         &self,
-        torrent: &Torrent,
+        torrent: &TorrentRecord,
         file: &TorrentFile,
     ) -> Result<i64, sqlx::Error> {
         query(
@@ -218,7 +216,7 @@ impl SqliteDatabaseV2_0_0 {
         .map(|v| v.last_insert_rowid())
     }
 
-    pub async fn insert_torrent_info(&self, torrent: &Torrent) -> Result<i64, sqlx::Error> {
+    pub async fn insert_torrent_info(&self, torrent: &TorrentRecord) -> Result<i64, sqlx::Error> {
         query(
             "INSERT INTO torrust_torrent_info (torrent_id, title, description)
         VALUES (?, ?, ?)",

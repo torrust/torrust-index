@@ -5,13 +5,13 @@ use sqlx::{query_as, SqlitePool};
 use crate::databases::database::DatabaseError;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct Category {
+pub struct CategoryRecord {
     pub category_id: i64,
     pub name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct User {
+pub struct UserRecord {
     pub user_id: i64,
     pub username: String,
     pub email: String,
@@ -21,7 +21,7 @@ pub struct User {
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct TrackerKey {
+pub struct TrackerKeyRecord {
     pub key_id: i64,
     pub user_id: i64,
     pub key: String,
@@ -29,7 +29,7 @@ pub struct TrackerKey {
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct Torrent {
+pub struct TorrentRecord {
     pub torrent_id: i64,
     pub uploader: String,
     pub info_hash: String,
@@ -43,7 +43,7 @@ pub struct Torrent {
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct TorrentFile {
+pub struct TorrentFileRecord {
     pub file_id: i64,
     pub torrent_uid: i64,
     pub number: i64,
@@ -64,8 +64,8 @@ impl SqliteDatabaseV1_0_0 {
         Self { pool: db }
     }
 
-    pub async fn get_categories_order_by_id(&self) -> Result<Vec<Category>, DatabaseError> {
-        query_as::<_, Category>(
+    pub async fn get_categories_order_by_id(&self) -> Result<Vec<CategoryRecord>, DatabaseError> {
+        query_as::<_, CategoryRecord>(
             "SELECT category_id, name FROM torrust_categories ORDER BY category_id ASC",
         )
         .fetch_all(&self.pool)
@@ -73,33 +73,33 @@ impl SqliteDatabaseV1_0_0 {
         .map_err(|_| DatabaseError::Error)
     }
 
-    pub async fn get_users(&self) -> Result<Vec<User>, sqlx::Error> {
-        query_as::<_, User>("SELECT * FROM torrust_users ORDER BY user_id ASC")
+    pub async fn get_users(&self) -> Result<Vec<UserRecord>, sqlx::Error> {
+        query_as::<_, UserRecord>("SELECT * FROM torrust_users ORDER BY user_id ASC")
             .fetch_all(&self.pool)
             .await
     }
 
-    pub async fn get_user_by_username(&self, username: &str) -> Result<User, sqlx::Error> {
-        query_as::<_, User>("SELECT * FROM torrust_users WHERE username = ?")
+    pub async fn get_user_by_username(&self, username: &str) -> Result<UserRecord, sqlx::Error> {
+        query_as::<_, UserRecord>("SELECT * FROM torrust_users WHERE username = ?")
             .bind(username)
             .fetch_one(&self.pool)
             .await
     }
 
-    pub async fn get_tracker_keys(&self) -> Result<Vec<TrackerKey>, sqlx::Error> {
-        query_as::<_, TrackerKey>("SELECT * FROM torrust_tracker_keys ORDER BY key_id ASC")
+    pub async fn get_tracker_keys(&self) -> Result<Vec<TrackerKeyRecord>, sqlx::Error> {
+        query_as::<_, TrackerKeyRecord>("SELECT * FROM torrust_tracker_keys ORDER BY key_id ASC")
             .fetch_all(&self.pool)
             .await
     }
 
-    pub async fn get_torrents(&self) -> Result<Vec<Torrent>, sqlx::Error> {
-        query_as::<_, Torrent>("SELECT * FROM torrust_torrents ORDER BY torrent_id ASC")
+    pub async fn get_torrents(&self) -> Result<Vec<TorrentRecord>, sqlx::Error> {
+        query_as::<_, TorrentRecord>("SELECT * FROM torrust_torrents ORDER BY torrent_id ASC")
             .fetch_all(&self.pool)
             .await
     }
 
-    pub async fn get_torrent_files(&self) -> Result<Vec<TorrentFile>, sqlx::Error> {
-        query_as::<_, TorrentFile>("SELECT * FROM torrust_torrent_files ORDER BY file_id ASC")
+    pub async fn get_torrent_files(&self) -> Result<Vec<TorrentFileRecord>, sqlx::Error> {
+        query_as::<_, TorrentFileRecord>("SELECT * FROM torrust_torrent_files ORDER BY file_id ASC")
             .fetch_all(&self.pool)
             .await
     }
