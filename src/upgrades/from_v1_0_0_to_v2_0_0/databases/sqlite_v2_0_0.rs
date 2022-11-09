@@ -222,17 +222,13 @@ impl SqliteDatabaseV2_0_0 {
         md5sum: &Option<String>,
         length: i64,
     ) -> Result<i64, sqlx::Error> {
-        query(
-            "
-            INSERT INTO torrust_torrent_files (md5sum, torrent_id, LENGTH)
-            VALUES (?, ?, ?)",
-        )
-        .bind(md5sum)
-        .bind(torrent_id)
-        .bind(length)
-        .execute(&self.pool)
-        .await
-        .map(|v| v.last_insert_rowid())
+        query("INSERT INTO torrust_torrent_files (md5sum, torrent_id, LENGTH) VALUES (?, ?, ?)")
+            .bind(md5sum)
+            .bind(torrent_id)
+            .bind(length)
+            .execute(&self.pool)
+            .await
+            .map(|v| v.last_insert_rowid())
     }
 
     pub async fn insert_torrent_file_for_torrent_with_multiple_files(
@@ -240,9 +236,7 @@ impl SqliteDatabaseV2_0_0 {
         torrent: &TorrentRecordV1,
         file: &TorrentFile,
     ) -> Result<i64, sqlx::Error> {
-        query(
-            "INSERT INTO torrust_torrent_files (md5sum, torrent_id, LENGTH, PATH)
-        VALUES (?, ?, ?, ?)",
+        query("INSERT INTO torrust_torrent_files (md5sum, torrent_id, LENGTH, PATH) VALUES (?, ?, ?, ?)",
         )
         .bind(file.md5sum.clone())
         .bind(torrent.torrent_id)
@@ -254,16 +248,13 @@ impl SqliteDatabaseV2_0_0 {
     }
 
     pub async fn insert_torrent_info(&self, torrent: &TorrentRecordV1) -> Result<i64, sqlx::Error> {
-        query(
-            "INSERT INTO torrust_torrent_info (torrent_id, title, description)
-        VALUES (?, ?, ?)",
-        )
-        .bind(torrent.torrent_id)
-        .bind(torrent.title.clone())
-        .bind(torrent.description.clone())
-        .execute(&self.pool)
-        .await
-        .map(|v| v.last_insert_rowid())
+        query("INSERT INTO torrust_torrent_info (torrent_id, title, description) VALUES (?, ?, ?)")
+            .bind(torrent.torrent_id)
+            .bind(torrent.title.clone())
+            .bind(torrent.description.clone())
+            .execute(&self.pool)
+            .await
+            .map(|v| v.last_insert_rowid())
     }
 
     pub async fn insert_torrent_announce_url(
@@ -280,52 +271,52 @@ impl SqliteDatabaseV2_0_0 {
     }
 
     pub async fn delete_all_database_rows(&self) -> Result<(), DatabaseError> {
-        query("DELETE FROM torrust_categories;")
+        query("DELETE FROM torrust_categories")
             .execute(&self.pool)
             .await
             .unwrap();
 
-        query("DELETE FROM torrust_torrents;")
+        query("DELETE FROM torrust_torrents")
             .execute(&self.pool)
             .await
             .unwrap();
 
-        query("DELETE FROM torrust_tracker_keys;")
+        query("DELETE FROM torrust_tracker_keys")
             .execute(&self.pool)
             .await
             .unwrap();
 
-        query("DELETE FROM torrust_users;")
+        query("DELETE FROM torrust_users")
             .execute(&self.pool)
             .await
             .unwrap();
 
-        query("DELETE FROM torrust_user_authentication;")
+        query("DELETE FROM torrust_user_authentication")
             .execute(&self.pool)
             .await
             .unwrap();
 
-        query("DELETE FROM torrust_user_bans;")
+        query("DELETE FROM torrust_user_bans")
             .execute(&self.pool)
             .await
             .unwrap();
 
-        query("DELETE FROM torrust_user_invitations;")
+        query("DELETE FROM torrust_user_invitations")
             .execute(&self.pool)
             .await
             .unwrap();
 
-        query("DELETE FROM torrust_user_profiles;")
+        query("DELETE FROM torrust_user_profiles")
             .execute(&self.pool)
             .await
             .unwrap();
 
-        query("DELETE FROM torrust_torrents;")
+        query("DELETE FROM torrust_torrents")
             .execute(&self.pool)
             .await
             .unwrap();
 
-        query("DELETE FROM torrust_user_public_keys;")
+        query("DELETE FROM torrust_user_public_keys")
             .execute(&self.pool)
             .await
             .unwrap();
