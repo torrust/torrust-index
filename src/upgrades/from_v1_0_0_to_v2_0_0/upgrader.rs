@@ -289,7 +289,7 @@ async fn transfer_torrents(
             .insert_torrent(&TorrentRecordV2::from_v1_data(
                 torrent,
                 &torrent_from_file.info,
-                &uploader
+                &uploader,
             ))
             .await
             .unwrap();
@@ -378,21 +378,7 @@ async fn transfer_torrents(
             &torrent.torrent_id
         );
 
-        if torrent_from_file.announce.is_some() {
-            println!("[v2][torrust_torrent_announce_urls][announce] adding the torrent announce url for torrent id {:?} ...", &torrent.torrent_id);
-
-            let announce_url_id = dest_database
-                .insert_torrent_announce_url(
-                    torrent.torrent_id,
-                    &torrent_from_file.announce.unwrap(),
-                )
-                .await;
-
-            println!(
-                "[v2][torrust_torrent_announce_urls][announce] torrent announce url insert result {:?} ...",
-                &announce_url_id
-            );
-        } else if torrent_from_file.announce_list.is_some() {
+        if torrent_from_file.announce_list.is_some() {
             // BEP-0012. Multiple trackers.
 
             println!("[v2][torrust_torrent_announce_urls][announce-list] adding the torrent announce url for torrent id {:?} ...", &torrent.torrent_id);
@@ -415,6 +401,20 @@ async fn transfer_torrents(
 
                 println!("[v2][torrust_torrent_announce_urls][announce-list] torrent announce url insert result {:?} ...", &announce_url_id);
             }
+        } else if torrent_from_file.announce.is_some() {
+            println!("[v2][torrust_torrent_announce_urls][announce] adding the torrent announce url for torrent id {:?} ...", &torrent.torrent_id);
+
+            let announce_url_id = dest_database
+                .insert_torrent_announce_url(
+                    torrent.torrent_id,
+                    &torrent_from_file.announce.unwrap(),
+                )
+                .await;
+
+            println!(
+                "[v2][torrust_torrent_announce_urls][announce] torrent announce url insert result {:?} ...",
+                &announce_url_id
+            );
         }
     }
     println!("Torrents transferred");
