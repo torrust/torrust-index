@@ -446,17 +446,9 @@ impl Database for MysqlDatabase {
             return Err(e)
         }
 
-        let insert_torrent_announce_urls_result: Result<(), DatabaseError> = if let Some(tracker_url) = &torrent.announce {
-            query("INSERT INTO torrust_torrent_announce_urls (torrent_id, tracker_url) VALUES (?, ?)")
-                .bind(torrent_id)
-                .bind(tracker_url)
-                .execute(&mut tx)
-                .await
-                .map(|_| ())
-                .map_err(|_| DatabaseError::Error)
-        } else {
+        let insert_torrent_announce_urls_result: Result<(), DatabaseError> = if let Some(announce_urls) = &torrent.announce_list {
             // flatten the nested vec (this will however remove the)
-            let announce_urls = torrent.announce_list.clone().unwrap().into_iter().flatten().collect::<Vec<String>>();
+            let announce_urls = announce_urls.iter().flatten().collect::<Vec<&String>>();
 
             for tracker_url in announce_urls.iter() {
                 let _ = query("INSERT INTO torrust_torrent_announce_urls (torrent_id, tracker_url) VALUES (?, ?)")
@@ -469,6 +461,16 @@ impl Database for MysqlDatabase {
             }
 
             Ok(())
+        } else {
+            let tracker_url = torrent.announce.as_ref().unwrap();
+
+            query("INSERT INTO torrust_torrent_announce_urls (torrent_id, tracker_url) VALUES (?, ?)")
+                .bind(torrent_id)
+                .bind(tracker_url)
+                .execute(&mut tx)
+                .await
+                .map(|_| ())
+                .map_err(|_| DatabaseError::Error)
         };
 
         // rollback transaction on error
