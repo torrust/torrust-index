@@ -21,15 +21,54 @@ use crate::{
 };
 use chrono::prelude::{DateTime, Utc};
 
-use std::{error, fs};
+use std::{env, error, fs};
 use std::{sync::Arc, time::SystemTime};
 
 use crate::config::Configuration;
 
+use text_colorizer::*;
+
+#[derive(Debug)]
+struct Arguments {
+    database_file: String, // The new database
+    upload_path: String,   // The relative dir where torrent files are stored
+}
+
+fn print_usage() {
+    eprintln!(
+        "{} - migrates date from version v1.0.0 to v2.0.0.
+
+        cargo run --bin upgrade TARGET_SLQLITE_FILE_PATH TORRENT_UPLOAD_DIR
+
+        For example:
+
+        cargo run --bin upgrade ./data_v2.db ./uploads
+
+        ",
+        "Upgrader".green()
+    );
+}
+
+fn parse_args() -> Arguments {
+    let args: Vec<String> = env::args().skip(1).collect();
+
+    if args.len() != 2 {
+        eprintln!(
+            "{} wrong number of arguments: expected 2, got {}",
+            "Error".red().bold(),
+            args.len()
+        );
+        print_usage();
+    }
+
+    Arguments {
+        database_file: args[0].clone(),
+        upload_path: args[1].clone(),
+    }
+}
+
 pub async fn upgrade() {
-    // TODO: get from command arguments
-    let database_file = "data_v2.db".to_string(); // The new database
-    let upload_path = "./uploads".to_string(); // The relative dir where torrent files are stored
+    let args = parse_args();
 
     let cfg = match Configuration::load_from_file().await {
         Ok(config) => Arc::new(config),
@@ -44,7 +83,7 @@ pub async fn upgrade() {
     let source_database = current_db(&settings.database.connect_url).await;
 
     // Get connection to destiny database
-    let dest_database = new_db(&database_file).await;
+    let dest_database = new_db(&args.database_file).await;
 
     println!("Upgrading data from version v1.0.0 to v2.0.0 ...");
 
@@ -53,7 +92,12 @@ pub async fn upgrade() {
     transfer_categories(source_database.clone(), dest_database.clone()).await;
     transfer_user_data(source_database.clone(), dest_database.clone()).await;
     transfer_tracker_keys(source_database.clone(), dest_database.clone()).await;
-    transfer_torrents(source_database.clone(), dest_database.clone(), &upload_path).await;
+    transfer_torrents(
+        source_database.clone(),
+        dest_database.clone(),
+        &args.upload_path,
+    )
+    .await;
 }
 
 async fn current_db(connect_url: &str) -> Arc<SqliteDatabaseV1_0_0> {
