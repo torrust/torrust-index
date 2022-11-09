@@ -5,6 +5,9 @@
 //! - In v2, the table `torrust_user` contains a field `date_registered` non existing in v1.
 //!   We changed that columns to allow NULL. WE also added the new column `date_imported` with
 //!   the datetime when the upgrader was executed.
+//!
+//! NOTES for `torrust_user_profiles` table transfer:
+//!
 //! - In v2, the table `torrust_user_profiles` contains two new fields: `bio` and `avatar`.
 //!   Empty string is used as default value.
 
@@ -50,8 +53,6 @@ pub async fn upgrade() {
     transfer_user_data(source_database.clone(), dest_database.clone()).await;
     transfer_tracker_keys(source_database.clone(), dest_database.clone()).await;
     transfer_torrents(source_database.clone(), dest_database.clone(), &upload_path).await;
-
-    // TODO: WIP. We have to transfer data from the 5 tables in V1 and the torrent files in folder `uploads`.
 }
 
 async fn current_db(connect_url: &str) -> Arc<SqliteDatabaseV1_0_0> {
@@ -86,12 +87,12 @@ async fn transfer_categories(
     println!("[v1] categories: {:?}", &source_categories);
 
     let result = dest_database.reset_categories_sequence().await.unwrap();
-    println!("result {:?}", result);
+    println!("[v2] reset categories sequence result {:?}", result);
 
     for cat in &source_categories {
         println!(
-            "[v2] adding category: {:?} {:?} ...",
-            &cat.category_id, &cat.name
+            "[v2] adding category {:?} with id {:?} ...",
+            &cat.name, &cat.category_id
         );
         let id = dest_database
             .insert_category_and_get_id(&cat.name)
@@ -126,8 +127,8 @@ async fn transfer_user_data(
         // [v2] table torrust_users
 
         println!(
-            "[v2][torrust_users] adding user: {:?} {:?} ...",
-            &user.user_id, &user.username
+            "[v2][torrust_users] adding user with username {:?} and id {:?} ...",
+            &user.username, &user.user_id
         );
 
         let date_imported = today_iso8601();
@@ -152,8 +153,8 @@ async fn transfer_user_data(
         // [v2] table torrust_user_profiles
 
         println!(
-            "[v2][torrust_user_profiles] adding user: {:?} {:?} ...",
-            &user.user_id, &user.username
+            "[v2][torrust_user_profiles] adding user profile for user with username {:?} and id {:?} ...",
+            &user.username, &user.user_id
         );
 
         let default_user_bio = "".to_string();
@@ -172,14 +173,14 @@ async fn transfer_user_data(
             .unwrap();
 
         println!(
-            "[v2][torrust_user_profiles] user: {:?} {:?} added.",
-            &user.user_id, &user.username
+            "[v2][torrust_user_profiles] user profile added for user with username {:?} and id {:?}.",
+            &user.username, &user.user_id
         );
 
         // [v2] table torrust_user_authentication
 
         println!(
-            "[v2][torrust_user_authentication] adding password hash ({:?}) for user ({:?}) ...",
+            "[v2][torrust_user_authentication] adding password hash ({:?}) for user id ({:?}) ...",
             &user.password, &user.user_id
         );
 
@@ -189,7 +190,7 @@ async fn transfer_user_data(
             .unwrap();
 
         println!(
-            "[v2][torrust_user_authentication] password hash ({:?}) added for user ({:?}).",
+            "[v2][torrust_user_authentication] password hash ({:?}) added for user id ({:?}).",
             &user.password, &user.user_id
         );
     }
@@ -214,7 +215,7 @@ async fn transfer_tracker_keys(
         // [v2] table torrust_tracker_keys
 
         println!(
-            "[v2][torrust_users] adding the tracker key: {:?} ...",
+            "[v2][torrust_users] adding the tracker key with id {:?} ...",
             &tracker_key.key_id
         );
 
@@ -236,7 +237,7 @@ async fn transfer_tracker_keys(
         }
 
         println!(
-            "[v2][torrust_tracker_keys] tracker key: {:?} added.",
+            "[v2][torrust_tracker_keys] tracker key with id {:?} added.",
             &tracker_key.key_id
         );
     }
@@ -266,11 +267,7 @@ async fn transfer_torrents(
             &torrent.torrent_id
         );
 
-        // TODO: confirm with @WarmBeer that
-        // - All torrents were public in version v1.0.0
-        // - Infohashes were in lowercase en v1.0. and uppercase in version v2.0.0
-        // - Only one option is used for announce url if we have two the announce and the announce list.
-        //   And announce has priority over announce list.
+        // All torrents were public in version v1.0.0
         let private = false;
 
         let uploader = source_database
@@ -280,7 +277,8 @@ async fn transfer_torrents(
 
         if uploader.username != torrent.uploader {
             panic!(
-                "Error copying torrent {:?}. Uploader in torrent does username",
+                "Error copying torrent with id {:?}.
+                Username (`uploader`) in `torrust_torrents` table does not match `username` in `torrust_users` table",
                 &torrent.torrent_id
             );
         }
@@ -317,13 +315,11 @@ async fn transfer_torrents(
         }
 
         println!(
-            "[v2][torrust_torrents] torrent: {:?} added.",
+            "[v2][torrust_torrents] torrent with id {:?} added.",
             &torrent.torrent_id
         );
 
         // [v2] table torrust_torrent_files
-
-        // TODO
 
         println!("[v2][torrust_torrent_files] adding torrent files");
 
@@ -331,12 +327,12 @@ async fn transfer_torrents(
         let is_torrent_with_a_single_file = torrent_from_file.info.length.is_some();
 
         if is_torrent_with_a_single_file {
-            // Only one file is being shared:
+            // The torrent contains only one file then:
             // - "path" is NULL
             // - "md5sum" can be NULL
 
             println!(
-                "[v2][torrust_torrent_files][one] adding torrent file {:?} with length {:?} ...",
+                "[v2][torrust_torrent_files][single-file-torrent] adding torrent file {:?} with length {:?} ...",
                 &torrent_from_file.info.name, &torrent_from_file.info.length,
             );
 
@@ -350,7 +346,7 @@ async fn transfer_torrents(
                 .await;
 
             println!(
-                "[v2][torrust_torrent_files][one] torrent file insert result: {:?}",
+                "[v2][torrust_torrent_files][single-file-torrent] torrent file insert result: {:?}",
                 &file_id
             );
         } else {
@@ -359,7 +355,7 @@ async fn transfer_torrents(
 
             for file in files.iter() {
                 println!(
-                    "[v2][torrust_torrent_files][multiple] adding torrent file: {:?} ...",
+                    "[v2][torrust_torrent_files][multiple-file-torrent] adding torrent file: {:?} ...",
                     &file
                 );
 
@@ -368,7 +364,7 @@ async fn transfer_torrents(
                     .await;
 
                 println!(
-                    "[v2][torrust_torrent_files][multiple] torrent file insert result: {:?}",
+                    "[v2][torrust_torrent_files][multiple-file-torrent] torrent file insert result: {:?}",
                     &file_id
                 );
             }
@@ -377,7 +373,7 @@ async fn transfer_torrents(
         // [v2] table torrust_torrent_info
 
         println!(
-            "[v2][torrust_torrent_info] adding the torrent info for torrent {:?} ...",
+            "[v2][torrust_torrent_info] adding the torrent info for torrent id {:?} ...",
             &torrent.torrent_id
         );
 
@@ -391,12 +387,12 @@ async fn transfer_torrents(
         // [v2] table torrust_torrent_announce_urls
 
         println!(
-            "[v2][torrust_torrent_announce_urls] adding the torrent announce url for torrent {:?} ...",
+            "[v2][torrust_torrent_announce_urls] adding the torrent announce url for torrent id {:?} ...",
             &torrent.torrent_id
         );
 
         if torrent_from_file.announce.is_some() {
-            println!("[v2][torrust_torrent_announce_urls] adding the torrent announce url for torrent {:?} ...", &torrent.torrent_id);
+            println!("[v2][torrust_torrent_announce_urls][announce] adding the torrent announce url for torrent id {:?} ...", &torrent.torrent_id);
 
             let announce_url_id = dest_database
                 .insert_torrent_announce_url(
@@ -406,13 +402,13 @@ async fn transfer_torrents(
                 .await;
 
             println!(
-                "[v2][torrust_torrent_announce_urls] torrent announce url insert result {:?} ...",
+                "[v2][torrust_torrent_announce_urls][announce] torrent announce url insert result {:?} ...",
                 &announce_url_id
             );
         } else if torrent_from_file.announce_list.is_some() {
             // BEP-0012. Multiple trackers.
 
-            println!("[v2][torrust_torrent_announce_urls] adding the torrent announce url for torrent {:?} ...", &torrent.torrent_id);
+            println!("[v2][torrust_torrent_announce_urls][announce-list] adding the torrent announce url for torrent id {:?} ...", &torrent.torrent_id);
 
             // flatten the nested vec (this will however remove the)
             let announce_urls = torrent_from_file
@@ -424,13 +420,13 @@ async fn transfer_torrents(
                 .collect::<Vec<String>>();
 
             for tracker_url in announce_urls.iter() {
-                println!("[v2][torrust_torrent_announce_urls] adding the torrent announce url (from announce list) for torrent {:?} ...", &torrent.torrent_id);
+                println!("[v2][torrust_torrent_announce_urls][announce-list] adding the torrent announce url for torrent id {:?} ...", &torrent.torrent_id);
 
                 let announce_url_id = dest_database
                     .insert_torrent_announce_url(torrent.torrent_id, tracker_url)
                     .await;
 
-                println!("[v2][torrust_torrent_announce_urls] torrent announce url insert result {:?} ...", &announce_url_id);
+                println!("[v2][torrust_torrent_announce_urls][announce-list] torrent announce url insert result {:?} ...", &announce_url_id);
             }
         }
     }
