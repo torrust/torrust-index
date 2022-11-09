@@ -268,9 +268,6 @@ async fn transfer_torrents(
             &torrent.torrent_id
         );
 
-        // All torrents were public in version v1.0.0
-        let private = false;
-
         let uploader = source_database
             .get_user_by_username(&torrent.uploader)
             .await
@@ -292,8 +289,7 @@ async fn transfer_torrents(
             .insert_torrent(&TorrentRecordV2::from_v1_data(
                 torrent,
                 &torrent_from_file.info,
-                &uploader,
-                private,
+                &uploader
             ))
             .await
             .unwrap();

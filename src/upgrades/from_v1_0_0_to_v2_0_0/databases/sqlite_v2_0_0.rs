@@ -23,7 +23,7 @@ pub struct TorrentRecordV2 {
     pub name: String,
     pub pieces: String,
     pub piece_length: i64,
-    pub private: bool,
+    pub private: Option<u8>,
     pub root_hash: i64,
     pub date_uploaded: String,
 }
@@ -33,7 +33,6 @@ impl TorrentRecordV2 {
         torrent: &TorrentRecordV1,
         torrent_info: &TorrentInfo,
         uploader: &UserRecordV1,
-        private: bool,
     ) -> Self {
         Self {
             torrent_id: torrent.torrent_id,
@@ -44,7 +43,7 @@ impl TorrentRecordV2 {
             name: torrent_info.name.clone(),
             pieces: torrent_info.get_pieces_as_string(),
             piece_length: torrent_info.piece_length,
-            private,
+            private: torrent_info.private,
             root_hash: torrent_info.get_root_hash_as_i64(),
             date_uploaded: convert_timestamp_to_datetime(torrent.upload_date),
         }
@@ -208,7 +207,7 @@ impl SqliteDatabaseV2_0_0 {
         .bind(torrent.name.clone())
         .bind(torrent.pieces.clone())
         .bind(torrent.piece_length)
-        .bind(torrent.private)
+        .bind(torrent.private.unwrap_or(0))
         .bind(torrent.root_hash)
         .bind(torrent.date_uploaded.clone())
         .execute(&self.pool)
