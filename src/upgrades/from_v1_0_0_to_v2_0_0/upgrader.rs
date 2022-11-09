@@ -11,14 +11,15 @@
 //! - In v2, the table `torrust_user_profiles` contains two new fields: `bio` and `avatar`.
 //!   Empty string is used as default value.
 
-use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::{
+    SqliteDatabaseV2_0_0, TorrentRecordV2,
+};
 use crate::utils::parse_torrent::decode_torrent;
 use crate::{
     models::torrent_file::Torrent,
     upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0,
 };
 use chrono::prelude::{DateTime, Utc};
-use chrono::NaiveDateTime;
 
 use std::{error, fs};
 use std::{sync::Arc, time::SystemTime};
@@ -287,23 +288,13 @@ async fn transfer_torrents(
 
         let torrent_from_file = read_torrent_from_file(&filepath).unwrap();
 
-        let pieces = torrent_from_file.info.get_pieces_as_string();
-        let root_hash = torrent_from_file.info.get_root_hash_as_i64();
-
         let id = dest_database
-            .insert_torrent(
-                torrent.torrent_id,
-                uploader.user_id,
-                torrent.category_id,
-                &torrent_from_file.info_hash(),
-                torrent.file_size,
-                &torrent_from_file.info.name,
-                &pieces,
-                torrent_from_file.info.piece_length,
+            .insert_torrent(&TorrentRecordV2::from_v1_data(
+                torrent,
+                &torrent_from_file.info,
+                &uploader,
                 private,
-                root_hash,
-                &convert_timestamp_to_datetime(torrent.upload_date),
-            )
+            ))
             .await
             .unwrap();
 
@@ -443,15 +434,4 @@ fn read_torrent_from_file(path: &str) -> Result<Torrent, Box<dyn error::Error>> 
         Ok(torrent) => Ok(torrent),
         Err(e) => Err(e),
     }
-}
-
-fn convert_timestamp_to_datetime(timestamp: i64) -> String {
-    // The expected format in database is: 2022-11-04 09:53:57
-    // MySQL uses a DATETIME column and SQLite uses a TEXT column.
-
-    let naive_datetime = NaiveDateTime::from_timestamp(timestamp, 0);
-    let datetime_again: DateTime<Utc> = DateTime::from_utc(naive_datetime, Utc);
-
-    // Format without timezone
-    datetime_again.format("%Y-%m-%d %H:%M:%S").to_string()
 }

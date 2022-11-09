@@ -1,17 +1,67 @@
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqlitePoolOptions, SqliteQueryResult};
 use sqlx::{query, query_as, SqlitePool};
 
 use crate::databases::database::DatabaseError;
-use crate::models::torrent_file::TorrentFile;
+use crate::models::torrent_file::{TorrentFile, TorrentInfo};
 
-use super::sqlite_v1_0_0::TorrentRecord;
+use super::sqlite_v1_0_0::{TorrentRecordV1, UserRecordV1};
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct CategoryRecord {
+pub struct CategoryRecordV2 {
     pub category_id: i64,
     pub name: String,
 }
+
+pub struct TorrentRecordV2 {
+    pub torrent_id: i64,
+    pub uploader_id: i64,
+    pub category_id: i64,
+    pub info_hash: String,
+    pub size: i64,
+    pub name: String,
+    pub pieces: String,
+    pub piece_length: i64,
+    pub private: bool,
+    pub root_hash: i64,
+    pub date_uploaded: String,
+}
+
+impl TorrentRecordV2 {
+    pub fn from_v1_data(
+        torrent: &TorrentRecordV1,
+        torrent_info: &TorrentInfo,
+        uploader: &UserRecordV1,
+        private: bool,
+    ) -> Self {
+        Self {
+            torrent_id: torrent.torrent_id,
+            uploader_id: uploader.user_id,
+            category_id: torrent.category_id,
+            info_hash: torrent.info_hash.clone(),
+            size: torrent.file_size,
+            name: torrent_info.name.clone(),
+            pieces: torrent_info.get_pieces_as_string(),
+            piece_length: torrent_info.piece_length,
+            private,
+            root_hash: torrent_info.get_root_hash_as_i64(),
+            date_uploaded: convert_timestamp_to_datetime(torrent.upload_date),
+        }
+    }
+}
+
+fn convert_timestamp_to_datetime(timestamp: i64) -> String {
+    // The expected format in database is: 2022-11-04 09:53:57
+    // MySQL uses a DATETIME column and SQLite uses a TEXT column.
+
+    let naive_datetime = NaiveDateTime::from_timestamp(timestamp, 0);
+    let datetime_again: DateTime<Utc> = DateTime::from_utc(naive_datetime, Utc);
+
+    // Format without timezone
+    datetime_again.format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
 pub struct SqliteDatabaseV2_0_0 {
     pub pool: SqlitePool,
 }
@@ -39,8 +89,8 @@ impl SqliteDatabaseV2_0_0 {
             .map_err(|_| DatabaseError::Error)
     }
 
-    pub async fn get_categories(&self) -> Result<Vec<CategoryRecord>, DatabaseError> {
-        query_as::<_, CategoryRecord>("SELECT tc.category_id, tc.name, COUNT(tt.category_id) as num_torrents FROM torrust_categories tc LEFT JOIN torrust_torrents tt on tc.category_id = tt.category_id GROUP BY tc.name")
+    pub async fn get_categories(&self) -> Result<Vec<CategoryRecordV2>, DatabaseError> {
+        query_as::<_, CategoryRecordV2>("SELECT tc.category_id, tc.name, COUNT(tt.category_id) as num_torrents FROM torrust_categories tc LEFT JOIN torrust_torrents tt on tc.category_id = tt.category_id GROUP BY tc.name")
             .fetch_all(&self.pool)
             .await
             .map_err(|_| DatabaseError::Error)
@@ -133,20 +183,7 @@ impl SqliteDatabaseV2_0_0 {
             .map(|v| v.last_insert_rowid())
     }
 
-    pub async fn insert_torrent(
-        &self,
-        torrent_id: i64,
-        uploader_id: i64,
-        category_id: i64,
-        info_hash: &str,
-        size: i64,
-        name: &str,
-        pieces: &str,
-        piece_length: i64,
-        private: bool,
-        root_hash: i64,
-        date_uploaded: &str,
-    ) -> Result<i64, sqlx::Error> {
+    pub async fn insert_torrent(&self, torrent: &TorrentRecordV2) -> Result<i64, sqlx::Error> {
         query(
             "
             INSERT INTO torrust_torrents (
@@ -163,17 +200,17 @@ impl SqliteDatabaseV2_0_0 {
                 date_uploaded
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
-        .bind(torrent_id)
-        .bind(uploader_id)
-        .bind(category_id)
-        .bind(info_hash)
-        .bind(size)
-        .bind(name)
-        .bind(pieces)
-        .bind(piece_length)
-        .bind(private)
-        .bind(root_hash)
-        .bind(date_uploaded)
+        .bind(torrent.torrent_id)
+        .bind(torrent.uploader_id)
+        .bind(torrent.category_id)
+        .bind(torrent.info_hash.clone())
+        .bind(torrent.size)
+        .bind(torrent.name.clone())
+        .bind(torrent.pieces.clone())
+        .bind(torrent.piece_length)
+        .bind(torrent.private)
+        .bind(torrent.root_hash)
+        .bind(torrent.date_uploaded.clone())
         .execute(&self.pool)
         .await
         .map(|v| v.last_insert_rowid())
@@ -200,7 +237,7 @@ impl SqliteDatabaseV2_0_0 {
 
     pub async fn insert_torrent_file_for_torrent_with_multiple_files(
         &self,
-        torrent: &TorrentRecord,
+        torrent: &TorrentRecordV1,
         file: &TorrentFile,
     ) -> Result<i64, sqlx::Error> {
         query(
@@ -216,7 +253,7 @@ impl SqliteDatabaseV2_0_0 {
         .map(|v| v.last_insert_rowid())
     }
 
-    pub async fn insert_torrent_info(&self, torrent: &TorrentRecord) -> Result<i64, sqlx::Error> {
+    pub async fn insert_torrent_info(&self, torrent: &TorrentRecordV1) -> Result<i64, sqlx::Error> {
         query(
             "INSERT INTO torrust_torrent_info (torrent_id, title, description)
         VALUES (?, ?, ?)",
