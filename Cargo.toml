@@ -35,3 +35,4 @@ lettre = { version = "0.10.0-rc.3", features = ["builder", "tokio1", "tokio1-rus
 sailfish = "0.4.0"
 regex = "1.6.0"
 pbkdf2 = "0.11.0"
+text-colorizer = "1.0.0"
