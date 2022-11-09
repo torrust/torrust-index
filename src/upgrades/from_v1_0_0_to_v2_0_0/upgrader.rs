@@ -30,9 +30,9 @@ const NUMBER_OF_ARGUMENTS: i64 = 3;
 
 #[derive(Debug)]
 pub struct Arguments {
-    source_database_file: String, // The source database in version v1.0.0 we want to migrate
-    destiny_database_file: String, // The new migrated database in version v2.0.0
-    upload_path: String,          // The relative dir where torrent files are stored
+    pub source_database_file: String, // The source database in version v1.0.0 we want to migrate
+    pub destiny_database_file: String, // The new migrated database in version v2.0.0
+    pub upload_path: String,          // The relative dir where torrent files are stored
 }
 
 fn print_usage() {
@@ -96,8 +96,9 @@ pub async fn upgrade(args: &Arguments) {
     .await;
 }
 
-async fn current_db(connect_url: &str) -> Arc<SqliteDatabaseV1_0_0> {
-    Arc::new(SqliteDatabaseV1_0_0::new(connect_url).await)
+async fn current_db(db_filename: &str) -> Arc<SqliteDatabaseV1_0_0> {
+    let source_database_connect_url = format!("sqlite://{}?mode=ro", db_filename);
+    Arc::new(SqliteDatabaseV1_0_0::new(&source_database_connect_url).await)
 }
 
 async fn new_db(db_filename: &str) -> Arc<SqliteDatabaseV2_0_0> {
