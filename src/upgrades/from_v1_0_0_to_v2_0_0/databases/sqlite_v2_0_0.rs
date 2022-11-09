@@ -67,17 +67,17 @@ impl SqliteDatabaseV2_0_0 {
             })
     }
 
-    pub async fn insert_user(
+    pub async fn insert_imported_user(
         &self,
         user_id: i64,
-        date_registered: &str,
+        date_imported: &str,
         administrator: bool,
     ) -> Result<i64, sqlx::Error> {
         query(
-            "INSERT INTO torrust_users (user_id, date_registered, administrator) VALUES (?, ?, ?)",
+            "INSERT INTO torrust_users (user_id, date_imported, administrator) VALUES (?, ?, ?)",
         )
         .bind(user_id)
-        .bind(date_registered)
+        .bind(date_imported)
         .bind(administrator)
         .execute(&self.pool)
         .await

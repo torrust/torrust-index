@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct User {
     pub user_id: i64,
-    pub date_registered: String,
+    pub date_registered: Option<String>,
+    pub date_imported: Option<String>,
     pub administrator: bool,
 }
 
@@ -33,7 +34,8 @@ pub struct UserCompact {
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct UserFull {
     pub user_id: i64,
-    pub date_registered: String,
+    pub date_registered: Option<String>,
+    pub date_imported: Option<String>,
     pub administrator: bool,
     pub username: String,
     pub email: String,

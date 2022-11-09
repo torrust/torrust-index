@@ -3,7 +3,8 @@
 //! NOTES for `torrust_users` table transfer:
 //!
 //! - In v2, the table `torrust_user` contains a field `date_registered` non existing in v1.
-//!   It's used the day when the upgrade command is executed.
+//!   We changed that columns to allow NULL. WE also added the new column `date_imported` with
+//!   the datetime when the upgrader was executed.
 //! - In v2, the table `torrust_user_profiles` contains two new fields: `bio` and `avatar`.
 //!   Empty string is used as default value.
 
@@ -129,10 +130,10 @@ async fn transfer_user_data(
             &user.user_id, &user.username
         );
 
-        let default_data_registered = today_iso8601();
+        let date_imported = today_iso8601();
 
         let id = dest_database
-            .insert_user(user.user_id, &default_data_registered, user.administrator)
+            .insert_imported_user(user.user_id, &date_imported, user.administrator)
             .await
             .unwrap();
 
