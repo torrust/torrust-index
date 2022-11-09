@@ -71,10 +71,11 @@ fn parse_args() -> Arguments {
 }
 
 pub async fn run_upgrader() {
-    upgrade(&parse_args()).await
+    let now = datetime_iso_8601();
+    upgrade(&parse_args(), &now).await;
 }
 
-pub async fn upgrade(args: &Arguments) {
+pub async fn upgrade(args: &Arguments, date_imported: &str) {
     // Get connection to source database (current DB in settings)
     let source_database = current_db(&args.source_database_file).await;
 
@@ -86,7 +87,12 @@ pub async fn upgrade(args: &Arguments) {
     migrate_destiny_database(dest_database.clone()).await;
     reset_destiny_database(dest_database.clone()).await;
     transfer_categories(source_database.clone(), dest_database.clone()).await;
-    transfer_user_data(source_database.clone(), dest_database.clone()).await;
+    transfer_user_data(
+        source_database.clone(),
+        dest_database.clone(),
+        date_imported,
+    )
+    .await;
     transfer_tracker_keys(source_database.clone(), dest_database.clone()).await;
     transfer_torrents(
         source_database.clone(),
@@ -158,6 +164,7 @@ async fn transfer_categories(
 async fn transfer_user_data(
     source_database: Arc<SqliteDatabaseV1_0_0>,
     dest_database: Arc<SqliteDatabaseV2_0_0>,
+    date_imported: &str,
 ) {
     println!("Transferring users ...");
 
@@ -172,8 +179,6 @@ async fn transfer_user_data(
             "[v2][torrust_users] adding user with username {:?} and id {:?} ...",
             &user.username, &user.user_id
         );
-
-        let date_imported = today_iso8601();
 
         let id = dest_database
             .insert_imported_user(user.user_id, &date_imported, user.administrator)
@@ -238,7 +243,9 @@ async fn transfer_user_data(
     }
 }
 
-fn today_iso8601() -> String {
+/// Current datetime in ISO8601 without time zone.
+/// For example: 2022-11-10 10:35:15
+pub fn datetime_iso_8601() -> String {
     let dt: DateTime<Utc> = SystemTime::now().into();
     format!("{}", dt.format("%Y-%m-%d %H:%M:%S"))
 }
