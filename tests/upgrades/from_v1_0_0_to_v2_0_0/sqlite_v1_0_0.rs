@@ -1,7 +1,9 @@
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{query, SqlitePool};
 use std::fs;
-use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::UserRecordV1;
+use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::{
+    TrackerKeyRecordV1, UserRecordV1,
+};
 
 pub struct SqliteDatabaseV1_0_0 {
     pub pool: SqlitePool,
@@ -61,6 +63,20 @@ impl SqliteDatabaseV1_0_0 {
             .bind(user.email_verified)
             .bind(user.password.clone())
             .bind(user.administrator)
+            .execute(&self.pool)
+            .await
+            .map(|v| v.last_insert_rowid())
+    }
+
+    pub async fn insert_tracker_key(
+        &self,
+        tracker_key: &TrackerKeyRecordV1,
+    ) -> Result<i64, sqlx::Error> {
+        query("INSERT INTO torrust_tracker_keys (key_id, user_id, key, valid_until) VALUES (?, ?, ?, ?)")
+            .bind(tracker_key.key_id)
+            .bind(tracker_key.user_id)
+            .bind(tracker_key.key.clone())
+            .bind(tracker_key.valid_until)
             .execute(&self.pool)
             .await
             .map(|v| v.last_insert_rowid())

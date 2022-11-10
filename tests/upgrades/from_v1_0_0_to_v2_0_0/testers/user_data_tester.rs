@@ -10,7 +10,7 @@ pub struct UserDataTester {
     source_database: Arc<SqliteDatabaseV1_0_0>,
     destiny_database: Arc<SqliteDatabaseV2_0_0>,
     execution_time: String,
-    test_data: TestData,
+    pub test_data: TestData,
 }
 
 pub struct TestData {

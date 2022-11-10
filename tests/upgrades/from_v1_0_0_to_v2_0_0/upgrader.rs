@@ -13,6 +13,7 @@
 //! to see the "upgrader" command output.
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::tracker_keys_tester::TrackerKeysTester;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::user_data_tester::UserDataTester;
 use std::fs;
 use std::sync::Arc;
@@ -43,7 +44,7 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
 
     // Load data into database v1
 
-    // `torrust_users` table
+    // `torrust_users`, `torrust_user_profiles` and `torrust_user_authentication` tables
 
     let user_data_tester = UserDataTester::new(
         source_database.clone(),
@@ -55,7 +56,13 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
 
     // `torrust_tracker_keys` table
 
-    // TODO
+    let tracker_keys_tester = TrackerKeysTester::new(
+        source_database.clone(),
+        destiny_database.clone(),
+        user_data_tester.test_data.user.user_id,
+    );
+
+    tracker_keys_tester.load_data_into_source_db().await;
 
     // `torrust_torrents` table
 
@@ -71,21 +78,13 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
 
     // Assertions in database v2
 
-    // `torrust_users` table
+    // `torrust_users`, `torrust_user_profiles` and `torrust_user_authentication` tables
 
     user_data_tester.assert().await;
 
-    // `torrust_user_authentication` table
-
-    // TODO
-
-    // `torrust_user_profiles` table
-
-    // TODO
-
     // `torrust_tracker_keys` table
 
-    // TODO
+    tracker_keys_tester.assert().await;
 
     // `torrust_torrents` table
 

@@ -26,6 +26,14 @@ pub struct UserAuthenticationRecordV2 {
     pub password_hash: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct TrackerKeyRecordV2 {
+    pub tracker_key_id: i64,
+    pub user_id: i64,
+    pub tracker_key: String,
+    pub date_expiry: i64,
+}
+
 pub struct SqliteDatabaseV2_0_0 {
     pub pool: SqlitePool,
 }
@@ -66,6 +74,18 @@ impl SqliteDatabaseV2_0_0 {
             "SELECT * FROM torrust_user_authentication WHERE user_id = ?",
         )
         .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+    }
+
+    pub async fn get_tracker_key(
+        &self,
+        tracker_key_id: i64,
+    ) -> Result<TrackerKeyRecordV2, sqlx::Error> {
+        query_as::<_, TrackerKeyRecordV2>(
+            "SELECT * FROM torrust_tracker_keys WHERE user_id = ?",
+        )
+        .bind(tracker_key_id)
         .fetch_one(&self.pool)
         .await
     }
