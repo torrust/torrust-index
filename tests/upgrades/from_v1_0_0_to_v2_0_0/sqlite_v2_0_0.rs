@@ -35,6 +35,20 @@ pub struct TrackerKeyRecordV2 {
     pub date_expiry: i64,
 }
 
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct TorrentInfoRecordV2 {
+    pub torrent_id: i64,
+    pub title: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, PartialEq)]
+pub struct TorrentAnnounceUrlV2 {
+    pub announce_url_id: i64,
+    pub torrent_id: i64,
+    pub tracker_url: String,
+}
+
 pub struct SqliteDatabaseV2_0_0 {
     pub pool: SqlitePool,
 }
@@ -94,5 +108,29 @@ impl SqliteDatabaseV2_0_0 {
             .bind(torrent_id)
             .fetch_one(&self.pool)
             .await
+    }
+
+    pub async fn get_torrent_info(
+        &self,
+        torrent_id: i64,
+    ) -> Result<TorrentInfoRecordV2, sqlx::Error> {
+        query_as::<_, TorrentInfoRecordV2>(
+            "SELECT * FROM torrust_torrent_info WHERE torrent_id = ?",
+        )
+        .bind(torrent_id)
+        .fetch_one(&self.pool)
+        .await
+    }
+
+    pub async fn get_torrent_announce_urls(
+        &self,
+        torrent_id: i64,
+    ) -> Result<Vec<TorrentAnnounceUrlV2>, sqlx::Error> {
+        query_as::<_, TorrentAnnounceUrlV2>(
+            "SELECT * FROM torrust_torrent_announce_urls WHERE torrent_id = ?",
+        )
+        .bind(torrent_id)
+        .fetch_all(&self.pool)
+        .await
     }
 }

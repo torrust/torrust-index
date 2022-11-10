@@ -31,7 +31,7 @@ impl TorrentTester {
             info_hash: "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_string(),
             title: "title".to_string(),
             category_id: 1,
-            description: "description".to_string(),
+            description: Some("description".to_string()),
             upload_date: 1667546358, // 2022-11-04 07:19:18
             file_size: 9219566,
             seeders: 0,
@@ -60,10 +60,10 @@ impl TorrentTester {
         let torrent_file = read_torrent_from_file(&filepath).unwrap();
 
         self.assert_torrent(&torrent_file).await;
+        self.assert_torrent_info().await;
+        self.assert_torrent_announce_urls(&torrent_file).await;
         // TODO
         // `torrust_torrent_files`,
-        // `torrust_torrent_info`
-        // `torrust_torrent_announce_urls`
     }
 
     pub fn torrent_file_path(&self, upload_path: &str, torrent_id: i64) -> String {
@@ -111,5 +111,42 @@ impl TorrentTester {
             imported_torrent.date_uploaded,
             convert_timestamp_to_datetime(self.test_data.torrent.upload_date)
         );
+    }
+
+    /// Table `torrust_torrent_info`
+    async fn assert_torrent_info(&self) {
+        let torrent_info = self
+            .destiny_database
+            .get_torrent_info(self.test_data.torrent.torrent_id)
+            .await
+            .unwrap();
+
+        assert_eq!(torrent_info.torrent_id, self.test_data.torrent.torrent_id);
+        assert_eq!(torrent_info.title, self.test_data.torrent.title);
+        assert_eq!(torrent_info.description, self.test_data.torrent.description);
+    }
+
+    /// Table `torrust_torrent_announce_urls`
+    async fn assert_torrent_announce_urls(&self, torrent_file: &Torrent) {
+        let torrent_announce_urls = self
+            .destiny_database
+            .get_torrent_announce_urls(self.test_data.torrent.torrent_id)
+            .await
+            .unwrap();
+
+        let urls: Vec<String> = torrent_announce_urls
+            .iter()
+            .map(|torrent_announce_url| torrent_announce_url.tracker_url.to_string())
+            .collect();
+
+        let expected_urls = torrent_file
+            .announce_list
+            .clone()
+            .unwrap()
+            .into_iter()
+            .flatten()
+            .collect::<Vec<String>>();
+
+        assert_eq!(urls, expected_urls);
     }
 }

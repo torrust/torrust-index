@@ -35,7 +35,7 @@ pub struct TorrentRecordV1 {
     pub info_hash: String,
     pub title: String,
     pub category_id: i64,
-    pub description: String,
+    pub description: Option<String>,
     pub upload_date: i64,
     pub file_size: i64,
     pub seeders: i64,
