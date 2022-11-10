@@ -41,7 +41,7 @@ impl TrackerKeyTester {
     }
 
     /// Table `torrust_tracker_keys`
-    pub async fn assert(&self) {
+    pub async fn assert_data_in_destiny_db(&self) {
         let imported_key = self
             .destiny_database
             .get_tracker_key(self.test_data.tracker_key.key_id)

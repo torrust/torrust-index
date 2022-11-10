@@ -55,7 +55,7 @@ impl TorrentTester {
             .unwrap();
     }
 
-    pub async fn assert(&self, upload_path: &str) {
+    pub async fn assert_data_in_destiny_db(&self, upload_path: &str) {
         let filepath = self.torrent_file_path(upload_path, self.test_data.torrent.torrent_id);
         let torrent_file = read_torrent_from_file(&filepath).unwrap();
 

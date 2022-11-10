@@ -47,7 +47,7 @@ impl UserTester {
             .unwrap();
     }
 
-    pub async fn assert(&self) {
+    pub async fn assert_data_in_destiny_db(&self) {
         self.assert_user().await;
         self.assert_user_profile().await;
         self.assert_user_authentication().await;

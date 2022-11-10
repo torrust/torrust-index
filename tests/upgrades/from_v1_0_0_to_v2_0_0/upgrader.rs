@@ -44,7 +44,7 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
     // The datetime when the upgrader is executed
     let execution_time = datetime_iso_8601();
 
-    // Load data into database v1
+    // Load data into source database in version v1.0.0
 
     let user_tester = UserTester::new(
         source_database.clone(),
@@ -68,18 +68,21 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
     torrent_tester.load_data_into_source_db().await;
 
     // Run the upgrader
-    let args = Arguments {
-        source_database_file: source_database_file.clone(),
-        destiny_database_file: destiny_database_file.clone(),
-        upload_path: upload_path.clone(),
-    };
-    upgrade(&args, &execution_time).await;
+    upgrade(
+        &Arguments {
+            source_database_file: source_database_file.clone(),
+            destiny_database_file: destiny_database_file.clone(),
+            upload_path: upload_path.clone(),
+        },
+        &execution_time,
+    )
+    .await;
 
-    // Assertions in database v2
+    // Assertions for data transferred to the new database in version v2.0.0
 
-    user_tester.assert().await;
-    tracker_key_tester.assert().await;
-    torrent_tester.assert(&upload_path).await;
+    user_tester.assert_data_in_destiny_db().await;
+    tracker_key_tester.assert_data_in_destiny_db().await;
+    torrent_tester.assert_data_in_destiny_db(&upload_path).await;
 }
 
 async fn source_db_connection(source_database_file: &str) -> Arc<SqliteDatabaseV1_0_0> {
