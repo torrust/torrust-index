@@ -14,6 +14,7 @@ pub struct CategoryRecordV2 {
     pub name: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct TorrentRecordV2 {
     pub torrent_id: i64,
     pub uploader_id: i64,
@@ -50,7 +51,7 @@ impl TorrentRecordV2 {
     }
 }
 
-fn convert_timestamp_to_datetime(timestamp: i64) -> String {
+pub fn convert_timestamp_to_datetime(timestamp: i64) -> String {
     // The expected format in database is: 2022-11-04 09:53:57
     // MySQL uses a DATETIME column and SQLite uses a TEXT column.
 
@@ -136,7 +137,7 @@ impl SqliteDatabaseV2_0_0 {
         user_id: i64,
         username: &str,
         email: &str,
-        email_verified: bool
+        email_verified: bool,
     ) -> Result<i64, sqlx::Error> {
         query("INSERT INTO torrust_user_profiles (user_id, username, email, email_verified, bio, avatar) VALUES (?, ?, ?, ?, ?, ?)")
             .bind(user_id)

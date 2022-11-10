@@ -2,7 +2,7 @@ use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{query, SqlitePool};
 use std::fs;
 use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::{
-    TrackerKeyRecordV1, UserRecordV1,
+    TorrentRecordV1, TrackerKeyRecordV1, UserRecordV1,
 };
 
 pub struct SqliteDatabaseV1_0_0 {
@@ -80,5 +80,35 @@ impl SqliteDatabaseV1_0_0 {
             .execute(&self.pool)
             .await
             .map(|v| v.last_insert_rowid())
+    }
+
+    pub async fn insert_torrent(&self, torrent: &TorrentRecordV1) -> Result<i64, sqlx::Error> {
+        query(
+            "INSERT INTO torrust_torrents (
+            torrent_id,
+            uploader,
+            info_hash,
+            title,
+            category_id,
+            description,
+            upload_date,
+            file_size,
+            seeders,
+            leechers
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(torrent.torrent_id)
+        .bind(torrent.uploader.clone())
+        .bind(torrent.info_hash.clone())
+        .bind(torrent.title.clone())
+        .bind(torrent.category_id)
+        .bind(torrent.description.clone())
+        .bind(torrent.upload_date)
+        .bind(torrent.file_size)
+        .bind(torrent.seeders)
+        .bind(torrent.leechers)
+        .execute(&self.pool)
+        .await
+        .map(|v| v.last_insert_rowid())
     }
 }

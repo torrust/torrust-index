@@ -45,14 +45,14 @@ impl TorrentInfo {
     pub fn get_pieces_as_string(&self) -> String {
         match &self.pieces {
             None => "".to_string(),
-            Some(byte_buf) => bytes_to_hex(byte_buf.as_ref())
+            Some(byte_buf) => bytes_to_hex(byte_buf.as_ref()),
         }
     }
 
     pub fn get_root_hash_as_i64(&self) -> i64 {
         match &self.root_hash {
             None => 0i64,
-            Some(root_hash) => root_hash.parse::<i64>().unwrap()
+            Some(root_hash) => root_hash.parse::<i64>().unwrap(),
         }
     }
 }

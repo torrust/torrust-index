@@ -10,7 +10,7 @@ pub struct CategoryRecord {
     pub name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
 pub struct UserRecordV1 {
     pub user_id: i64,
     pub username: String,
