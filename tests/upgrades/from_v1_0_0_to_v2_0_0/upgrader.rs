@@ -14,8 +14,8 @@
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::torrent_tester::TorrentTester;
-use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::tracker_keys_tester::TrackerKeysTester;
-use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::user_data_tester::UserDataTester;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::tracker_key_tester::TrackerKeyTester;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::user_tester::UserTester;
 use std::fs;
 use std::sync::Arc;
 use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::upgrader::{
@@ -46,24 +46,24 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
 
     // Load data into database v1
 
-    let user_data_tester = UserDataTester::new(
+    let user_tester = UserTester::new(
         source_database.clone(),
         destiny_database.clone(),
         &execution_time,
     );
-    user_data_tester.load_data_into_source_db().await;
+    user_tester.load_data_into_source_db().await;
 
-    let tracker_keys_tester = TrackerKeysTester::new(
+    let tracker_key_tester = TrackerKeyTester::new(
         source_database.clone(),
         destiny_database.clone(),
-        user_data_tester.test_data.user.user_id,
+        user_tester.test_data.user.user_id,
     );
-    tracker_keys_tester.load_data_into_source_db().await;
+    tracker_key_tester.load_data_into_source_db().await;
 
     let torrent_tester = TorrentTester::new(
         source_database.clone(),
         destiny_database.clone(),
-        &user_data_tester.test_data.user,
+        &user_tester.test_data.user,
     );
     torrent_tester.load_data_into_source_db().await;
 
@@ -77,8 +77,8 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
 
     // Assertions in database v2
 
-    user_data_tester.assert().await;
-    tracker_keys_tester.assert().await;
+    user_tester.assert().await;
+    tracker_key_tester.assert().await;
     torrent_tester.assert(&upload_path).await;
 }
 

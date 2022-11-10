@@ -6,7 +6,7 @@ use rand_core::OsRng;
 use std::sync::Arc;
 use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::UserRecordV1;
 
-pub struct UserDataTester {
+pub struct UserTester {
     source_database: Arc<SqliteDatabaseV1_0_0>,
     destiny_database: Arc<SqliteDatabaseV2_0_0>,
     execution_time: String,
@@ -17,7 +17,7 @@ pub struct TestData {
     pub user: UserRecordV1,
 }
 
-impl UserDataTester {
+impl UserTester {
     pub fn new(
         source_database: Arc<SqliteDatabaseV1_0_0>,
         destiny_database: Arc<SqliteDatabaseV2_0_0>,

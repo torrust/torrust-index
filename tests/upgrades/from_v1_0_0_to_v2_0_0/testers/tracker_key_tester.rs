@@ -3,7 +3,7 @@ use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
 use std::sync::Arc;
 use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::TrackerKeyRecordV1;
 
-pub struct TrackerKeysTester {
+pub struct TrackerKeyTester {
     source_database: Arc<SqliteDatabaseV1_0_0>,
     destiny_database: Arc<SqliteDatabaseV2_0_0>,
     test_data: TestData,
@@ -13,7 +13,7 @@ pub struct TestData {
     pub tracker_key: TrackerKeyRecordV1,
 }
 
-impl TrackerKeysTester {
+impl TrackerKeyTester {
     pub fn new(
         source_database: Arc<SqliteDatabaseV1_0_0>,
         destiny_database: Arc<SqliteDatabaseV2_0_0>,
