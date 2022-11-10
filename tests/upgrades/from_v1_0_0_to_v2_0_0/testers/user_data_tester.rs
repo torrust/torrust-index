@@ -1,0 +1,91 @@
+use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
+use argon2::password_hash::SaltString;
+use argon2::{Argon2, PasswordHasher};
+use rand_core::OsRng;
+use std::sync::Arc;
+use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::UserRecordV1;
+
+pub struct UserDataTester {
+    source_database: Arc<SqliteDatabaseV1_0_0>,
+    destiny_database: Arc<SqliteDatabaseV2_0_0>,
+    execution_time: String,
+    test_data: TestData,
+}
+
+pub struct TestData {
+    pub user: UserRecordV1,
+}
+
+impl UserDataTester {
+    pub fn new(
+        source_database: Arc<SqliteDatabaseV1_0_0>,
+        destiny_database: Arc<SqliteDatabaseV2_0_0>,
+        execution_time: &str,
+    ) -> Self {
+        let user = UserRecordV1 {
+            user_id: 1,
+            username: "user01".to_string(),
+            email: "user01@torrust.com".to_string(),
+            email_verified: true,
+            password: hashed_valid_password(),
+            administrator: true,
+        };
+
+        Self {
+            source_database,
+            destiny_database,
+            execution_time: execution_time.to_owned(),
+            test_data: TestData { user },
+        }
+    }
+
+    pub async fn load_data_into_source_db(&self) {
+        self.source_database
+            .insert_user(&self.test_data.user)
+            .await
+            .unwrap();
+    }
+
+    pub async fn assert(&self) {
+        self.assert_user().await;
+    }
+
+    /// Table `torrust_users`
+    async fn assert_user(&self) {
+        let imported_user = self
+            .destiny_database
+            .get_user(self.test_data.user.user_id)
+            .await
+            .unwrap();
+
+        assert_eq!(imported_user.user_id, self.test_data.user.user_id);
+        assert!(imported_user.date_registered.is_none());
+        assert_eq!(imported_user.date_imported.unwrap(), self.execution_time);
+        assert_eq!(
+            imported_user.administrator,
+            self.test_data.user.administrator
+        );
+    }
+}
+
+fn hashed_valid_password() -> String {
+    hash_password(&valid_password())
+}
+
+fn valid_password() -> String {
+    "123456".to_string()
+}
+
+fn hash_password(plain_password: &str) -> String {
+    let salt = SaltString::generate(&mut OsRng);
+
+    // Argon2 with default params (Argon2id v19)
+    let argon2 = Argon2::default();
+
+    // Hash password to PHC string ($argon2id$v=19$...)
+    argon2
+        .hash_password(plain_password.as_bytes(), &salt)
+        .unwrap()
+        .to_string()
+}
