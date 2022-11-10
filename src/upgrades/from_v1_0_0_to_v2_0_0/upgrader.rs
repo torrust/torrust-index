@@ -181,7 +181,7 @@ async fn transfer_user_data(
         );
 
         let id = dest_database
-            .insert_imported_user(user.user_id, &date_imported, user.administrator)
+            .insert_imported_user(user.user_id, date_imported, user.administrator)
             .await
             .unwrap();
 
@@ -204,17 +204,12 @@ async fn transfer_user_data(
             &user.username, &user.user_id
         );
 
-        let default_user_bio = "".to_string();
-        let default_user_avatar = "".to_string();
-
         dest_database
             .insert_user_profile(
                 user.user_id,
                 &user.username,
                 &user.email,
                 user.email_verified,
-                &default_user_bio,
-                &default_user_avatar,
             )
             .await
             .unwrap();

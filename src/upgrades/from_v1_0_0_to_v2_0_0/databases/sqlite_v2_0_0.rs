@@ -136,17 +136,13 @@ impl SqliteDatabaseV2_0_0 {
         user_id: i64,
         username: &str,
         email: &str,
-        email_verified: bool,
-        bio: &str,
-        avatar: &str,
+        email_verified: bool
     ) -> Result<i64, sqlx::Error> {
         query("INSERT INTO torrust_user_profiles (user_id, username, email, email_verified, bio, avatar) VALUES (?, ?, ?, ?, ?, ?)")
             .bind(user_id)
             .bind(username)
             .bind(email)
             .bind(email_verified)
-            .bind(bio)
-            .bind(avatar)
             .execute(&self.pool)
             .await
             .map(|v| v.last_insert_rowid())
