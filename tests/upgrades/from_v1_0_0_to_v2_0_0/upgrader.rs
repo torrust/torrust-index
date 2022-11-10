@@ -1,8 +1,16 @@
 //! You can run this test with:
 //!
+//! //! ```text
+//! cargo test upgrades_data_from_version_v1_0_0_to_v2_0_0
+//! ```
+//!
+//! or:
+//!
 //! ```text
 //! cargo test upgrades_data_from_version_v1_0_0_to_v2_0_0 -- --nocapture
 //! ```
+//!
+//! to see the "upgrader" command output.
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::user_data_tester::UserDataTester;

@@ -49,6 +49,8 @@ impl UserDataTester {
 
     pub async fn assert(&self) {
         self.assert_user().await;
+        self.assert_user_profile().await;
+        self.assert_user_authentication().await;
     }
 
     /// Table `torrust_users`
@@ -65,6 +67,43 @@ impl UserDataTester {
         assert_eq!(
             imported_user.administrator,
             self.test_data.user.administrator
+        );
+    }
+
+    /// Table `torrust_user_profiles`
+    async fn assert_user_profile(&self) {
+        let imported_user_profile = self
+            .destiny_database
+            .get_user_profile(self.test_data.user.user_id)
+            .await
+            .unwrap();
+
+        assert_eq!(imported_user_profile.user_id, self.test_data.user.user_id);
+        assert_eq!(imported_user_profile.username, self.test_data.user.username);
+        assert_eq!(imported_user_profile.email, self.test_data.user.email);
+        assert_eq!(
+            imported_user_profile.email_verified,
+            self.test_data.user.email_verified
+        );
+        assert!(imported_user_profile.bio.is_none());
+        assert!(imported_user_profile.avatar.is_none());
+    }
+
+    /// Table `torrust_user_profiles`
+    async fn assert_user_authentication(&self) {
+        let imported_user_authentication = self
+            .destiny_database
+            .get_user_authentication(self.test_data.user.user_id)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            imported_user_authentication.user_id,
+            self.test_data.user.user_id
+        );
+        assert_eq!(
+            imported_user_authentication.password_hash,
+            self.test_data.user.password
         );
     }
 }
