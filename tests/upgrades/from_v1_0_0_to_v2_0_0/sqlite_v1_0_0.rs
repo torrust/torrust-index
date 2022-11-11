@@ -27,7 +27,6 @@ impl SqliteDatabaseV1_0_0 {
     pub async fn migrate(&self, fixtures_dir: &str) {
         let migrations_dir = format!("{}database/v1.0.0/migrations/", fixtures_dir);
 
-        // TODO: read files from dir
         let migrations = vec![
             "20210831113004_torrust_users.sql",
             "20210904135524_torrust_tracker_keys.sql",
