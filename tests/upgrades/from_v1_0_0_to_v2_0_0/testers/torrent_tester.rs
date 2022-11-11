@@ -15,8 +15,7 @@ pub struct TorrentTester {
 }
 
 pub struct TestData {
-    pub torrent_01: TorrentRecordV1,
-    pub torrent_02: TorrentRecordV1,
+    pub torrents: Vec<TorrentRecordV1>,
     pub user: UserRecordV1,
 }
 
@@ -71,48 +70,30 @@ impl TorrentTester {
             source_database,
             destiny_database,
             test_data: TestData {
-                torrent_01,
-                torrent_02,
+                torrents: vec![torrent_01, torrent_02],
                 user: user.clone(),
             },
         }
     }
 
     pub async fn load_data_into_source_db(&self) {
-        self.source_database
-            .insert_torrent(&self.test_data.torrent_01)
-            .await
-            .unwrap();
-        self.source_database
-            .insert_torrent(&self.test_data.torrent_02)
-            .await
-            .unwrap();
+        for torrent in &self.test_data.torrents {
+            self.source_database.insert_torrent(&torrent).await.unwrap();
+        }
     }
 
     pub async fn assert_data_in_destiny_db(&self, upload_path: &str) {
-        let filepath_01 = self.torrent_file_path(upload_path, self.test_data.torrent_01.torrent_id);
-        let filepath_02 = self.torrent_file_path(upload_path, self.test_data.torrent_02.torrent_id);
+        for torrent in &self.test_data.torrents {
+            let filepath = self.torrent_file_path(upload_path, torrent.torrent_id);
 
-        let torrent_file_01 = read_torrent_from_file(&filepath_01).unwrap();
-        let torrent_file_02 = read_torrent_from_file(&filepath_02).unwrap();
+            let torrent_file = read_torrent_from_file(&filepath).unwrap();
 
-        // Check torrent 01
-        self.assert_torrent(&self.test_data.torrent_01, &torrent_file_01)
-            .await;
-        self.assert_torrent_info(&self.test_data.torrent_01).await;
-        self.assert_torrent_announce_urls(&self.test_data.torrent_01, &torrent_file_01)
-            .await;
-        self.assert_torrent_files(&self.test_data.torrent_01, &torrent_file_01)
-            .await;
-
-        // Check torrent 02
-        self.assert_torrent(&self.test_data.torrent_02, &torrent_file_02)
-            .await;
-        self.assert_torrent_info(&self.test_data.torrent_02).await;
-        self.assert_torrent_announce_urls(&self.test_data.torrent_02, &torrent_file_02)
-            .await;
-        self.assert_torrent_files(&self.test_data.torrent_02, &torrent_file_02)
-            .await;
+            self.assert_torrent(&torrent, &torrent_file).await;
+            self.assert_torrent_info(&torrent).await;
+            self.assert_torrent_announce_urls(&torrent, &torrent_file)
+                .await;
+            self.assert_torrent_files(&torrent, &torrent_file).await;
+        }
     }
 
     pub fn torrent_file_path(&self, upload_path: &str, torrent_id: i64) -> String {
