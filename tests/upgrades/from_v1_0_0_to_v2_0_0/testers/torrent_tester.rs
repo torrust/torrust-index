@@ -6,7 +6,7 @@ use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1
     TorrentRecordV1, UserRecordV1,
 };
 use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::convert_timestamp_to_datetime;
-use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::upgrader::read_torrent_from_file;
+use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::transferrers::torrent_transferrer::read_torrent_from_file;
 
 pub struct TorrentTester {
     source_database: Arc<SqliteDatabaseV1_0_0>,
