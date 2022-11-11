@@ -49,6 +49,15 @@ pub struct TorrentAnnounceUrlV2 {
     pub tracker_url: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, PartialEq)]
+pub struct TorrentFileV2 {
+    pub file_id: i64,
+    pub torrent_id: i64,
+    pub md5sum: Option<String>,
+    pub length: i64,
+    pub path: Option<String>,
+}
+
 pub struct SqliteDatabaseV2_0_0 {
     pub pool: SqlitePool,
 }
@@ -132,5 +141,15 @@ impl SqliteDatabaseV2_0_0 {
         .bind(torrent_id)
         .fetch_all(&self.pool)
         .await
+    }
+
+    pub async fn get_torrent_files(
+        &self,
+        torrent_id: i64,
+    ) -> Result<Vec<TorrentFileV2>, sqlx::Error> {
+        query_as::<_, TorrentFileV2>("SELECT * FROM torrust_torrent_files WHERE torrent_id = ?")
+            .bind(torrent_id)
+            .fetch_all(&self.pool)
+            .await
     }
 }

@@ -55,6 +55,14 @@ impl TorrentInfo {
             Some(root_hash) => root_hash.parse::<i64>().unwrap(),
         }
     }
+
+    pub fn is_a_single_file_torrent(&self) -> bool {
+        self.length.is_some()
+    }
+
+    pub fn is_a_multiple_file_torrent(&self) -> bool {
+        self.files.is_some()
+    }
 }
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
@@ -191,6 +199,23 @@ impl Torrent {
                 }
             }
         }
+    }
+
+    pub fn announce_urls(&self) -> Vec<String> {
+        self.announce_list
+            .clone()
+            .unwrap()
+            .into_iter()
+            .flatten()
+            .collect::<Vec<String>>()
+    }
+
+    pub fn is_a_single_file_torrent(&self) -> bool {
+        self.info.is_a_single_file_torrent()
+    }
+
+    pub fn is_a_multiple_file_torrent(&self) -> bool {
+        self.info.is_a_multiple_file_torrent()
     }
 }
 

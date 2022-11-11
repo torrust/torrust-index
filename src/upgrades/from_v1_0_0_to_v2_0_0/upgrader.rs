@@ -359,10 +359,7 @@ async fn transfer_torrents(
 
         println!("[v2][torrust_torrent_files] adding torrent files");
 
-        let _is_torrent_with_multiple_files = torrent_from_file.info.files.is_some();
-        let is_torrent_with_a_single_file = torrent_from_file.info.length.is_some();
-
-        if is_torrent_with_a_single_file {
+        if torrent_from_file.is_a_single_file_torrent() {
             // The torrent contains only one file then:
             // - "path" is NULL
             // - "md5sum" can be NULL

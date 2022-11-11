@@ -62,8 +62,7 @@ impl TorrentTester {
         self.assert_torrent(&torrent_file).await;
         self.assert_torrent_info().await;
         self.assert_torrent_announce_urls(&torrent_file).await;
-        // TODO
-        // `torrust_torrent_files`,
+        self.assert_torrent_files(&torrent_file).await;
     }
 
     pub fn torrent_file_path(&self, upload_path: &str, torrent_id: i64) -> String {
@@ -139,14 +138,30 @@ impl TorrentTester {
             .map(|torrent_announce_url| torrent_announce_url.tracker_url.to_string())
             .collect();
 
-        let expected_urls = torrent_file
-            .announce_list
-            .clone()
-            .unwrap()
-            .into_iter()
-            .flatten()
-            .collect::<Vec<String>>();
+        let expected_urls = torrent_file.announce_urls();
 
         assert_eq!(urls, expected_urls);
+    }
+
+    /// Table `torrust_torrent_files`
+    async fn assert_torrent_files(&self, torrent_file: &Torrent) {
+        let db_torrent_files = self
+            .destiny_database
+            .get_torrent_files(self.test_data.torrent.torrent_id)
+            .await
+            .unwrap();
+
+        if torrent_file.is_a_single_file_torrent() {
+            let db_torrent_file = &db_torrent_files[0];
+            assert_eq!(
+                db_torrent_file.torrent_id,
+                self.test_data.torrent.torrent_id
+            );
+            assert!(db_torrent_file.md5sum.is_none());
+            assert_eq!(db_torrent_file.length, torrent_file.info.length.unwrap());
+            assert!(db_torrent_file.path.is_none());
+        } else {
+            todo!();
+        }
     }
 }
