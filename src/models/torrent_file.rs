@@ -202,6 +202,10 @@ impl Torrent {
     }
 
     pub fn announce_urls(&self) -> Vec<String> {
+        if self.announce_list.is_none() {
+            return vec![self.announce.clone().unwrap()];
+        }
+
         self.announce_list
             .clone()
             .unwrap()
