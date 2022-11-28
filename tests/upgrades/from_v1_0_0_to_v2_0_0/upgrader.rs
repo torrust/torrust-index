@@ -13,6 +13,7 @@
 //! to see the "upgrader" command output.
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::category_tester::CategoryTester;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::torrent_tester::TorrentTester;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::tracker_key_tester::TrackerKeyTester;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::user_tester::UserTester;
@@ -56,6 +57,7 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
     // The datetime when the upgrader is executed
     let execution_time = datetime_iso_8601();
 
+    let category_tester = CategoryTester::new(source_db.clone(), dest_db.clone());
     let user_tester = UserTester::new(source_db.clone(), dest_db.clone(), &execution_time);
     let tracker_key_tester = TrackerKeyTester::new(
         source_db.clone(),
@@ -66,9 +68,11 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
         source_db.clone(),
         dest_db.clone(),
         &user_tester.test_data.user,
+        category_tester.get_valid_category_id(),
     );
 
     // Load data into source database in version v1.0.0
+    category_tester.load_data_into_source_db().await;
     user_tester.load_data_into_source_db().await;
     tracker_key_tester.load_data_into_source_db().await;
     torrent_tester.load_data_into_source_db().await;
@@ -85,6 +89,7 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
     .await;
 
     // Assertions for data transferred to the new database in version v2.0.0
+    category_tester.assert_data_in_destiny_db().await;
     user_tester.assert_data_in_destiny_db().await;
     tracker_key_tester.assert_data_in_destiny_db().await;
     torrent_tester

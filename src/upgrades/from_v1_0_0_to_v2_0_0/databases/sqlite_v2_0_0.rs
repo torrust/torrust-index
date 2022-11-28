@@ -117,6 +117,15 @@ impl SqliteDatabaseV2_0_0 {
             })
     }
 
+    pub async fn insert_category(&self, category: &CategoryRecordV2) -> Result<i64, sqlx::Error> {
+        query("INSERT INTO torrust_categories (category_id, name) VALUES (?, ?)")
+            .bind(category.category_id)
+            .bind(category.name.clone())
+            .execute(&self.pool)
+            .await
+            .map(|v| v.last_insert_rowid())
+    }
+
     pub async fn insert_imported_user(
         &self,
         user_id: i64,

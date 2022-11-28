@@ -4,6 +4,12 @@ use sqlx::{query_as, SqlitePool};
 use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::TorrentRecordV2;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+pub struct CategoryRecordV2 {
+    pub category_id: i64,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserRecordV2 {
     pub user_id: i64,
     pub date_registered: Option<String>,
@@ -74,6 +80,13 @@ impl SqliteDatabaseV2_0_0 {
             .await
             .expect("Unable to create database pool.");
         Self { pool: db }
+    }
+
+    pub async fn get_category(&self, category_id: i64) -> Result<CategoryRecordV2, sqlx::Error> {
+        query_as::<_, CategoryRecordV2>("SELECT * FROM torrust_categories WHERE category_id = ?")
+            .bind(category_id)
+            .fetch_one(&self.pool)
+            .await
     }
 
     pub async fn get_user(&self, user_id: i64) -> Result<UserRecordV2, sqlx::Error> {

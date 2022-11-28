@@ -5,7 +5,7 @@ use sqlx::{query_as, SqlitePool};
 use crate::databases::database::DatabaseError;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct CategoryRecord {
+pub struct CategoryRecordV1 {
     pub category_id: i64,
     pub name: String,
 }
@@ -64,8 +64,8 @@ impl SqliteDatabaseV1_0_0 {
         Self { pool: db }
     }
 
-    pub async fn get_categories_order_by_id(&self) -> Result<Vec<CategoryRecord>, DatabaseError> {
-        query_as::<_, CategoryRecord>(
+    pub async fn get_categories_order_by_id(&self) -> Result<Vec<CategoryRecordV1>, DatabaseError> {
+        query_as::<_, CategoryRecordV1>(
             "SELECT category_id, name FROM torrust_categories ORDER BY category_id ASC",
         )
         .fetch_all(&self.pool)

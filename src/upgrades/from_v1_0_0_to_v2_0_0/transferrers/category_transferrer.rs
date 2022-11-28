@@ -1,5 +1,7 @@
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
-use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::{
+    CategoryRecordV2, SqliteDatabaseV2_0_0,
+};
 use std::sync::Arc;
 
 pub async fn transfer_categories(
@@ -12,7 +14,7 @@ pub async fn transfer_categories(
     println!("[v1] categories: {:?}", &source_categories);
 
     let result = dest_database.reset_categories_sequence().await.unwrap();
-    println!("[v2] reset categories sequence result {:?}", result);
+    println!("[v2] reset categories sequence result: {:?}", result);
 
     for cat in &source_categories {
         println!(
@@ -20,7 +22,10 @@ pub async fn transfer_categories(
             &cat.name, &cat.category_id
         );
         let id = dest_database
-            .insert_category_and_get_id(&cat.name)
+            .insert_category(&CategoryRecordV2 {
+                category_id: cat.category_id,
+                name: cat.name.clone(),
+            })
             .await
             .unwrap();
 

@@ -2,7 +2,7 @@ use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{query, SqlitePool};
 use std::fs;
 use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::{
-    TorrentRecordV1, TrackerKeyRecordV1, UserRecordV1,
+    CategoryRecordV1, TorrentRecordV1, TrackerKeyRecordV1, UserRecordV1,
 };
 
 pub struct SqliteDatabaseV1_0_0 {
@@ -52,6 +52,23 @@ impl SqliteDatabaseV1_0_0 {
         let res = sqlx::query(&sql).execute(&self.pool).await;
 
         println!("Migration result {:?}", res);
+    }
+
+    pub async fn insert_category(&self, category: &CategoryRecordV1) -> Result<i64, sqlx::Error> {
+        query("INSERT INTO torrust_categories (category_id, name) VALUES (?, ?)")
+            .bind(category.category_id)
+            .bind(category.name.clone())
+            .execute(&self.pool)
+            .await
+            .map(|v| v.last_insert_rowid())
+    }
+
+    pub async fn delete_all_categories(&self) -> Result<(), sqlx::Error> {
+        query("DELETE FROM torrust_categories")
+            .execute(&self.pool)
+            .await
+            .unwrap();
+        Ok(())
     }
 
     pub async fn insert_user(&self, user: &UserRecordV1) -> Result<i64, sqlx::Error> {

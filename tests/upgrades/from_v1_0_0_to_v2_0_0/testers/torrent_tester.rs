@@ -24,19 +24,20 @@ impl TorrentTester {
         source_database: Arc<SqliteDatabaseV1_0_0>,
         destiny_database: Arc<SqliteDatabaseV2_0_0>,
         user: &UserRecordV1,
+        category_id: i64,
     ) -> Self {
         let torrent_01 = TorrentRecordV1 {
             torrent_id: 1,
             uploader: user.username.clone(),
             info_hash: "9e0217d0fa71c87332cd8bf9dbeabcb2c2cf3c4d".to_string(),
             title: "A Mandelbrot Set 2048x2048px picture".to_string(),
-            category_id: 1,
+            category_id,
             description: Some(
-                "A beautiful Mandelbrot Set picture in black and white. \
-                    - Hybrid torrent V1 and V2. \
-                    - Single-file torrent. \
-                    - Public. \
-                    - More than one tracker URL. \
+                "A beautiful Mandelbrot Set picture in black and white. \n \
+                    - Hybrid torrent V1 and V2. \n \
+                    - Single-file torrent. \n \
+                    - Public. \n \
+                    - More than one tracker URL. \n \
             "
                 .to_string(),
             ),
@@ -50,13 +51,13 @@ impl TorrentTester {
             uploader: user.username.clone(),
             info_hash: "0902d375f18ec020f0cc68ed4810023032ba81cb".to_string(),
             title: "Two Mandelbrot Set 2048x2048px pictures".to_string(),
-            category_id: 1,
+            category_id,
             description: Some(
-                "Two beautiful Mandelbrot Set pictures in black and white. \
-                    - Hybrid torrent V1 and V2. \
-                    - Multiple-files torrent. \
-                    - Private.
-                    - Only one tracker URL.
+                "Two beautiful Mandelbrot Set pictures in black and white. \n \
+                    - Hybrid torrent V1 and V2. \n \
+                    - Multiple-files torrent. \n \
+                    - Private. \n \
+                    - Only one tracker URL. \n \
                     "
                 .to_string(),
             ),
