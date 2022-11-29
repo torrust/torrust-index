@@ -179,13 +179,19 @@ impl TrackerService {
     }
 
     pub async fn update_torrents(&self) -> Result<(), ServiceError> {
-        println!("Updating torrents..");
+        println!("Updating torrents ...");
         let torrents = self.database.get_all_torrents_compact().await?;
 
         for torrent in torrents {
-            let _ = self.get_torrent_info(torrent.torrent_id, &torrent.info_hash).await;
+            let _ = self
+                .update_torrent_tracker_stats(torrent.torrent_id, &torrent.info_hash)
+                .await;
         }
 
         Ok(())
+    }
+
+    pub async fn update_torrent_tracker_stats(&self, torrent_id: i64, info_hash: &str) -> Result<TorrentInfo, ServiceError> {
+        self.get_torrent_info(torrent_id, info_hash).await
     }
 }
