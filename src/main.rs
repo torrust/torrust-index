@@ -1,13 +1,14 @@
 use std::sync::Arc;
-use actix_web::{App, HttpServer, middleware, web};
+
 use actix_cors::Cors;
-use torrust_index_backend::{routes};
-use torrust_index_backend::config::{Configuration};
-use torrust_index_backend::common::AppData;
+use actix_web::{middleware, web, App, HttpServer};
 use torrust_index_backend::auth::AuthorizationService;
+use torrust_index_backend::common::AppData;
+use torrust_index_backend::config::Configuration;
 use torrust_index_backend::databases::database::connect_database;
-use torrust_index_backend::tracker::TrackerService;
 use torrust_index_backend::mailer::MailerService;
+use torrust_index_backend::routes;
+use torrust_index_backend::tracker::TrackerService;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -20,23 +21,22 @@ async fn main() -> std::io::Result<()> {
 
     let settings = cfg.settings.read().await;
 
-    let database = Arc::new(connect_database(&settings.database.connect_url)
+    let database = Arc::new(
+        connect_database(&settings.database.connect_url)
             .await
-            .expect("Database error.")
+            .expect("Database error."),
     );
 
     let auth = Arc::new(AuthorizationService::new(cfg.clone(), database.clone()));
     let tracker_service = Arc::new(TrackerService::new(cfg.clone(), database.clone()));
     let mailer_service = Arc::new(MailerService::new(cfg.clone()).await);
-    let app_data = Arc::new(
-        AppData::new(
-            cfg.clone(),
-            database.clone(),
-            auth.clone(),
-            tracker_service.clone(),
-            mailer_service.clone(),
-        )
-    );
+    let app_data = Arc::new(AppData::new(
+        cfg.clone(),
+        database.clone(),
+        auth.clone(),
+        tracker_service.clone(),
+        mailer_service.clone(),
+    ));
 
     let interval = settings.database.torrent_info_update_interval;
     let weak_tracker_service = Arc::downgrade(&tracker_service);
@@ -69,7 +69,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .configure(routes::init_routes)
     })
-        .bind(("0.0.0.0", port))?
-        .run()
-        .await
+    .bind(("0.0.0.0", port))?
+    .run()
+    .await
 }

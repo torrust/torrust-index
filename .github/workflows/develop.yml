@@ -1,0 +1,20 @@
+name: Development Checks
+
+on: [pull_request]
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Verify Formatting
+        uses: ClementTsang/cargo-action@main
+        with:
+          command: fmt
+          args: --all --check

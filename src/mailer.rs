@@ -1,17 +1,19 @@
-use crate::config::Configuration;
 use std::sync::Arc;
-use crate::errors::ServiceError;
-use serde::{Serialize, Deserialize};
-use lettre::{AsyncSmtpTransport, Tokio1Executor, Message, AsyncTransport};
-use lettre::transport::smtp::authentication::{Credentials, Mechanism};
+
+use jsonwebtoken::{encode, EncodingKey, Header};
 use lettre::message::{MessageBuilder, MultiPart, SinglePart};
-use jsonwebtoken::{encode, Header, EncodingKey};
+use lettre::transport::smtp::authentication::{Credentials, Mechanism};
+use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 use sailfish::TemplateOnce;
+use serde::{Deserialize, Serialize};
+
+use crate::config::Configuration;
+use crate::errors::ServiceError;
 use crate::utils::time::current_time;
 
 pub struct MailerService {
     cfg: Arc<Configuration>,
-    mailer: Arc<Mailer>
+    mailer: Arc<Mailer>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -28,15 +30,11 @@ struct VerifyTemplate {
     verification_url: String,
 }
 
-
 impl MailerService {
     pub async fn new(cfg: Arc<Configuration>) -> MailerService {
         let mailer = Arc::new(Self::get_mailer(&cfg).await);
 
-        Self {
-            cfg,
-            mailer,
-        }
+        Self { cfg, mailer }
     }
 
     async fn get_mailer(cfg: &Configuration) -> Mailer {
@@ -47,15 +45,17 @@ impl MailerService {
         AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&settings.mail.server)
             .port(settings.mail.port)
             .credentials(creds)
-            .authentication(vec![
-                Mechanism::Login,
-                Mechanism::Xoauth2,
-                Mechanism::Plain,
-            ])
+            .authentication(vec![Mechanism::Login, Mechanism::Xoauth2, Mechanism::Plain])
             .build()
     }
 
-    pub async fn send_verification_mail(&self, to: &str, username: &str, user_id: i64, base_url: &str) -> Result<(), ServiceError> {
+    pub async fn send_verification_mail(
+        &self,
+        to: &str,
+        username: &str,
+        user_id: i64,
+        base_url: &str,
+    ) -> Result<(), ServiceError> {
         let builder = self.get_builder(to).await;
         let verification_url = self.get_verification_url(user_id, base_url).await;
 
@@ -68,8 +68,7 @@ impl MailerService {
 
                 If this account wasn't made by you, you can ignore this email.
             "#,
-            username,
-            verification_url
+            username, verification_url
         );
 
         let ctx = VerifyTemplate {
@@ -84,13 +83,13 @@ impl MailerService {
                     .singlepart(
                         SinglePart::builder()
                             .header(lettre::message::header::ContentType::TEXT_PLAIN)
-                            .body(mail_body)
+                            .body(mail_body),
                     )
                     .singlepart(
                         SinglePart::builder()
                             .header(lettre::message::header::ContentType::TEXT_HTML)
-                            .body(ctx.render_once().unwrap())
-                    )
+                            .body(ctx.render_once().unwrap()),
+                    ),
             )
             .unwrap();
 
@@ -99,7 +98,7 @@ impl MailerService {
             Err(e) => {
                 eprintln!("Failed to send email: {}", e);
                 Err(ServiceError::FailedToSendVerificationEmail)
-            },
+            }
         }
     }
 
@@ -122,15 +121,10 @@ impl MailerService {
         let claims = VerifyClaims {
             iss: String::from("email-verification"),
             sub: user_id,
-            exp: current_time() + 315_569_260 // 10 years from now
+            exp: current_time() + 315_569_260, // 10 years from now
         };
 
-        let token = encode(
-            &Header::default(),
-            &claims,
-            &EncodingKey::from_secret(key),
-        )
-            .unwrap();
+        let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(key)).unwrap();
 
         let mut base_url = base_url.clone();
         if let Some(cfg_base_url) = &settings.net.base_url {

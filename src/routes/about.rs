@@ -1,17 +1,13 @@
-use actix_web::{Responder, web, HttpResponse};
 use actix_web::http::StatusCode;
+use actix_web::{web, HttpResponse, Responder};
 
 use crate::errors::ServiceResult;
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/about")
-            .service(web::resource("")
-                .route(web::get().to(get_about))
-            )
-            .service(web::resource("/license")
-                .route(web::get().to(get_license))
-            )
+            .service(web::resource("").route(web::get().to(get_about)))
+            .service(web::resource("/license").route(web::get().to(get_license))),
     );
 }
 
@@ -36,8 +32,7 @@ const ABOUT: &str = r#"
 pub async fn get_about() -> ServiceResult<impl Responder> {
     Ok(HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body(ABOUT)
-    )
+        .body(ABOUT))
 }
 
 const LICENSE: &str = r#"
@@ -71,6 +66,5 @@ const LICENSE: &str = r#"
 pub async fn get_license() -> ServiceResult<impl Responder> {
     Ok(HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
-        .body(LICENSE)
-    )
+        .body(LICENSE))
 }

@@ -1,9 +1,11 @@
 use std::borrow::Cow;
-use derive_more::{Display, Error};
-use actix_web::{ResponseError, HttpResponse, HttpResponseBuilder};
-use actix_web::http::{header, StatusCode};
-use serde::{Deserialize, Serialize};
 use std::error;
+
+use actix_web::http::{header, StatusCode};
+use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
+use derive_more::{Display, Error};
+use serde::{Deserialize, Serialize};
+
 use crate::databases::database::DatabaseError;
 
 pub type ServiceResult<V> = Result<V, ServiceError>;
@@ -14,9 +16,7 @@ pub enum ServiceError {
     #[display(fmt = "internal server error")]
     InternalServerError,
 
-    #[display(
-    fmt = "This server is is closed for registration. Contact admin if this is unexpected"
-    )]
+    #[display(fmt = "This server is is closed for registration. Contact admin if this is unexpected")]
     ClosedForRegistration,
 
     #[display(fmt = "Email is required")] //405j
@@ -174,19 +174,14 @@ impl ResponseError for ServiceError {
 
             ServiceError::CategoryExists => StatusCode::BAD_REQUEST,
 
-            _ => StatusCode::INTERNAL_SERVER_ERROR
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
     fn error_response(&self) -> HttpResponse {
         HttpResponseBuilder::new(self.status_code())
             .append_header((header::CONTENT_TYPE, "application/json; charset=UTF-8"))
-            .body(
-                serde_json::to_string(&ErrorToResponse {
-                    error: self.to_string(),
-                })
-                    .unwrap(),
-            )
+            .body(serde_json::to_string(&ErrorToResponse { error: self.to_string() }).unwrap())
             .into()
     }
 }
@@ -204,7 +199,7 @@ impl From<sqlx::Error> for ServiceError {
                 }
             } else {
                 ServiceError::TorrentNotFound
-            }
+            };
         }
 
         ServiceError::InternalServerError

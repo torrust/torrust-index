@@ -1,10 +1,10 @@
 use async_trait::async_trait;
-use chrono::{NaiveDateTime};
-use serde::{Serialize, Deserialize};
+use chrono::NaiveDateTime;
+use serde::{Deserialize, Serialize};
 
 use crate::databases::mysql::MysqlDatabase;
 use crate::databases::sqlite::SqliteDatabase;
-use crate::models::response::{TorrentsResponse};
+use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
 use crate::models::tracker_key::TrackerKey;
@@ -14,7 +14,7 @@ use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub enum DatabaseDriver {
     Sqlite3,
-    Mysql
+    Mysql,
 }
 
 /// Compact representation of torrent.
@@ -29,7 +29,7 @@ pub struct TorrentCompact {
 pub struct Category {
     pub category_id: i64,
     pub name: String,
-    pub num_torrents: i64
+    pub num_torrents: i64,
 }
 
 /// Sorting options for torrents.
@@ -73,9 +73,7 @@ pub async fn connect_database(db_path: &str) -> Result<Box<dyn Database>, Databa
             let db = MysqlDatabase::new(db_path).await;
             Ok(Box::new(db))
         }
-        _ => {
-            Err(DatabaseError::UnrecognizedDatabaseDriver)
-        }
+        _ => Err(DatabaseError::UnrecognizedDatabaseDriver),
     }
 }
 
@@ -137,10 +135,24 @@ pub trait Database: Sync + Send {
     async fn delete_category(&self, category_name: &str) -> Result<(), DatabaseError>;
 
     /// Get results of a torrent search in a paginated and sorted form as `TorrentsResponse` from `search`, `categories`, `sort`, `offset` and `page_size`.
-    async fn get_torrents_search_sorted_paginated(&self, search: &Option<String>, categories: &Option<Vec<String>>, sort: &Sorting, offset: u64, page_size: u8) -> Result<TorrentsResponse, DatabaseError>;
+    async fn get_torrents_search_sorted_paginated(
+        &self,
+        search: &Option<String>,
+        categories: &Option<Vec<String>>,
+        sort: &Sorting,
+        offset: u64,
+        page_size: u8,
+    ) -> Result<TorrentsResponse, DatabaseError>;
 
     /// Add new torrent and return the newly inserted `torrent_id` with `torrent`, `uploader_id`, `category_id`, `title` and `description`.
-    async fn insert_torrent_and_get_id(&self, torrent: &Torrent, uploader_id: i64, category_id: i64, title: &str, description: &str) -> Result<i64, DatabaseError>;
+    async fn insert_torrent_and_get_id(
+        &self,
+        torrent: &Torrent,
+        uploader_id: i64,
+        category_id: i64,
+        title: &str,
+        description: &str,
+    ) -> Result<i64, DatabaseError>;
 
     /// Get `Torrent` from `torrent_id`.
     async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<Torrent, DatabaseError>;
@@ -167,7 +179,13 @@ pub trait Database: Sync + Send {
     async fn update_torrent_description(&self, torrent_id: i64, description: &str) -> Result<(), DatabaseError>;
 
     /// Update the seeders and leechers info for a torrent with `torrent_id`, `tracker_url`, `seeders` and `leechers`.
-    async fn update_tracker_info(&self, torrent_id: i64, tracker_url: &str, seeders: i64, leechers: i64) -> Result<(), DatabaseError>;
+    async fn update_tracker_info(
+        &self,
+        torrent_id: i64,
+        tracker_url: &str,
+        seeders: i64,
+        leechers: i64,
+    ) -> Result<(), DatabaseError>;
 
     /// Delete a torrent with `torrent_id`.
     async fn delete_torrent(&self, torrent_id: i64) -> Result<(), DatabaseError>;
