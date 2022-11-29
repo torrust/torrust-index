@@ -1,7 +1,9 @@
+use std::sync::Arc;
+
+use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::TrackerKeyRecordV1;
+
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
-use std::sync::Arc;
-use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::TrackerKeyRecordV1;
 
 pub struct TrackerKeyTester {
     source_database: Arc<SqliteDatabaseV1_0_0>,
@@ -14,11 +16,7 @@ pub struct TestData {
 }
 
 impl TrackerKeyTester {
-    pub fn new(
-        source_database: Arc<SqliteDatabaseV1_0_0>,
-        destiny_database: Arc<SqliteDatabaseV2_0_0>,
-        user_id: i64,
-    ) -> Self {
+    pub fn new(source_database: Arc<SqliteDatabaseV1_0_0>, destiny_database: Arc<SqliteDatabaseV2_0_0>, user_id: i64) -> Self {
         let tracker_key = TrackerKeyRecordV1 {
             key_id: 1,
             user_id,
@@ -48,15 +46,9 @@ impl TrackerKeyTester {
             .await
             .unwrap();
 
-        assert_eq!(
-            imported_key.tracker_key_id,
-            self.test_data.tracker_key.key_id
-        );
+        assert_eq!(imported_key.tracker_key_id, self.test_data.tracker_key.key_id);
         assert_eq!(imported_key.user_id, self.test_data.tracker_key.user_id);
         assert_eq!(imported_key.tracker_key, self.test_data.tracker_key.key);
-        assert_eq!(
-            imported_key.date_expiry,
-            self.test_data.tracker_key.valid_until
-        );
+        assert_eq!(imported_key.date_expiry, self.test_data.tracker_key.valid_until);
     }
 }

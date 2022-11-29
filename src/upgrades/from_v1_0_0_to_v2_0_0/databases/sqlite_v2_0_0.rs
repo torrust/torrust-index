@@ -3,10 +3,9 @@ use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqlitePoolOptions, SqliteQueryResult};
 use sqlx::{query, query_as, SqlitePool};
 
+use super::sqlite_v1_0_0::{TorrentRecordV1, UserRecordV1};
 use crate::databases::database::DatabaseError;
 use crate::models::torrent_file::{TorrentFile, TorrentInfo};
-
-use super::sqlite_v1_0_0::{TorrentRecordV1, UserRecordV1};
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct CategoryRecordV2 {
@@ -30,11 +29,7 @@ pub struct TorrentRecordV2 {
 }
 
 impl TorrentRecordV2 {
-    pub fn from_v1_data(
-        torrent: &TorrentRecordV1,
-        torrent_info: &TorrentInfo,
-        uploader: &UserRecordV1,
-    ) -> Self {
+    pub fn from_v1_data(torrent: &TorrentRecordV1, torrent_info: &TorrentInfo, uploader: &UserRecordV1) -> Self {
         Self {
             torrent_id: torrent.torrent_id,
             uploader_id: uploader.user_id,
@@ -96,10 +91,7 @@ impl SqliteDatabaseV2_0_0 {
             .map_err(|_| DatabaseError::Error)
     }
 
-    pub async fn insert_category_and_get_id(
-        &self,
-        category_name: &str,
-    ) -> Result<i64, DatabaseError> {
+    pub async fn insert_category_and_get_id(&self, category_name: &str) -> Result<i64, DatabaseError> {
         query("INSERT INTO torrust_categories (name) VALUES (?)")
             .bind(category_name)
             .execute(&self.pool)
@@ -126,12 +118,7 @@ impl SqliteDatabaseV2_0_0 {
             .map(|v| v.last_insert_rowid())
     }
 
-    pub async fn insert_imported_user(
-        &self,
-        user_id: i64,
-        date_imported: &str,
-        administrator: bool,
-    ) -> Result<i64, sqlx::Error> {
+    pub async fn insert_imported_user(&self, user_id: i64, date_imported: &str, administrator: bool) -> Result<i64, sqlx::Error> {
         query("INSERT INTO torrust_users (user_id, date_imported, administrator) VALUES (?, ?, ?)")
             .bind(user_id)
             .bind(date_imported)
@@ -148,21 +135,19 @@ impl SqliteDatabaseV2_0_0 {
         email: &str,
         email_verified: bool,
     ) -> Result<i64, sqlx::Error> {
-        query("INSERT INTO torrust_user_profiles (user_id, username, email, email_verified, bio, avatar) VALUES (?, ?, ?, ?, ?, ?)")
-            .bind(user_id)
-            .bind(username)
-            .bind(email)
-            .bind(email_verified)
-            .execute(&self.pool)
-            .await
-            .map(|v| v.last_insert_rowid())
+        query(
+            "INSERT INTO torrust_user_profiles (user_id, username, email, email_verified, bio, avatar) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(user_id)
+        .bind(username)
+        .bind(email)
+        .bind(email_verified)
+        .execute(&self.pool)
+        .await
+        .map(|v| v.last_insert_rowid())
     }
 
-    pub async fn insert_user_password_hash(
-        &self,
-        user_id: i64,
-        password_hash: &str,
-    ) -> Result<i64, sqlx::Error> {
+    pub async fn insert_user_password_hash(&self, user_id: i64, password_hash: &str) -> Result<i64, sqlx::Error> {
         query("INSERT INTO torrust_user_authentication (user_id, password_hash) VALUES (?, ?)")
             .bind(user_id)
             .bind(password_hash)
@@ -241,15 +226,14 @@ impl SqliteDatabaseV2_0_0 {
         torrent: &TorrentRecordV1,
         file: &TorrentFile,
     ) -> Result<i64, sqlx::Error> {
-        query("INSERT INTO torrust_torrent_files (md5sum, torrent_id, LENGTH, PATH) VALUES (?, ?, ?, ?)",
-        )
-        .bind(file.md5sum.clone())
-        .bind(torrent.torrent_id)
-        .bind(file.length)
-        .bind(file.path.join("/"))
-        .execute(&self.pool)
-        .await
-        .map(|v| v.last_insert_rowid())
+        query("INSERT INTO torrust_torrent_files (md5sum, torrent_id, LENGTH, PATH) VALUES (?, ?, ?, ?)")
+            .bind(file.md5sum.clone())
+            .bind(torrent.torrent_id)
+            .bind(file.length)
+            .bind(file.path.join("/"))
+            .execute(&self.pool)
+            .await
+            .map(|v| v.last_insert_rowid())
     }
 
     pub async fn insert_torrent_info(&self, torrent: &TorrentRecordV1) -> Result<i64, sqlx::Error> {
@@ -262,11 +246,7 @@ impl SqliteDatabaseV2_0_0 {
             .map(|v| v.last_insert_rowid())
     }
 
-    pub async fn insert_torrent_announce_url(
-        &self,
-        torrent_id: i64,
-        tracker_url: &str,
-    ) -> Result<i64, sqlx::Error> {
+    pub async fn insert_torrent_announce_url(&self, torrent_id: i64, tracker_url: &str) -> Result<i64, sqlx::Error> {
         query("INSERT INTO torrust_torrent_announce_urls (torrent_id, tracker_url) VALUES (?, ?)")
             .bind(torrent_id)
             .bind(tracker_url)
@@ -276,50 +256,29 @@ impl SqliteDatabaseV2_0_0 {
     }
 
     pub async fn delete_all_database_rows(&self) -> Result<(), DatabaseError> {
-        query("DELETE FROM torrust_categories")
-            .execute(&self.pool)
-            .await
-            .unwrap();
+        query("DELETE FROM torrust_categories").execute(&self.pool).await.unwrap();
 
-        query("DELETE FROM torrust_torrents")
-            .execute(&self.pool)
-            .await
-            .unwrap();
+        query("DELETE FROM torrust_torrents").execute(&self.pool).await.unwrap();
 
-        query("DELETE FROM torrust_tracker_keys")
-            .execute(&self.pool)
-            .await
-            .unwrap();
+        query("DELETE FROM torrust_tracker_keys").execute(&self.pool).await.unwrap();
 
-        query("DELETE FROM torrust_users")
-            .execute(&self.pool)
-            .await
-            .unwrap();
+        query("DELETE FROM torrust_users").execute(&self.pool).await.unwrap();
 
         query("DELETE FROM torrust_user_authentication")
             .execute(&self.pool)
             .await
             .unwrap();
 
-        query("DELETE FROM torrust_user_bans")
-            .execute(&self.pool)
-            .await
-            .unwrap();
+        query("DELETE FROM torrust_user_bans").execute(&self.pool).await.unwrap();
 
         query("DELETE FROM torrust_user_invitations")
             .execute(&self.pool)
             .await
             .unwrap();
 
-        query("DELETE FROM torrust_user_profiles")
-            .execute(&self.pool)
-            .await
-            .unwrap();
+        query("DELETE FROM torrust_user_profiles").execute(&self.pool).await.unwrap();
 
-        query("DELETE FROM torrust_torrents")
-            .execute(&self.pool)
-            .await
-            .unwrap();
+        query("DELETE FROM torrust_torrents").execute(&self.pool).await.unwrap();
 
         query("DELETE FROM torrust_user_public_keys")
             .execute(&self.pool)

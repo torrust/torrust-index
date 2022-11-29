@@ -1,6 +1,7 @@
+use std::sync::Arc;
+
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
-use std::sync::Arc;
 
 pub async fn transfer_users(
     source_database: Arc<SqliteDatabaseV1_0_0>,
@@ -27,16 +28,10 @@ pub async fn transfer_users(
             .unwrap();
 
         if id != user.user_id {
-            panic!(
-                "Error copying user {:?} from source DB to destiny DB",
-                &user.user_id
-            );
+            panic!("Error copying user {:?} from source DB to destiny DB", &user.user_id);
         }
 
-        println!(
-            "[v2][torrust_users] user: {:?} {:?} added.",
-            &user.user_id, &user.username
-        );
+        println!("[v2][torrust_users] user: {:?} {:?} added.", &user.user_id, &user.username);
 
         // [v2] table torrust_user_profiles
 
@@ -46,12 +41,7 @@ pub async fn transfer_users(
         );
 
         dest_database
-            .insert_user_profile(
-                user.user_id,
-                &user.username,
-                &user.email,
-                user.email_verified,
-            )
+            .insert_user_profile(user.user_id, &user.username, &user.email, user.email_verified)
             .await
             .unwrap();
 

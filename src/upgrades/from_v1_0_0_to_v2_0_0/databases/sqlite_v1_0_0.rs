@@ -65,12 +65,10 @@ impl SqliteDatabaseV1_0_0 {
     }
 
     pub async fn get_categories_order_by_id(&self) -> Result<Vec<CategoryRecordV1>, DatabaseError> {
-        query_as::<_, CategoryRecordV1>(
-            "SELECT category_id, name FROM torrust_categories ORDER BY category_id ASC",
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|_| DatabaseError::Error)
+        query_as::<_, CategoryRecordV1>("SELECT category_id, name FROM torrust_categories ORDER BY category_id ASC")
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::Error)
     }
 
     pub async fn get_users(&self) -> Result<Vec<UserRecordV1>, sqlx::Error> {
@@ -99,10 +97,8 @@ impl SqliteDatabaseV1_0_0 {
     }
 
     pub async fn get_torrent_files(&self) -> Result<Vec<TorrentFileRecordV1>, sqlx::Error> {
-        query_as::<_, TorrentFileRecordV1>(
-            "SELECT * FROM torrust_torrent_files ORDER BY file_id ASC",
-        )
-        .fetch_all(&self.pool)
-        .await
+        query_as::<_, TorrentFileRecordV1>("SELECT * FROM torrust_torrent_files ORDER BY file_id ASC")
+            .fetch_all(&self.pool)
+            .await
     }
 }

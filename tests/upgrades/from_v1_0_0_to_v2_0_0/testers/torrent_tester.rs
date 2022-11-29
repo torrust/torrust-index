@@ -1,12 +1,12 @@
-use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
-use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
 use std::sync::Arc;
+
 use torrust_index_backend::models::torrent_file::Torrent;
-use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::{
-    TorrentRecordV1, UserRecordV1,
-};
+use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::{TorrentRecordV1, UserRecordV1};
 use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::convert_timestamp_to_datetime;
 use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::transferrers::torrent_transferrer::read_torrent_from_file;
+
+use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
 
 pub struct TorrentTester {
     source_database: Arc<SqliteDatabaseV1_0_0>,
@@ -91,8 +91,7 @@ impl TorrentTester {
 
             self.assert_torrent(&torrent, &torrent_file).await;
             self.assert_torrent_info(&torrent).await;
-            self.assert_torrent_announce_urls(&torrent, &torrent_file)
-                .await;
+            self.assert_torrent_announce_urls(&torrent, &torrent_file).await;
             self.assert_torrent_files(&torrent, &torrent_file).await;
         }
     }
@@ -103,11 +102,7 @@ impl TorrentTester {
 
     /// Table `torrust_torrents`
     async fn assert_torrent(&self, torrent: &TorrentRecordV1, torrent_file: &Torrent) {
-        let imported_torrent = self
-            .destiny_database
-            .get_torrent(torrent.torrent_id)
-            .await
-            .unwrap();
+        let imported_torrent = self.destiny_database.get_torrent(torrent.torrent_id).await.unwrap();
 
         assert_eq!(imported_torrent.torrent_id, torrent.torrent_id);
         assert_eq!(imported_torrent.uploader_id, self.test_data.user.user_id);
@@ -115,23 +110,14 @@ impl TorrentTester {
         assert_eq!(imported_torrent.info_hash, torrent.info_hash);
         assert_eq!(imported_torrent.size, torrent.file_size);
         assert_eq!(imported_torrent.name, torrent_file.info.name);
-        assert_eq!(
-            imported_torrent.pieces,
-            torrent_file.info.get_pieces_as_string()
-        );
-        assert_eq!(
-            imported_torrent.piece_length,
-            torrent_file.info.piece_length
-        );
+        assert_eq!(imported_torrent.pieces, torrent_file.info.get_pieces_as_string());
+        assert_eq!(imported_torrent.piece_length, torrent_file.info.piece_length);
         if torrent_file.info.private.is_none() {
             assert_eq!(imported_torrent.private, Some(0));
         } else {
             assert_eq!(imported_torrent.private, torrent_file.info.private);
         }
-        assert_eq!(
-            imported_torrent.root_hash,
-            torrent_file.info.get_root_hash_as_i64()
-        );
+        assert_eq!(imported_torrent.root_hash, torrent_file.info.get_root_hash_as_i64());
         assert_eq!(
             imported_torrent.date_uploaded,
             convert_timestamp_to_datetime(torrent.upload_date)
@@ -140,11 +126,7 @@ impl TorrentTester {
 
     /// Table `torrust_torrent_info`
     async fn assert_torrent_info(&self, torrent: &TorrentRecordV1) {
-        let torrent_info = self
-            .destiny_database
-            .get_torrent_info(torrent.torrent_id)
-            .await
-            .unwrap();
+        let torrent_info = self.destiny_database.get_torrent_info(torrent.torrent_id).await.unwrap();
 
         assert_eq!(torrent_info.torrent_id, torrent.torrent_id);
         assert_eq!(torrent_info.title, torrent.title);
@@ -152,11 +134,7 @@ impl TorrentTester {
     }
 
     /// Table `torrust_torrent_announce_urls`
-    async fn assert_torrent_announce_urls(
-        &self,
-        torrent: &TorrentRecordV1,
-        torrent_file: &Torrent,
-    ) {
+    async fn assert_torrent_announce_urls(&self, torrent: &TorrentRecordV1, torrent_file: &Torrent) {
         let torrent_announce_urls = self
             .destiny_database
             .get_torrent_announce_urls(torrent.torrent_id)
@@ -175,11 +153,7 @@ impl TorrentTester {
 
     /// Table `torrust_torrent_files`
     async fn assert_torrent_files(&self, torrent: &TorrentRecordV1, torrent_file: &Torrent) {
-        let db_torrent_files = self
-            .destiny_database
-            .get_torrent_files(torrent.torrent_id)
-            .await
-            .unwrap();
+        let db_torrent_files = self.destiny_database.get_torrent_files(torrent.torrent_id).await.unwrap();
 
         if torrent_file.is_a_single_file_torrent() {
             let db_torrent_file = &db_torrent_files[0];
@@ -195,10 +169,7 @@ impl TorrentTester {
                 let file_path = file.path.join("/");
 
                 // Find file in database
-                let db_torrent_file = db_torrent_files
-                    .iter()
-                    .find(|&f| f.path == Some(file_path.clone()))
-                    .unwrap();
+                let db_torrent_file = db_torrent_files.iter().find(|&f| f.path == Some(file_path.clone())).unwrap();
 
                 assert_eq!(db_torrent_file.torrent_id, torrent.torrent_id);
                 assert!(db_torrent_file.md5sum.is_none());

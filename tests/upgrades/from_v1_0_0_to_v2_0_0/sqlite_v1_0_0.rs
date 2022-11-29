@@ -1,6 +1,7 @@
+use std::fs;
+
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{query, SqlitePool};
-use std::fs;
 use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::{
     CategoryRecordV1, TorrentRecordV1, TrackerKeyRecordV1, UserRecordV1,
 };
@@ -46,8 +47,7 @@ impl SqliteDatabaseV1_0_0 {
     async fn run_migration_from_file(&self, migration_file_path: &str) {
         println!("Executing migration: {:?}", migration_file_path);
 
-        let sql = fs::read_to_string(migration_file_path)
-            .expect("Should have been able to read the file");
+        let sql = fs::read_to_string(migration_file_path).expect("Should have been able to read the file");
 
         let res = sqlx::query(&sql).execute(&self.pool).await;
 
@@ -64,10 +64,7 @@ impl SqliteDatabaseV1_0_0 {
     }
 
     pub async fn delete_all_categories(&self) -> Result<(), sqlx::Error> {
-        query("DELETE FROM torrust_categories")
-            .execute(&self.pool)
-            .await
-            .unwrap();
+        query("DELETE FROM torrust_categories").execute(&self.pool).await.unwrap();
         Ok(())
     }
 
@@ -84,10 +81,7 @@ impl SqliteDatabaseV1_0_0 {
             .map(|v| v.last_insert_rowid())
     }
 
-    pub async fn insert_tracker_key(
-        &self,
-        tracker_key: &TrackerKeyRecordV1,
-    ) -> Result<i64, sqlx::Error> {
+    pub async fn insert_tracker_key(&self, tracker_key: &TrackerKeyRecordV1) -> Result<i64, sqlx::Error> {
         query("INSERT INTO torrust_tracker_keys (key_id, user_id, key, valid_until) VALUES (?, ?, ?, ?)")
             .bind(tracker_key.key_id)
             .bind(tracker_key.user_id)

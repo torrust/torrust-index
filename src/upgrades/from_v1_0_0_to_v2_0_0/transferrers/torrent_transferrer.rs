@@ -1,10 +1,10 @@
-use crate::models::torrent_file::Torrent;
-use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
-use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
-use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::TorrentRecordV2;
-use crate::utils::parse_torrent::decode_torrent;
 use std::sync::Arc;
 use std::{error, fs};
+
+use crate::models::torrent_file::Torrent;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::{SqliteDatabaseV2_0_0, TorrentRecordV2};
+use crate::utils::parse_torrent::decode_torrent;
 
 pub async fn transfer_torrents(
     source_database: Arc<SqliteDatabaseV1_0_0>,
@@ -25,15 +25,9 @@ pub async fn transfer_torrents(
     for torrent in &torrents {
         // [v2] table torrust_torrents
 
-        println!(
-            "[v2][torrust_torrents] adding the torrent: {:?} ...",
-            &torrent.torrent_id
-        );
+        println!("[v2][torrust_torrents] adding the torrent: {:?} ...", &torrent.torrent_id);
 
-        let uploader = source_database
-            .get_user_by_username(&torrent.uploader)
-            .await
-            .unwrap();
+        let uploader = source_database.get_user_by_username(&torrent.uploader).await.unwrap();
 
         if uploader.username != torrent.uploader {
             panic!(
@@ -54,25 +48,15 @@ pub async fn transfer_torrents(
         let torrent_from_file = torrent_from_file_result.unwrap();
 
         let id = dest_database
-            .insert_torrent(&TorrentRecordV2::from_v1_data(
-                torrent,
-                &torrent_from_file.info,
-                &uploader,
-            ))
+            .insert_torrent(&TorrentRecordV2::from_v1_data(torrent, &torrent_from_file.info, &uploader))
             .await
             .unwrap();
 
         if id != torrent.torrent_id {
-            panic!(
-                "Error copying torrent {:?} from source DB to destiny DB",
-                &torrent.torrent_id
-            );
+            panic!("Error copying torrent {:?} from source DB to destiny DB", &torrent.torrent_id);
         }
 
-        println!(
-            "[v2][torrust_torrents] torrent with id {:?} added.",
-            &torrent.torrent_id
-        );
+        println!("[v2][torrust_torrents] torrent with id {:?} added.", &torrent.torrent_id);
 
         // [v2] table torrust_torrent_files
 
@@ -131,10 +115,7 @@ pub async fn transfer_torrents(
 
         let id = dest_database.insert_torrent_info(torrent).await;
 
-        println!(
-            "[v2][torrust_torrents] torrent info insert result: {:?}.",
-            &id
-        );
+        println!("[v2][torrust_torrents] torrent info insert result: {:?}.", &id);
 
         // [v2] table torrust_torrent_announce_urls
 
@@ -146,7 +127,10 @@ pub async fn transfer_torrents(
         if torrent_from_file.announce_list.is_some() {
             // BEP-0012. Multiple trackers.
 
-            println!("[v2][torrust_torrent_announce_urls][announce-list] adding the torrent announce url for torrent id {:?} ...", &torrent.torrent_id);
+            println!(
+                "[v2][torrust_torrent_announce_urls][announce-list] adding the torrent announce url for torrent id {:?} ...",
+                &torrent.torrent_id
+            );
 
             // flatten the nested vec (this will however remove the)
             let announce_urls = torrent_from_file
@@ -158,22 +142,28 @@ pub async fn transfer_torrents(
                 .collect::<Vec<String>>();
 
             for tracker_url in announce_urls.iter() {
-                println!("[v2][torrust_torrent_announce_urls][announce-list] adding the torrent announce url for torrent id {:?} ...", &torrent.torrent_id);
+                println!(
+                    "[v2][torrust_torrent_announce_urls][announce-list] adding the torrent announce url for torrent id {:?} ...",
+                    &torrent.torrent_id
+                );
 
                 let announce_url_id = dest_database
                     .insert_torrent_announce_url(torrent.torrent_id, tracker_url)
                     .await;
 
-                println!("[v2][torrust_torrent_announce_urls][announce-list] torrent announce url insert result {:?} ...", &announce_url_id);
+                println!(
+                    "[v2][torrust_torrent_announce_urls][announce-list] torrent announce url insert result {:?} ...",
+                    &announce_url_id
+                );
             }
         } else if torrent_from_file.announce.is_some() {
-            println!("[v2][torrust_torrent_announce_urls][announce] adding the torrent announce url for torrent id {:?} ...", &torrent.torrent_id);
+            println!(
+                "[v2][torrust_torrent_announce_urls][announce] adding the torrent announce url for torrent id {:?} ...",
+                &torrent.torrent_id
+            );
 
             let announce_url_id = dest_database
-                .insert_torrent_announce_url(
-                    torrent.torrent_id,
-                    &torrent_from_file.announce.unwrap(),
-                )
+                .insert_torrent_announce_url(torrent.torrent_id, &torrent_from_file.announce.unwrap())
                 .await;
 
             println!(

@@ -103,22 +103,14 @@ impl SqliteDatabaseV2_0_0 {
             .await
     }
 
-    pub async fn get_user_authentication(
-        &self,
-        user_id: i64,
-    ) -> Result<UserAuthenticationRecordV2, sqlx::Error> {
-        query_as::<_, UserAuthenticationRecordV2>(
-            "SELECT * FROM torrust_user_authentication WHERE user_id = ?",
-        )
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await
+    pub async fn get_user_authentication(&self, user_id: i64) -> Result<UserAuthenticationRecordV2, sqlx::Error> {
+        query_as::<_, UserAuthenticationRecordV2>("SELECT * FROM torrust_user_authentication WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await
     }
 
-    pub async fn get_tracker_key(
-        &self,
-        tracker_key_id: i64,
-    ) -> Result<TrackerKeyRecordV2, sqlx::Error> {
+    pub async fn get_tracker_key(&self, tracker_key_id: i64) -> Result<TrackerKeyRecordV2, sqlx::Error> {
         query_as::<_, TrackerKeyRecordV2>("SELECT * FROM torrust_tracker_keys WHERE user_id = ?")
             .bind(tracker_key_id)
             .fetch_one(&self.pool)
@@ -132,34 +124,21 @@ impl SqliteDatabaseV2_0_0 {
             .await
     }
 
-    pub async fn get_torrent_info(
-        &self,
-        torrent_id: i64,
-    ) -> Result<TorrentInfoRecordV2, sqlx::Error> {
-        query_as::<_, TorrentInfoRecordV2>(
-            "SELECT * FROM torrust_torrent_info WHERE torrent_id = ?",
-        )
-        .bind(torrent_id)
-        .fetch_one(&self.pool)
-        .await
+    pub async fn get_torrent_info(&self, torrent_id: i64) -> Result<TorrentInfoRecordV2, sqlx::Error> {
+        query_as::<_, TorrentInfoRecordV2>("SELECT * FROM torrust_torrent_info WHERE torrent_id = ?")
+            .bind(torrent_id)
+            .fetch_one(&self.pool)
+            .await
     }
 
-    pub async fn get_torrent_announce_urls(
-        &self,
-        torrent_id: i64,
-    ) -> Result<Vec<TorrentAnnounceUrlV2>, sqlx::Error> {
-        query_as::<_, TorrentAnnounceUrlV2>(
-            "SELECT * FROM torrust_torrent_announce_urls WHERE torrent_id = ?",
-        )
-        .bind(torrent_id)
-        .fetch_all(&self.pool)
-        .await
+    pub async fn get_torrent_announce_urls(&self, torrent_id: i64) -> Result<Vec<TorrentAnnounceUrlV2>, sqlx::Error> {
+        query_as::<_, TorrentAnnounceUrlV2>("SELECT * FROM torrust_torrent_announce_urls WHERE torrent_id = ?")
+            .bind(torrent_id)
+            .fetch_all(&self.pool)
+            .await
     }
 
-    pub async fn get_torrent_files(
-        &self,
-        torrent_id: i64,
-    ) -> Result<Vec<TorrentFileV2>, sqlx::Error> {
+    pub async fn get_torrent_files(&self, torrent_id: i64) -> Result<Vec<TorrentFileV2>, sqlx::Error> {
         query_as::<_, TorrentFileV2>("SELECT * FROM torrust_torrent_files WHERE torrent_id = ?")
             .bind(torrent_id)
             .fetch_all(&self.pool)

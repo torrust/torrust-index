@@ -11,28 +11,25 @@
 //! - In v2, the table `torrust_user_profiles` contains two new fields: `bio` and `avatar`.
 //!   Empty string is used as default value.
 
-use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::{
-    current_db, migrate_destiny_database, new_db, reset_destiny_database,
-};
+use std::env;
+use std::time::SystemTime;
+
+use chrono::prelude::{DateTime, Utc};
+use text_colorizer::*;
+
+use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::{current_db, migrate_destiny_database, new_db, reset_destiny_database};
 use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrers::category_transferrer::transfer_categories;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrers::torrent_transferrer::transfer_torrents;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrers::tracker_key_transferrer::transfer_tracker_keys;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrers::user_transferrer::transfer_users;
 
-use chrono::prelude::{DateTime, Utc};
-
-use std::env;
-use std::time::SystemTime;
-
-use text_colorizer::*;
-
 const NUMBER_OF_ARGUMENTS: i64 = 3;
 
 #[derive(Debug)]
 pub struct Arguments {
-    pub source_database_file: String, // The source database in version v1.0.0 we want to migrate
+    pub source_database_file: String,  // The source database in version v1.0.0 we want to migrate
     pub destiny_database_file: String, // The new migrated database in version v2.0.0
-    pub upload_path: String,          // The relative dir where torrent files are stored
+    pub upload_path: String,           // The relative dir where torrent files are stored
 }
 
 fn print_usage() {
@@ -88,19 +85,9 @@ pub async fn upgrade(args: &Arguments, date_imported: &str) {
     reset_destiny_database(dest_database.clone()).await;
 
     transfer_categories(source_database.clone(), dest_database.clone()).await;
-    transfer_users(
-        source_database.clone(),
-        dest_database.clone(),
-        date_imported,
-    )
-    .await;
+    transfer_users(source_database.clone(), dest_database.clone(), date_imported).await;
     transfer_tracker_keys(source_database.clone(), dest_database.clone()).await;
-    transfer_torrents(
-        source_database.clone(),
-        dest_database.clone(),
-        &args.upload_path,
-    )
-    .await;
+    transfer_torrents(source_database.clone(), dest_database.clone(), &args.upload_path).await;
 }
 
 /// Current datetime in ISO8601 without time zone.

@@ -54,13 +54,12 @@ impl Database for SqliteDatabase {
                 .map_err(|_| DatabaseError::Error)?;
 
         // add password hash for account
-        let insert_user_auth_result =
-            query("INSERT INTO torrust_user_authentication (user_id, password_hash) VALUES (?, ?)")
-                .bind(user_id)
-                .bind(password_hash)
-                .execute(&mut tx)
-                .await
-                .map_err(|_| DatabaseError::Error);
+        let insert_user_auth_result = query("INSERT INTO torrust_user_authentication (user_id, password_hash) VALUES (?, ?)")
+            .bind(user_id)
+            .bind(password_hash)
+            .execute(&mut tx)
+            .await
+            .map_err(|_| DatabaseError::Error);
 
         // rollback transaction on error
         if let Err(e) = insert_user_auth_result {
@@ -109,23 +108,15 @@ impl Database for SqliteDatabase {
             .map_err(|_| DatabaseError::UserNotFound)
     }
 
-    async fn get_user_authentication_from_id(
-        &self,
-        user_id: i64,
-    ) -> Result<UserAuthentication, DatabaseError> {
-        query_as::<_, UserAuthentication>(
-            "SELECT * FROM torrust_user_authentication WHERE user_id = ?",
-        )
-        .bind(user_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|_| DatabaseError::UserNotFound)
+    async fn get_user_authentication_from_id(&self, user_id: i64) -> Result<UserAuthentication, DatabaseError> {
+        query_as::<_, UserAuthentication>("SELECT * FROM torrust_user_authentication WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::UserNotFound)
     }
 
-    async fn get_user_profile_from_username(
-        &self,
-        username: &str,
-    ) -> Result<UserProfile, DatabaseError> {
+    async fn get_user_profile_from_username(&self, username: &str) -> Result<UserProfile, DatabaseError> {
         query_as::<_, UserProfile>("SELECT * FROM torrust_user_profiles WHERE username = ?")
             .bind(username)
             .fetch_one(&self.pool)
@@ -164,12 +155,7 @@ impl Database for SqliteDatabase {
             .map_err(|_| DatabaseError::Error)
     }
 
-    async fn ban_user(
-        &self,
-        user_id: i64,
-        reason: &str,
-        date_expiry: NaiveDateTime,
-    ) -> Result<(), DatabaseError> {
+    async fn ban_user(&self, user_id: i64, reason: &str, date_expiry: NaiveDateTime) -> Result<(), DatabaseError> {
         // date needs to be in ISO 8601 format
         let date_expiry_string = date_expiry.format("%Y-%m-%d %H:%M:%S").to_string();
 
@@ -207,11 +193,7 @@ impl Database for SqliteDatabase {
             .map_err(|_| DatabaseError::Error)
     }
 
-    async fn add_tracker_key(
-        &self,
-        user_id: i64,
-        tracker_key: &TrackerKey,
-    ) -> Result<(), DatabaseError> {
+    async fn add_tracker_key(&self, user_id: i64, tracker_key: &TrackerKey) -> Result<(), DatabaseError> {
         let key = tracker_key.key.clone();
 
         query("INSERT INTO torrust_tracker_keys (user_id, tracker_key, date_expiry) VALUES ($1, $2, $3)")
@@ -361,10 +343,7 @@ impl Database for SqliteDatabase {
             category_filter_query
         );
 
-        let count_query = format!(
-            "SELECT COUNT(*) as count FROM ({}) AS count_table",
-            query_string
-        );
+        let count_query = format!("SELECT COUNT(*) as count FROM ({}) AS count_table", query_string);
 
         let count_result: Result<i64, DatabaseError> = query_as(&count_query)
             .bind(title.clone())
@@ -411,11 +390,7 @@ impl Database for SqliteDatabase {
         let (pieces, root_hash): (String, bool) = if let Some(pieces) = &torrent.info.pieces {
             (bytes_to_hex(pieces.as_ref()), false)
         } else {
-            let root_hash = torrent
-                .info
-                .root_hash
-                .as_ref()
-                .ok_or(DatabaseError::Error)?;
+            let root_hash = torrent.info.root_hash.as_ref().ok_or(DatabaseError::Error)?;
             (root_hash.to_string(), true)
         };
 
@@ -562,10 +537,7 @@ impl Database for SqliteDatabase {
         ))
     }
 
-    async fn get_torrent_info_from_id(
-        &self,
-        torrent_id: i64,
-    ) -> Result<DbTorrentInfo, DatabaseError> {
+    async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, DatabaseError> {
         query_as::<_, DbTorrentInfo>(
             "SELECT name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE torrent_id = ?",
         )
@@ -604,10 +576,7 @@ impl Database for SqliteDatabase {
             .map_err(|_| DatabaseError::TorrentNotFound)
     }
 
-    async fn get_torrent_listing_from_id(
-        &self,
-        torrent_id: i64,
-    ) -> Result<TorrentListing, DatabaseError> {
+    async fn get_torrent_listing_from_id(&self, torrent_id: i64) -> Result<TorrentListing, DatabaseError> {
         query_as::<_, TorrentListing>(
             "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, tt.date_uploaded, tt.size AS file_size,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
@@ -632,11 +601,7 @@ impl Database for SqliteDatabase {
             .map_err(|_| DatabaseError::Error)
     }
 
-    async fn update_torrent_title(
-        &self,
-        torrent_id: i64,
-        title: &str,
-    ) -> Result<(), DatabaseError> {
+    async fn update_torrent_title(&self, torrent_id: i64, title: &str) -> Result<(), DatabaseError> {
         query("UPDATE torrust_torrent_info SET title = $1 WHERE torrent_id = $2")
             .bind(title)
             .bind(torrent_id)
@@ -661,11 +626,7 @@ impl Database for SqliteDatabase {
             })
     }
 
-    async fn update_torrent_description(
-        &self,
-        torrent_id: i64,
-        description: &str,
-    ) -> Result<(), DatabaseError> {
+    async fn update_torrent_description(&self, torrent_id: i64, description: &str) -> Result<(), DatabaseError> {
         query("UPDATE torrust_torrent_info SET description = $1 WHERE torrent_id = $2")
             .bind(description)
             .bind(torrent_id)

@@ -1,11 +1,9 @@
-use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
-use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
 use std::sync::Arc;
 
-pub async fn transfer_tracker_keys(
-    source_database: Arc<SqliteDatabaseV1_0_0>,
-    dest_database: Arc<SqliteDatabaseV2_0_0>,
-) {
+use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
+
+pub async fn transfer_tracker_keys(source_database: Arc<SqliteDatabaseV1_0_0>, dest_database: Arc<SqliteDatabaseV2_0_0>) {
     println!("Transferring tracker keys ...");
 
     // Transfer table `torrust_tracker_keys`

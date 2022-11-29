@@ -11,17 +11,17 @@
 //! ```
 //!
 //! to see the "upgrader" command output.
+use std::fs;
+use std::sync::Arc;
+
+use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::upgrader::{datetime_iso_8601, upgrade, Arguments};
+
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::category_tester::CategoryTester;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::torrent_tester::TorrentTester;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::tracker_key_tester::TrackerKeyTester;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::user_tester::UserTester;
-use std::fs;
-use std::sync::Arc;
-use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::upgrader::{
-    datetime_iso_8601, upgrade, Arguments,
-};
 
 struct TestConfig {
     // Directories
@@ -59,11 +59,7 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
 
     let category_tester = CategoryTester::new(source_db.clone(), dest_db.clone());
     let user_tester = UserTester::new(source_db.clone(), dest_db.clone(), &execution_time);
-    let tracker_key_tester = TrackerKeyTester::new(
-        source_db.clone(),
-        dest_db.clone(),
-        user_tester.test_data.user.user_id,
-    );
+    let tracker_key_tester = TrackerKeyTester::new(source_db.clone(), dest_db.clone(), user_tester.test_data.user.user_id);
     let torrent_tester = TorrentTester::new(
         source_db.clone(),
         dest_db.clone(),
@@ -92,14 +88,10 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
     category_tester.assert_data_in_destiny_db().await;
     user_tester.assert_data_in_destiny_db().await;
     tracker_key_tester.assert_data_in_destiny_db().await;
-    torrent_tester
-        .assert_data_in_destiny_db(&config.upload_path)
-        .await;
+    torrent_tester.assert_data_in_destiny_db(&config.upload_path).await;
 }
 
-async fn setup_databases(
-    config: &TestConfig,
-) -> (Arc<SqliteDatabaseV1_0_0>, Arc<SqliteDatabaseV2_0_0>) {
+async fn setup_databases(config: &TestConfig) -> (Arc<SqliteDatabaseV1_0_0>, Arc<SqliteDatabaseV2_0_0>) {
     // Set up clean source database
     reset_databases(&config.source_database_file, &config.destiny_database_file);
     let source_database = source_db_connection(&config.source_database_file).await;
