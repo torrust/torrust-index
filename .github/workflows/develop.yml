@@ -1,9 +1,9 @@
 name: Development Checks
 
-on: [pull_request]
+on: [push,pull_request]
 
 jobs:
-  format:
+  run:
     runs-on: ubuntu-latest
     env:
       CARGO_TERM_COLOR: always
@@ -11,10 +11,30 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@nightly
         with:
-          components: rustfmt
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Verify Formatting
+      - name: Format
         uses: ClementTsang/cargo-action@main
         with:
           command: fmt
           args: --all --check
+      - name: Check
+        uses: ClementTsang/cargo-action@main
+        with:
+          command: check
+          args: --all-targets
+      - name: Clippy
+        uses: ClementTsang/cargo-action@main
+        with:
+          command: clippy
+          args: --all-targets
+      - name: Build
+        uses: ClementTsang/cargo-action@main
+        with:
+          command: build
+          args: --all-targets
+      - name: Test
+        uses: ClementTsang/cargo-action@main
+        with:
+          command: test
+          args: --all-targets
