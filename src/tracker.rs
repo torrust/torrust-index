@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::config::Configuration;
 use crate::databases::database::Database;
-use crate::models::tracker_key::TrackerKey;
 use crate::errors::ServiceError;
+use crate::models::tracker_key::TrackerKey;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TorrentInfo {
@@ -30,32 +30,36 @@ pub struct Peer {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PeerId {
     pub id: Option<String>,
-    pub client: Option<String>
+    pub client: Option<String>,
 }
 
 pub struct TrackerService {
     cfg: Arc<Configuration>,
-    database: Arc<Box<dyn Database>>
+    database: Arc<Box<dyn Database>>,
 }
 
 impl TrackerService {
     pub fn new(cfg: Arc<Configuration>, database: Arc<Box<dyn Database>>) -> TrackerService {
-        TrackerService {
-            cfg,
-            database
-        }
+        TrackerService { cfg, database }
     }
 
     pub async fn whitelist_info_hash(&self, info_hash: String) -> Result<(), ServiceError> {
         let settings = self.cfg.settings.read().await;
 
-        let request_url = format!("{}/api/whitelist/{}?token={}", settings.tracker.api_url, info_hash, settings.tracker.token);
+        let request_url = format!(
+            "{}/api/whitelist/{}?token={}",
+            settings.tracker.api_url, info_hash, settings.tracker.token
+        );
 
         drop(settings);
 
         let client = reqwest::Client::new();
 
-        let response = client.post(request_url).send().await.map_err(|_| ServiceError::TrackerOffline)?;
+        let response = client
+            .post(request_url)
+            .send()
+            .await
+            .map_err(|_| ServiceError::TrackerOffline)?;
 
         if response.status().is_success() {
             Ok(())
@@ -67,8 +71,10 @@ impl TrackerService {
     pub async fn remove_info_hash_from_whitelist(&self, info_hash: String) -> Result<(), ServiceError> {
         let settings = self.cfg.settings.read().await;
 
-        let request_url =
-            format!("{}/api/whitelist/{}?token={}", settings.tracker.api_url, info_hash, settings.tracker.token);
+        let request_url = format!(
+            "{}/api/whitelist/{}?token={}",
+            settings.tracker.api_url, info_hash, settings.tracker.token
+        );
 
         drop(settings);
 
@@ -76,11 +82,11 @@ impl TrackerService {
 
         let response = match client.delete(request_url).send().await {
             Ok(v) => Ok(v),
-            Err(_) => Err(ServiceError::InternalServerError)
+            Err(_) => Err(ServiceError::InternalServerError),
         }?;
 
         if response.status().is_success() {
-            return Ok(())
+            return Ok(());
         }
 
         Err(ServiceError::InternalServerError)
@@ -95,13 +101,11 @@ impl TrackerService {
         let tracker_key = self.database.get_user_tracker_key(user_id).await;
 
         match tracker_key {
-            Some(v) => { Ok(format!("{}/{}", settings.tracker.url, v.key)) }
-            None => {
-                match self.retrieve_new_tracker_key(user_id).await {
-                    Ok(v) => { Ok(format!("{}/{}", settings.tracker.url, v.key)) },
-                    Err(_) => { Err(ServiceError::TrackerOffline) }
-                }
-            }
+            Some(v) => Ok(format!("{}/{}", settings.tracker.url, v.key)),
+            None => match self.retrieve_new_tracker_key(user_id).await {
+                Ok(v) => Ok(format!("{}/{}", settings.tracker.url, v.key)),
+                Err(_) => Err(ServiceError::TrackerOffline),
+            },
         }
     }
 
@@ -109,17 +113,27 @@ impl TrackerService {
     pub async fn retrieve_new_tracker_key(&self, user_id: i64) -> Result<TrackerKey, ServiceError> {
         let settings = self.cfg.settings.read().await;
 
-        let request_url = format!("{}/api/key/{}?token={}", settings.tracker.api_url, settings.tracker.token_valid_seconds, settings.tracker.token);
+        let request_url = format!(
+            "{}/api/key/{}?token={}",
+            settings.tracker.api_url, settings.tracker.token_valid_seconds, settings.tracker.token
+        );
 
         drop(settings);
 
         let client = reqwest::Client::new();
 
         // issue new tracker key
-        let response = client.post(request_url).send().await.map_err(|_| ServiceError::InternalServerError)?;
+        let response = client
+            .post(request_url)
+            .send()
+            .await
+            .map_err(|_| ServiceError::InternalServerError)?;
 
         // get tracker key from response
-        let tracker_key = response.json::<TrackerKey>().await.map_err(|_| ServiceError::InternalServerError)?;
+        let tracker_key = response
+            .json::<TrackerKey>()
+            .await
+            .map_err(|_| ServiceError::InternalServerError)?;
 
         // add tracker key to database (tied to a user)
         self.database.add_tracker_key(user_id, &tracker_key).await?;
@@ -134,24 +148,27 @@ impl TrackerService {
 
         let tracker_url = settings.tracker.url.clone();
 
-        let request_url =
-            format!("{}/api/torrent/{}?token={}", settings.tracker.api_url, info_hash, settings.tracker.token);
+        let request_url = format!(
+            "{}/api/torrent/{}?token={}",
+            settings.tracker.api_url, info_hash, settings.tracker.token
+        );
 
         drop(settings);
 
         let client = reqwest::Client::new();
-        let response = match client.get(request_url)
-            .send()
-            .await {
+        let response = match client.get(request_url).send().await {
             Ok(v) => Ok(v),
-            Err(_) => Err(ServiceError::InternalServerError)
+            Err(_) => Err(ServiceError::InternalServerError),
         }?;
 
         let torrent_info = match response.json::<TorrentInfo>().await {
             Ok(torrent_info) => {
-                let _ = self.database.update_tracker_info(torrent_id, &tracker_url, torrent_info.seeders, torrent_info.leechers).await;
+                let _ = self
+                    .database
+                    .update_tracker_info(torrent_id, &tracker_url, torrent_info.seeders, torrent_info.leechers)
+                    .await;
                 Ok(torrent_info)
-            },
+            }
             Err(_) => {
                 let _ = self.database.update_tracker_info(torrent_id, &tracker_url, 0, 0).await;
                 Err(ServiceError::TorrentNotFound)

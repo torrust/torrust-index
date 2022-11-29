@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
-use crate::config::Configuration;
 use serde_bencode::ser;
 use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
+
+use crate::config::Configuration;
 use crate::utils::hex::{bytes_to_hex, hex_to_bytes};
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
@@ -21,7 +22,7 @@ pub struct TorrentInfo {
     pub name: String,
     #[serde(default)]
     pub pieces: Option<ByteBuf>,
-    #[serde(rename="piece length")]
+    #[serde(rename = "piece length")]
     pub piece_length: i64,
     #[serde(default)]
     pub md5sum: Option<String>,
@@ -34,7 +35,7 @@ pub struct TorrentInfo {
     #[serde(default)]
     pub path: Option<Vec<String>>,
     #[serde(default)]
-    #[serde(rename="root hash")]
+    #[serde(rename = "root hash")]
     pub root_hash: Option<String>,
 }
 
@@ -50,20 +51,24 @@ pub struct Torrent {
     #[serde(default)]
     pub httpseeds: Option<Vec<String>>,
     #[serde(default)]
-    #[serde(rename="announce-list")]
+    #[serde(rename = "announce-list")]
     pub announce_list: Option<Vec<Vec<String>>>,
     #[serde(default)]
-    #[serde(rename="creation date")]
+    #[serde(rename = "creation date")]
     pub creation_date: Option<i64>,
-    #[serde(rename="comment")]
+    #[serde(rename = "comment")]
     pub comment: Option<String>,
     #[serde(default)]
-    #[serde(rename="created by")]
+    #[serde(rename = "created by")]
     pub created_by: Option<String>,
 }
 
 impl Torrent {
-    pub fn from_db_info_files_and_announce_urls(torrent_info: DbTorrentInfo, torrent_files: Vec<TorrentFile>, torrent_announce_urls: Vec<Vec<String>>) -> Self {
+    pub fn from_db_info_files_and_announce_urls(
+        torrent_info: DbTorrentInfo,
+        torrent_files: Vec<TorrentFile>,
+        torrent_announce_urls: Vec<Vec<String>>,
+    ) -> Self {
         let private = if let Some(private_i64) = torrent_info.private {
             // must fit in a byte
             let private = if (0..256).contains(&private_i64) { private_i64 } else { 0 };
@@ -82,7 +87,7 @@ impl Torrent {
             files: None,
             private,
             path: None,
-            root_hash: None
+            root_hash: None,
         };
 
         // a torrent file has a root hash or a pieces key, but not both.
@@ -122,7 +127,7 @@ impl Torrent {
             announce_list: Some(torrent_announce_urls),
             creation_date: None,
             comment: None,
-            created_by: None
+            created_by: None,
         }
     }
 
@@ -155,7 +160,7 @@ impl Torrent {
 
     pub fn file_size(&self) -> i64 {
         if self.info.length.is_some() {
-            return self.info.length.unwrap()
+            return self.info.length.unwrap();
         } else {
             match &self.info.files {
                 None => 0,

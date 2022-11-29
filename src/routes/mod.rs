@@ -1,11 +1,11 @@
 use actix_web::web;
 
-pub mod user;
-pub mod torrent;
-pub mod category;
-pub mod settings;
 pub mod about;
+pub mod category;
 pub mod root;
+pub mod settings;
+pub mod torrent;
+pub mod user;
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     user::init_routes(cfg);

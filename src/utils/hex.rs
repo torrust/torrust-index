@@ -6,7 +6,7 @@ pub fn bytes_to_hex(bytes: &[u8]) -> String {
 
     for byte in bytes {
         write!(s, "{:02X}", byte).unwrap();
-    };
+    }
 
     s
 }

@@ -1,20 +1,21 @@
 use serde::{Deserialize, Serialize};
+
 use crate::databases::database::Category;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::TorrentFile;
 
 pub enum OkResponses {
-    TokenResponse(TokenResponse)
+    TokenResponse(TokenResponse),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct OkResponse<T> {
-    pub data: T
+    pub data: T,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ErrorResponse<T> {
-    pub errors: Vec<T>
+    pub errors: Vec<T>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -54,7 +55,11 @@ impl TorrentResponse {
             info_hash: torrent_listing.info_hash,
             title: torrent_listing.title,
             description: torrent_listing.description,
-            category: Category { category_id: 0, name: "".to_string(), num_torrents: 0 },
+            category: Category {
+                category_id: 0,
+                name: "".to_string(),
+                num_torrents: 0,
+            },
             upload_date: torrent_listing.date_uploaded,
             file_size: torrent_listing.file_size,
             seeders: torrent_listing.seeders,

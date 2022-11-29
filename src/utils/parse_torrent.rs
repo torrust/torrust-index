@@ -1,5 +1,7 @@
-use std::{error};
+use std::error;
+
 use serde_bencode::{de, Error};
+
 use crate::models::torrent_file::Torrent;
 
 pub fn decode_torrent(bytes: &[u8]) -> Result<Torrent, Box<dyn error::Error>> {

@@ -1,23 +1,22 @@
-use actix_web::HttpRequest;
-use crate::models::user::{UserClaims, UserCompact};
-use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm, encode, Header, EncodingKey};
-use crate::utils::time::current_time;
-use crate::errors::ServiceError;
 use std::sync::Arc;
+
+use actix_web::HttpRequest;
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+
 use crate::config::Configuration;
 use crate::databases::database::Database;
+use crate::errors::ServiceError;
+use crate::models::user::{UserClaims, UserCompact};
+use crate::utils::time::current_time;
 
 pub struct AuthorizationService {
     cfg: Arc<Configuration>,
-    database: Arc<Box<dyn Database>>
+    database: Arc<Box<dyn Database>>,
 }
 
 impl AuthorizationService {
     pub fn new(cfg: Arc<Configuration>, database: Arc<Box<dyn Database>>) -> AuthorizationService {
-        AuthorizationService {
-            cfg,
-            database
-        }
+        AuthorizationService { cfg, database }
     }
 
     pub async fn sign_jwt(&self, user: UserCompact) -> String {
@@ -28,17 +27,9 @@ impl AuthorizationService {
         // TODO: create config option for setting the token validity in seconds
         let exp_date = current_time() + 1_209_600; // two weeks from now
 
-        let claims = UserClaims {
-            user,
-            exp: exp_date,
-        };
+        let claims = UserClaims { user, exp: exp_date };
 
-        let token = encode(
-            &Header::default(),
-            &claims,
-            &EncodingKey::from_secret(key),
-        )
-            .unwrap();
+        let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(key)).unwrap();
 
         token
     }
@@ -53,11 +44,11 @@ impl AuthorizationService {
         ) {
             Ok(token_data) => {
                 if token_data.claims.exp < current_time() {
-                    return Err(ServiceError::TokenExpired)
+                    return Err(ServiceError::TokenExpired);
                 }
                 Ok(token_data.claims)
-            },
-            Err(_) => Err(ServiceError::TokenInvalid)
+            }
+            Err(_) => Err(ServiceError::TokenInvalid),
         }
     }
 
@@ -73,14 +64,15 @@ impl AuthorizationService {
                     Err(e) => Err(e),
                 }
             }
-            None => Err(ServiceError::TokenNotFound)
+            None => Err(ServiceError::TokenNotFound),
         }
     }
 
     pub async fn get_user_compact_from_request(&self, req: &HttpRequest) -> Result<UserCompact, ServiceError> {
         let claims = self.get_claims_from_request(req).await?;
 
-        self.database.get_user_compact_from_id(claims.user.user_id)
+        self.database
+            .get_user_compact_from_id(claims.user.user_id)
             .await
             .map_err(|_| ServiceError::UserNotFound)
     }

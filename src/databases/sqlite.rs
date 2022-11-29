@@ -1,19 +1,19 @@
-use sqlx::{Acquire, query, query_as, SqlitePool};
-use sqlx::sqlite::SqlitePoolOptions;
 use async_trait::async_trait;
-use chrono::{NaiveDateTime};
+use chrono::NaiveDateTime;
+use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::{query, query_as, Acquire, SqlitePool};
 
-use crate::models::torrent::TorrentListing;
-use crate::utils::time::current_time;
-use crate::models::tracker_key::{TrackerKey};
 use crate::databases::database::{Category, Database, DatabaseDriver, DatabaseError, Sorting, TorrentCompact};
-use crate::models::response::{TorrentsResponse};
+use crate::models::response::TorrentsResponse;
+use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::{DbTorrentAnnounceUrl, DbTorrentFile, DbTorrentInfo, Torrent, TorrentFile};
+use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 use crate::utils::hex::bytes_to_hex;
+use crate::utils::time::current_time;
 
 pub struct SqliteDatabase {
-    pub pool: SqlitePool
+    pub pool: SqlitePool,
 }
 
 impl SqliteDatabase {
@@ -28,9 +28,7 @@ impl SqliteDatabase {
             .await
             .expect("Could not run database migrations.");
 
-        Self {
-            pool: db
-        }
+        Self { pool: db }
     }
 }
 
@@ -41,23 +39,19 @@ impl Database for SqliteDatabase {
     }
 
     async fn insert_user_and_get_id(&self, username: &str, email: &str, password_hash: &str) -> Result<i64, DatabaseError> {
-
         // open pool connection
-        let mut conn = self.pool.acquire()
-            .await
-            .map_err(|_| DatabaseError::Error)?;
+        let mut conn = self.pool.acquire().await.map_err(|_| DatabaseError::Error)?;
 
         // start db transaction
-        let mut tx = conn.begin()
-            .await
-            .map_err(|_| DatabaseError::Error)?;
+        let mut tx = conn.begin().await.map_err(|_| DatabaseError::Error)?;
 
         // create the user account and get the user id
-        let user_id = query("INSERT INTO torrust_users (date_registered) VALUES (strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
-            .execute(&mut tx)
-            .await
-            .map(|v| v.last_insert_rowid())
-            .map_err(|_| DatabaseError::Error)?;
+        let user_id =
+            query("INSERT INTO torrust_users (date_registered) VALUES (strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
+                .execute(&mut tx)
+                .await
+                .map(|v| v.last_insert_rowid())
+                .map_err(|_| DatabaseError::Error)?;
 
         // add password hash for account
         let insert_user_auth_result = query("INSERT INTO torrust_user_authentication (user_id, password_hash) VALUES (?, ?)")
@@ -70,7 +64,7 @@ impl Database for SqliteDatabase {
         // rollback transaction on error
         if let Err(e) = insert_user_auth_result {
             let _ = tx.rollback().await;
-            return Err(e)
+            return Err(e);
         }
 
         // add account profile details
@@ -181,10 +175,12 @@ impl Database for SqliteDatabase {
             .execute(&self.pool)
             .await
             .map_err(|_| DatabaseError::Error)
-            .and_then(|v| if v.rows_affected() > 0 {
-                Ok(())
-            } else {
-                Err(DatabaseError::UserNotFound)
+            .and_then(|v| {
+                if v.rows_affected() > 0 {
+                    Ok(())
+                } else {
+                    Err(DatabaseError::UserNotFound)
+                }
             })
     }
 
@@ -216,10 +212,12 @@ impl Database for SqliteDatabase {
             .execute(&self.pool)
             .await
             .map_err(|_| DatabaseError::Error)
-            .and_then(|v| if v.rows_affected() > 0 {
-                Ok(())
-            } else {
-                Err(DatabaseError::UserNotFound)
+            .and_then(|v| {
+                if v.rows_affected() > 0 {
+                    Ok(())
+                } else {
+                    Err(DatabaseError::UserNotFound)
+                }
             })
     }
 
@@ -236,8 +234,8 @@ impl Database for SqliteDatabase {
                     } else {
                         DatabaseError::Error
                     }
-                },
-                _ => DatabaseError::Error
+                }
+                _ => DatabaseError::Error,
             })
     }
 
@@ -270,18 +268,27 @@ impl Database for SqliteDatabase {
             .execute(&self.pool)
             .await
             .map_err(|_| DatabaseError::Error)
-            .and_then(|v| if v.rows_affected() > 0 {
-                Ok(())
-            } else {
-                Err(DatabaseError::CategoryNotFound)
+            .and_then(|v| {
+                if v.rows_affected() > 0 {
+                    Ok(())
+                } else {
+                    Err(DatabaseError::CategoryNotFound)
+                }
             })
     }
 
     // TODO: refactor this
-    async fn get_torrents_search_sorted_paginated(&self, search: &Option<String>, categories: &Option<Vec<String>>, sort: &Sorting, offset: u64, page_size: u8) -> Result<TorrentsResponse, DatabaseError> {
+    async fn get_torrents_search_sorted_paginated(
+        &self,
+        search: &Option<String>,
+        categories: &Option<Vec<String>>,
+        sort: &Sorting,
+        offset: u64,
+        page_size: u8,
+    ) -> Result<TorrentsResponse, DatabaseError> {
         let title = match search {
             None => "%".to_string(),
-            Some(v) => format!("%{}%", v)
+            Some(v) => format!("%{}%", v),
         };
 
         let sort_query: String = match sort {
@@ -304,13 +311,18 @@ impl Database for SqliteDatabase {
                 // don't take user input in the db query
                 if let Ok(sanitized_category) = self.get_category_from_name(category).await {
                     let mut str = format!("tc.name = '{}'", sanitized_category.name);
-                    if i > 0 { str = format!(" OR {}", str); }
+                    if i > 0 {
+                        str = format!(" OR {}", str);
+                    }
                     category_filters.push_str(&str);
                     i += 1;
                 }
             }
             if category_filters.len() > 0 {
-                format!("INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND ({}) ", category_filters)
+                format!(
+                    "INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND ({}) ",
+                    category_filters
+                )
             } else {
                 String::new()
             }
@@ -354,22 +366,25 @@ impl Database for SqliteDatabase {
 
         Ok(TorrentsResponse {
             total: count as u32,
-            results: res
+            results: res,
         })
     }
 
-    async fn insert_torrent_and_get_id(&self, torrent: &Torrent, uploader_id: i64, category_id: i64, title: &str, description: &str) -> Result<i64, DatabaseError> {
+    async fn insert_torrent_and_get_id(
+        &self,
+        torrent: &Torrent,
+        uploader_id: i64,
+        category_id: i64,
+        title: &str,
+        description: &str,
+    ) -> Result<i64, DatabaseError> {
         let info_hash = torrent.info_hash();
 
         // open pool connection
-        let mut conn = self.pool.acquire()
-            .await
-            .map_err(|_| DatabaseError::Error)?;
+        let mut conn = self.pool.acquire().await.map_err(|_| DatabaseError::Error)?;
 
         // start db transaction
-        let mut tx = conn.begin()
-            .await
-            .map_err(|_| DatabaseError::Error)?;
+        let mut tx = conn.begin().await.map_err(|_| DatabaseError::Error)?;
 
         // torrent file can only hold a pieces key or a root hash key: http://www.bittorrent.org/beps/bep_0030.html
         let (pieces, root_hash): (String, bool) = if let Some(pieces) = &torrent.info.pieces {
@@ -439,7 +454,7 @@ impl Database for SqliteDatabase {
         // rollback transaction on error
         if let Err(e) = insert_torrent_files_result {
             let _ = tx.rollback().await;
-            return Err(e)
+            return Err(e);
         }
 
         let insert_torrent_announce_urls_result: Result<(), DatabaseError> = if let Some(announce_urls) = &torrent.announce_list {
@@ -472,27 +487,28 @@ impl Database for SqliteDatabase {
         // rollback transaction on error
         if let Err(e) = insert_torrent_announce_urls_result {
             let _ = tx.rollback().await;
-            return Err(e)
+            return Err(e);
         }
 
-        let insert_torrent_info_result = query(r#"INSERT INTO torrust_torrent_info (torrent_id, title, description) VALUES (?, ?, NULLIF(?, ""))"#)
-            .bind(torrent_id)
-            .bind(title)
-            .bind(description)
-            .execute(&mut tx)
-            .await
-            .map_err(|e| match e {
-                sqlx::Error::Database(err) => {
-                    if err.message().contains("info_hash") {
-                        DatabaseError::TorrentAlreadyExists
-                    } else if err.message().contains("title") {
-                        DatabaseError::TorrentTitleAlreadyExists
-                    } else {
-                        DatabaseError::Error
+        let insert_torrent_info_result =
+            query(r#"INSERT INTO torrust_torrent_info (torrent_id, title, description) VALUES (?, ?, NULLIF(?, ""))"#)
+                .bind(torrent_id)
+                .bind(title)
+                .bind(description)
+                .execute(&mut tx)
+                .await
+                .map_err(|e| match e {
+                    sqlx::Error::Database(err) => {
+                        if err.message().contains("info_hash") {
+                            DatabaseError::TorrentAlreadyExists
+                        } else if err.message().contains("title") {
+                            DatabaseError::TorrentTitleAlreadyExists
+                        } else {
+                            DatabaseError::Error
+                        }
                     }
-                }
-                _ => DatabaseError::Error
-            });
+                    _ => DatabaseError::Error,
+                });
 
         // commit or rollback transaction and return user_id on success
         match insert_torrent_info_result {
@@ -514,43 +530,45 @@ impl Database for SqliteDatabase {
 
         let torrent_announce_urls = self.get_torrent_announce_urls_from_id(torrent_id).await?;
 
-        Ok(Torrent::from_db_info_files_and_announce_urls(torrent_info, torrent_files, torrent_announce_urls))
+        Ok(Torrent::from_db_info_files_and_announce_urls(
+            torrent_info,
+            torrent_files,
+            torrent_announce_urls,
+        ))
     }
 
     async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, DatabaseError> {
         query_as::<_, DbTorrentInfo>(
-            "SELECT name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE torrent_id = ?"
+            "SELECT name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE torrent_id = ?",
         )
-            .bind(torrent_id)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|_| DatabaseError::TorrentNotFound)
+        .bind(torrent_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|_| DatabaseError::TorrentNotFound)
     }
 
     async fn get_torrent_files_from_id(&self, torrent_id: i64) -> Result<Vec<TorrentFile>, DatabaseError> {
-        let db_torrent_files = query_as::<_, DbTorrentFile>(
-            "SELECT md5sum, length, path FROM torrust_torrent_files WHERE torrent_id = ?"
-        )
-            .bind(torrent_id)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|_| DatabaseError::TorrentNotFound)?;
+        let db_torrent_files =
+            query_as::<_, DbTorrentFile>("SELECT md5sum, length, path FROM torrust_torrent_files WHERE torrent_id = ?")
+                .bind(torrent_id)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|_| DatabaseError::TorrentNotFound)?;
 
-        let torrent_files: Vec<TorrentFile> = db_torrent_files.into_iter().map(|tf| {
-            TorrentFile {
+        let torrent_files: Vec<TorrentFile> = db_torrent_files
+            .into_iter()
+            .map(|tf| TorrentFile {
                 path: tf.path.unwrap_or("".to_string()).split('/').map(|v| v.to_string()).collect(),
                 length: tf.length,
-                md5sum: tf.md5sum
-            }
-        }).collect();
+                md5sum: tf.md5sum,
+            })
+            .collect();
 
         Ok(torrent_files)
     }
 
     async fn get_torrent_announce_urls_from_id(&self, torrent_id: i64) -> Result<Vec<Vec<String>>, DatabaseError> {
-        query_as::<_, DbTorrentAnnounceUrl>(
-            "SELECT tracker_url FROM torrust_torrent_announce_urls WHERE torrent_id = ?"
-        )
+        query_as::<_, DbTorrentAnnounceUrl>("SELECT tracker_url FROM torrust_torrent_announce_urls WHERE torrent_id = ?")
             .bind(torrent_id)
             .fetch_all(&self.pool)
             .await
@@ -597,12 +615,14 @@ impl Database for SqliteDatabase {
                         DatabaseError::Error
                     }
                 }
-                _ => DatabaseError::Error
+                _ => DatabaseError::Error,
             })
-            .and_then(|v| if v.rows_affected() > 0 {
-                Ok(())
-            } else {
-                Err(DatabaseError::TorrentNotFound)
+            .and_then(|v| {
+                if v.rows_affected() > 0 {
+                    Ok(())
+                } else {
+                    Err(DatabaseError::TorrentNotFound)
+                }
             })
     }
 
@@ -613,14 +633,22 @@ impl Database for SqliteDatabase {
             .execute(&self.pool)
             .await
             .map_err(|_| DatabaseError::Error)
-            .and_then(|v| if v.rows_affected() > 0 {
-                Ok(())
-            } else {
-                Err(DatabaseError::TorrentNotFound)
+            .and_then(|v| {
+                if v.rows_affected() > 0 {
+                    Ok(())
+                } else {
+                    Err(DatabaseError::TorrentNotFound)
+                }
             })
     }
 
-    async fn update_tracker_info(&self, torrent_id: i64, tracker_url: &str, seeders: i64, leechers: i64) -> Result<(), DatabaseError> {
+    async fn update_tracker_info(
+        &self,
+        torrent_id: i64,
+        tracker_url: &str,
+        seeders: i64,
+        leechers: i64,
+    ) -> Result<(), DatabaseError> {
         query("REPLACE INTO torrust_torrent_tracker_stats (torrent_id, tracker_url, seeders, leechers) VALUES ($1, $2, $3, $4)")
             .bind(torrent_id)
             .bind(tracker_url)
@@ -638,10 +666,12 @@ impl Database for SqliteDatabase {
             .execute(&self.pool)
             .await
             .map_err(|_| DatabaseError::Error)
-            .and_then(|v| if v.rows_affected() > 0 {
-                Ok(())
-            } else {
-                Err(DatabaseError::TorrentNotFound)
+            .and_then(|v| {
+                if v.rows_affected() > 0 {
+                    Ok(())
+                } else {
+                    Err(DatabaseError::TorrentNotFound)
+                }
             })
     }
 
