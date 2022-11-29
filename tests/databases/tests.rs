@@ -29,7 +29,7 @@ async fn add_test_torrent_category(db: &Box<dyn Database>) -> Result<i64, Databa
 }
 
 pub async fn it_can_add_a_user(db: &Box<dyn Database>) {
-    let add_test_user_result = add_test_user(&db).await;
+    let add_test_user_result = add_test_user(db).await;
 
     assert!(add_test_user_result.is_ok());
 
@@ -49,7 +49,7 @@ pub async fn it_can_add_a_user(db: &Box<dyn Database>) {
             user_id: inserted_user_id,
             username: TEST_USER_USERNAME.to_string(),
             email: TEST_USER_EMAIL.to_string(),
-            email_verified: returned_user_profile.email_verified.clone(),
+            email_verified: returned_user_profile.email_verified,
             bio: returned_user_profile.bio.clone(),
             avatar: returned_user_profile.avatar.clone()
         }
@@ -57,7 +57,7 @@ pub async fn it_can_add_a_user(db: &Box<dyn Database>) {
 }
 
 pub async fn it_can_add_a_torrent_category(db: &Box<dyn Database>) {
-    let add_test_torrent_category_result = add_test_torrent_category(&db).await;
+    let add_test_torrent_category_result = add_test_torrent_category(db).await;
 
     assert!(add_test_torrent_category_result.is_ok());
 
@@ -72,8 +72,8 @@ pub async fn it_can_add_a_torrent_category(db: &Box<dyn Database>) {
 
 pub async fn it_can_add_a_torrent_and_tracker_stats_to_that_torrent(db: &Box<dyn Database>) {
     // set pre-conditions
-    let user_id = add_test_user(&db).await.expect("add_test_user failed.");
-    let torrent_category_id = add_test_torrent_category(&db)
+    let user_id = add_test_user(db).await.expect("add_test_user failed.");
+    let torrent_category_id = add_test_torrent_category(db)
         .await
         .expect("add_test_torrent_category failed.");
 

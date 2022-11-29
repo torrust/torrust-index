@@ -126,7 +126,7 @@ impl MailerService {
 
         let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(key)).unwrap();
 
-        let mut base_url = base_url.clone();
+        let mut base_url = &base_url.to_string();
         if let Some(cfg_base_url) = &settings.net.base_url {
             base_url = cfg_base_url;
         }

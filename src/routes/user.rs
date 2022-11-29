@@ -179,7 +179,7 @@ pub async fn verify_token(payload: web::Json<Token>, app_data: WebAppData) -> Se
     let _claims = app_data.auth.verify_jwt(&payload.token).await?;
 
     Ok(HttpResponse::Ok().json(OkResponse {
-        data: format!("Token is valid."),
+        data: "Token is valid.".to_string(),
     }))
 }
 
@@ -256,7 +256,7 @@ pub async fn ban_user(req: HttpRequest, app_data: WebAppData) -> ServiceResult<i
     let date_expiry = chrono::NaiveDateTime::parse_from_str("9999-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
         .expect("Could not parse date from 9999-01-01 00:00:00.");
 
-    let _ = app_data.database.ban_user(user_profile.user_id, &reason, date_expiry).await?;
+    app_data.database.ban_user(user_profile.user_id, &reason, date_expiry).await?;
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: format!("Banned user: {}", to_be_banned_username),

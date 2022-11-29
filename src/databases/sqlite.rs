@@ -318,7 +318,7 @@ impl Database for SqliteDatabase {
                     i += 1;
                 }
             }
-            if category_filters.len() > 0 {
+            if !category_filters.is_empty() {
                 format!(
                     "INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND ({}) ",
                     category_filters
@@ -558,7 +558,7 @@ impl Database for SqliteDatabase {
         let torrent_files: Vec<TorrentFile> = db_torrent_files
             .into_iter()
             .map(|tf| TorrentFile {
-                path: tf.path.unwrap_or("".to_string()).split('/').map(|v| v.to_string()).collect(),
+                path: tf.path.unwrap_or_default().split('/').map(|v| v.to_string()).collect(),
                 length: tf.length,
                 md5sum: tf.md5sum,
             })

@@ -4,7 +4,7 @@ use crate::models::torrent_file::Torrent;
 use crate::routes::torrent::CreateTorrent;
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
 pub struct TorrentListing {
     pub torrent_id: i64,
     pub uploader: String,

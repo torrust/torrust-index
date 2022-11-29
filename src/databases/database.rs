@@ -11,7 +11,7 @@ use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 
 /// Database drivers.
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub enum DatabaseDriver {
     Sqlite3,
     Mysql,
