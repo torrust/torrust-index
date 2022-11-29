@@ -250,12 +250,12 @@ pub async fn update_torrent(
 
     // update torrent title
     if let Some(title) = &payload.title {
-        let _res = app_data.database.update_torrent_title(torrent_id, title).await?;
+        app_data.database.update_torrent_title(torrent_id, title).await?;
     }
 
     // update torrent description
     if let Some(description) = &payload.description {
-        let _res = app_data.database.update_torrent_description(torrent_id, description).await?;
+        app_data.database.update_torrent_description(torrent_id, description).await?;
     }
 
     let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
@@ -278,7 +278,7 @@ pub async fn delete_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceRe
     // needed later for removing torrent from tracker whitelist
     let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
 
-    let _res = app_data.database.delete_torrent(torrent_id).await?;
+    app_data.database.delete_torrent(torrent_id).await?;
 
     // remove info_hash from tracker whitelist
     let _ = app_data
@@ -344,7 +344,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
                     continue;
                 }
                 let wrapped_data = &data.unwrap().unwrap();
-                let parsed_data = std::str::from_utf8(&wrapped_data).unwrap();
+                let parsed_data = std::str::from_utf8(wrapped_data).unwrap();
 
                 match name {
                     "title" => title = parsed_data.to_string(),

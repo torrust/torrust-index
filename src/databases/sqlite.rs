@@ -318,7 +318,7 @@ impl Database for SqliteDatabase {
                     i += 1;
                 }
             }
-            if category_filters.len() > 0 {
+            if !category_filters.is_empty() {
                 format!(
                     "INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND ({}) ",
                     category_filters

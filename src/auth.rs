@@ -29,9 +29,7 @@ impl AuthorizationService {
 
         let claims = UserClaims { user, exp: exp_date };
 
-        let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(key)).unwrap();
-
-        token
+        encode(&Header::default(), &claims, &EncodingKey::from_secret(key)).unwrap()
     }
 
     pub async fn verify_jwt(&self, token: &str) -> Result<UserClaims, ServiceError> {

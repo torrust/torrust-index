@@ -57,7 +57,7 @@ pub async fn delete_category(
         return Err(ServiceError::Unauthorized);
     }
 
-    let _ = app_data.database.delete_category(&payload.name).await?;
+    app_data.database.delete_category(&payload.name).await?;
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: payload.name.clone(),

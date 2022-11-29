@@ -6,10 +6,10 @@ use sha1::{Digest, Sha1};
 use crate::config::Configuration;
 use crate::utils::hex::{bytes_to_hex, hex_to_bytes};
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct TorrentNode(String, i64);
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct TorrentFile {
     pub path: Vec<String>,
     pub length: i64,
@@ -17,7 +17,7 @@ pub struct TorrentFile {
     pub md5sum: Option<String>,
 }
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct TorrentInfo {
     pub name: String,
     #[serde(default)]
@@ -160,7 +160,7 @@ impl Torrent {
 
     pub fn file_size(&self) -> i64 {
         if self.info.length.is_some() {
-            return self.info.length.unwrap();
+            self.info.length.unwrap()
         } else {
             match &self.info.files {
                 None => 0,
@@ -176,7 +176,7 @@ impl Torrent {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DbTorrentFile {
     pub path: Option<String>,
     pub length: i64,
@@ -184,7 +184,7 @@ pub struct DbTorrentFile {
     pub md5sum: Option<String>,
 }
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DbTorrentInfo {
     pub name: String,
     pub pieces: String,
@@ -194,7 +194,7 @@ pub struct DbTorrentInfo {
     pub root_hash: i64,
 }
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DbTorrentAnnounceUrl {
     pub tracker_url: String,
 }

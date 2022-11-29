@@ -10,7 +10,7 @@ use crate::databases::database::DatabaseError;
 
 pub type ServiceResult<V> = Result<V, ServiceError>;
 
-#[derive(Debug, Display, PartialEq, Error)]
+#[derive(Debug, Display, PartialEq, Eq, Error)]
 #[allow(dead_code)]
 pub enum ServiceError {
     #[display(fmt = "internal server error")]
@@ -182,7 +182,6 @@ impl ResponseError for ServiceError {
         HttpResponseBuilder::new(self.status_code())
             .append_header((header::CONTENT_TYPE, "application/json; charset=UTF-8"))
             .body(serde_json::to_string(&ErrorToResponse { error: self.to_string() }).unwrap())
-            .into()
     }
 }
 

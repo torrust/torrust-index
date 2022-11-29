@@ -135,9 +135,9 @@ impl Configuration {
             eprintln!("Creating config file..");
             let config = Configuration::default();
             let _ = config.save_to_file().await;
-            return Err(ConfigError::Message(format!(
-                "Please edit the config.TOML in the root folder and restart the tracker."
-            )));
+            return Err(ConfigError::Message(
+                "Please edit the config.TOML in the root folder and restart the tracker.".to_string(),
+            ));
         }
 
         let torrust_config: TorrustConfig = match config.try_into() {
