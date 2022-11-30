@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod common;
 pub mod config;
+pub mod console;
 pub mod databases;
 pub mod errors;
 pub mod mailer;

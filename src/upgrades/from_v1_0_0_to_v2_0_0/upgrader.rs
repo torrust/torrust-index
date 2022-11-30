@@ -23,7 +23,7 @@ use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrers::torrent_transferrer::t
 use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrers::tracker_key_transferrer::transfer_tracker_keys;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrers::user_transferrer::transfer_users;
 
-const NUMBER_OF_ARGUMENTS: i64 = 3;
+const NUMBER_OF_ARGUMENTS: usize = 3;
 
 #[derive(Debug)]
 pub struct Arguments {
@@ -50,7 +50,7 @@ fn print_usage() {
 fn parse_args() -> Arguments {
     let args: Vec<String> = env::args().skip(1).collect();
 
-    if args.len() != 3 {
+    if args.len() != NUMBER_OF_ARGUMENTS {
         eprintln!(
             "{} wrong number of arguments: expected {}, got {}",
             "Error".red().bold(),
@@ -88,6 +88,16 @@ pub async fn upgrade(args: &Arguments, date_imported: &str) {
     transfer_users(source_database.clone(), target_database.clone(), date_imported).await;
     transfer_tracker_keys(source_database.clone(), target_database.clone()).await;
     transfer_torrents(source_database.clone(), target_database.clone(), &args.upload_path).await;
+
+    println!("Upgrade data from version v1.0.0 to v2.0.0 finished!\n");
+
+    eprintln!(
+        "{}\nWe recommend you to run the command to import torrent statistics for all torrents manually. \
+         If you do not do it the statistics will be imported anyway during the normal execution of the program. \
+         You can import statistics manually with:\n {}",
+        "SUGGESTION: \n".yellow(),
+        "cargo run --bin import_tracker_statistics".yellow()
+    );
 }
 
 /// Current datetime in ISO8601 without time zone.
