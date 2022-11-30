@@ -339,7 +339,7 @@ impl Database for SqliteDatabase {
             INNER JOIN torrust_torrent_info ti ON tt.torrent_id = ti.torrent_id
             LEFT JOIN torrust_torrent_tracker_stats ts ON tt.torrent_id = ts.torrent_id
             WHERE title LIKE ?
-            GROUP BY ts.torrent_id",
+            GROUP BY tt.torrent_id",
             category_filter_query
         );
 
