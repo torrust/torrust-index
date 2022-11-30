@@ -43,14 +43,10 @@ fn print_usage() {
     eprintln!(
         "{} - imports torrents statistics from linked tracker.
 
-        cargo run --bin upgrade SOURCE_DB_FILE DESTINY_DB_FILE TORRENT_UPLOAD_DIR
-
-        For example:
-
         cargo run --bin import_tracker_statistics
 
         ",
-        "Upgrader".green()
+        "Tracker Statistics Importer".green()
     );
 }
 

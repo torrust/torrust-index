@@ -36,7 +36,7 @@ fn print_usage() {
     eprintln!(
         "{} - migrates date from version v1.0.0 to v2.0.0.
 
-        cargo run --bin upgrade SOURCE_DB_FILE DESTINY_DB_FILE TORRENT_UPLOAD_DIR
+        cargo run --bin upgrade SOURCE_DB_FILE TARGET_DB_FILE TORRENT_UPLOAD_DIR
 
         For example:
 
