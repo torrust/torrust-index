@@ -7,7 +7,7 @@ use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
 
 pub struct CategoryTester {
     source_database: Arc<SqliteDatabaseV1_0_0>,
-    destiny_database: Arc<SqliteDatabaseV2_0_0>,
+    target_database: Arc<SqliteDatabaseV2_0_0>,
     test_data: TestData,
 }
 
@@ -16,7 +16,7 @@ pub struct TestData {
 }
 
 impl CategoryTester {
-    pub fn new(source_database: Arc<SqliteDatabaseV1_0_0>, destiny_database: Arc<SqliteDatabaseV2_0_0>) -> Self {
+    pub fn new(source_database: Arc<SqliteDatabaseV1_0_0>, target_database: Arc<SqliteDatabaseV2_0_0>) -> Self {
         let category_01 = CategoryRecordV1 {
             category_id: 10,
             name: "category name 10".to_string(),
@@ -28,7 +28,7 @@ impl CategoryTester {
 
         Self {
             source_database,
-            destiny_database,
+            target_database,
             test_data: TestData {
                 categories: vec![category_01, category_02],
             },
@@ -51,9 +51,9 @@ impl CategoryTester {
     }
 
     /// Table `torrust_categories`
-    pub async fn assert_data_in_destiny_db(&self) {
+    pub async fn assert_data_in_target_db(&self) {
         for categories in &self.test_data.categories {
-            let imported_category = self.destiny_database.get_category(categories.category_id).await.unwrap();
+            let imported_category = self.target_database.get_category(categories.category_id).await.unwrap();
 
             assert_eq!(imported_category.category_id, categories.category_id);
             assert_eq!(imported_category.name, categories.name);

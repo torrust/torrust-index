@@ -31,4 +31,4 @@ Before replacing the DB in production you can make some tests like:
 
 ## Notes
 
-The `db_schemas` contains the snapshots of the source and destiny databases for this upgrade.
+The `db_schemas` contains the snapshots of the source and target databases for this upgrade.

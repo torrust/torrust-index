@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
 
-pub async fn transfer_tracker_keys(source_database: Arc<SqliteDatabaseV1_0_0>, dest_database: Arc<SqliteDatabaseV2_0_0>) {
+pub async fn transfer_tracker_keys(source_database: Arc<SqliteDatabaseV1_0_0>, target_database: Arc<SqliteDatabaseV2_0_0>) {
     println!("Transferring tracker keys ...");
 
     // Transfer table `torrust_tracker_keys`
@@ -18,7 +18,7 @@ pub async fn transfer_tracker_keys(source_database: Arc<SqliteDatabaseV1_0_0>, d
             &tracker_key.key_id
         );
 
-        let id = dest_database
+        let id = target_database
             .insert_tracker_key(
                 tracker_key.key_id,
                 tracker_key.user_id,
@@ -30,7 +30,7 @@ pub async fn transfer_tracker_keys(source_database: Arc<SqliteDatabaseV1_0_0>, d
 
         if id != tracker_key.key_id {
             panic!(
-                "Error copying tracker key {:?} from source DB to destiny DB",
+                "Error copying tracker key {:?} from source DB to the target DB",
                 &tracker_key.key_id
             );
         }

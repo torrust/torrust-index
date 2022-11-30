@@ -8,7 +8,7 @@ use crate::utils::parse_torrent::decode_torrent;
 
 pub async fn transfer_torrents(
     source_database: Arc<SqliteDatabaseV1_0_0>,
-    dest_database: Arc<SqliteDatabaseV2_0_0>,
+    target_database: Arc<SqliteDatabaseV2_0_0>,
     upload_path: &str,
 ) {
     println!("Transferring torrents ...");
@@ -47,13 +47,16 @@ pub async fn transfer_torrents(
 
         let torrent_from_file = torrent_from_file_result.unwrap();
 
-        let id = dest_database
+        let id = target_database
             .insert_torrent(&TorrentRecordV2::from_v1_data(torrent, &torrent_from_file.info, &uploader))
             .await
             .unwrap();
 
         if id != torrent.torrent_id {
-            panic!("Error copying torrent {:?} from source DB to destiny DB", &torrent.torrent_id);
+            panic!(
+                "Error copying torrent {:?} from source DB to the target DB",
+                &torrent.torrent_id
+            );
         }
 
         println!("[v2][torrust_torrents] torrent with id {:?} added.", &torrent.torrent_id);
@@ -72,7 +75,7 @@ pub async fn transfer_torrents(
                 &torrent_from_file.info.name, &torrent_from_file.info.length,
             );
 
-            let file_id = dest_database
+            let file_id = target_database
                 .insert_torrent_file_for_torrent_with_one_file(
                     torrent.torrent_id,
                     // TODO: it seems med5sum can be None. Why? When?
@@ -95,7 +98,7 @@ pub async fn transfer_torrents(
                     &file
                 );
 
-                let file_id = dest_database
+                let file_id = target_database
                     .insert_torrent_file_for_torrent_with_multiple_files(torrent, file)
                     .await;
 
@@ -113,7 +116,7 @@ pub async fn transfer_torrents(
             &torrent.torrent_id
         );
 
-        let id = dest_database.insert_torrent_info(torrent).await;
+        let id = target_database.insert_torrent_info(torrent).await;
 
         println!("[v2][torrust_torrents] torrent info insert result: {:?}.", &id);
 
@@ -147,7 +150,7 @@ pub async fn transfer_torrents(
                     &torrent.torrent_id
                 );
 
-                let announce_url_id = dest_database
+                let announce_url_id = target_database
                     .insert_torrent_announce_url(torrent.torrent_id, tracker_url)
                     .await;
 
@@ -162,7 +165,7 @@ pub async fn transfer_torrents(
                 &torrent.torrent_id
             );
 
-            let announce_url_id = dest_database
+            let announce_url_id = target_database
                 .insert_torrent_announce_url(torrent.torrent_id, &torrent_from_file.announce.unwrap())
                 .await;
 

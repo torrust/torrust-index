@@ -12,6 +12,7 @@
 //!
 //! to see the "upgrader" command output.
 use std::fs;
+use std::path::Path;
 use std::sync::Arc;
 
 use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::upgrader::{datetime_iso_8601, upgrade, Arguments};
@@ -29,7 +30,7 @@ struct TestConfig {
     pub upload_path: String,
     // Files
     pub source_database_file: String,
-    pub destiny_database_file: String,
+    pub target_database_file: String,
 }
 
 impl Default for TestConfig {
@@ -38,12 +39,12 @@ impl Default for TestConfig {
         let upload_path = format!("{}uploads/", &fixtures_dir);
         let output_dir = "./tests/upgrades/from_v1_0_0_to_v2_0_0/output/".to_string();
         let source_database_file = format!("{}source.db", output_dir);
-        let destiny_database_file = format!("{}destiny.db", output_dir);
+        let target_database_file = format!("{}target.db", output_dir);
         Self {
             fixtures_dir,
             upload_path,
             source_database_file,
-            destiny_database_file,
+            target_database_file,
         }
     }
 }
@@ -52,17 +53,17 @@ impl Default for TestConfig {
 async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
     let config = TestConfig::default();
 
-    let (source_db, dest_db) = setup_databases(&config).await;
+    let (source_db, target_db) = setup_databases(&config).await;
 
     // The datetime when the upgrader is executed
     let execution_time = datetime_iso_8601();
 
-    let category_tester = CategoryTester::new(source_db.clone(), dest_db.clone());
-    let user_tester = UserTester::new(source_db.clone(), dest_db.clone(), &execution_time);
-    let tracker_key_tester = TrackerKeyTester::new(source_db.clone(), dest_db.clone(), user_tester.test_data.user.user_id);
+    let category_tester = CategoryTester::new(source_db.clone(), target_db.clone());
+    let user_tester = UserTester::new(source_db.clone(), target_db.clone(), &execution_time);
+    let tracker_key_tester = TrackerKeyTester::new(source_db.clone(), target_db.clone(), user_tester.test_data.user.user_id);
     let torrent_tester = TorrentTester::new(
         source_db.clone(),
-        dest_db.clone(),
+        target_db.clone(),
         &user_tester.test_data.user,
         category_tester.get_valid_category_id(),
     );
@@ -77,7 +78,7 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
     upgrade(
         &Arguments {
             source_database_file: config.source_database_file.clone(),
-            destiny_database_file: config.destiny_database_file.clone(),
+            target_database_file: config.target_database_file.clone(),
             upload_path: config.upload_path.clone(),
         },
         &execution_time,
@@ -85,34 +86,39 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
     .await;
 
     // Assertions for data transferred to the new database in version v2.0.0
-    category_tester.assert_data_in_destiny_db().await;
-    user_tester.assert_data_in_destiny_db().await;
-    tracker_key_tester.assert_data_in_destiny_db().await;
-    torrent_tester.assert_data_in_destiny_db(&config.upload_path).await;
+    category_tester.assert_data_in_target_db().await;
+    user_tester.assert_data_in_target_db().await;
+    tracker_key_tester.assert_data_in_target_db().await;
+    torrent_tester.assert_data_in_target_db(&config.upload_path).await;
 }
 
 async fn setup_databases(config: &TestConfig) -> (Arc<SqliteDatabaseV1_0_0>, Arc<SqliteDatabaseV2_0_0>) {
     // Set up clean source database
-    reset_databases(&config.source_database_file, &config.destiny_database_file);
+    reset_databases(&config.source_database_file, &config.target_database_file);
     let source_database = source_db_connection(&config.source_database_file).await;
     source_database.migrate(&config.fixtures_dir).await;
 
-    // Set up connection for the destiny database
-    let destiny_database = destiny_db_connection(&config.destiny_database_file).await;
+    // Set up connection for the target database
+    let target_database = target_db_connection(&config.target_database_file).await;
 
-    (source_database, destiny_database)
+    (source_database, target_database)
 }
 
 async fn source_db_connection(source_database_file: &str) -> Arc<SqliteDatabaseV1_0_0> {
     Arc::new(SqliteDatabaseV1_0_0::db_connection(&source_database_file).await)
 }
 
-async fn destiny_db_connection(destiny_database_file: &str) -> Arc<SqliteDatabaseV2_0_0> {
-    Arc::new(SqliteDatabaseV2_0_0::db_connection(&destiny_database_file).await)
+async fn target_db_connection(target_database_file: &str) -> Arc<SqliteDatabaseV2_0_0> {
+    Arc::new(SqliteDatabaseV2_0_0::db_connection(&target_database_file).await)
 }
 
 /// Reset databases from previous executions
-fn reset_databases(source_database_file: &str, destiny_database_file: &str) {
-    fs::remove_file(&source_database_file).expect("Can't remove source DB file.");
-    fs::remove_file(&destiny_database_file).expect("Can't remove destiny DB file.");
+fn reset_databases(source_database_file: &str, target_database_file: &str) {
+    if Path::new(source_database_file).exists() {
+        fs::remove_file(&source_database_file).expect("Can't remove the source DB file.");
+    }
+
+    if Path::new(target_database_file).exists() {
+        fs::remove_file(&target_database_file).expect("Can't remove the target DB file.");
+    }
 }

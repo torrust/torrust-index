@@ -5,7 +5,7 @@ use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteData
 
 pub async fn transfer_users(
     source_database: Arc<SqliteDatabaseV1_0_0>,
-    dest_database: Arc<SqliteDatabaseV2_0_0>,
+    target_database: Arc<SqliteDatabaseV2_0_0>,
     date_imported: &str,
 ) {
     println!("Transferring users ...");
@@ -22,13 +22,13 @@ pub async fn transfer_users(
             &user.username, &user.user_id
         );
 
-        let id = dest_database
+        let id = target_database
             .insert_imported_user(user.user_id, date_imported, user.administrator)
             .await
             .unwrap();
 
         if id != user.user_id {
-            panic!("Error copying user {:?} from source DB to destiny DB", &user.user_id);
+            panic!("Error copying user {:?} from source DB to the target DB", &user.user_id);
         }
 
         println!("[v2][torrust_users] user: {:?} {:?} added.", &user.user_id, &user.username);
@@ -40,7 +40,7 @@ pub async fn transfer_users(
             &user.username, &user.user_id
         );
 
-        dest_database
+        target_database
             .insert_user_profile(user.user_id, &user.username, &user.email, user.email_verified)
             .await
             .unwrap();
@@ -57,7 +57,7 @@ pub async fn transfer_users(
             &user.password, &user.user_id
         );
 
-        dest_database
+        target_database
             .insert_user_password_hash(user.user_id, &user.password)
             .await
             .unwrap();
