@@ -19,10 +19,10 @@ use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::upgrader::{datetime_
 
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
-use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::category_tester::CategoryTester;
-use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::torrent_tester::TorrentTester;
-use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::tracker_key_tester::TrackerKeyTester;
-use crate::upgrades::from_v1_0_0_to_v2_0_0::testers::user_tester::UserTester;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrer_testers::category_transferrer_tester::CategoryTester;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrer_testers::torrent_transferrer_tester::TorrentTester;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrer_testers::tracker_key_transferrer_tester::TrackerKeyTester;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrer_testers::user_transferrer_tester::UserTester;
 
 struct TestConfig {
     // Directories
