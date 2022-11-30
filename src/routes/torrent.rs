@@ -96,6 +96,12 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
         )
         .await?;
 
+    // update torrent tracker stats
+    let _ = app_data
+        .tracker
+        .update_torrent_tracker_stats(torrent_id, &torrent_request.torrent.info_hash())
+        .await;
+
     // whitelist info hash on tracker
     if let Err(e) = app_data
         .tracker
