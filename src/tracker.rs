@@ -47,7 +47,7 @@ impl TrackerService {
         let settings = self.cfg.settings.read().await;
 
         let request_url = format!(
-            "{}/api/whitelist/{}?token={}",
+            "{}/api/v1/whitelist/{}?token={}",
             settings.tracker.api_url, info_hash, settings.tracker.token
         );
 
@@ -72,7 +72,7 @@ impl TrackerService {
         let settings = self.cfg.settings.read().await;
 
         let request_url = format!(
-            "{}/api/whitelist/{}?token={}",
+            "{}/api/v1/whitelist/{}?token={}",
             settings.tracker.api_url, info_hash, settings.tracker.token
         );
 
@@ -114,7 +114,7 @@ impl TrackerService {
         let settings = self.cfg.settings.read().await;
 
         let request_url = format!(
-            "{}/api/key/{}?token={}",
+            "{}/api/v1/key/{}?token={}",
             settings.tracker.api_url, settings.tracker.token_valid_seconds, settings.tracker.token
         );
 
@@ -149,7 +149,7 @@ impl TrackerService {
         let tracker_url = settings.tracker.url.clone();
 
         let request_url = format!(
-            "{}/api/torrent/{}?token={}",
+            "{}/api/v1/torrent/{}?token={}",
             settings.tracker.api_url, info_hash, settings.tracker.token
         );
 
