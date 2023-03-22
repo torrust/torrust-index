@@ -1,58 +1,24 @@
 # Torrust Index Backend
 
-![README HEADER](./img/Torrust_Repo_BackEnd_Readme_Header-20220615.jpg)
+This repository serves as the backend for the [Torrust Index](https://github.com/torrust/torrust-index) project, that implements the [Torrust Index Application Interface](https://github.com/torrust/torrust-index-api-lib).
 
-![Open Source](https://badgen.net/badge/Open%20Source/100%25/DA2CE7)
-![Cool](https://badgen.net/badge/Cool/100%25/FF7F50)
-
-![Nautilus Sponsored](https://badgen.net/badge/Sponsor/Nautilus%20Cyberneering/red)
-
----
-
-## 📢Important Updates 📢
-
-- None at the moment [ACCESS ALL UPDATES](https://github.com/torrust/torrust-index-backend/wiki/Project-Updates)
-
----
-
-## Index
-
-- [PROJECT DESCRIPTION](#project-description)
-- [PROJECT ROADMAP](#project_roadmap)
-- [DOCUMENTATION](#documentation)
-- [INSTALLATION](#installation)
-- [CONTACT & CONTRIBUTING](#contact_and_contributing)
-- [CREDITS](#credits)
-
-## Project Description
-
-This repository serves as the backend for the [Torrust Index](https://github.com/torrust/torrust-index) project.
-
-### Roadmap
-
-*Coming soon.*
+We also provide the [Torrust Index Frontend](https://github.com/torrust/torrust-index-frontend) project, that is our reference web-application that consumes the API provided here.
 
 ## Documentation
 
-You can read the documentation [here](https://torrust.com/torrust-index/install/#installing-the-backend).
+You can read the Torrust Index documentation [here](https://torrust.com/torrust-index/install/#installing-the-backend).
 
 ## Installation
 
-1. Install prerequisites:
+1. Setup [Rust / Cargo](https://www.rust-lang.org/) in your Environment.
 
-    - [Rust/Cargo](https://www.rust-lang.org/) - Compiler toolchain & Package Manager (cargo).
+2. Clone this repo.
 
-2. Clone the repository:
-
-    ```bash
-    git clone https://github.com/torrust/torrust-index-backend.git
-    ```
-
-3. Open the project directory and create a file called: `.env`:
+3. Set the database connection URI in the projects `/.env` file:
 
     ```bash
     cd torrust-index-backend
-    echo "DATABASE_URL=sqlite://data.db?mode=rwc" > .env
+    echo "DATABASE_URL=sqlite://data.db?mode=rwc" >> .env
     ```
 
 4. Install sqlx-cli and build the sqlite database:
@@ -74,11 +40,9 @@ You can read the documentation [here](https://torrust.com/torrust-index/install/
     ./target/release/torrust-index-backend
     ```
 
-7. Edit the newly generated `config.toml` file ([config.toml documentation](https://torrust.github.io/torrust-tracker/CONFIG.html)):
+7. Review and edit the default `/config.toml` file.
 
-    ```bash
-    nano config.toml
-    ```
+> _Please view the [configuration documentation](https://torrust.github.io/torrust-tracker/CONFIG.html)._
 
 8. Run the backend again:
 
@@ -88,17 +52,12 @@ You can read the documentation [here](https://torrust.com/torrust-index/install/
 
 ## Contact and Contributing
 
-Feel free to contact us via:
+Please consider the [Torrust Contribution Guide](https://github.com/torrust/.github/blob/main/info/contributing.md).
 
-Message `Warm Beer#3352` on Discord or email `mick@dutchbits.nl`.
+Please report issues:
 
-or
-
-Please make suggestions and report any **Torrust Index Back End** specific bugs you find to the issue tracker of this repository [here](https://github.com/torrust/torrust-index-backend/issues)
-
-**Torrust Index Front End** specific issues can be submitted [here](https://github.com/torrust/torrust-index-frontend/issues).
-
-Universal issues with the **Torrust Index** can be submitted [here](https://github.com/torrust/torrust-index/issues). Ideas and feature requests are welcome as well!
+* Torrust Index Backend specifically: [here](https://github.com/torrust/torrust-index-backend/issues).
+* Torrust Index in general: [here](https://github.com/torrust/torrust-index/issues).
 
 ---
 
