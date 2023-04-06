@@ -5,6 +5,8 @@ use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
 use torrust_index_backend::auth::AuthorizationService;
 use torrust_index_backend::bootstrap::logging;
+use torrust_index_backend::cache::cache::BytesCache;
+use torrust_index_backend::cache::image::manager::{ImageCacheManager, ImageCacheManagerConfig};
 use torrust_index_backend::common::AppData;
 use torrust_index_backend::config::{Configuration, CONFIG_ENV_VAR_NAME, CONFIG_PATH};
 use torrust_index_backend::databases::database::connect_database;
@@ -31,12 +33,33 @@ async fn main() -> std::io::Result<()> {
     let auth = Arc::new(AuthorizationService::new(cfg.clone(), database.clone()));
     let tracker_service = Arc::new(TrackerService::new(cfg.clone(), database.clone()));
     let mailer_service = Arc::new(MailerService::new(cfg.clone()).await);
+
+    let max_image_request_timeout_ms = cfg.settings.read().await.cache.image_cache_max_request_timeout_ms;
+    let max_image_size = cfg.settings.read().await.cache.image_cache_entry_size_limit;
+    let user_quota_period_seconds = cfg.settings.read().await.cache.image_cache_user_quota_period_seconds;
+    let user_quota_bytes = cfg.settings.read().await.cache.image_cache_user_quota_bytes;
+    let image_cache_capacity = cfg.settings.read().await.cache.image_cache_capacity;
+
+    let image_cache_manager_config = ImageCacheManagerConfig {
+        max_image_request_timeout_ms,
+        max_image_size,
+        user_quota_period_seconds,
+        user_quota_bytes,
+    };
+
+    let image_cache =
+        BytesCache::with_capacity_and_entry_size_limit(image_cache_capacity, image_cache_manager_config.max_image_size)
+            .expect("Could not create image cache.");
+
+    let image_cache_manager = Arc::new(ImageCacheManager::new(image_cache, image_cache_manager_config));
+
     let app_data = Arc::new(AppData::new(
         cfg.clone(),
         database.clone(),
         auth.clone(),
         tracker_service.clone(),
         mailer_service.clone(),
+        image_cache_manager,
     ));
 
     let interval = settings.database.torrent_info_update_interval;
@@ -65,7 +88,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .wrap(Cors::permissive())
+            .wrap(Cors::permissive().allowed_origin("http://localhost:3001"))
             .app_data(web::Data::new(app_data.clone()))
             .wrap(middleware::Logger::default())
             .configure(routes::init_routes)

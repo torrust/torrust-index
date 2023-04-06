@@ -340,7 +340,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
     let mut category = "".to_string();
 
     while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_type = field.content_disposition().unwrap();
+        let content_type = field.content_disposition().clone();
         let name = content_type.get_name().unwrap();
 
         match name {
