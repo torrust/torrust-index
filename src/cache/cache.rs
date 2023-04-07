@@ -6,27 +6,25 @@ pub enum Error {
     EntrySizeLimitExceedsTotalCapacity,
     BytesExceedEntrySizeLimit,
     CacheCapacityIsTooSmall,
-    CacheFull
+    CacheFull,
 }
 
 #[derive(Debug, Clone)]
 pub struct BytesCacheEntry {
-    pub bytes: Bytes
+    pub bytes: Bytes,
 }
 
 // Individual entry destined for the byte cache.
 impl BytesCacheEntry {
     pub fn new(bytes: Bytes) -> Self {
-        Self {
-            bytes
-        }
+        Self { bytes }
     }
 }
 
 pub struct BytesCache {
     bytes_table: IndexMap<String, BytesCacheEntry>,
     total_capacity: usize,
-    entry_size_limit: usize
+    entry_size_limit: usize,
 }
 
 impl BytesCache {
@@ -59,7 +57,7 @@ impl BytesCache {
     // With bot a total capacity limit and an individual entry size limit.
     pub fn with_capacity_and_entry_size_limit(cap: usize, esl: usize) -> Result<Self, Error> {
         if esl > cap {
-            return Err(Error::EntrySizeLimitExceedsTotalCapacity)
+            return Err(Error::EntrySizeLimitExceedsTotalCapacity);
         }
 
         let mut new = Self::new();
@@ -95,7 +93,7 @@ impl BytesCache {
     // For TO DO above: semaphore: Arc<tokio::sync::Semaphore>, might be a solution.
     pub async fn set(&mut self, key: String, bytes: Bytes) -> Result<Option<BytesCacheEntry>, Error> {
         if bytes.len() > self.entry_size_limit {
-            return  Err(Error::BytesExceedEntrySizeLimit)
+            return Err(Error::BytesExceedEntrySizeLimit);
         }
 
         // Remove the old entry so that a new entry will be added as last in the queue.
@@ -112,7 +110,7 @@ impl BytesCache {
     fn free_size(&mut self, size: usize) -> Result<(), Error> {
         // Size may not exceed the total capacity of the bytes cache.
         if size > self.total_capacity {
-            return Err(Error::CacheCapacityIsTooSmall)
+            return Err(Error::CacheCapacityIsTooSmall);
         }
 
         let cache_size = self.total_size();
@@ -120,7 +118,8 @@ impl BytesCache {
         let mut size_freed: usize = 0;
 
         while size_freed < size_to_be_freed {
-            let oldest_entry = self.pop()
+            let oldest_entry = self
+                .pop()
                 .expect("bytes cache has no more entries, yet there isn't enough space.");
 
             size_freed += oldest_entry.bytes.len();
@@ -131,9 +130,7 @@ impl BytesCache {
 
     // Remove and return the oldest entry.
     pub fn pop(&mut self) -> Option<BytesCacheEntry> {
-        self.bytes_table
-            .shift_remove_index(0)
-            .map(|(_, entry)| entry)
+        self.bytes_table.shift_remove_index(0).map(|(_, entry)| entry)
     }
 }
 

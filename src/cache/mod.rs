@@ -1,2 +1,2 @@
-pub mod image;
 pub mod cache;
+pub mod image;

@@ -1,6 +1,7 @@
 use std::sync::Once;
-use actix_web::{HttpRequest, HttpResponse, Responder, web};
+
 use actix_web::http::StatusCode;
+use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use bytes::Bytes;
 
 use crate::cache::image::manager::Error;
@@ -11,11 +12,7 @@ static ERROR_IMAGE_LOADER: Once = Once::new();
 static mut ERROR_IMAGE_UNAUTHENTICATED: Bytes = Bytes::new();
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/proxy")
-            .service(web::resource("/image/{url}")
-                .route(web::get().to(get_proxy_image)))
-    );
+    cfg.service(web::scope("/proxy").service(web::resource("/image/{url}").route(web::get().to(get_proxy_image))));
 
     load_error_images();
 }
@@ -34,12 +31,10 @@ pub async fn get_proxy_image(req: HttpRequest, app_data: WebAppData, path: web::
     let url = urlencoding::decode(&encoded_url).unwrap_or_default();
 
     match app_data.image_cache_manager.get_image_by_url(&url, opt_user).await {
-        Ok(image_bytes) => {
-            Ok(HttpResponse::build(StatusCode::OK)
-                .content_type("image/png")
-                .append_header(("Cache-Control", "max-age=15552000"))
-                .body(image_bytes))
-        }
+        Ok(image_bytes) => Ok(HttpResponse::build(StatusCode::OK)
+            .content_type("image/png")
+            .append_header(("Cache-Control", "max-age=15552000"))
+            .body(image_bytes)),
         // todo: add other error images.
         Err(e) => unsafe {
             // Handling status codes in the frontend other tan OK is quite a pain.
@@ -49,13 +44,13 @@ pub async fn get_proxy_image(req: HttpRequest, app_data: WebAppData, path: web::
                 Error::UrlIsNotAnImage => (StatusCode::BAD_REQUEST, ERROR_IMAGE_UNAUTHENTICATED.clone()),
                 Error::ImageTooBig => (StatusCode::BAD_REQUEST, ERROR_IMAGE_UNAUTHENTICATED.clone()),
                 Error::UserQuotaMet => (StatusCode::TOO_MANY_REQUESTS, ERROR_IMAGE_UNAUTHENTICATED.clone()),
-                Error::Unauthenticated => (StatusCode::UNAUTHORIZED, ERROR_IMAGE_UNAUTHENTICATED.clone())
+                Error::Unauthenticated => (StatusCode::UNAUTHORIZED, ERROR_IMAGE_UNAUTHENTICATED.clone()),
             };
 
             Ok(HttpResponse::build(StatusCode::OK)
                 .content_type("image/png")
                 .append_header(("Cache-Control", "no-cache"))
                 .body(error_image_bytes))
-        }
+        },
     }
 }

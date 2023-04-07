@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::sync::Once;
 use std::time::{Duration, SystemTime};
+
 use bytes::Bytes;
 use tokio::sync::RwLock;
 
@@ -16,7 +17,7 @@ pub enum Error {
     UrlIsNotAnImage,
     ImageTooBig,
     UserQuotaMet,
-    Unauthenticated
+    Unauthenticated,
 }
 
 type UserQuotas = HashMap<UserId, ImageCacheQuota>;
@@ -34,7 +35,7 @@ pub struct ImageCacheQuota {
     pub usage: usize,
     pub max_usage: usize,
     pub date_start_secs: u64,
-    pub period_secs: u64
+    pub period_secs: u64,
 }
 
 impl ImageCacheQuota {
@@ -44,7 +45,7 @@ impl ImageCacheQuota {
             usage: 0,
             max_usage,
             date_start_secs: now_in_secs(),
-            period_secs
+            period_secs,
         }
     }
 
@@ -55,7 +56,7 @@ impl ImageCacheQuota {
         }
 
         if self.met() {
-            return Err(())
+            return Err(());
         }
 
         self.usage = self.usage.saturating_add(amount);
@@ -77,14 +78,14 @@ pub struct ImageCacheManagerConfig {
     pub max_image_request_timeout_ms: u64,
     pub max_image_size: usize,
     pub user_quota_period_seconds: u64,
-    pub user_quota_bytes: usize
+    pub user_quota_bytes: usize,
 }
 
 pub struct ImageCacheManager {
     image_cache: RwLock<BytesCache>,
     user_quotas: RwLock<UserQuotas>,
     reqwest_client: reqwest::Client,
-    config: ImageCacheManagerConfig
+    config: ImageCacheManagerConfig,
 }
 
 impl ImageCacheManager {
@@ -98,7 +99,7 @@ impl ImageCacheManager {
             image_cache: RwLock::new(bytes_cache),
             user_quotas: RwLock::new(HashMap::new()),
             reqwest_client,
-            config
+            config,
         }
     }
 
@@ -115,12 +116,12 @@ impl ImageCacheManager {
 
         // Check if image is already in our cache and send it if so.
         if let Some(entry) = self.image_cache.read().await.get(url).await {
-            return Ok(entry.bytes)
+            return Ok(entry.bytes);
         }
 
         // Check if authenticated.
         if opt_user.is_none() {
-            return Err(Error::Unauthenticated)
+            return Err(Error::Unauthenticated);
         }
 
         let user = opt_user.unwrap();
@@ -128,7 +129,7 @@ impl ImageCacheManager {
         // Check user quota.
         if let Some(quota) = self.user_quotas.read().await.get(&user.user_id) {
             if quota.met() {
-                return Err(Error::UserQuotaMet)
+                return Err(Error::UserQuotaMet);
             }
         }
 
@@ -143,35 +144,43 @@ impl ImageCacheManager {
         // Verify the content-type of the response.
         if let Some(content_type) = res.headers().get("Content-Type") {
             if content_type != "image/jpeg" && content_type != "image/png" {
-                return Err(Error::UrlIsNotAnImage)
+                return Err(Error::UrlIsNotAnImage);
             }
         } else {
-            return Err(Error::UrlIsNotAnImage)
+            return Err(Error::UrlIsNotAnImage);
         }
 
-        let image_bytes = res
-            .bytes()
-            .await
-            .map_err(|_| Error::UrlIsNotAnImage)?;
+        let image_bytes = res.bytes().await.map_err(|_| Error::UrlIsNotAnImage)?;
 
         // Verify that the response size does not exceed the defined max image size.
         if image_bytes.len() > self.config.max_image_size {
-            return Err(Error::ImageTooBig)
+            return Err(Error::ImageTooBig);
         }
 
         // TODO: Update the cache on a separate thread, so that the client does not have to wait.
         // Update image cache.
-        if self.image_cache.write().await.set(url.to_string(), image_bytes.clone()).await.is_err() {
-            return Err(Error::ImageTooBig)
+        if self
+            .image_cache
+            .write()
+            .await
+            .set(url.to_string(), image_bytes.clone())
+            .await
+            .is_err()
+        {
+            return Err(Error::ImageTooBig);
         }
 
-        let mut quota = self.user_quotas.read().await.get(&user.user_id)
+        let mut quota = self
+            .user_quotas
+            .read()
+            .await
+            .get(&user.user_id)
             .cloned()
             .unwrap_or(ImageCacheQuota::new(
                 user.user_id,
                 self.config.user_quota_bytes,
-                self.config.user_quota_period_seconds)
-            );
+                self.config.user_quota_period_seconds,
+            ));
 
         let _ = quota.add_usage(image_bytes.len());
 

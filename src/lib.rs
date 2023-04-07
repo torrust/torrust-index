@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod bootstrap;
+pub mod cache;
 pub mod common;
 pub mod config;
 pub mod console;
@@ -11,7 +12,6 @@ pub mod routes;
 pub mod tracker;
 pub mod upgrades;
 pub mod utils;
-pub mod cache;
 
 trait AsCSV {
     fn as_csv<T>(&self) -> Result<Option<Vec<T>>, ()>

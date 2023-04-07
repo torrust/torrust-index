@@ -2,11 +2,11 @@ use actix_web::web;
 
 pub mod about;
 pub mod category;
+pub mod proxy;
 pub mod root;
 pub mod settings;
 pub mod torrent;
 pub mod user;
-pub mod proxy;
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     user::init_routes(cfg);
