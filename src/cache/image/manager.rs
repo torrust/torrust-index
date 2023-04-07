@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::fs;
-use std::sync::Once;
 use std::time::{Duration, SystemTime};
 
 use bytes::Bytes;
@@ -8,9 +6,6 @@ use tokio::sync::RwLock;
 
 use crate::cache::cache::BytesCache;
 use crate::models::user::{UserCompact, UserId};
-
-static ERROR_IMAGE_LOADER: Once = Once::new();
-static mut ERROR_IMAGE_UNAUTHENTICATED: Bytes = Bytes::new();
 
 pub enum Error {
     UrlIsUnreachable,
@@ -103,17 +98,9 @@ impl ImageCacheManager {
         }
     }
 
-    fn load_error_images() {
-        ERROR_IMAGE_LOADER.call_once(|| unsafe {
-            ERROR_IMAGE_UNAUTHENTICATED = Bytes::from(fs::read("resources/images/sign_in_to_see_img.png").unwrap());
-        });
-    }
-
     /// Get an image from the url and insert it into the cache if it isn't cached already.
     /// Unauthenticated users can only get already cached images.
     pub async fn get_image_by_url(&self, url: &str, opt_user: Option<UserCompact>) -> Result<Bytes, Error> {
-        Self::load_error_images();
-
         // Check if image is already in our cache and send it if so.
         if let Some(entry) = self.image_cache.read().await.get(url).await {
             return Ok(entry.bytes);
