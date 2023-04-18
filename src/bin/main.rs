@@ -1,10 +1,12 @@
+use std::env;
 use std::sync::Arc;
 
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
 use torrust_index_backend::auth::AuthorizationService;
+use torrust_index_backend::bootstrap::logging;
 use torrust_index_backend::common::AppData;
-use torrust_index_backend::config::Configuration;
+use torrust_index_backend::config::{Configuration, CONFIG_ENV_VAR_NAME, CONFIG_PATH};
 use torrust_index_backend::databases::database::connect_database;
 use torrust_index_backend::mailer::MailerService;
 use torrust_index_backend::routes;
@@ -12,12 +14,11 @@ use torrust_index_backend::tracker::TrackerService;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let cfg = match Configuration::load_from_file().await {
-        Ok(config) => Arc::new(config),
-        Err(error) => {
-            panic!("{}", error)
-        }
-    };
+    let configuration = init_configuration().await;
+
+    logging::setup();
+
+    let cfg = Arc::new(configuration);
 
     let settings = cfg.settings.read().await;
 
@@ -60,7 +61,7 @@ async fn main() -> std::io::Result<()> {
 
     drop(settings);
 
-    println!("Listening on 0.0.0.0:{}", port);
+    println!("Listening on http://0.0.0.0:{}", port);
 
     HttpServer::new(move || {
         App::new()
@@ -72,4 +73,21 @@ async fn main() -> std::io::Result<()> {
     .bind(("0.0.0.0", port))?
     .run()
     .await
+}
+
+async fn init_configuration() -> Configuration {
+    if env::var(CONFIG_ENV_VAR_NAME).is_ok() {
+        println!("Loading configuration from env var `{}`", CONFIG_ENV_VAR_NAME);
+
+        Configuration::load_from_env_var(CONFIG_ENV_VAR_NAME).unwrap()
+    } else {
+        println!("Loading configuration from config file `{}`", CONFIG_PATH);
+
+        match Configuration::load_from_file().await {
+            Ok(config) => config,
+            Err(error) => {
+                panic!("{}", error)
+            }
+        }
+    }
 }

@@ -1,9 +1,13 @@
-use std::fs;
 use std::path::Path;
+use std::{env, fs};
 
-use config::{Config, ConfigError, File};
+use config::{Config, ConfigError, File, FileFormat};
+use log::warn;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
+
+pub const CONFIG_PATH: &str = "./config.toml";
+pub const CONFIG_ENV_VAR_NAME: &str = "TORRUST_IDX_BACK_CONFIG";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Website {
@@ -12,6 +16,7 @@ pub struct Website {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TrackerMode {
+    // todo: use https://crates.io/crates/torrust-tracker-primitives
     Public,
     Private,
     Whitelisted,
@@ -123,16 +128,18 @@ impl Configuration {
         }
     }
 
+    /// Loads the configuration from the configuration file.
     pub async fn load_from_file() -> Result<Configuration, ConfigError> {
-        let mut config = Config::new();
+        let config_builder = Config::builder();
 
-        const CONFIG_PATH: &str = "config.toml";
+        #[allow(unused_assignments)]
+        let mut config = Config::default();
 
         if Path::new(CONFIG_PATH).exists() {
-            config.merge(File::with_name(CONFIG_PATH))?;
+            config = config_builder.add_source(File::with_name(CONFIG_PATH)).build()?;
         } else {
-            eprintln!("No config file found.");
-            eprintln!("Creating config file..");
+            warn!("No config file found.");
+            warn!("Creating config file..");
             let config = Configuration::default();
             let _ = config.save_to_file().await;
             return Err(ConfigError::Message(
@@ -140,7 +147,7 @@ impl Configuration {
             ));
         }
 
-        let torrust_config: TorrustConfig = match config.try_into() {
+        let torrust_config: TorrustConfig = match config.try_deserialize() {
             Ok(data) => Ok(data),
             Err(e) => Err(ConfigError::Message(format!("Errors while processing config: {}.", e))),
         }?;
@@ -150,6 +157,32 @@ impl Configuration {
         })
     }
 
+    /// Loads the configuration from the environment variable. The whole
+    /// configuration must be in the environment variable. It contains the same
+    /// configuration as the configuration file with the same format.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if the environment variable does not exist or has a bad configuration.
+    pub fn load_from_env_var(config_env_var_name: &str) -> Result<Configuration, ConfigError> {
+        match env::var(config_env_var_name) {
+            Ok(config_toml) => {
+                let config_builder = Config::builder()
+                    .add_source(File::from_str(&config_toml, FileFormat::Toml))
+                    .build()?;
+                let torrust_config: TorrustConfig = config_builder.try_deserialize()?;
+                Ok(Configuration {
+                    settings: RwLock::new(torrust_config),
+                })
+            }
+            Err(_) => {
+                return Err(ConfigError::Message(
+                    "Unable to load configuration from the configuration environment variable.".to_string(),
+                ))
+            }
+        }
+    }
+
     pub async fn save_to_file(&self) -> Result<(), ()> {
         let settings = self.settings.read().await;
 
@@ -157,7 +190,7 @@ impl Configuration {
 
         drop(settings);
 
-        fs::write("config.toml", toml_string).expect("Could not write to file!");
+        fs::write(CONFIG_PATH, toml_string).expect("Could not write to file!");
         Ok(())
     }
 
