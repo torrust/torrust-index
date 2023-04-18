@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod bootstrap;
 pub mod common;
 pub mod config;
 pub mod console;
