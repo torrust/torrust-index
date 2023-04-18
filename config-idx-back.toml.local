@@ -18,8 +18,8 @@ max_password_length = 64
 secret_key = "MaxVerstappenWC2021"
 
 [database]
-#connect_url = "sqlite://storage/database/data.db?mode=rwc" # SQLite
-connect_url = "mysql://root:root_secret_password@mysql:3306/torrust_index_backend" # MySQL
+connect_url = "sqlite://storage/database/data.db?mode=rwc" # SQLite
+#connect_url = "mysql://root:root_secret_password@mysql:3306/torrust_index_backend" # MySQL
 torrent_info_update_interval = 3600
 
 [mail]

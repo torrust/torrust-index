@@ -25,6 +25,9 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - name: Run tests
         run: cargo test
+      - name: Stop databases
+        working-directory: ./tests
+        run: docker-compose down
 
   tag:
     needs: test

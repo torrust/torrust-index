@@ -8,6 +8,9 @@ default-run = "main"
 [profile.dev.package.sqlx-macros]
 opt-level = 3
 
+[features]
+e2e-tests = []
+
 [dependencies]
 actix-web = "4.0.0-beta.8"
 actix-multipart = "0.4.0-beta.5"

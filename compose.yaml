@@ -4,15 +4,30 @@ services:
   idx-back:
     build:
       context: .
+      args:
+        RUN_AS_USER: appuser
+        UID: ${TORRUST_IDX_BACK_USER_UID:-1000}
       target: development
     user: ${TORRUST_IDX_BACK_USER_UID:-1000}:${TORRUST_IDX_BACK_USER_UID:-1000}
     tty: true
     environment:
       - TORRUST_IDX_BACK_CONFIG=${TORRUST_IDX_BACK_CONFIG}
+      - CARGO_HOME=/home/appuser/.cargo
     networks:
       - server_side
     ports:
       - 3000:3000
+    # todo: implement healthcheck
+    #healthcheck:
+    #  test:
+    #    [
+    #      "CMD-SHELL",
+    #      "cargo run healthcheck"
+    #    ]
+    #  interval: 10s
+    #  retries: 5
+    #  start_period: 10s
+    #  timeout: 3s
     volumes:
       - ./:/app
       - ~/.cargo:/home/appuser/.cargo
@@ -25,11 +40,23 @@ services:
     tty: true
     environment:
       - TORRUST_TRACKER_CONFIG=${TORRUST_TRACKER_CONFIG}
+      - TORRUST_TRACKER_API_TOKEN=${TORRUST_TRACKER_API_TOKEN:-MyAccessToken}
     networks:
       - server_side
     ports:
       - 6969:6969/udp
       - 1212:1212/tcp
+    # todo: implement healthcheck
+    #healthcheck:
+    #  test:
+    #    [
+    #      "CMD-SHELL",
+    #      "/app/main healthcheck"
+    #    ]
+    #  interval: 10s
+    #  retries: 5
+    #  start_period: 10s
+    #  timeout: 3s
     volumes:
       - ./storage:/app/storage
     depends_on:

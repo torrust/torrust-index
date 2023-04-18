@@ -1,0 +1,7 @@
+[alias]
+cov = "llvm-cov"
+cov-lcov = "llvm-cov --lcov --output-path=./.coverage/lcov.info"
+cov-html = "llvm-cov --html"
+time = "build --timings --all-targets"
+e2e = "test --features e2e-tests"
+

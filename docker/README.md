@@ -63,9 +63,11 @@ If you want to inject an environment variable into docker-compose you can use th
 Build and run it locally:
 
 ```s
-TORRUST_TRACKER_CONFIG=$(cat config-tracker.toml.local) \
-TORRUST_IDX_BACK_CONFIG=$(cat config-idx-back.toml.local) \
-  docker compose up --build
+TORRUST_IDX_BACK_USER_UID=${TORRUST_IDX_BACK_USER_UID:-1000} \
+    TORRUST_IDX_BACK_CONFIG=$(cat config-idx-back.toml.local) \
+    TORRUST_TRACKER_CONFIG=$(cat config-tracker.toml.local) \
+    TORRUST_TRACKER_API_TOKEN=${TORRUST_TRACKER_API_TOKEN:-MyAccessToken} \
+    docker compose up -d --build
 ```
 
 After running the "up" command you will have three running containers:
