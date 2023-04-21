@@ -1,7 +1,8 @@
-use reqwest::Response;
+use reqwest::Response as ReqwestResponse;
 
 use crate::e2e::connection_info::ConnectionInfo;
 use crate::e2e::http::{Query, ReqwestQuery};
+use crate::e2e::response::Response;
 
 /// API Client
 pub struct Client {
@@ -15,10 +16,6 @@ impl Client {
             connection_info,
             base_path: "/".to_string(),
         }
-    }
-
-    pub async fn entrypoint(&self) -> Response {
-        self.get("", Query::default()).await
     }
 
     pub async fn get(&self, path: &str, params: Query) -> Response {
@@ -53,7 +50,7 @@ impl Client {
 }
 
 async fn get(path: &str, query: Option<Query>) -> Response {
-    match query {
+    let response: ReqwestResponse = match query {
         Some(params) => reqwest::Client::builder()
             .build()
             .unwrap()
@@ -63,5 +60,6 @@ async fn get(path: &str, query: Option<Query>) -> Response {
             .await
             .unwrap(),
         None => reqwest::Client::builder().build().unwrap().get(path).send().await.unwrap(),
-    }
+    };
+    Response::from(response).await
 }
