@@ -36,7 +36,8 @@ impl Client {
 
     /*
     pub async fn post(&self, path: &str) -> Response {
-        reqwest::Client::new().post(self.base_url(path).clone()).send().await.unwrap()
+        let response = reqwest::Client::new().post(self.base_url(path).clone()).send().await.unwrap();
+        Response::from(response).await
     }
 
     async fn delete(&self, path: &str) -> Response {

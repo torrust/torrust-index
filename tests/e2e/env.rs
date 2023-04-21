@@ -6,7 +6,7 @@ pub struct TestEnv {
 }
 
 impl TestEnv {
-    pub fn guess_client(&self) -> Client {
+    pub fn unauthenticated_client(&self) -> Client {
         Client::new(anonymous_connection(&self.authority))
     }
 }
