@@ -21,7 +21,7 @@ Build and run locally:
 
 ```s
 docker context use default
-export TORRUST_IDX_BACK_USER_UID=1000
+export TORRUST_IDX_BACK_USER_UID=$(id -u)
 ./docker/bin/build.sh $TORRUST_IDX_BACK_USER_UID
 ./bin/install.sh
 ./docker/bin/run.sh $TORRUST_IDX_BACK_USER_UID
@@ -30,7 +30,7 @@ export TORRUST_IDX_BACK_USER_UID=1000
 Run using the pre-built public docker image:
 
 ```s
-export TORRUST_IDX_BACK_USER_UID=1000
+export TORRUST_IDX_BACK_USER_UID=$(id -u)
 docker run -it \
     --user="$TORRUST_IDX_BACK_USER_UID" \
     --publish 3000:3000/tcp \
