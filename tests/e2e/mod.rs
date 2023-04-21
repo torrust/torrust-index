@@ -19,6 +19,7 @@
 mod asserts;
 mod client;
 mod connection_info;
+pub mod env;
 mod http;
 mod response;
 mod routes;

@@ -1,4 +1,4 @@
-pub fn connection_with_no_token(bind_address: &str) -> ConnectionInfo {
+pub fn anonymous_connection(bind_address: &str) -> ConnectionInfo {
     ConnectionInfo::anonymous(bind_address)
 }
 

@@ -18,6 +18,18 @@ impl Client {
         }
     }
 
+    pub async fn root(&self) -> Response {
+        self.get("", Query::empty()).await
+    }
+
+    pub async fn about(&self) -> Response {
+        self.get("about", Query::empty()).await
+    }
+
+    pub async fn license(&self) -> Response {
+        self.get("about/license", Query::empty()).await
+    }
+
     pub async fn get(&self, path: &str, params: Query) -> Response {
         self.get_request_with_query(path, params).await
     }
