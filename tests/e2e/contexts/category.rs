@@ -1,13 +1,12 @@
 use crate::e2e::asserts::assert_json_ok;
-use crate::e2e::env::TestEnv;
-use crate::e2e::http::Query;
+use crate::e2e::environment::TestEnv;
 
 #[tokio::test]
 #[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_return_an_empty_category_list_when_there_are_no_categories() {
     let client = TestEnv::default().unauthenticated_client();
 
-    let response = client.get("category", Query::empty()).await;
+    let response = client.get_categories().await;
 
     assert_json_ok(&response);
 }

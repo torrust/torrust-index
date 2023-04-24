@@ -1,5 +1,5 @@
 use crate::e2e::asserts::{assert_response_title, assert_text_ok};
-use crate::e2e::env::TestEnv;
+use crate::e2e::environment::TestEnv;
 
 #[tokio::test]
 #[cfg_attr(not(feature = "e2e-tests"), ignore)]
