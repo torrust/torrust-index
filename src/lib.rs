@@ -33,7 +33,7 @@ where
                 let mut acc = vec![];
                 for s in s.as_ref().split(',') {
                     let item = s.trim().parse::<T>().map_err(|_| ())?;
-                    acc.push(item)
+                    acc.push(item);
                 }
                 if acc.is_empty() {
                     Ok(None)
