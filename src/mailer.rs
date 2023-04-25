@@ -40,13 +40,21 @@ impl MailerService {
     async fn get_mailer(cfg: &Configuration) -> Mailer {
         let settings = cfg.settings.read().await;
 
-        let creds = Credentials::new(settings.mail.username.to_owned(), settings.mail.password.to_owned());
+        if !settings.mail.username.is_empty() && !settings.mail.password.is_empty() {
+            // SMTP authentication
+            let creds = Credentials::new(settings.mail.username.clone(), settings.mail.password.clone());
 
-        AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&settings.mail.server)
-            .port(settings.mail.port)
-            .credentials(creds)
-            .authentication(vec![Mechanism::Login, Mechanism::Xoauth2, Mechanism::Plain])
-            .build()
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&settings.mail.server)
+                .port(settings.mail.port)
+                .credentials(creds)
+                .authentication(vec![Mechanism::Login, Mechanism::Xoauth2, Mechanism::Plain])
+                .build()
+        } else {
+            // SMTP without authentication
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&settings.mail.server)
+                .port(settings.mail.port)
+                .build()
+        }
     }
 
     pub async fn send_verification_mail(

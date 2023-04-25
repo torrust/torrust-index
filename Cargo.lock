@@ -2684,6 +2684,7 @@ dependencies = [
  "lettre",
  "log",
  "pbkdf2",
+ "rand",
  "rand_core",
  "regex",
  "reqwest",

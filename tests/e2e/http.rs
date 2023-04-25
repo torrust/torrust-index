@@ -12,7 +12,7 @@ impl Query {
         Self { params: vec![] }
     }
 
-    pub fn params(params: Vec<QueryParam>) -> Self {
+    pub fn with_params(params: Vec<QueryParam>) -> Self {
         Self { params }
     }
 

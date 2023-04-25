@@ -2,6 +2,7 @@ use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use log::{debug, info};
 use pbkdf2::Pbkdf2;
 use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
@@ -20,6 +21,7 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/user")
             .service(web::resource("/register").route(web::post().to(register)))
             .service(web::resource("/login").route(web::post().to(login)))
+            // code-review: should not this be a POST method? We add the user to the blacklist. We do not delete the user.
             .service(web::resource("/ban/{user}").route(web::delete().to(ban_user)))
             .service(web::resource("/token/verify").route(web::post().to(verify_token)))
             .service(web::resource("/token/renew").route(web::post().to(renew_token)))
@@ -47,6 +49,8 @@ pub struct Token {
 }
 
 pub async fn register(req: HttpRequest, mut payload: web::Json<Register>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    info!("registering user: {}", payload.username);
+
     let settings = app_data.cfg.settings.read().await;
 
     match settings.auth.email_on_signup {
@@ -253,6 +257,8 @@ pub async fn verify_email(req: HttpRequest, app_data: WebAppData) -> String {
 
 // TODO: add reason and date_expiry parameters to request
 pub async fn ban_user(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    debug!("banning user");
+
     let user = app_data.auth.get_user_compact_from_request(&req).await?;
 
     // check if user is administrator
@@ -261,6 +267,8 @@ pub async fn ban_user(req: HttpRequest, app_data: WebAppData) -> ServiceResult<i
     }
 
     let to_be_banned_username = req.match_info().get("user").unwrap();
+
+    debug!("user to be banned: {}", to_be_banned_username);
 
     let user_profile = app_data
         .database

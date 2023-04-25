@@ -33,6 +33,8 @@ services:
       - ~/.cargo:/home/appuser/.cargo
     depends_on:
       - tracker
+      - mailcatcher
+      - mysql
 
   tracker:
     image: torrust/tracker:develop
@@ -61,6 +63,14 @@ services:
       - ./storage:/app/storage
     depends_on:
       - mysql
+
+  mailcatcher:
+    image: dockage/mailcatcher:0.8.2
+    networks:
+      - server_side
+    ports:
+      - 1080:1080
+      - 1025:1025
 
   mysql:
     image: mysql:8.0

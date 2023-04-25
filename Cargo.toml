@@ -41,3 +41,6 @@ pbkdf2 = "0.11.0"
 text-colorizer = "1.0.0"
 log = "0.4.17"
 fern = "0.6.2"
+
+[dev-dependencies]
+rand = "0.8.5"
