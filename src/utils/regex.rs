@@ -1,5 +1,6 @@
 use regex::Regex;
 
+#[must_use]
 pub fn validate_email_address(email_address_to_be_checked: &str) -> bool {
     let email_regex = Regex::new(r"^([a-z\d_+]([a-z\d_+.]*[a-z\d_+])?)@([a-z\d]+([\-.][a-z\d]+)*\.[a-z]{2,6})").unwrap();
 

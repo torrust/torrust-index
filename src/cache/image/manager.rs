@@ -19,6 +19,7 @@ pub enum Error {
 
 type UserQuotas = HashMap<i64, ImageCacheQuota>;
 
+#[must_use]
 pub fn now_in_secs() -> u64 {
     match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
         Ok(n) => n.as_secs(),
@@ -36,6 +37,7 @@ pub struct ImageCacheQuota {
 }
 
 impl ImageCacheQuota {
+    #[must_use]
     pub fn new(user_id: i64, max_usage: usize, period_secs: u64) -> Self {
         Self {
             user_id,
@@ -66,6 +68,7 @@ impl ImageCacheQuota {
         self.date_start_secs = now_in_secs();
     }
 
+    #[must_use]
     pub fn is_reached(&self) -> bool {
         self.usage >= self.max_usage
     }

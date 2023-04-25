@@ -48,6 +48,7 @@ pub struct TorrentResponse {
 }
 
 impl TorrentResponse {
+    #[must_use]
     pub fn from_listing(torrent_listing: TorrentListing) -> TorrentResponse {
         TorrentResponse {
             torrent_id: torrent_listing.torrent_id,
@@ -57,7 +58,7 @@ impl TorrentResponse {
             description: torrent_listing.description,
             category: Category {
                 category_id: 0,
-                name: "".to_string(),
+                name: String::new(),
                 num_torrents: 0,
             },
             upload_date: torrent_listing.date_uploaded,
@@ -66,7 +67,7 @@ impl TorrentResponse {
             leechers: torrent_listing.leechers,
             files: vec![],
             trackers: vec![],
-            magnet_link: "".to_string(),
+            magnet_link: String::new(),
         }
     }
 }

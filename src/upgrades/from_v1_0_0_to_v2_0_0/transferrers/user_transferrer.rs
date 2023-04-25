@@ -27,9 +27,11 @@ pub async fn transfer_users(
             .await
             .unwrap();
 
-        if id != user.user_id {
-            panic!("Error copying user {:?} from source DB to the target DB", &user.user_id);
-        }
+        assert!(
+            id == user.user_id,
+            "Error copying user {:?} from source DB to the target DB",
+            &user.user_id
+        );
 
         println!("[v2][torrust_users] user: {:?} {:?} added.", &user.user_id, &user.username);
 

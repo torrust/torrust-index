@@ -42,13 +42,15 @@ pub struct TorrentInfo {
 impl TorrentInfo {
     /// torrent file can only hold a pieces key or a root hash key:
     /// http://www.bittorrent.org/beps/bep_0030.html
+    #[must_use]
     pub fn get_pieces_as_string(&self) -> String {
         match &self.pieces {
-            None => "".to_string(),
+            None => String::new(),
             Some(byte_buf) => bytes_to_hex(byte_buf.as_ref()),
         }
     }
 
+    #[must_use]
     pub fn get_root_hash_as_i64(&self) -> i64 {
         match &self.root_hash {
             None => 0i64,
@@ -56,10 +58,12 @@ impl TorrentInfo {
         }
     }
 
+    #[must_use]
     pub fn is_a_single_file_torrent(&self) -> bool {
         self.length.is_some()
     }
 
+    #[must_use]
     pub fn is_a_multiple_file_torrent(&self) -> bool {
         self.files.is_some()
     }
@@ -90,6 +94,7 @@ pub struct Torrent {
 }
 
 impl Torrent {
+    #[must_use]
     pub fn from_db_info_files_and_announce_urls(
         torrent_info: DbTorrentInfo,
         torrent_files: Vec<TorrentFile>,
@@ -170,6 +175,7 @@ impl Torrent {
         }
     }
 
+    #[must_use]
     pub fn calculate_info_hash_as_bytes(&self) -> [u8; 20] {
         let info_bencoded = ser::to_bytes(&self.info).unwrap();
         let mut hasher = Sha1::new();
@@ -180,10 +186,12 @@ impl Torrent {
         sum_bytes
     }
 
+    #[must_use]
     pub fn info_hash(&self) -> String {
         bytes_to_hex(&self.calculate_info_hash_as_bytes())
     }
 
+    #[must_use]
     pub fn file_size(&self) -> i64 {
         if self.info.length.is_some() {
             self.info.length.unwrap()
@@ -201,6 +209,7 @@ impl Torrent {
         }
     }
 
+    #[must_use]
     pub fn announce_urls(&self) -> Vec<String> {
         if self.announce_list.is_none() {
             return vec![self.announce.clone().unwrap()];
@@ -214,10 +223,12 @@ impl Torrent {
             .collect::<Vec<String>>()
     }
 
+    #[must_use]
     pub fn is_a_single_file_torrent(&self) -> bool {
         self.info.is_a_single_file_torrent()
     }
 
+    #[must_use]
     pub fn is_a_multiple_file_torrent(&self) -> bool {
         self.info.is_a_multiple_file_torrent()
     }

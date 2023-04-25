@@ -22,12 +22,11 @@ pub async fn transfer_categories(source_database: Arc<SqliteDatabaseV1_0_0>, tar
             .await
             .unwrap();
 
-        if id != cat.category_id {
-            panic!(
-                "Error copying category {:?} from source DB to the target DB",
-                &cat.category_id
-            );
-        }
+        assert!(
+            id == cat.category_id,
+            "Error copying category {:?} from source DB to the target DB",
+            &cat.category_id
+        );
 
         println!("[v2] category: {:?} {:?} added.", id, &cat.name);
     }

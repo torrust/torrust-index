@@ -46,7 +46,7 @@ impl CategoryTester {
 
         // Add test categories
         for categories in &self.test_data.categories {
-            self.source_database.insert_category(&categories).await.unwrap();
+            self.source_database.insert_category(categories).await.unwrap();
         }
     }
 

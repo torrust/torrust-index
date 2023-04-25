@@ -21,7 +21,7 @@ impl TrackerKeyTester {
             key_id: 1,
             user_id,
             key: "rRstSTM5rx0sgxjLkRSJf3rXODcRBI5T".to_string(),
-            valid_until: 2456956800, // 11-10-2047 00:00:00 UTC
+            valid_until: 2_456_956_800, // 11-10-2047 00:00:00 UTC
         };
 
         Self {

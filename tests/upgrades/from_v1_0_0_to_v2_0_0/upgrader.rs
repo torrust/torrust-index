@@ -38,8 +38,8 @@ impl Default for TestConfig {
         let fixtures_dir = "./tests/upgrades/from_v1_0_0_to_v2_0_0/fixtures/".to_string();
         let upload_path = format!("{}uploads/", &fixtures_dir);
         let output_dir = "./tests/upgrades/from_v1_0_0_to_v2_0_0/output/".to_string();
-        let source_database_file = format!("{}source.db", output_dir);
-        let target_database_file = format!("{}target.db", output_dir);
+        let source_database_file = format!("{output_dir}source.db");
+        let target_database_file = format!("{output_dir}target.db");
         Self {
             fixtures_dir,
             upload_path,
@@ -105,20 +105,20 @@ async fn setup_databases(config: &TestConfig) -> (Arc<SqliteDatabaseV1_0_0>, Arc
 }
 
 async fn source_db_connection(source_database_file: &str) -> Arc<SqliteDatabaseV1_0_0> {
-    Arc::new(SqliteDatabaseV1_0_0::db_connection(&source_database_file).await)
+    Arc::new(SqliteDatabaseV1_0_0::db_connection(source_database_file).await)
 }
 
 async fn target_db_connection(target_database_file: &str) -> Arc<SqliteDatabaseV2_0_0> {
-    Arc::new(SqliteDatabaseV2_0_0::db_connection(&target_database_file).await)
+    Arc::new(SqliteDatabaseV2_0_0::db_connection(target_database_file).await)
 }
 
 /// Reset databases from previous executions
 fn reset_databases(source_database_file: &str, target_database_file: &str) {
     if Path::new(source_database_file).exists() {
-        fs::remove_file(&source_database_file).expect("Can't remove the source DB file.");
+        fs::remove_file(source_database_file).expect("Can't remove the source DB file.");
     }
 
     if Path::new(target_database_file).exists() {
-        fs::remove_file(&target_database_file).expect("Can't remove the target DB file.");
+        fs::remove_file(target_database_file).expect("Can't remove the target DB file.");
     }
 }

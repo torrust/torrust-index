@@ -27,6 +27,7 @@ pub struct BytesCache {
 }
 
 impl BytesCache {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             bytes_table: IndexMap::new(),
@@ -36,6 +37,7 @@ impl BytesCache {
     }
 
     // With a total capacity in bytes.
+    #[must_use]
     pub fn with_capacity(capacity: usize) -> Self {
         let mut new = Self::new();
 
@@ -45,6 +47,7 @@ impl BytesCache {
     }
 
     // With a limit for individual entry sizes.
+    #[must_use]
     pub fn with_entry_size_limit(entry_size_limit: usize) -> Self {
         let mut new = Self::new();
 
@@ -77,6 +80,7 @@ impl BytesCache {
     }
 
     // Size of all the entry bytes combined.
+    #[must_use]
     pub fn total_size(&self) -> usize {
         let mut size: usize = 0;
 

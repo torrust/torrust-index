@@ -370,9 +370,9 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
     let torrent_buffer = vec![0u8];
     let mut torrent_cursor = Cursor::new(torrent_buffer);
 
-    let mut title = "".to_string();
-    let mut description = "".to_string();
-    let mut category = "".to_string();
+    let mut title = String::new();
+    let mut description = String::new();
+    let mut category = String::new();
 
     while let Ok(Some(mut field)) = payload.try_next().await {
         match field.content_disposition().get_name().unwrap() {

@@ -1,11 +1,12 @@
 use std::fmt::Write;
 use std::num::ParseIntError;
 
+#[must_use]
 pub fn bytes_to_hex(bytes: &[u8]) -> String {
     let mut s = String::with_capacity(2 * bytes.len());
 
     for byte in bytes {
-        write!(s, "{:02X}", byte).unwrap();
+        write!(s, "{byte:02X}").unwrap();
     }
 
     s

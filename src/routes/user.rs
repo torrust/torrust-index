@@ -96,7 +96,7 @@ pub async fn register(req: HttpRequest, mut payload: web::Json<Register>, app_da
         return Err(ServiceError::UsernameInvalid);
     }
 
-    let email = payload.email.as_ref().unwrap_or(&"".to_string()).to_string();
+    let email = payload.email.as_ref().unwrap_or(&String::new()).to_string();
 
     let user_id = app_data
         .database

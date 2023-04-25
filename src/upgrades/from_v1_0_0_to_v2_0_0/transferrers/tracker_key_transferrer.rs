@@ -28,12 +28,11 @@ pub async fn transfer_tracker_keys(source_database: Arc<SqliteDatabaseV1_0_0>, t
             .await
             .unwrap();
 
-        if id != tracker_key.key_id {
-            panic!(
-                "Error copying tracker key {:?} from source DB to the target DB",
-                &tracker_key.key_id
-            );
-        }
+        assert!(
+            id == tracker_key.key_id,
+            "Error copying tracker key {:?} from source DB to the target DB",
+            &tracker_key.key_id
+        );
 
         println!(
             "[v2][torrust_tracker_keys] tracker key with id {:?} added.",

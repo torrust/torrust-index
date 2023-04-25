@@ -192,7 +192,7 @@ impl ResponseError for ServiceError {
 
 impl From<sqlx::Error> for ServiceError {
     fn from(e: sqlx::Error) -> Self {
-        eprintln!("{:?}", e);
+        eprintln!("{e:?}");
 
         if let Some(err) = e.as_database_error() {
             return if err.code() == Some(Cow::from("2067")) {
@@ -229,28 +229,28 @@ impl From<DatabaseError> for ServiceError {
 
 impl From<argon2::password_hash::Error> for ServiceError {
     fn from(e: argon2::password_hash::Error) -> Self {
-        eprintln!("{}", e);
+        eprintln!("{e}");
         ServiceError::InternalServerError
     }
 }
 
 impl From<std::io::Error> for ServiceError {
     fn from(e: std::io::Error) -> Self {
-        eprintln!("{}", e);
+        eprintln!("{e}");
         ServiceError::InternalServerError
     }
 }
 
 impl From<Box<dyn error::Error>> for ServiceError {
     fn from(e: Box<dyn error::Error>) -> Self {
-        eprintln!("{}", e);
+        eprintln!("{e}");
         ServiceError::InternalServerError
     }
 }
 
 impl From<serde_json::Error> for ServiceError {
     fn from(e: serde_json::Error) -> Self {
-        eprintln!("{}", e);
+        eprintln!("{e}");
         ServiceError::InternalServerError
     }
 }

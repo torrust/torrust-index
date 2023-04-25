@@ -29,21 +29,22 @@ pub async fn transfer_torrents(
 
         let uploader = source_database.get_user_by_username(&torrent.uploader).await.unwrap();
 
-        if uploader.username != torrent.uploader {
-            panic!(
-                "Error copying torrent with id {:?}.
+        assert!(
+            uploader.username == torrent.uploader,
+            "Error copying torrent with id {:?}.
                 Username (`uploader`) in `torrust_torrents` table does not match `username` in `torrust_users` table",
-                &torrent.torrent_id
-            );
-        }
+            &torrent.torrent_id
+        );
 
         let filepath = format!("{}/{}.torrent", upload_path, &torrent.torrent_id);
 
         let torrent_from_file_result = read_torrent_from_file(&filepath);
 
-        if torrent_from_file_result.is_err() {
-            panic!("Error torrent file not found: {:?}", &filepath);
-        }
+        assert!(
+            torrent_from_file_result.is_ok(),
+            "Error torrent file not found: {:?}",
+            &filepath
+        );
 
         let torrent_from_file = torrent_from_file_result.unwrap();
 
@@ -52,12 +53,11 @@ pub async fn transfer_torrents(
             .await
             .unwrap();
 
-        if id != torrent.torrent_id {
-            panic!(
-                "Error copying torrent {:?} from source DB to the target DB",
-                &torrent.torrent_id
-            );
-        }
+        assert!(
+            id == torrent.torrent_id,
+            "Error copying torrent {:?} from source DB to the target DB",
+            &torrent.torrent_id
+        );
 
         println!("[v2][torrust_torrents] torrent with id {:?} added.", &torrent.torrent_id);
 
@@ -144,7 +144,7 @@ pub async fn transfer_torrents(
                 .flatten()
                 .collect::<Vec<String>>();
 
-            for tracker_url in announce_urls.iter() {
+            for tracker_url in &announce_urls {
                 println!(
                     "[v2][torrust_torrent_announce_urls][announce-list] adding the torrent announce url for torrent id {:?} ...",
                     &torrent.torrent_id

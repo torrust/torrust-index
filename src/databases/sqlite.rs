@@ -92,7 +92,7 @@ impl Database for SqliteDatabase {
         match insert_user_profile_result {
             Ok(_) => {
                 let _ = tx.commit().await;
-                Ok(user_id as i64)
+                Ok(user_id)
             }
             Err(e) => {
                 let _ = tx.rollback().await;
@@ -410,7 +410,7 @@ impl Database for SqliteDatabase {
             .bind(root_hash)
             .execute(&self.pool)
             .await
-            .map(|v| v.last_insert_rowid() as i64)
+            .map(|v| v.last_insert_rowid())
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
                     if err.message().contains("info_hash") {
@@ -462,7 +462,7 @@ impl Database for SqliteDatabase {
             // flatten the nested vec (this will however remove the)
             let announce_urls = announce_urls.iter().flatten().collect::<Vec<&String>>();
 
-            for tracker_url in announce_urls.iter() {
+            for tracker_url in &announce_urls {
                 let _ = query("INSERT INTO torrust_torrent_announce_urls (torrent_id, tracker_url) VALUES (?, ?)")
                     .bind(torrent_id)
                     .bind(tracker_url)
@@ -515,7 +515,7 @@ impl Database for SqliteDatabase {
         match insert_torrent_info_result {
             Ok(_) => {
                 let _ = tx.commit().await;
-                Ok(torrent_id as i64)
+                Ok(torrent_id)
             }
             Err(e) => {
                 let _ = tx.rollback().await;
@@ -555,7 +555,12 @@ impl Database for SqliteDatabase {
         let torrent_files: Vec<TorrentFile> = db_torrent_files
             .into_iter()
             .map(|tf| TorrentFile {
-                path: tf.path.unwrap_or_default().split('/').map(|v| v.to_string()).collect(),
+                path: tf
+                    .path
+                    .unwrap_or_default()
+                    .split('/')
+                    .map(std::string::ToString::to_string)
+                    .collect(),
                 length: tf.length,
                 md5sum: tf.md5sum,
             })

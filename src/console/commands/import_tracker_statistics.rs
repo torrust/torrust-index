@@ -4,7 +4,7 @@ use std::env;
 use std::sync::Arc;
 
 use derive_more::{Display, Error};
-use text_colorizer::*;
+use text_colorizer::Colorize;
 
 use crate::bootstrap::config::init_configuration;
 use crate::bootstrap::logging;

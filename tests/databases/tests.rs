@@ -81,7 +81,7 @@ pub async fn it_can_add_a_torrent_and_tracker_stats_to_that_torrent(db: &Box<dyn
         info: TorrentInfo {
             name: TEST_TORRENT_TITLE.to_string(),
             pieces: Some(ByteBuf::from("1234567890123456789012345678901234567890".as_bytes())),
-            piece_length: 256000,
+            piece_length: 256_000,
             md5sum: None,
             length: Some(TEST_TORRENT_FILE_SIZE),
             files: None,
