@@ -1,6 +1,7 @@
 use std::future::Future;
 
-use torrust_index_backend::databases::database::{connect_database, Database};
+use torrust_index_backend::databases::database;
+use torrust_index_backend::databases::database::Database;
 
 mod mysql;
 mod sqlite;
@@ -21,7 +22,7 @@ where
 
 // runs all tests
 pub async fn run_tests(db_path: &str) {
-    let db_res = connect_database(db_path).await;
+    let db_res = database::connect(db_path).await;
 
     assert!(db_res.is_ok());
 

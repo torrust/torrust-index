@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use torrust_index_backend::databases::database::connect_database;
+use torrust_index_backend::databases::database;
 
 use crate::common::client::Client;
 use crate::common::contexts::user::fixtures::random_user_registration;
@@ -12,7 +12,7 @@ pub async fn new_logged_in_admin(env: &TestEnv) -> LoggedInUserData {
     let user = new_logged_in_user(env).await;
 
     let database = Arc::new(
-        connect_database(&env.database_connect_url().unwrap())
+        database::connect(&env.database_connect_url().unwrap())
             .await
             .expect("Database error."),
     );

@@ -6,7 +6,7 @@ use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
 use derive_more::{Display, Error};
 use serde::{Deserialize, Serialize};
 
-use crate::databases::database::DatabaseError;
+use crate::databases::database;
 
 pub type ServiceResult<V> = Result<V, ServiceError>;
 
@@ -210,19 +210,19 @@ impl From<sqlx::Error> for ServiceError {
     }
 }
 
-impl From<DatabaseError> for ServiceError {
-    fn from(e: DatabaseError) -> Self {
+impl From<database::Error> for ServiceError {
+    fn from(e: database::Error) -> Self {
         match e {
-            DatabaseError::Error => ServiceError::InternalServerError,
-            DatabaseError::UsernameTaken => ServiceError::UsernameTaken,
-            DatabaseError::EmailTaken => ServiceError::EmailTaken,
-            DatabaseError::UserNotFound => ServiceError::UserNotFound,
-            DatabaseError::CategoryAlreadyExists => ServiceError::CategoryExists,
-            DatabaseError::CategoryNotFound => ServiceError::InvalidCategory,
-            DatabaseError::TorrentNotFound => ServiceError::TorrentNotFound,
-            DatabaseError::TorrentAlreadyExists => ServiceError::InfoHashAlreadyExists,
-            DatabaseError::TorrentTitleAlreadyExists => ServiceError::TorrentTitleAlreadyExists,
-            DatabaseError::UnrecognizedDatabaseDriver => ServiceError::InternalServerError,
+            database::Error::Error => ServiceError::InternalServerError,
+            database::Error::UsernameTaken => ServiceError::UsernameTaken,
+            database::Error::EmailTaken => ServiceError::EmailTaken,
+            database::Error::UserNotFound => ServiceError::UserNotFound,
+            database::Error::CategoryAlreadyExists => ServiceError::CategoryExists,
+            database::Error::CategoryNotFound => ServiceError::InvalidCategory,
+            database::Error::TorrentNotFound => ServiceError::TorrentNotFound,
+            database::Error::TorrentAlreadyExists => ServiceError::InfoHashAlreadyExists,
+            database::Error::TorrentTitleAlreadyExists => ServiceError::TorrentTitleAlreadyExists,
+            database::Error::UnrecognizedDatabaseDriver => ServiceError::InternalServerError,
         }
     }
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use torrust_index_backend::databases::database::connect_database;
+use torrust_index_backend::databases::database;
 use torrust_index_backend::models::torrent_file::Torrent;
 use torrust_index_backend::models::tracker_key::TrackerKey;
 
@@ -41,7 +41,7 @@ pub async fn get_user_tracker_key(logged_in_user: &LoggedInUserData, env: &TestE
     // querying the database.
 
     let database = Arc::new(
-        connect_database(&env.database_connect_url().unwrap())
+        database::connect(&env.database_connect_url().unwrap())
             .await
             .expect("database connection to be established."),
     );

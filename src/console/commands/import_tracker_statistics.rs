@@ -8,7 +8,7 @@ use text_colorizer::Colorize;
 
 use crate::bootstrap::config::init_configuration;
 use crate::bootstrap::logging;
-use crate::databases::database::connect_database;
+use crate::databases::database;
 use crate::tracker::service::Service;
 use crate::tracker::statistics_importer::StatisticsImporter;
 
@@ -77,7 +77,7 @@ pub async fn import(_args: &Arguments) {
     eprintln!("Tracker url: {}", tracker_url.green());
 
     let database = Arc::new(
-        connect_database(&settings.database.connect_url)
+        database::connect(&settings.database.connect_url)
             .await
             .expect("Database error."),
     );

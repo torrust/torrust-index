@@ -1,5 +1,6 @@
 use serde_bytes::ByteBuf;
-use torrust_index_backend::databases::database::{Database, DatabaseError};
+use torrust_index_backend::databases::database;
+use torrust_index_backend::databases::database::Database;
 use torrust_index_backend::models::torrent::TorrentListing;
 use torrust_index_backend::models::torrent_file::{Torrent, TorrentInfo};
 use torrust_index_backend::models::user::UserProfile;
@@ -19,12 +20,12 @@ const TEST_TORRENT_FILE_SIZE: i64 = 128_000;
 const TEST_TORRENT_SEEDERS: i64 = 437;
 const TEST_TORRENT_LEECHERS: i64 = 1289;
 
-async fn add_test_user(db: &Box<dyn Database>) -> Result<i64, DatabaseError> {
+async fn add_test_user(db: &Box<dyn Database>) -> Result<i64, database::Error> {
     db.insert_user_and_get_id(TEST_USER_USERNAME, TEST_USER_EMAIL, TEST_USER_PASSWORD)
         .await
 }
 
-async fn add_test_torrent_category(db: &Box<dyn Database>) -> Result<i64, DatabaseError> {
+async fn add_test_torrent_category(db: &Box<dyn Database>) -> Result<i64, database::Error> {
     db.insert_category_and_get_id(TEST_CATEGORY_NAME).await
 }
 

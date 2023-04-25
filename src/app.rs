@@ -11,7 +11,7 @@ use crate::bootstrap::logging;
 use crate::cache::image::manager::ImageCacheService;
 use crate::common::AppData;
 use crate::config::Configuration;
-use crate::databases::database::connect_database;
+use crate::databases::database;
 use crate::mailer::MailerService;
 use crate::routes;
 use crate::tracker::service::Service;
@@ -43,7 +43,7 @@ pub async fn run(configuration: Configuration) -> Running {
 
     // Build app dependencies
 
-    let database = Arc::new(connect_database(&database_connect_url).await.expect("Database error."));
+    let database = Arc::new(database::connect(&database_connect_url).await.expect("Database error."));
     let auth = Arc::new(AuthorizationService::new(cfg.clone(), database.clone()));
     let tracker_service = Arc::new(Service::new(cfg.clone(), database.clone()).await);
     let tracker_statistics_importer =
