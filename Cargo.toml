@@ -1,9 +1,9 @@
 [package]
+authors = ["Mick van Dijke <mick@dutchbits.nl>", "Wesley Bijleveld <wesley@dutchbits.nl>"]
+default-run = "main"
+edition = "2021"
 name = "torrust-index-backend"
 version = "2.0.0-dev.1"
-authors = ["Mick van Dijke <mick@dutchbits.nl>", "Wesley Bijleveld <wesley@dutchbits.nl>"]
-edition = "2021"
-default-run = "main"
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3
@@ -12,35 +12,35 @@ opt-level = 3
 e2e-tests = []
 
 [dependencies]
-actix-web = "4.0.0-beta.8"
-actix-multipart = "0.4.0-beta.5"
 actix-cors = "0.6.0-beta.2"
+actix-multipart = "0.4.0-beta.5"
+actix-web = "4.0.0-beta.8"
+argon2 = "0.4.1"
 async-trait = "0.1.52"
-futures = "0.3.5"
-sqlx = { version = "0.6.1", features = [ "runtime-tokio-native-tls", "sqlite", "mysql", "migrate", "time" ] }
+chrono = "0.4.19"
 config = "0.13"
-toml = "0.5"
 derive_more = "0.99"
+fern = "0.6.2"
+futures = "0.3.5"
+jsonwebtoken = "8.1.1"
+lettre = { version = "0.10.0-rc.3", features = ["builder", "smtp-transport", "tokio1", "tokio1-rustls-tls"] }
+log = "0.4.17"
+pbkdf2 = "0.11.0"
+rand_core = { version = "0.6", features = ["std"] }
+regex = "1.6.0"
+reqwest = { version = "0.11.4", features = ["json"] }
+sailfish = "0.4.0"
 serde = { version = "1.0", features = ["rc"] }
-serde_derive = "1"
-serde_json = "1"
 serde_bencode = "0.2.3"
 serde_bytes = "0.11"
-urlencoding = "2.1.0"
-argon2 = "0.4.1"
-rand_core = { version = "0.6", features = ["std"] }
-chrono = "0.4.19"
-jsonwebtoken = "8.1.1"
+serde_derive = "1"
+serde_json = "1"
 sha-1 = "0.10.0"
-reqwest = { version = "0.11.4", features = [ "json" ] }
-tokio = {version = "1.13", features = ["macros", "io-util", "net", "time", "rt-multi-thread", "fs", "sync", "signal"]}
-lettre = { version = "0.10.0-rc.3", features = ["builder", "tokio1", "tokio1-rustls-tls", "smtp-transport"]}
-sailfish = "0.4.0"
-regex = "1.6.0"
-pbkdf2 = "0.11.0"
+sqlx = { version = "0.6.1", features = ["migrate", "mysql", "runtime-tokio-native-tls", "sqlite", "time"] }
 text-colorizer = "1.0.0"
-log = "0.4.17"
-fern = "0.6.2"
+tokio = { version = "1.13", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+toml = "0.5"
+urlencoding = "2.1.0"
 
 [dev-dependencies]
 rand = "0.8.5"

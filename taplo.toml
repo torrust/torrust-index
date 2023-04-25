@@ -1,0 +1,8 @@
+[formatting]
+array_auto_expand = false
+column_width = 130
+compact_arrays = true
+reorder_arrays = true
+
+# todo: add turn this on for the Cargo.toml ["dependencies", "*-dependencies"] sectoins.
+reorder_keys = false
