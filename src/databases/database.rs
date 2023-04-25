@@ -3,7 +3,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
 use crate::databases::mysql::Mysql;
-use crate::databases::sqlite::SqliteDatabase;
+use crate::databases::sqlite::Sqlite;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
@@ -71,7 +71,7 @@ pub enum Error {
 pub async fn connect(db_path: &str) -> Result<Box<dyn Database>, Error> {
     match &db_path.chars().collect::<Vec<char>>() as &[char] {
         ['s', 'q', 'l', 'i', 't', 'e', ..] => {
-            let db = SqliteDatabase::new(db_path).await;
+            let db = Sqlite::new(db_path).await;
             Ok(Box::new(db))
         }
         ['m', 'y', 's', 'q', 'l', ..] => {

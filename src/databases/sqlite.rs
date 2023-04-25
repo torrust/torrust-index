@@ -14,11 +14,11 @@ use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 use crate::utils::clock::current_time;
 use crate::utils::hex::bytes_to_hex;
 
-pub struct SqliteDatabase {
+pub struct Sqlite {
     pub pool: SqlitePool,
 }
 
-impl SqliteDatabase {
+impl Sqlite {
     pub async fn new(database_url: &str) -> Self {
         let db = SqlitePoolOptions::new()
             .connect(database_url)
@@ -35,7 +35,7 @@ impl SqliteDatabase {
 }
 
 #[async_trait]
-impl Database for SqliteDatabase {
+impl Database for Sqlite {
     fn get_database_driver(&self) -> Driver {
         Driver::Sqlite3
     }
@@ -138,7 +138,7 @@ impl Database for SqliteDatabase {
         const HOUR_IN_SECONDS: i64 = 3600;
 
         // casting current_time() to i64 will overflow in the year 2262
-        let current_time_plus_hour = (current_time() as i64) + HOUR_IN_SECONDS;
+        let current_time_plus_hour = i64::try_from(current_time()).unwrap().saturating_add(HOUR_IN_SECONDS);
 
         // get tracker key that is valid for at least one hour from now
         query_as::<_, TrackerKey>("SELECT tracker_key AS key, date_expiry AS valid_until FROM torrust_tracker_keys WHERE user_id = $1 AND date_expiry > $2 ORDER BY date_expiry DESC")
@@ -320,13 +320,13 @@ impl Database for SqliteDatabase {
                     i += 1;
                 }
             }
-            if !category_filters.is_empty() {
+            if category_filters.is_empty() {
+                String::new()
+            } else {
                 format!(
                     "INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND ({}) ",
                     category_filters
                 )
-            } else {
-                String::new()
             }
         } else {
             String::new()
@@ -360,18 +360,19 @@ impl Database for SqliteDatabase {
 
         let res: Vec<TorrentListing> = sqlx::query_as::<_, TorrentListing>(&query_string)
             .bind(title)
-            .bind(offset as i64)
+            .bind(i64::saturating_add_unsigned(0, offset))
             .bind(limit)
             .fetch_all(&self.pool)
             .await
             .map_err(|_| database::Error::Error)?;
 
         Ok(TorrentsResponse {
-            total: count as u32,
+            total: u32::try_from(count).expect("variable `count` is larger than u32"),
             results: res,
         })
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn insert_torrent_and_get_id(
         &self,
         torrent: &Torrent,
