@@ -12,10 +12,9 @@ use crate::cache::image::manager::ImageCacheService;
 use crate::common::AppData;
 use crate::config::Configuration;
 use crate::databases::database;
-use crate::mailer::MailerService;
-use crate::routes;
 use crate::tracker::service::Service;
 use crate::tracker::statistics_importer::StatisticsImporter;
+use crate::{mailer, routes};
 
 pub struct Running {
     pub api_server: Server,
@@ -48,7 +47,7 @@ pub async fn run(configuration: Configuration) -> Running {
     let tracker_service = Arc::new(Service::new(cfg.clone(), database.clone()).await);
     let tracker_statistics_importer =
         Arc::new(StatisticsImporter::new(cfg.clone(), tracker_service.clone(), database.clone()).await);
-    let mailer_service = Arc::new(MailerService::new(cfg.clone()).await);
+    let mailer_service = Arc::new(mailer::Service::new(cfg.clone()).await);
     let image_cache_service = Arc::new(ImageCacheService::new(cfg.clone()).await);
 
     // Build app container

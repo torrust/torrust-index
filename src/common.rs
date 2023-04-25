@@ -4,7 +4,7 @@ use crate::auth::AuthorizationService;
 use crate::cache::image::manager::ImageCacheService;
 use crate::config::Configuration;
 use crate::databases::database::Database;
-use crate::mailer::MailerService;
+use crate::mailer;
 use crate::tracker::service::Service;
 use crate::tracker::statistics_importer::StatisticsImporter;
 
@@ -18,7 +18,7 @@ pub struct AppData {
     pub auth: Arc<AuthorizationService>,
     pub tracker_service: Arc<Service>,
     pub tracker_statistics_importer: Arc<StatisticsImporter>,
-    pub mailer: Arc<MailerService>,
+    pub mailer: Arc<mailer::Service>,
     pub image_cache_manager: Arc<ImageCacheService>,
 }
 
@@ -29,7 +29,7 @@ impl AppData {
         auth: Arc<AuthorizationService>,
         tracker_service: Arc<Service>,
         tracker_statistics_importer: Arc<StatisticsImporter>,
-        mailer: Arc<MailerService>,
+        mailer: Arc<mailer::Service>,
         image_cache_manager: Arc<ImageCacheService>,
     ) -> AppData {
         AppData {
