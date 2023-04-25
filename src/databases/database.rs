@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
-use crate::databases::mysql::MysqlDatabase;
+use crate::databases::mysql::Mysql;
 use crate::databases::sqlite::SqliteDatabase;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
@@ -75,7 +75,7 @@ pub async fn connect(db_path: &str) -> Result<Box<dyn Database>, Error> {
             Ok(Box::new(db))
         }
         ['m', 'y', 's', 'q', 'l', ..] => {
-            let db = MysqlDatabase::new(db_path).await;
+            let db = Mysql::new(db_path).await;
             Ok(Box::new(db))
         }
         _ => Err(Error::UnrecognizedDatabaseDriver),
