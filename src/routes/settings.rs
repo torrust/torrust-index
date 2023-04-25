@@ -1,7 +1,7 @@
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 
 use crate::common::WebAppData;
-use crate::config::AppConfiguration;
+use crate::config;
 use crate::errors::{ServiceError, ServiceResult};
 use crate::models::response::OkResponse;
 
@@ -27,7 +27,7 @@ pub async fn get_settings(req: HttpRequest, app_data: WebAppData) -> ServiceResu
         return Err(ServiceError::Unauthorized);
     }
 
-    let settings: tokio::sync::RwLockReadGuard<AppConfiguration> = app_data.cfg.settings.read().await;
+    let settings: tokio::sync::RwLockReadGuard<config::TorrustBackend> = app_data.cfg.settings.read().await;
 
     Ok(HttpResponse::Ok().json(OkResponse { data: &*settings }))
 }
@@ -57,7 +57,7 @@ pub async fn get_site_name(app_data: WebAppData) -> ServiceResult<impl Responder
 /// - The settings could not be updated because they were loaded from env vars.
 pub async fn update_settings_handler(
     req: HttpRequest,
-    payload: web::Json<AppConfiguration>,
+    payload: web::Json<config::TorrustBackend>,
     app_data: WebAppData,
 ) -> ServiceResult<impl Responder> {
     // check for user

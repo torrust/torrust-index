@@ -11,6 +11,14 @@ pub struct Website {
     pub name: String,
 }
 
+impl Default for Website {
+    fn default() -> Self {
+        Self {
+            name: "Torrust".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TrackerMode {
     // todo: use https://crates.io/crates/torrust-tracker-primitives
@@ -18,6 +26,12 @@ pub enum TrackerMode {
     Private,
     Whitelisted,
     PrivateWhitelisted,
+}
+
+impl Default for TrackerMode {
+    fn default() -> Self {
+        Self::Public
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,6 +43,18 @@ pub struct Tracker {
     pub token_valid_seconds: u64,
 }
 
+impl Default for Tracker {
+    fn default() -> Self {
+        Self {
+            url: "udp://localhost:6969".to_string(),
+            mode: TrackerMode::default(),
+            api_url: "http://localhost:1212".to_string(),
+            token: "MyAccessToken".to_string(),
+            token_valid_seconds: 7_257_600,
+        }
+    }
+}
+
 /// Port 0 means that the OS will choose a random free port.
 pub const FREE_PORT: u16 = 0;
 
@@ -38,11 +64,26 @@ pub struct Network {
     pub base_url: Option<String>,
 }
 
+impl Default for Network {
+    fn default() -> Self {
+        Self {
+            port: 3000,
+            base_url: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EmailOnSignup {
     Required,
     Optional,
     None,
+}
+
+impl Default for EmailOnSignup {
+    fn default() -> Self {
+        Self::Optional
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,10 +94,30 @@ pub struct Auth {
     pub secret_key: String,
 }
 
+impl Default for Auth {
+    fn default() -> Self {
+        Self {
+            email_on_signup: EmailOnSignup::default(),
+            min_password_length: 6,
+            max_password_length: 64,
+            secret_key: "MaxVerstappenWC2021".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Database {
     pub connect_url: String,
     pub torrent_info_update_interval: u64,
+}
+
+impl Default for Database {
+    fn default() -> Self {
+        Self {
+            connect_url: "sqlite://data.db?mode=rwc".to_string(),
+            torrent_info_update_interval: 3600,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,6 +131,21 @@ pub struct Mail {
     pub port: u16,
 }
 
+impl Default for Mail {
+    fn default() -> Self {
+        Self {
+            email_verification_enabled: false,
+            from: "example@email.com".to_string(),
+            reply_to: "noreply@email.com".to_string(),
+            username: String::default(),
+            password: String::default(),
+            server: String::default(),
+            port: 25,
+        }
+    }
+}
+
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageCache {
     pub max_request_timeout_ms: u64,
@@ -85,8 +161,29 @@ pub struct Api {
     pub max_torrent_page_size: u8,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppConfiguration {
+impl Default for Api {
+    fn default() -> Self {
+        Self {
+            default_torrent_page_size: 10,
+            max_torrent_page_size: 30,
+        }
+    }
+}
+
+impl Default for ImageCache {
+    fn default() -> Self {
+        Self {
+            max_request_timeout_ms: 1000,
+            capacity: 128_000_000,
+            entry_size_limit: 4_000_000,
+            user_quota_period_seconds: 3600,
+            user_quota_bytes: 64_000_000,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct TorrustBackend {
     pub website: Website,
     pub tracker: Tracker,
     pub net: Network,
@@ -97,67 +194,16 @@ pub struct AppConfiguration {
     pub api: Api,
 }
 
-impl Default for AppConfiguration {
-    fn default() -> Self {
-        Self {
-            website: Website {
-                name: "Torrust".to_string(),
-            },
-            tracker: Tracker {
-                url: "udp://localhost:6969".to_string(),
-                mode: TrackerMode::Public,
-                api_url: "http://localhost:1212".to_string(),
-                token: "MyAccessToken".to_string(),
-                token_valid_seconds: 7_257_600,
-            },
-            net: Network {
-                port: 3000,
-                base_url: None,
-            },
-            auth: Auth {
-                email_on_signup: EmailOnSignup::Optional,
-                min_password_length: 6,
-                max_password_length: 64,
-                secret_key: "MaxVerstappenWC2021".to_string(),
-            },
-            database: Database {
-                connect_url: "sqlite://data.db?mode=rwc".to_string(),
-                torrent_info_update_interval: 3600,
-            },
-            mail: Mail {
-                email_verification_enabled: false,
-                from: "example@email.com".to_string(),
-                reply_to: "noreply@email.com".to_string(),
-                username: String::new(),
-                password: String::new(),
-                server: String::new(),
-                port: 25,
-            },
-            image_cache: ImageCache {
-                max_request_timeout_ms: 1000,
-                capacity: 128_000_000,
-                entry_size_limit: 4_000_000,
-                user_quota_period_seconds: 3600,
-                user_quota_bytes: 64_000_000,
-            },
-            api: Api {
-                default_torrent_page_size: 10,
-                max_torrent_page_size: 30,
-            },
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct Configuration {
-    pub settings: RwLock<AppConfiguration>,
+    pub settings: RwLock<TorrustBackend>,
     pub config_path: Option<String>,
 }
 
 impl Default for Configuration {
-    fn default() -> Self {
-        Self {
-            settings: RwLock::new(AppConfiguration::default()),
+    fn default() -> Configuration {
+        Configuration {
+            settings: RwLock::new(TorrustBackend::default()),
             config_path: None,
         }
     }
@@ -165,6 +211,11 @@ impl Default for Configuration {
 
 impl Configuration {
     /// Loads the configuration from the configuration file.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error no configuration in the `CONFIG_PATH` exists, and a new file is is created.
+    /// This function will return an error if the `config` is not a valid `TorrustConfig` document.
     pub async fn load_from_file(config_path: &str) -> Result<Configuration, ConfigError> {
         let config_builder = Config::builder();
 
@@ -183,7 +234,7 @@ impl Configuration {
             ));
         }
 
-        let torrust_config: AppConfiguration = match config.try_deserialize() {
+        let torrust_config: TorrustBackend = match config.try_deserialize() {
             Ok(data) => Ok(data),
             Err(e) => Err(ConfigError::Message(format!("Errors while processing config: {}.", e))),
         }?;
@@ -207,7 +258,7 @@ impl Configuration {
                 let config_builder = Config::builder()
                     .add_source(File::from_str(&config_toml, FileFormat::Toml))
                     .build()?;
-                let torrust_config: AppConfiguration = config_builder.try_deserialize()?;
+                let torrust_config: TorrustBackend = config_builder.try_deserialize()?;
                 Ok(Configuration {
                     settings: RwLock::new(torrust_config),
                     config_path: None,
@@ -219,6 +270,7 @@ impl Configuration {
         }
     }
 
+    /// Returns the save to file of this [`Configuration`].
     pub async fn save_to_file(&self, config_path: &str) {
         let settings = self.settings.read().await;
 
@@ -229,13 +281,17 @@ impl Configuration {
         fs::write(config_path, toml_string).expect("Could not write to file!");
     }
 
-    /// Updates the settings and saves them to the configuration file.
+    /// Update the settings file based upon a supplied `new_settings`.
+    ///
+    /// # Errors
+    ///
+    /// Todo: Make an error if the save fails.
     ///
     /// # Panics
     ///
     /// Will panic if the configuration file path is not defined. That happens
     /// when the configuration was loaded from the environment variable.
-    pub async fn update_settings(&self, new_settings: AppConfiguration) {
+    pub async fn update_settings(&self, new_settings: TorrustBackend) -> Result<(), ()> {
         match &self.config_path {
             Some(config_path) => {
                 let mut settings = self.settings.write().await;
@@ -244,6 +300,8 @@ impl Configuration {
                 drop(settings);
 
                 let _ = self.save_to_file(config_path).await;
+
+                Ok(())
             }
             None => panic!(
                 "Cannot update settings when the config file path is not defined. For example: when it's loaded from env var."
