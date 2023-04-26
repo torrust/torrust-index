@@ -177,8 +177,6 @@ async fn it_should_not_allow_a_logged_in_user_to_renew_an_authentication_token_w
         })
         .await;
 
-    println!("Response body: {}", response.body);
-
     let res: TokenRenewalResponse = serde_json::from_str(&response.body).unwrap();
 
     assert_eq!(

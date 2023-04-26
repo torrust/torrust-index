@@ -27,7 +27,7 @@ pub async fn get_settings(req: HttpRequest, app_data: WebAppData) -> ServiceResu
         return Err(ServiceError::Unauthorized);
     }
 
-    let settings = app_data.cfg.settings.read().await;
+    let settings: tokio::sync::RwLockReadGuard<TorrustConfig> = app_data.cfg.settings.read().await;
 
     Ok(HttpResponse::Ok().json(OkResponse { data: &*settings }))
 }
