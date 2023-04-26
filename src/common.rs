@@ -4,10 +4,8 @@ use crate::auth::AuthorizationService;
 use crate::cache::image::manager::ImageCacheService;
 use crate::config::Configuration;
 use crate::databases::database::Database;
-use crate::mailer;
-use crate::tracker::service::Service;
 use crate::tracker::statistics_importer::StatisticsImporter;
-
+use crate::{mailer, tracker};
 pub type Username = String;
 
 pub type WebAppData = actix_web::web::Data<Arc<AppData>>;
@@ -16,7 +14,7 @@ pub struct AppData {
     pub cfg: Arc<Configuration>,
     pub database: Arc<Box<dyn Database>>,
     pub auth: Arc<AuthorizationService>,
-    pub tracker_service: Arc<Service>,
+    pub tracker_service: Arc<tracker::service::Service>,
     pub tracker_statistics_importer: Arc<StatisticsImporter>,
     pub mailer: Arc<mailer::Service>,
     pub image_cache_manager: Arc<ImageCacheService>,
@@ -27,7 +25,7 @@ impl AppData {
         cfg: Arc<Configuration>,
         database: Arc<Box<dyn Database>>,
         auth: Arc<AuthorizationService>,
-        tracker_service: Arc<Service>,
+        tracker_service: Arc<tracker::service::Service>,
         tracker_statistics_importer: Arc<StatisticsImporter>,
         mailer: Arc<mailer::Service>,
         image_cache_manager: Arc<ImageCacheService>,
