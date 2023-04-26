@@ -9,14 +9,19 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/category").service(
             web::resource("")
-                .route(web::get().to(get_categories))
-                .route(web::post().to(add_category))
-                .route(web::delete().to(delete_category)),
+                .route(web::get().to(get))
+                .route(web::post().to(add))
+                .route(web::delete().to(delete)),
         ),
     );
 }
 
-pub async fn get_categories(app_data: WebAppData) -> ServiceResult<impl Responder> {
+/// Gets the Categories
+///
+/// # Errors
+///
+/// This function will return an error if there is a database error.
+pub async fn get(app_data: WebAppData) -> ServiceResult<impl Responder> {
     let categories = app_data.database.get_categories().await?;
 
     Ok(HttpResponse::Ok().json(OkResponse { data: categories }))
@@ -28,7 +33,13 @@ pub struct Category {
     pub icon: Option<String>,
 }
 
-pub async fn add_category(req: HttpRequest, payload: web::Json<Category>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+/// Adds a New Category
+///
+/// # Errors
+///
+/// This function will return an error if unable to get user.
+/// This function will return an error if unable to insert into the database the new category.
+pub async fn add(req: HttpRequest, payload: web::Json<Category>, app_data: WebAppData) -> ServiceResult<impl Responder> {
     // check for user
     let user = app_data.auth.get_user_compact_from_request(&req).await?;
 
@@ -44,11 +55,13 @@ pub async fn add_category(req: HttpRequest, payload: web::Json<Category>, app_da
     }))
 }
 
-pub async fn delete_category(
-    req: HttpRequest,
-    payload: web::Json<Category>,
-    app_data: WebAppData,
-) -> ServiceResult<impl Responder> {
+/// Deletes a Category
+///
+/// # Errors
+///
+/// This function will return an error if unable to get user.
+/// This function will return an error if unable to delete the category from the database.
+pub async fn delete(req: HttpRequest, payload: web::Json<Category>, app_data: WebAppData) -> ServiceResult<impl Responder> {
     // code-review: why do we need to send the whole category object to delete it?
     // And we should use the ID instead of the name, because the name could change
     // or we could add support for multiple languages.
