@@ -41,7 +41,7 @@ pub struct TorrentInfo {
 
 impl TorrentInfo {
     /// torrent file can only hold a pieces key or a root hash key:
-    /// http://www.bittorrent.org/beps/bep_0030.html
+    /// [BEP 39](http://www.bittorrent.org/beps/bep_0030.html)
     #[must_use]
     pub fn get_pieces_as_string(&self) -> String {
         match &self.pieces {
@@ -54,7 +54,9 @@ impl TorrentInfo {
     pub fn get_root_hash_as_i64(&self) -> i64 {
         match &self.root_hash {
             None => 0i64,
-            Some(root_hash) => root_hash.parse::<i64>().unwrap(),
+            Some(root_hash) => root_hash
+                .parse::<i64>()
+                .expect("variable `root_hash` cannot be converted into a `i64`"),
         }
     }
 
@@ -100,13 +102,7 @@ impl Torrent {
         torrent_files: Vec<TorrentFile>,
         torrent_announce_urls: Vec<Vec<String>>,
     ) -> Self {
-        let private = if let Some(private_i64) = torrent_info.private {
-            // must fit in a byte
-            let private = if (0..256).contains(&private_i64) { private_i64 } else { 0 };
-            Some(private as u8)
-        } else {
-            None
-        };
+        let private = u8::try_from(torrent_info.private.unwrap_or(0)).ok();
 
         // the info part of the torrent file
         let mut info = TorrentInfo {
@@ -125,20 +121,27 @@ impl Torrent {
         if torrent_info.root_hash > 0 {
             info.root_hash = Some(torrent_info.pieces);
         } else {
-            let pieces = hex_to_bytes(&torrent_info.pieces).unwrap();
+            let pieces = hex_to_bytes(&torrent_info.pieces).expect("variable `torrent_info.pieces` is not a valid hex string");
             info.pieces = Some(ByteBuf::from(pieces));
         }
 
         // either set the single file or the multiple files information
         if torrent_files.len() == 1 {
-            // can safely unwrap because we know there is 1 element
-            let torrent_file = torrent_files.first().unwrap();
+            let torrent_file = torrent_files
+                .first()
+                .expect("vector `torrent_files` should have at least one element");
 
             info.md5sum = torrent_file.md5sum.clone();
 
             info.length = Some(torrent_file.length);
 
-            let path = if torrent_file.path.first().as_ref().unwrap().is_empty() {
+            let path = if torrent_file
+                .path
+                .first()
+                .as_ref()
+                .expect("the vector for the `path` should have at least one element")
+                .is_empty()
+            {
                 None
             } else {
                 Some(torrent_file.path.clone())
@@ -177,7 +180,7 @@ impl Torrent {
 
     #[must_use]
     pub fn calculate_info_hash_as_bytes(&self) -> [u8; 20] {
-        let info_bencoded = ser::to_bytes(&self.info).unwrap();
+        let info_bencoded = ser::to_bytes(&self.info).expect("variable `info` was not able to be serialized.");
         let mut hasher = Sha1::new();
         hasher.update(info_bencoded);
         let sum_hex = hasher.finalize();
@@ -193,10 +196,9 @@ impl Torrent {
 
     #[must_use]
     pub fn file_size(&self) -> i64 {
-        if self.info.length.is_some() {
-            self.info.length.unwrap()
-        } else {
-            match &self.info.files {
+        match self.info.length {
+            Some(length) => length,
+            None => match &self.info.files {
                 None => 0,
                 Some(files) => {
                     let mut file_size = 0;
@@ -205,22 +207,16 @@ impl Torrent {
                     }
                     file_size
                 }
-            }
+            },
         }
     }
 
     #[must_use]
     pub fn announce_urls(&self) -> Vec<String> {
-        if self.announce_list.is_none() {
-            return vec![self.announce.clone().unwrap()];
+        match &self.announce_list {
+            Some(list) => list.clone().into_iter().flatten().collect::<Vec<String>>(),
+            None => vec![self.announce.clone().expect("variable `announce` should not be None")],
         }
-
-        self.announce_list
-            .clone()
-            .unwrap()
-            .into_iter()
-            .flatten()
-            .collect::<Vec<String>>()
     }
 
     #[must_use]
@@ -234,6 +230,7 @@ impl Torrent {
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DbTorrentFile {
     pub path: Option<String>,
