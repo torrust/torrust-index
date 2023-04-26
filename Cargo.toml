@@ -44,3 +44,4 @@ fern = "0.6.2"
 
 [dev-dependencies]
 rand = "0.8.5"
+tempfile = "3.5.0"
