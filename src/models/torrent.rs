@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::models::torrent_file::Torrent;
-use crate::routes::torrent::CreateTorrent;
+use crate::routes::torrent::Create;
 
 #[allow(clippy::module_name_repetitions)]
 #[allow(dead_code)]
@@ -22,6 +22,6 @@ pub struct TorrentListing {
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub struct TorrentRequest {
-    pub fields: CreateTorrent,
+    pub fields: Create,
     pub torrent: Torrent,
 }
