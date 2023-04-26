@@ -17,7 +17,7 @@ use crate::models::torrent::TorrentRequest;
 use crate::utils::parse_torrent;
 use crate::AsCSV;
 
-pub fn init_routes(cfg: &mut web::ServiceConfig) {
+pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/torrent")
             .service(web::resource("/upload").route(web::post().to(upload_torrent)))

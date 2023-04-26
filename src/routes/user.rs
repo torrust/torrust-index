@@ -16,7 +16,7 @@ use crate::models::user::UserAuthentication;
 use crate::utils::clock::current_time;
 use crate::utils::regex::validate_email_address;
 
-pub fn init_routes(cfg: &mut web::ServiceConfig) {
+pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/user")
             .service(web::resource("/register").route(web::post().to(register)))

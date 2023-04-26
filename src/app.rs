@@ -91,7 +91,7 @@ pub async fn run(configuration: Configuration) -> Running {
             .wrap(Cors::permissive())
             .app_data(web::Data::new(app_data.clone()))
             .wrap(middleware::Logger::default())
-            .configure(routes::init_routes)
+            .configure(routes::init)
     })
     .bind((ip, net_port))
     .expect("can't bind server to socket address");

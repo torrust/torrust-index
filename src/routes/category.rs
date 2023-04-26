@@ -5,7 +5,7 @@ use crate::common::WebAppData;
 use crate::errors::{ServiceError, ServiceResult};
 use crate::models::response::OkResponse;
 
-pub fn init_routes(cfg: &mut web::ServiceConfig) {
+pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/category").service(
             web::resource("")
