@@ -8,16 +8,19 @@ pub enum OkResponses {
     TokenResponse(TokenResponse),
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct OkResponse<T> {
     pub data: T,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ErrorResponse<T> {
     pub errors: Vec<T>,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenResponse {
     pub token: String,
@@ -25,11 +28,13 @@ pub struct TokenResponse {
     pub admin: bool,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewTorrentResponse {
     pub torrent_id: i64,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct TorrentResponse {
     pub torrent_id: i64,
@@ -72,6 +77,7 @@ impl TorrentResponse {
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug, sqlx::FromRow)]
 pub struct TorrentsResponse {
     pub total: u32,
