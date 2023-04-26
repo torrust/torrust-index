@@ -1,7 +1,7 @@
-use reqwest::Response as ReqwestResponse;
 use serde::Serialize;
 
 use super::contexts::category::{AddCategoryForm, DeleteCategoryForm};
+use super::contexts::settings::UpdateSettingsForm;
 use super::contexts::user::{LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username};
 use crate::e2e::connection_info::ConnectionInfo;
 use crate::e2e::http::{Query, ReqwestQuery};
@@ -49,6 +49,24 @@ impl Client {
         self.http_client.get("", Query::empty()).await
     }
 
+    // Context: settings
+
+    pub async fn get_public_settings(&self) -> Response {
+        self.http_client.get("settings/public", Query::empty()).await
+    }
+
+    pub async fn get_site_name(&self) -> Response {
+        self.http_client.get("settings/name", Query::empty()).await
+    }
+
+    pub async fn get_settings(&self) -> Response {
+        self.http_client.get("settings", Query::empty()).await
+    }
+
+    pub async fn update_settings(&self, update_settings_form: UpdateSettingsForm) -> Response {
+        self.http_client.post("settings", &update_settings_form).await
+    }
+
     // Context: user
 
     pub async fn register_user(&self, registration_form: RegistrationForm) -> Response {
@@ -87,7 +105,26 @@ impl Http {
     }
 
     pub async fn get(&self, path: &str, params: Query) -> Response {
-        self.get_request_with_query(path, params).await
+        let response = match &self.connection_info.token {
+            Some(token) => reqwest::Client::builder()
+                .build()
+                .unwrap()
+                .get(self.base_url(path).clone())
+                .query(&ReqwestQuery::from(params))
+                .bearer_auth(token)
+                .send()
+                .await
+                .unwrap(),
+            None => reqwest::Client::builder()
+                .build()
+                .unwrap()
+                .get(self.base_url(path).clone())
+                .query(&ReqwestQuery::from(params))
+                .send()
+                .await
+                .unwrap(),
+        };
+        Response::from(response).await
     }
 
     pub async fn post<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> Response {
@@ -145,26 +182,7 @@ impl Http {
         Response::from(response).await
     }
 
-    pub async fn get_request_with_query(&self, path: &str, params: Query) -> Response {
-        get(&self.base_url(path), Some(params)).await
-    }
-
     fn base_url(&self, path: &str) -> String {
         format!("http://{}{}{path}", &self.connection_info.bind_address, &self.base_path)
     }
-}
-
-async fn get(path: &str, query: Option<Query>) -> Response {
-    let response: ReqwestResponse = match query {
-        Some(params) => reqwest::Client::builder()
-            .build()
-            .unwrap()
-            .get(path)
-            .query(&ReqwestQuery::from(params))
-            .send()
-            .await
-            .unwrap(),
-        None => reqwest::Client::builder().build().unwrap().get(path).send().await.unwrap(),
-    };
-    Response::from(response).await
 }
