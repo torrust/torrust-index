@@ -1,6 +1,7 @@
 use reqwest::Response as ReqwestResponse;
 use serde::Serialize;
 
+use super::contexts::category::{AddCategoryForm, DeleteCategoryForm};
 use super::contexts::user::{LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username};
 use crate::e2e::connection_info::ConnectionInfo;
 use crate::e2e::http::{Query, ReqwestQuery};
@@ -32,6 +33,14 @@ impl Client {
 
     pub async fn get_categories(&self) -> Response {
         self.http_client.get("category", Query::empty()).await
+    }
+
+    pub async fn add_category(&self, add_category_form: AddCategoryForm) -> Response {
+        self.http_client.post("category", &add_category_form).await
+    }
+
+    pub async fn delete_category(&self, delete_category_form: DeleteCategoryForm) -> Response {
+        self.http_client.delete_with_body("category", &delete_category_form).await
     }
 
     // Context: root
@@ -82,12 +91,21 @@ impl Http {
     }
 
     pub async fn post<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> Response {
-        let response = reqwest::Client::new()
-            .post(self.base_url(path).clone())
-            .json(&form)
-            .send()
-            .await
-            .unwrap();
+        let response = match &self.connection_info.token {
+            Some(token) => reqwest::Client::new()
+                .post(self.base_url(path).clone())
+                .bearer_auth(token)
+                .json(&form)
+                .send()
+                .await
+                .unwrap(),
+            None => reqwest::Client::new()
+                .post(self.base_url(path).clone())
+                .json(&form)
+                .send()
+                .await
+                .unwrap(),
+        };
         Response::from(response).await
     }
 
@@ -101,6 +119,25 @@ impl Http {
                 .unwrap(),
             None => reqwest::Client::new()
                 .delete(self.base_url(path).clone())
+                .send()
+                .await
+                .unwrap(),
+        };
+        Response::from(response).await
+    }
+
+    async fn delete_with_body<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> Response {
+        let response = match &self.connection_info.token {
+            Some(token) => reqwest::Client::new()
+                .delete(self.base_url(path).clone())
+                .bearer_auth(token)
+                .json(&form)
+                .send()
+                .await
+                .unwrap(),
+            None => reqwest::Client::new()
+                .delete(self.base_url(path).clone())
+                .json(&form)
                 .send()
                 .await
                 .unwrap(),

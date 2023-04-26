@@ -49,6 +49,10 @@ pub async fn delete_category(
     payload: web::Json<Category>,
     app_data: WebAppData,
 ) -> ServiceResult<impl Responder> {
+    // code-review: why do we need to send the whole category object to delete it?
+    // And we should use the ID instead of the name, because the name could change
+    // or we could add support for multiple languages.
+
     // check for user
     let user = app_data.auth.get_user_compact_from_request(&req).await?;
 

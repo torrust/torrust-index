@@ -1,5 +1,6 @@
 use reqwest::Response as ReqwestResponse;
 
+#[derive(Debug)]
 pub struct Response {
     pub status: u16,
     pub content_type: Option<String>,
