@@ -63,23 +63,31 @@ pub enum Error {
     TorrentTitleAlreadyExists,
 }
 
+/// Get the Driver of the Database from the Connection String
+///
+/// # Errors
+///
+/// This function will return an `Error::UnrecognizedDatabaseDriver` if unable to match database type.
+pub fn get_driver(db_path: &str) -> Result<Driver, Error> {
+    match &db_path.chars().collect::<Vec<char>>() as &[char] {
+        ['s', 'q', 'l', 'i', 't', 'e', ..] => Ok(Driver::Sqlite3),
+        ['m', 'y', 's', 'q', 'l', ..] => Ok(Driver::Mysql),
+        _ => Err(Error::UnrecognizedDatabaseDriver),
+    }
+}
+
 /// Connect to a database.
 ///
 /// # Errors
 ///
 /// This function will return an `Error::UnrecognizedDatabaseDriver` if unable to match database type.
 pub async fn connect(db_path: &str) -> Result<Box<dyn Database>, Error> {
-    match &db_path.chars().collect::<Vec<char>>() as &[char] {
-        ['s', 'q', 'l', 'i', 't', 'e', ..] => {
-            let db = Sqlite::new(db_path).await;
-            Ok(Box::new(db))
-        }
-        ['m', 'y', 's', 'q', 'l', ..] => {
-            let db = Mysql::new(db_path).await;
-            Ok(Box::new(db))
-        }
-        _ => Err(Error::UnrecognizedDatabaseDriver),
-    }
+    let db_driver = self::get_driver(db_path)?;
+
+    Ok(match db_driver {
+        self::Driver::Sqlite3 => Box::new(Sqlite::new(db_path).await),
+        self::Driver::Mysql => Box::new(Mysql::new(db_path).await),
+    })
 }
 
 /// Trait for database implementations.
@@ -87,6 +95,10 @@ pub async fn connect(db_path: &str) -> Result<Box<dyn Database>, Error> {
 pub trait Database: Sync + Send {
     /// Return current database driver.
     fn get_database_driver(&self) -> Driver;
+
+    async fn new(db_path: &str) -> Self
+    where
+        Self: Sized;
 
     /// Add new user and return the newly inserted `user_id`.
     async fn insert_user_and_get_id(&self, username: &str, email: &str, password: &str) -> Result<i64, Error>;

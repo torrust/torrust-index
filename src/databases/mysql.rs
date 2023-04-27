@@ -11,15 +11,20 @@ use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::{DbTorrentAnnounceUrl, DbTorrentFile, DbTorrentInfo, Torrent, TorrentFile};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
-use crate::utils::clock::current_time;
-use crate::utils::hex::bytes_to_hex;
+use crate::utils::clock;
+use crate::utils::hex::from_bytes;
 
 pub struct Mysql {
     pub pool: MySqlPool,
 }
 
-impl Mysql {
-    pub async fn new(database_url: &str) -> Self {
+#[async_trait]
+impl Database for Mysql {
+    fn get_database_driver(&self) -> Driver {
+        Driver::Mysql
+    }
+
+    async fn new(database_url: &str) -> Self {
         let db = MySqlPoolOptions::new()
             .connect(database_url)
             .await
@@ -31,13 +36,6 @@ impl Mysql {
             .expect("Could not run database migrations.");
 
         Self { pool: db }
-    }
-}
-
-#[async_trait]
-impl Database for Mysql {
-    fn get_database_driver(&self) -> Driver {
-        Driver::Mysql
     }
 
     async fn insert_user_and_get_id(&self, username: &str, email: &str, password_hash: &str) -> Result<i64, database::Error> {
@@ -142,7 +140,7 @@ impl Database for Mysql {
     async fn get_user_tracker_key(&self, user_id: i64) -> Option<TrackerKey> {
         const HOUR_IN_SECONDS: i64 = 3600;
 
-        let current_time_plus_hour = i64::try_from(current_time()).unwrap().saturating_add(HOUR_IN_SECONDS);
+        let current_time_plus_hour = i64::try_from(clock::now()).unwrap().saturating_add(HOUR_IN_SECONDS);
 
         // get tracker key that is valid for at least one hour from now
         query_as::<_, TrackerKey>("SELECT tracker_key AS 'key', date_expiry AS valid_until FROM torrust_tracker_keys WHERE user_id = ? AND date_expiry > ? ORDER BY date_expiry DESC")
@@ -401,7 +399,7 @@ impl Database for Mysql {
 
         // torrent file can only hold a pieces key or a root hash key: http://www.bittorrent.org/beps/bep_0030.html
         let (pieces, root_hash): (String, bool) = if let Some(pieces) = &torrent.info.pieces {
-            (bytes_to_hex(pieces.as_ref()), false)
+            (from_bytes(pieces.as_ref()), false)
         } else {
             let root_hash = torrent.info.root_hash.as_ref().ok_or(database::Error::Error)?;
             (root_hash.to_string(), true)

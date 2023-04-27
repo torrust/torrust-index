@@ -2,7 +2,8 @@ use regex::Regex;
 
 #[must_use]
 pub fn validate_email_address(email_address_to_be_checked: &str) -> bool {
-    let email_regex = Regex::new(r"^([a-z\d_+]([a-z\d_+.]*[a-z\d_+])?)@([a-z\d]+([\-.][a-z\d]+)*\.[a-z]{2,6})").unwrap();
+    let email_regex = Regex::new(r"^([a-z\d_+]([a-z\d_+.]*[a-z\d_+])?)@([a-z\d]+([\-.][a-z\d]+)*\.[a-z]{2,6})")
+        .expect("regex failed to compile");
 
     email_regex.is_match(email_address_to_be_checked)
 }
@@ -27,6 +28,6 @@ mod tests {
 
         assert!(validate_email_address("test@torrust.com"));
 
-        assert!(validate_email_address("t@torrust.org"))
+        assert!(validate_email_address("t@torrust.org"));
     }
 }

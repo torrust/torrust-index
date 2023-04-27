@@ -7,7 +7,7 @@ use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::errors::ServiceError;
 use crate::models::user::{UserClaims, UserCompact};
-use crate::utils::clock::current_time;
+use crate::utils::clock;
 
 pub struct AuthorizationService {
     cfg: Arc<Configuration>,
@@ -26,7 +26,7 @@ impl AuthorizationService {
         // create JWT that expires in two weeks
         let key = settings.auth.secret_key.as_bytes();
         // TODO: create config option for setting the token validity in seconds
-        let exp_date = current_time() + 1_209_600; // two weeks from now
+        let exp_date = clock::now() + 1_209_600; // two weeks from now
 
         let claims = UserClaims { user, exp: exp_date };
 
@@ -47,7 +47,7 @@ impl AuthorizationService {
             &Validation::new(Algorithm::HS256),
         ) {
             Ok(token_data) => {
-                if token_data.claims.exp < current_time() {
+                if token_data.claims.exp < clock::now() {
                     return Err(ServiceError::TokenExpired);
                 }
                 Ok(token_data.claims)

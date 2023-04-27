@@ -1,3 +1,5 @@
+#![allow(clippy::missing_errors_doc)]
+
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqlitePoolOptions, SqliteQueryResult};
@@ -257,6 +259,7 @@ impl SqliteDatabaseV2_0_0 {
             .map(|v| v.last_insert_rowid())
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub async fn delete_all_database_rows(&self) -> Result<(), database::Error> {
         query("DELETE FROM torrust_categories").execute(&self.pool).await.unwrap();
 

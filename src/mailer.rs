@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Configuration;
 use crate::errors::ServiceError;
-use crate::utils::clock::current_time;
+use crate::utils::clock;
 
 pub struct Service {
     cfg: Arc<Configuration>,
@@ -137,7 +137,7 @@ impl Service {
         let claims = VerifyClaims {
             iss: String::from("email-verification"),
             sub: user_id,
-            exp: current_time() + 315_569_260, // 10 years from now
+            exp: clock::now() + 315_569_260, // 10 years from now
         };
 
         let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(key)).unwrap();

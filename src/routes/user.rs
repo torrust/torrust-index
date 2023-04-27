@@ -13,7 +13,7 @@ use crate::errors::{ServiceError, ServiceResult};
 use crate::mailer::VerifyClaims;
 use crate::models::response::{OkResponse, TokenResponse};
 use crate::models::user::UserAuthentication;
-use crate::utils::clock::current_time;
+use crate::utils::clock;
 use crate::utils::regex::validate_email_address;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
@@ -251,7 +251,7 @@ pub async fn renew_token(payload: web::Json<Token>, app_data: WebAppData) -> Ser
     let user_compact = app_data.database.get_user_compact_from_id(claims.user.user_id).await?;
 
     // renew token if it is valid for less than one week
-    let token = match claims.exp - current_time() {
+    let token = match claims.exp - clock::now() {
         x if x < ONE_WEEK_IN_SECONDS => app_data.auth.sign_jwt(user_compact.clone()).await,
         _ => payload.token.clone(),
     };

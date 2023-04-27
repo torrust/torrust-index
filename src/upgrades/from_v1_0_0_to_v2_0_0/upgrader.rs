@@ -67,7 +67,7 @@ fn parse_args() -> Arguments {
     }
 }
 
-pub async fn run_upgrader() {
+pub async fn run() {
     let now = datetime_iso_8601();
     upgrade(&parse_args(), &now).await;
 }

@@ -20,16 +20,16 @@ const TEST_TORRENT_FILE_SIZE: i64 = 128_000;
 const TEST_TORRENT_SEEDERS: i64 = 437;
 const TEST_TORRENT_LEECHERS: i64 = 1289;
 
-async fn add_test_user(db: &Box<dyn Database>) -> Result<i64, database::Error> {
+async fn add_test_user<T: Database + ?Sized>(db: &T) -> Result<i64, database::Error> {
     db.insert_user_and_get_id(TEST_USER_USERNAME, TEST_USER_EMAIL, TEST_USER_PASSWORD)
         .await
 }
 
-async fn add_test_torrent_category(db: &Box<dyn Database>) -> Result<i64, database::Error> {
+async fn add_test_torrent_category<T: Database + ?Sized>(db: &T) -> Result<i64, database::Error> {
     db.insert_category_and_get_id(TEST_CATEGORY_NAME).await
 }
 
-pub async fn it_can_add_a_user(db: &Box<dyn Database>) {
+pub async fn it_can_add_a_user<T: Database + ?Sized>(db: &T) {
     let add_test_user_result = add_test_user(db).await;
 
     assert!(add_test_user_result.is_ok());
@@ -57,7 +57,7 @@ pub async fn it_can_add_a_user(db: &Box<dyn Database>) {
     );
 }
 
-pub async fn it_can_add_a_torrent_category(db: &Box<dyn Database>) {
+pub async fn it_can_add_a_torrent_category<T: Database + ?Sized>(db: &T) {
     let add_test_torrent_category_result = add_test_torrent_category(db).await;
 
     assert!(add_test_torrent_category_result.is_ok());
@@ -71,7 +71,7 @@ pub async fn it_can_add_a_torrent_category(db: &Box<dyn Database>) {
     assert_eq!(category.name, TEST_CATEGORY_NAME.to_string());
 }
 
-pub async fn it_can_add_a_torrent_and_tracker_stats_to_that_torrent(db: &Box<dyn Database>) {
+pub async fn it_can_add_a_torrent_and_tracker_stats_to_that_torrent<T: Database + ?Sized>(db: &T) {
     // set pre-conditions
     let user_id = add_test_user(db).await.expect("add_test_user failed.");
     let torrent_category_id = add_test_torrent_category(db)

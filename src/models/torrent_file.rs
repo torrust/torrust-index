@@ -4,7 +4,7 @@ use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
 
 use crate::config::Configuration;
-use crate::utils::hex::{bytes_to_hex, hex_to_bytes};
+use crate::utils::hex::{from_bytes, into_bytes};
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct TorrentNode(String, i64);
@@ -46,7 +46,7 @@ impl TorrentInfo {
     pub fn get_pieces_as_string(&self) -> String {
         match &self.pieces {
             None => String::new(),
-            Some(byte_buf) => bytes_to_hex(byte_buf.as_ref()),
+            Some(byte_buf) => from_bytes(byte_buf.as_ref()),
         }
     }
 
@@ -121,7 +121,7 @@ impl Torrent {
         if torrent_info.root_hash > 0 {
             info.root_hash = Some(torrent_info.pieces);
         } else {
-            let pieces = hex_to_bytes(&torrent_info.pieces).expect("variable `torrent_info.pieces` is not a valid hex string");
+            let pieces = into_bytes(&torrent_info.pieces).expect("variable `torrent_info.pieces` is not a valid hex string");
             info.pieces = Some(ByteBuf::from(pieces));
         }
 
@@ -191,7 +191,7 @@ impl Torrent {
 
     #[must_use]
     pub fn info_hash(&self) -> String {
-        bytes_to_hex(&self.calculate_info_hash_as_bytes())
+        from_bytes(&self.calculate_info_hash_as_bytes())
     }
 
     #[must_use]

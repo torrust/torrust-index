@@ -8,9 +8,9 @@ mod sqlite;
 mod tests;
 
 // used to run tests with a clean database
-async fn run_test<'a, T, F>(db_fn: T, db: &'a Box<dyn Database>)
+async fn run_test<'a, T, F, DB: Database + ?Sized>(db_fn: T, db: &'a DB)
 where
-    T: FnOnce(&'a Box<dyn Database>) -> F + 'a,
+    T: FnOnce(&'a DB) -> F + 'a,
     F: Future<Output = ()>,
 {
     // cleanup database before testing
@@ -26,9 +26,11 @@ pub async fn run_tests(db_path: &str) {
 
     assert!(db_res.is_ok());
 
-    let db = db_res.unwrap();
+    let db_boxed = db_res.unwrap();
 
-    run_test(tests::it_can_add_a_user, &db).await;
-    run_test(tests::it_can_add_a_torrent_category, &db).await;
-    run_test(tests::it_can_add_a_torrent_and_tracker_stats_to_that_torrent, &db).await;
+    let db: &dyn Database = db_boxed.as_ref();
+
+    run_test(tests::it_can_add_a_user, db).await;
+    run_test(tests::it_can_add_a_torrent_category, db).await;
+    run_test(tests::it_can_add_a_torrent_and_tracker_stats_to_that_torrent, db).await;
 }

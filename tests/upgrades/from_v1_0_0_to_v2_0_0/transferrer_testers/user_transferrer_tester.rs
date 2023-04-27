@@ -42,6 +42,7 @@ impl UserTester {
         }
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub async fn load_data_into_source_db(&self) {
         self.source_database.insert_user(&self.test_data.user).await.unwrap();
     }

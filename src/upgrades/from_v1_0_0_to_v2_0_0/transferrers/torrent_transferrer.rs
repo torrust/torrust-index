@@ -1,3 +1,5 @@
+#![allow(clippy::missing_errors_doc)]
+
 use std::sync::Arc;
 use std::{error, fs};
 
@@ -6,6 +8,8 @@ use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteData
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::{SqliteDatabaseV2_0_0, TorrentRecordV2};
 use crate::utils::parse_torrent::decode_torrent;
 
+#[allow(clippy::missing_panics_doc)]
+#[allow(clippy::too_many_lines)]
 pub async fn transfer_torrents(
     source_database: Arc<SqliteDatabaseV1_0_0>,
     target_database: Arc<SqliteDatabaseV2_0_0>,

@@ -31,6 +31,7 @@ impl TrackerKeyTester {
         }
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub async fn load_data_into_source_db(&self) {
         self.source_database
             .insert_tracker_key(&self.test_data.tracker_key)
@@ -38,6 +39,7 @@ impl TrackerKeyTester {
             .unwrap();
     }
 
+    #[allow(clippy::missing_panics_doc)]
     /// Table `torrust_tracker_keys`
     pub async fn assert_data_in_target_db(&self) {
         let imported_key = self

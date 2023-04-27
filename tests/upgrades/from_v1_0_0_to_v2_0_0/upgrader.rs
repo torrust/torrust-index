@@ -1,6 +1,6 @@
 //! You can run this test with:
 //!
-//! //! ```text
+//! ```text
 //! cargo test upgrades_data_from_version_v1_0_0_to_v2_0_0
 //! ```
 //!

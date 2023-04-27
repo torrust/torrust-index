@@ -39,6 +39,7 @@ impl CategoryTester {
         self.test_data.categories[0].category_id
     }
 
+    #[allow(clippy::missing_panics_doc)]
     /// Table `torrust_categories`
     pub async fn load_data_into_source_db(&self) {
         // Delete categories added by migrations
@@ -50,6 +51,7 @@ impl CategoryTester {
         }
     }
 
+    #[allow(clippy::missing_panics_doc)]
     /// Table `torrust_categories`
     pub async fn assert_data_in_target_db(&self) {
         for categories in &self.test_data.categories {

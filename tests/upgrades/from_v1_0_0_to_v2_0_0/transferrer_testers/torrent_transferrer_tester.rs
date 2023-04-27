@@ -77,12 +77,14 @@ impl TorrentTester {
         }
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub async fn load_data_into_source_db(&self) {
         for torrent in &self.test_data.torrents {
             self.source_database.insert_torrent(torrent).await.unwrap();
         }
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub async fn assert_data_in_target_db(&self, upload_path: &str) {
         for torrent in &self.test_data.torrents {
             let filepath = self.torrent_file_path(upload_path, torrent.torrent_id);

@@ -79,7 +79,7 @@ pub async fn import(_args: &Arguments) {
     let database = Arc::new(
         database::connect(&settings.database.connect_url)
             .await
-            .expect("Database error."),
+            .expect("unable to connect to db"),
     );
 
     let tracker_service = Arc::new(Service::new(cfg.clone(), database.clone()).await);
