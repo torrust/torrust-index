@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
+use log::debug;
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{query, query_as, Acquire, SqlitePool};
 
@@ -355,6 +356,8 @@ impl Database for SqliteDatabase {
         let count = count_result?;
 
         query_string = format!("{} ORDER BY {} LIMIT ?, ?", query_string, sort_query);
+
+        debug!("query bindings: title: {} offset: {} page_size: {}", title, offset, page_size);
 
         let res: Vec<TorrentListing> = sqlx::query_as::<_, TorrentListing>(&query_string)
             .bind(title)

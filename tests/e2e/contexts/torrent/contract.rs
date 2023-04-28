@@ -30,6 +30,7 @@ mod for_guests {
     use crate::e2e::contexts::torrent::responses::{Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse};
     use crate::e2e::contexts::user::fixtures::logged_in_user;
     use crate::e2e::environment::TestEnv;
+    use crate::e2e::http::{Query, QueryParam};
 
     #[tokio::test]
     #[cfg_attr(not(feature = "e2e-tests"), ignore)]
@@ -39,12 +40,38 @@ mod for_guests {
 
         let client = TestEnv::default().unauthenticated_client();
 
-        let response = client.get_torrents().await;
+        let response = client.get_torrents(Query::empty()).await;
 
         let torrent_list_response: TorrentListResponse = serde_json::from_str(&response.body).unwrap();
 
         assert!(torrent_list_response.data.total > 0);
         assert!(torrent_list_response.data.contains(indexed_torrent.torrent_id));
+        assert!(response.is_json_and_ok());
+    }
+
+    #[tokio::test]
+    #[cfg_attr(not(feature = "e2e-tests"), ignore)]
+    async fn it_should_allow_guests_to_get_torrents_per_page() {
+        let uploader = logged_in_user().await;
+
+        let min_page_size = 10;
+
+        // We insert one more torrent than the minimum page size
+        for _ in 0..=min_page_size {
+            let (_test_torrent, _indexed_torrent) = upload_random_torrent_to_index(&uploader).await;
+        }
+
+        let client = TestEnv::default().unauthenticated_client();
+
+        // We request only one torrent per page
+        let response = client
+            .get_torrents(Query::with_params([QueryParam::new("page_size", "1")].to_vec()))
+            .await;
+
+        let torrent_list_response: TorrentListResponse = serde_json::from_str(&response.body).unwrap();
+
+        // We should have the minimum page size 10
+        assert_eq!(torrent_list_response.data.results.len(), min_page_size);
         assert!(response.is_json_and_ok());
     }
 

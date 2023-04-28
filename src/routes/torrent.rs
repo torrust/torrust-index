@@ -4,6 +4,7 @@ use actix_multipart::Multipart;
 use actix_web::web::Query;
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use futures::{StreamExt, TryStreamExt};
+use log::debug;
 use serde::Deserialize;
 use sqlx::FromRow;
 
@@ -299,6 +300,8 @@ pub async fn delete_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceRe
 
 // eg: /torrents?categories=music,other,movie&search=bunny&sort=size_DESC
 pub async fn get_torrents(params: Query<TorrentSearch>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    debug!("get_torrents: {:?}", params);
+
     let sort = params.sort.unwrap_or(Sorting::UploadedDesc);
 
     let page = params.page.unwrap_or(0);
@@ -315,7 +318,7 @@ pub async fn get_torrents(params: Query<TorrentSearch>, app_data: WebAppData) ->
 
     let torrents_response = app_data
         .database
-        .get_torrents_search_sorted_paginated(&params.search, &categories, &sort, offset, page_size as u8)
+        .get_torrents_search_sorted_paginated(&params.search, &categories, &sort, offset, page_size)
         .await?;
 
     Ok(HttpResponse::Ok().json(OkResponse { data: torrents_response }))
