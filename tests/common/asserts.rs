@@ -1,6 +1,6 @@
-use crate::e2e::responses::TextResponse;
-
 // Text responses
+
+use super::responses::TextResponse;
 
 pub fn assert_response_title(response: &TextResponse, title: &str) {
     let title_element = format!("<title>{title}</title>");
