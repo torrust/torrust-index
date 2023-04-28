@@ -2990,7 +2990,7 @@ dependencies = [
  "tempfile",
  "text-colorizer",
  "tokio",
- "toml 0.5.8",
+ "toml 0.7.3",
  "urlencoding",
  "uuid",
  "which",
