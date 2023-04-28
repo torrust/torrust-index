@@ -24,11 +24,13 @@ Get torrent info:
 mod for_guests {
     use torrust_index_backend::utils::parse_torrent::decode_torrent;
 
-    use crate::e2e::contexts::category::fixtures::software_predefined_category_id;
-    use crate::e2e::contexts::torrent::asserts::assert_expected_torrent_details;
-    use crate::e2e::contexts::torrent::fixtures::upload_random_torrent_to_index;
-    use crate::e2e::contexts::torrent::responses::{Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse};
-    use crate::e2e::contexts::user::fixtures::logged_in_user;
+    use crate::common::contexts::category::fixtures::software_predefined_category_id;
+    use crate::common::contexts::torrent::asserts::assert_expected_torrent_details;
+    use crate::common::contexts::torrent::responses::{
+        Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
+    };
+    use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
+    use crate::e2e::contexts::user::steps::logged_in_user;
     use crate::e2e::environment::TestEnv;
 
     #[tokio::test]
@@ -140,10 +142,10 @@ mod for_guests {
 
 mod for_authenticated_users {
 
-    use crate::e2e::contexts::torrent::fixtures::random_torrent;
-    use crate::e2e::contexts::torrent::requests::UploadTorrentMultipartForm;
-    use crate::e2e::contexts::torrent::responses::UploadedTorrentResponse;
-    use crate::e2e::contexts::user::fixtures::logged_in_user;
+    use crate::common::contexts::torrent::fixtures::random_torrent;
+    use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
+    use crate::common::contexts::torrent::responses::UploadedTorrentResponse;
+    use crate::e2e::contexts::user::steps::logged_in_user;
     use crate::e2e::environment::TestEnv;
 
     #[tokio::test]
@@ -231,8 +233,8 @@ mod for_authenticated_users {
     }
 
     mod and_non_admins {
-        use crate::e2e::contexts::torrent::fixtures::upload_random_torrent_to_index;
-        use crate::e2e::contexts::user::fixtures::logged_in_user;
+        use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
+        use crate::e2e::contexts::user::steps::logged_in_user;
         use crate::e2e::environment::TestEnv;
 
         #[tokio::test]
@@ -250,10 +252,10 @@ mod for_authenticated_users {
     }
 
     mod and_torrent_owners {
-        use crate::e2e::contexts::torrent::fixtures::upload_random_torrent_to_index;
-        use crate::e2e::contexts::torrent::requests::UpdateTorrentFrom;
-        use crate::e2e::contexts::torrent::responses::UpdatedTorrentResponse;
-        use crate::e2e::contexts::user::fixtures::logged_in_user;
+        use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
+        use crate::common::contexts::torrent::responses::UpdatedTorrentResponse;
+        use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
+        use crate::e2e::contexts::user::steps::logged_in_user;
         use crate::e2e::environment::TestEnv;
 
         #[tokio::test]
@@ -288,10 +290,10 @@ mod for_authenticated_users {
     }
 
     mod and_admins {
-        use crate::e2e::contexts::torrent::fixtures::upload_random_torrent_to_index;
-        use crate::e2e::contexts::torrent::requests::UpdateTorrentFrom;
-        use crate::e2e::contexts::torrent::responses::{DeletedTorrentResponse, UpdatedTorrentResponse};
-        use crate::e2e::contexts::user::fixtures::{logged_in_admin, logged_in_user};
+        use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
+        use crate::common::contexts::torrent::responses::{DeletedTorrentResponse, UpdatedTorrentResponse};
+        use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
+        use crate::e2e::contexts::user::steps::{logged_in_admin, logged_in_user};
         use crate::e2e::environment::TestEnv;
 
         #[tokio::test]

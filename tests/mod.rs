@@ -1,3 +1,5 @@
+mod common;
 mod databases;
 mod e2e;
-pub mod upgrades;
+mod integration;
+mod upgrades;

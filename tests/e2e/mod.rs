@@ -29,10 +29,5 @@
 //! clean database, delete the files before running the tests.
 //!
 //! See the [docker documentation](https://github.com/torrust/torrust-index-backend/tree/develop/docker) for more information on how to run the API.
-mod asserts;
-mod client;
-mod connection_info;
 mod contexts;
-mod environment;
-mod http;
-mod responses;
+pub mod environment;

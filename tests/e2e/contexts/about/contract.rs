@@ -1,4 +1,5 @@
-use crate::e2e::asserts::{assert_response_title, assert_text_ok};
+//! API contract for `about` context.
+use crate::common::asserts::{assert_response_title, assert_text_ok};
 use crate::e2e::environment::TestEnv;
 
 #[tokio::test]

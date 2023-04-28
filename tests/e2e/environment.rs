@@ -1,5 +1,5 @@
-use super::connection_info::{anonymous_connection, authenticated_connection};
-use crate::e2e::client::Client;
+use crate::common::client::Client;
+use crate::common::connection_info::{anonymous_connection, authenticated_connection};
 
 pub struct TestEnv {
     pub authority: String,

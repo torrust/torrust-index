@@ -1,14 +1,14 @@
 use reqwest::multipart;
 use serde::Serialize;
 
-use super::contexts::category::{AddCategoryForm, DeleteCategoryForm};
-use super::contexts::settings::UpdateSettingsForm;
-use super::contexts::torrent::requests::{TorrentId, UpdateTorrentFrom};
-use super::contexts::user::{LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username};
-use super::responses::{self, BinaryResponse};
-use crate::e2e::connection_info::ConnectionInfo;
-use crate::e2e::http::{Query, ReqwestQuery};
-use crate::e2e::responses::TextResponse;
+use super::connection_info::ConnectionInfo;
+use super::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
+use super::contexts::settings::form::UpdateSettingsForm;
+use super::contexts::torrent::forms::UpdateTorrentFrom;
+use super::contexts::torrent::requests::TorrentId;
+use super::contexts::user::forms::{LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username};
+use super::http::{Query, ReqwestQuery};
+use super::responses::{self, BinaryResponse, TextResponse};
 
 /// API Client
 pub struct Client {

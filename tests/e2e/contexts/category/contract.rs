@@ -1,38 +1,18 @@
-use serde::{Deserialize, Serialize};
-
-use crate::e2e::asserts::assert_json_ok;
-use crate::e2e::contexts::category::fixtures::{add_category, random_category_name};
-use crate::e2e::contexts::user::fixtures::{logged_in_admin, logged_in_user};
+//! API contract for `category` context.
+use crate::common::asserts::assert_json_ok;
+use crate::common::contexts::category::fixtures::random_category_name;
+use crate::common::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
+use crate::common::contexts::category::responses::{AddedCategoryResponse, ListResponse};
+use crate::e2e::contexts::category::steps::add_category;
+use crate::e2e::contexts::user::steps::{logged_in_admin, logged_in_user};
 use crate::e2e::environment::TestEnv;
 
-// Request data
-
-#[derive(Serialize)]
-pub struct AddCategoryForm {
-    pub name: String,
-    pub icon: Option<String>,
-}
-
-pub type DeleteCategoryForm = AddCategoryForm;
-
-// Response data
-
-#[derive(Deserialize)]
-pub struct AddedCategoryResponse {
-    pub data: String,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct ListResponse {
-    pub data: Vec<ListItem>,
-}
-
-#[derive(Deserialize, Debug, PartialEq)]
-pub struct ListItem {
-    pub category_id: i64,
-    pub name: String,
-    pub num_torrents: i64,
-}
+/* todo:
+    - it should allow adding a new category to authenticated clients
+    - it should not allow adding a new category with an empty name
+    - it should allow adding a new category with an optional icon
+    - ...
+*/
 
 #[tokio::test]
 #[cfg_attr(not(feature = "e2e-tests"), ignore)]
@@ -201,50 +181,4 @@ async fn it_should_not_allow_guests_to_delete_categories() {
         .await;
 
     assert_eq!(response.status, 401);
-}
-
-/* todo:
-    - it should allow adding a new category to authenticated clients
-    - it should not allow adding a new category with an empty name
-    - it should allow adding a new category with an optional icon
-    - ...
-*/
-
-pub mod fixtures {
-
-    use rand::Rng;
-
-    use super::AddCategoryForm;
-    use crate::e2e::contexts::user::fixtures::logged_in_admin;
-    use crate::e2e::environment::TestEnv;
-    use crate::e2e::responses::TextResponse;
-
-    pub fn software_predefined_category_name() -> String {
-        "software".to_string()
-    }
-
-    pub fn software_predefined_category_id() -> i64 {
-        5
-    }
-
-    pub async fn add_category(category_name: &str) -> TextResponse {
-        let logged_in_admin = logged_in_admin().await;
-        let client = TestEnv::default().authenticated_client(&logged_in_admin.token);
-
-        client
-            .add_category(AddCategoryForm {
-                name: category_name.to_string(),
-                icon: None,
-            })
-            .await
-    }
-
-    pub fn random_category_name() -> String {
-        format!("category name {}", random_id())
-    }
-
-    fn random_id() -> u64 {
-        let mut rng = rand::thread_rng();
-        rng.gen_range(0..1_000_000)
-    }
 }
