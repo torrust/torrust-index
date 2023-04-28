@@ -12,9 +12,9 @@ opt-level = 3
 e2e-tests = []
 
 [dependencies]
-actix-web = "4.0.0-beta.8"
-actix-multipart = "0.4.0-beta.5"
-actix-cors = "0.6.0-beta.2"
+actix-web = "4.3"
+actix-multipart = "0.6"
+actix-cors = "0.6"
 async-trait = "0.1"
 futures = "0.3"
 sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls", "sqlite", "mysql", "migrate", "time" ] }
