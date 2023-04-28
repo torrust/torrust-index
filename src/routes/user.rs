@@ -3,8 +3,8 @@ use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use log::{debug, info};
+use pbkdf2::password_hash::rand_core::OsRng;
 use pbkdf2::Pbkdf2;
-use rand_core::OsRng;
 use serde::{Deserialize, Serialize};
 
 use crate::common::WebAppData;
