@@ -29,7 +29,7 @@ serde_bytes = "0.11"
 urlencoding = "2.1"
 argon2 = "0.5"
 rand_core = { version = "0.6", features = ["std"] }
-chrono = "0.4"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 jsonwebtoken = "8.3"
 sha-1 = "0.10"
 reqwest = { version = "0.11", features = [ "json", "multipart" ] }
