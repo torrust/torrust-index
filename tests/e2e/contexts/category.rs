@@ -217,9 +217,17 @@ pub mod fixtures {
     use super::AddCategoryForm;
     use crate::e2e::contexts::user::fixtures::logged_in_admin;
     use crate::e2e::environment::TestEnv;
-    use crate::e2e::response::Response;
+    use crate::e2e::responses::TextResponse;
 
-    pub async fn add_category(category_name: &str) -> Response {
+    pub fn software_predefined_category_name() -> String {
+        "software".to_string()
+    }
+
+    pub fn software_predefined_category_id() -> i64 {
+        5
+    }
+
+    pub async fn add_category(category_name: &str) -> TextResponse {
         let logged_in_admin = logged_in_admin().await;
         let client = TestEnv::default().authenticated_client(&logged_in_admin.token);
 

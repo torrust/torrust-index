@@ -35,6 +35,9 @@ wait_for_container_to_be_healthy() {
     return 1
 }
 
+# Install tool to create torrent files
+cargo install imdl
+
 cp .env.local .env
 ./bin/install.sh
 

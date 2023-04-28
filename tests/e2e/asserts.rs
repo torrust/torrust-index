@@ -1,8 +1,8 @@
-use crate::e2e::response::Response;
+use crate::e2e::responses::TextResponse;
 
 // Text responses
 
-pub fn assert_response_title(response: &Response, title: &str) {
+pub fn assert_response_title(response: &TextResponse, title: &str) {
     let title_element = format!("<title>{title}</title>");
 
     assert!(
@@ -11,14 +11,14 @@ pub fn assert_response_title(response: &Response, title: &str) {
     );
 }
 
-pub fn assert_text_ok(response: &Response) {
+pub fn assert_text_ok(response: &TextResponse) {
     assert_eq!(response.status, 200);
     if let Some(content_type) = &response.content_type {
         assert_eq!(content_type, "text/html; charset=utf-8");
     }
 }
 
-pub fn _assert_text_bad_request(response: &Response) {
+pub fn _assert_text_bad_request(response: &TextResponse) {
     assert_eq!(response.status, 400);
     if let Some(content_type) = &response.content_type {
         assert_eq!(content_type, "text/plain; charset=utf-8");
@@ -27,7 +27,7 @@ pub fn _assert_text_bad_request(response: &Response) {
 
 // JSON responses
 
-pub fn assert_json_ok(response: &Response) {
+pub fn assert_json_ok(response: &TextResponse) {
     assert_eq!(response.status, 200);
     if let Some(content_type) = &response.content_type {
         assert_eq!(content_type, "application/json");

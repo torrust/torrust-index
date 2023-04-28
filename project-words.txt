@@ -17,6 +17,8 @@ hasher
 Hasher
 httpseeds
 imagoodboy
+imdl
+infohash
 jsonwebtoken
 leechers
 Leechers
@@ -41,6 +43,8 @@ strftime
 sublicensable
 sublist
 subpoints
+tempdir
+tempfile
 torrust
 Torrust
 upgrader
