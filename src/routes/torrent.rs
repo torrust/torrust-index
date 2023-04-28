@@ -340,10 +340,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
     let mut category = "".to_string();
 
     while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_type = field.content_disposition().unwrap();
-        let name = content_type.get_name().unwrap();
-
-        match name {
+        match field.content_disposition().get_name().unwrap() {
             "title" | "description" | "category" => {
                 let data = field.next().await;
                 if data.is_none() {
@@ -352,7 +349,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
                 let wrapped_data = &data.unwrap().unwrap();
                 let parsed_data = std::str::from_utf8(wrapped_data).unwrap();
 
-                match name {
+                match field.content_disposition().get_name().unwrap() {
                     "title" => title = parsed_data.to_string(),
                     "description" => description = parsed_data.to_string(),
                     "category" => category = parsed_data.to_string(),
@@ -360,7 +357,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
                 }
             }
             "torrent" => {
-                if *field.content_type() != "application/x-bittorrent" {
+                if *field.content_type().unwrap() != "application/x-bittorrent" {
                     return Err(ServiceError::InvalidFileType);
                 }
 
