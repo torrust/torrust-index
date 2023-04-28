@@ -26,7 +26,7 @@ serde_derive = "1"
 serde_json = "1"
 serde_bencode = "0.2.3"
 serde_bytes = "0.11"
-urlencoding = "2.1.0"
+urlencoding = "2.1"
 argon2 = "0.5"
 rand_core = { version = "0.6", features = ["std"] }
 chrono = "0.4"
