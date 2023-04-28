@@ -17,7 +17,7 @@ actix-multipart = "0.4.0-beta.5"
 actix-cors = "0.6.0-beta.2"
 async-trait = "0.1.52"
 futures = "0.3.5"
-sqlx = { version = "0.6.1", features = [ "runtime-tokio-native-tls", "sqlite", "mysql", "migrate", "time" ] }
+sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls", "sqlite", "mysql", "migrate", "time" ] }
 config = "0.13"
 toml = "0.7"
 derive_more = "0.99"
