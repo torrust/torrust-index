@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use log::info;
 use serde::{Deserialize, Serialize};
 
 use crate::config::Configuration;
@@ -179,10 +180,11 @@ impl TrackerService {
     }
 
     pub async fn update_torrents(&self) -> Result<(), ServiceError> {
-        println!("Updating torrents ...");
+        info!("Updating torrents ...");
         let torrents = self.database.get_all_torrents_compact().await?;
 
         for torrent in torrents {
+            info!("Updating torrent {} ...", torrent.torrent_id);
             let _ = self
                 .update_torrent_tracker_stats(torrent.torrent_id, &torrent.info_hash)
                 .await;
