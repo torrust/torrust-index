@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use log::info;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 
 use crate::config::Configuration;
@@ -185,9 +185,15 @@ impl TrackerService {
 
         for torrent in torrents {
             info!("Updating torrent {} ...", torrent.torrent_id);
-            let _ = self
+            let ret = self
                 .update_torrent_tracker_stats(torrent.torrent_id, &torrent.info_hash)
                 .await;
+            if let Some(err) = ret.err() {
+                error!(
+                    "Error updating torrent tracker stats for torrent {}: {:?}",
+                    torrent.torrent_id, err
+                );
+            }
         }
 
         Ok(())

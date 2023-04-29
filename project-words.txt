@@ -32,6 +32,7 @@ NCCA
 nilm
 nocapture
 Oberhachingerstr
+oneshot
 ppassword
 reqwest
 Roadmap

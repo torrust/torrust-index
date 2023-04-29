@@ -29,6 +29,9 @@ pub struct Tracker {
     pub token_valid_seconds: u64,
 }
 
+/// Port 0 means that the OS will choose a random free port.
+pub const FREE_PORT: u16 = 0;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Network {
     pub port: u16,
@@ -77,14 +80,9 @@ pub struct TorrustConfig {
     pub mail: Mail,
 }
 
-#[derive(Debug)]
-pub struct Configuration {
-    pub settings: RwLock<TorrustConfig>,
-}
-
-impl Configuration {
-    pub fn default() -> Configuration {
-        let torrust_config = TorrustConfig {
+impl TorrustConfig {
+    pub fn default() -> Self {
+        Self {
             website: Website {
                 name: "Torrust".to_string(),
             },
@@ -118,10 +116,19 @@ impl Configuration {
                 server: "".to_string(),
                 port: 25,
             },
-        };
+        }
+    }
+}
 
+#[derive(Debug)]
+pub struct Configuration {
+    pub settings: RwLock<TorrustConfig>,
+}
+
+impl Configuration {
+    pub fn default() -> Configuration {
         Configuration {
-            settings: RwLock::new(torrust_config),
+            settings: RwLock::new(TorrustConfig::default()),
         }
     }
 

@@ -29,7 +29,7 @@ pub fn setup() {
 
 fn config_level_or_default(log_level: &Option<String>) -> LevelFilter {
     match log_level {
-        None => log::LevelFilter::Info,
+        None => log::LevelFilter::Warn,
         Some(level) => LevelFilter::from_str(level).unwrap(),
     }
 }

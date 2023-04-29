@@ -94,7 +94,10 @@ pub async fn run(configuration: Configuration) -> Running {
 
     let running_server = server.run();
 
-    info!("Listening on http://{}", socket_address);
+    let starting_message = format!("Listening on http://{}", socket_address);
+    info!("{}", starting_message);
+    // Logging could be disabled or redirected to file. So print to stdout too.
+    println!("{}", starting_message);
 
     Running {
         api_server: running_server,
