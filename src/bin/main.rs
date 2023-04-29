@@ -13,7 +13,7 @@ use torrust_index_backend::routes;
 use torrust_index_backend::tracker::TrackerService;
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> Result<(), std::io::Error> {
     let configuration = init_configuration().await;
 
     logging::setup();
@@ -57,22 +57,27 @@ async fn main() -> std::io::Result<()> {
         }
     });
 
+    // todo: get IP from settings
+    let ip = "0.0.0.0".to_string();
     let port = settings.net.port;
 
     drop(settings);
 
-    println!("Listening on http://0.0.0.0:{}", port);
-
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         App::new()
             .wrap(Cors::permissive())
             .app_data(web::Data::new(app_data.clone()))
             .wrap(middleware::Logger::default())
             .configure(routes::init_routes)
     })
-    .bind(("0.0.0.0", port))?
-    .run()
-    .await
+    .bind((ip.clone(), port))
+    .expect("can't bind server to socket address");
+
+    let server_port = server.addrs()[0].port();
+
+    println!("Listening on http://{}:{}", ip, server_port);
+
+    server.run().await
 }
 
 async fn init_configuration() -> Configuration {
