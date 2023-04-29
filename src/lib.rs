@@ -1,3 +1,4 @@
+pub mod app;
 pub mod auth;
 pub mod bootstrap;
 pub mod common;

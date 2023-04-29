@@ -6,9 +6,6 @@ use log::warn;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
-pub const CONFIG_PATH: &str = "./config.toml";
-pub const CONFIG_ENV_VAR_NAME: &str = "TORRUST_IDX_BACK_CONFIG";
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Website {
     pub name: String,
@@ -31,6 +28,9 @@ pub struct Tracker {
     pub token: String,
     pub token_valid_seconds: u64,
 }
+
+/// Port 0 means that the OS will choose a random free port.
+pub const FREE_PORT: u16 = 0;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Network {
@@ -80,14 +80,9 @@ pub struct TorrustConfig {
     pub mail: Mail,
 }
 
-#[derive(Debug)]
-pub struct Configuration {
-    pub settings: RwLock<TorrustConfig>,
-}
-
-impl Configuration {
-    pub fn default() -> Configuration {
-        let torrust_config = TorrustConfig {
+impl TorrustConfig {
+    pub fn default() -> Self {
+        Self {
             website: Website {
                 name: "Torrust".to_string(),
             },
@@ -96,7 +91,7 @@ impl Configuration {
                 mode: TrackerMode::Public,
                 api_url: "http://localhost:1212".to_string(),
                 token: "MyAccessToken".to_string(),
-                token_valid_seconds: 7257600,
+                token_valid_seconds: 7_257_600,
             },
             net: Network {
                 port: 3000,
@@ -121,27 +116,36 @@ impl Configuration {
                 server: "".to_string(),
                 port: 25,
             },
-        };
+        }
+    }
+}
 
+#[derive(Debug)]
+pub struct Configuration {
+    pub settings: RwLock<TorrustConfig>,
+}
+
+impl Configuration {
+    pub fn default() -> Configuration {
         Configuration {
-            settings: RwLock::new(torrust_config),
+            settings: RwLock::new(TorrustConfig::default()),
         }
     }
 
     /// Loads the configuration from the configuration file.
-    pub async fn load_from_file() -> Result<Configuration, ConfigError> {
+    pub async fn load_from_file(config_path: &str) -> Result<Configuration, ConfigError> {
         let config_builder = Config::builder();
 
         #[allow(unused_assignments)]
         let mut config = Config::default();
 
-        if Path::new(CONFIG_PATH).exists() {
-            config = config_builder.add_source(File::with_name(CONFIG_PATH)).build()?;
+        if Path::new(config_path).exists() {
+            config = config_builder.add_source(File::with_name(config_path)).build()?;
         } else {
             warn!("No config file found.");
             warn!("Creating config file..");
             let config = Configuration::default();
-            let _ = config.save_to_file().await;
+            let _ = config.save_to_file(config_path).await;
             return Err(ConfigError::Message(
                 "Please edit the config.TOML in the root folder and restart the tracker.".to_string(),
             ));
@@ -183,24 +187,24 @@ impl Configuration {
         }
     }
 
-    pub async fn save_to_file(&self) -> Result<(), ()> {
+    pub async fn save_to_file(&self, config_path: &str) -> Result<(), ()> {
         let settings = self.settings.read().await;
 
         let toml_string = toml::to_string(&*settings).expect("Could not encode TOML value");
 
         drop(settings);
 
-        fs::write(CONFIG_PATH, toml_string).expect("Could not write to file!");
+        fs::write(config_path, toml_string).expect("Could not write to file!");
         Ok(())
     }
 
-    pub async fn update_settings(&self, new_settings: TorrustConfig) -> Result<(), ()> {
+    pub async fn update_settings(&self, new_settings: TorrustConfig, config_path: &str) -> Result<(), ()> {
         let mut settings = self.settings.write().await;
         *settings = new_settings;
 
         drop(settings);
 
-        let _ = self.save_to_file().await;
+        let _ = self.save_to_file(config_path).await;
 
         Ok(())
     }
