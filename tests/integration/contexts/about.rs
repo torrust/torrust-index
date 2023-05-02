@@ -1,5 +1,5 @@
 use crate::common::asserts::{assert_response_title, assert_text_ok};
-use crate::integration::environment::TestEnv;
+use crate::environments::isolated::TestEnv;
 
 #[tokio::test]
 async fn it_should_load_the_about_page_with_information_about_the_api() {

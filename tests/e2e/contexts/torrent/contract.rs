@@ -31,7 +31,7 @@ mod for_guests {
     };
     use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
     use crate::e2e::contexts::user::steps::logged_in_user;
-    use crate::e2e::environment::TestEnv;
+    use crate::environments::shared::TestEnv;
 
     #[tokio::test]
     #[cfg_attr(not(feature = "e2e-tests"), ignore)]
@@ -146,7 +146,7 @@ mod for_authenticated_users {
     use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
     use crate::common::contexts::torrent::responses::UploadedTorrentResponse;
     use crate::e2e::contexts::user::steps::logged_in_user;
-    use crate::e2e::environment::TestEnv;
+    use crate::environments::shared::TestEnv;
 
     #[tokio::test]
     #[cfg_attr(not(feature = "e2e-tests"), ignore)]
@@ -235,7 +235,7 @@ mod for_authenticated_users {
     mod and_non_admins {
         use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
         use crate::e2e::contexts::user::steps::logged_in_user;
-        use crate::e2e::environment::TestEnv;
+        use crate::environments::shared::TestEnv;
 
         #[tokio::test]
         #[cfg_attr(not(feature = "e2e-tests"), ignore)]
@@ -256,7 +256,7 @@ mod for_authenticated_users {
         use crate::common::contexts::torrent::responses::UpdatedTorrentResponse;
         use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
         use crate::e2e::contexts::user::steps::logged_in_user;
-        use crate::e2e::environment::TestEnv;
+        use crate::environments::shared::TestEnv;
 
         #[tokio::test]
         #[cfg_attr(not(feature = "e2e-tests"), ignore)]
@@ -294,7 +294,7 @@ mod for_authenticated_users {
         use crate::common::contexts::torrent::responses::{DeletedTorrentResponse, UpdatedTorrentResponse};
         use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
         use crate::e2e::contexts::user::steps::{logged_in_admin, logged_in_user};
-        use crate::e2e::environment::TestEnv;
+        use crate::environments::shared::TestEnv;
 
         #[tokio::test]
         #[cfg_attr(not(feature = "e2e-tests"), ignore)]

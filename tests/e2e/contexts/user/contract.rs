@@ -5,7 +5,7 @@ use crate::common::contexts::user::responses::{
     SuccessfulLoginResponse, TokenRenewalData, TokenRenewalResponse, TokenVerifiedResponse,
 };
 use crate::e2e::contexts::user::steps::{logged_in_user, registered_user};
-use crate::e2e::environment::TestEnv;
+use crate::environments::shared::TestEnv;
 
 /*
 
@@ -129,7 +129,7 @@ mod banned_user_list {
     use crate::common::contexts::user::forms::Username;
     use crate::common::contexts::user::responses::BannedUserResponse;
     use crate::e2e::contexts::user::steps::{logged_in_admin, logged_in_user, registered_user};
-    use crate::e2e::environment::TestEnv;
+    use crate::environments::shared::TestEnv;
 
     #[tokio::test]
     #[cfg_attr(not(feature = "e2e-tests"), ignore)]

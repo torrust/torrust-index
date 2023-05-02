@@ -1,6 +1,6 @@
 //! API contract for `about` context.
 use crate::common::asserts::{assert_response_title, assert_text_ok};
-use crate::e2e::environment::TestEnv;
+use crate::environments::shared::TestEnv;
 
 #[tokio::test]
 #[cfg_attr(not(feature = "e2e-tests"), ignore)]

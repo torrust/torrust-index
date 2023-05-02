@@ -5,7 +5,7 @@ use crate::common::contexts::category::forms::{AddCategoryForm, DeleteCategoryFo
 use crate::common::contexts::category::responses::{AddedCategoryResponse, ListResponse};
 use crate::e2e::contexts::category::steps::add_category;
 use crate::e2e::contexts::user::steps::{logged_in_admin, logged_in_user};
-use crate::e2e::environment::TestEnv;
+use crate::environments::shared::TestEnv;
 
 /* todo:
     - it should allow adding a new category to authenticated clients

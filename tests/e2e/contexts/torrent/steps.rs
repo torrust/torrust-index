@@ -2,7 +2,7 @@ use crate::common::contexts::torrent::fixtures::{random_torrent, TestTorrent, To
 use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
 use crate::common::contexts::torrent::responses::UploadedTorrentResponse;
 use crate::common::contexts::user::responses::LoggedInUserData;
-use crate::e2e::environment::TestEnv;
+use crate::environments::shared::TestEnv;
 
 /// Add a new random torrent to the index
 pub async fn upload_random_torrent_to_index(uploader: &LoggedInUserData) -> (TestTorrent, TorrentListedInIndex) {

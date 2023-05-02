@@ -5,7 +5,7 @@ use torrust_index_backend::databases::database::connect_database;
 use crate::common::contexts::user::fixtures::random_user_registration;
 use crate::common::contexts::user::forms::{LoginForm, RegisteredUser};
 use crate::common::contexts::user::responses::{LoggedInUserData, SuccessfulLoginResponse};
-use crate::e2e::environment::TestEnv;
+use crate::environments::shared::TestEnv;
 
 pub async fn logged_in_admin() -> LoggedInUserData {
     let user = logged_in_user().await;

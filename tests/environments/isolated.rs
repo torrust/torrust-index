@@ -6,6 +6,9 @@ use crate::common::client::Client;
 use crate::common::connection_info::{anonymous_connection, authenticated_connection};
 use crate::common::random;
 
+/// Provides an isolated test environment for testing. The environment is
+/// launched with a temporary directory and a default ephemeral configuration
+/// before running the test.
 pub struct TestEnv {
     pub app_starter: AppStarter,
     pub temp_dir: TempDir,
@@ -21,6 +24,7 @@ impl TestEnv {
 
     /// Provides a test environment with a default configuration for testing
     /// application.
+    #[must_use]
     pub fn with_test_configuration() -> Self {
         let temp_dir = TempDir::new().expect("failed to create a temporary directory");
 
@@ -37,6 +41,7 @@ impl TestEnv {
     }
 
     /// Provides an unauthenticated client for integration tests.
+    #[must_use]
     pub fn unauthenticated_client(&self) -> Client {
         Client::new(anonymous_connection(
             &self
@@ -46,6 +51,7 @@ impl TestEnv {
     }
 
     /// Provides an authenticated client for integration tests.
+    #[must_use]
     pub fn _authenticated_client(&self, token: &str) -> Client {
         Client::new(authenticated_connection(
             &self

@@ -1,7 +1,7 @@
 use crate::common::contexts::category::forms::AddCategoryForm;
 use crate::common::responses::TextResponse;
 use crate::e2e::contexts::user::steps::logged_in_admin;
-use crate::e2e::environment::TestEnv;
+use crate::environments::shared::TestEnv;
 
 pub async fn add_category(category_name: &str) -> TextResponse {
     let logged_in_admin = logged_in_admin().await;
