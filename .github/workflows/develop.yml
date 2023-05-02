@@ -19,6 +19,8 @@ jobs:
         run: cargo check --all-targets
       - name: Clippy
         run: cargo clippy --all-targets
+      - name: Install torrent edition tool (needed for testing)
+        run: cargo install imdl
       - name: Unit and integration tests
         run: cargo test --all-targets
       - uses: taiki-e/install-action@cargo-llvm-cov

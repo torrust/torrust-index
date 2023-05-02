@@ -16,6 +16,14 @@ pub struct Client {
 }
 
 impl Client {
+    pub fn unauthenticated(bind_address: &str) -> Self {
+        Self::new(ConnectionInfo::anonymous(bind_address))
+    }
+
+    pub fn authenticated(bind_address: &str, token: &str) -> Self {
+        Self::new(ConnectionInfo::new(bind_address, token))
+    }
+
     pub fn new(connection_info: ConnectionInfo) -> Self {
         Self {
             http_client: Http::new(connection_info),

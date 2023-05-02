@@ -1,5 +1,4 @@
 use crate::common::client::Client;
-use crate::common::connection_info::{anonymous_connection, authenticated_connection};
 
 /// Provides a shared test environment for testing. All tests shared the same
 /// application instance.
@@ -16,20 +15,15 @@ impl TestEnv {
     /// be running to provide a valid environment.
     pub async fn running() -> Self {
         let env = Self::default();
-        let client = env.unauthenticated_client();
+        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
         let is_running = client.server_is_running().await;
         assert!(is_running, "Test server is not running on {}", env.authority);
         env
     }
 
-    #[must_use]
-    pub fn unauthenticated_client(&self) -> Client {
-        Client::new(anonymous_connection(&self.authority))
-    }
-
-    #[must_use]
-    pub fn authenticated_client(&self, token: &str) -> Client {
-        Client::new(authenticated_connection(&self.authority, token))
+    /// Provides the API server socket address.
+    pub fn server_socket_addr(&self) -> Option<String> {
+        Some(self.authority.clone())
     }
 }
 

@@ -53,8 +53,8 @@ sleep 20s
 # Just to make sure that everything is up and running
 docker ps
 
-# Run E2E tests
-cargo test --features e2e-tests
+# Run E2E tests with shared app instance
+TORRUST_IDX_BACK_E2E_SHARED=true cargo test
 
 # Stop E2E testing environment
 ./docker/bin/e2e-env-down.sh

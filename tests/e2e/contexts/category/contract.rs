@@ -1,11 +1,12 @@
 //! API contract for `category` context.
 use crate::common::asserts::assert_json_ok;
+use crate::common::client::Client;
 use crate::common::contexts::category::fixtures::random_category_name;
 use crate::common::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
 use crate::common::contexts::category::responses::{AddedCategoryResponse, ListResponse};
 use crate::e2e::contexts::category::steps::add_category;
-use crate::e2e::contexts::user::steps::{logged_in_admin, logged_in_user};
-use crate::environments::shared::TestEnv;
+use crate::e2e::contexts::user::steps::{new_logged_in_admin, new_logged_in_user};
+use crate::e2e::environment::TestEnv;
 
 /* todo:
     - it should allow adding a new category to authenticated clients
@@ -15,9 +16,10 @@ use crate::environments::shared::TestEnv;
 */
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_return_an_empty_category_list_when_there_are_no_categories() {
-    let client = TestEnv::running().await.unauthenticated_client();
+    let mut env = TestEnv::new();
+    env.start().await;
+    let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let response = client.get_categories().await;
 
@@ -25,14 +27,15 @@ async fn it_should_return_an_empty_category_list_when_there_are_no_categories() 
 }
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_return_a_category_list() {
+    let mut env = TestEnv::new();
+    env.start().await;
+    let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
     // Add a category
     let category_name = random_category_name();
-    let response = add_category(&category_name).await;
+    let response = add_category(&category_name, &env).await;
     assert_eq!(response.status, 200);
-
-    let client = TestEnv::running().await.unauthenticated_client();
 
     let response = client.get_categories().await;
 
@@ -48,9 +51,10 @@ async fn it_should_return_a_category_list() {
 }
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_not_allow_adding_a_new_category_to_unauthenticated_users() {
-    let client = TestEnv::running().await.unauthenticated_client();
+    let mut env = TestEnv::new();
+    env.start().await;
+    let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let response = client
         .add_category(AddCategoryForm {
@@ -63,10 +67,13 @@ async fn it_should_not_allow_adding_a_new_category_to_unauthenticated_users() {
 }
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_not_allow_adding_a_new_category_to_non_admins() {
-    let logged_non_admin = logged_in_user().await;
-    let client = TestEnv::running().await.authenticated_client(&logged_non_admin.token);
+    let mut env = TestEnv::new();
+    env.start().await;
+
+    let logged_non_admin = new_logged_in_user(&env).await;
+
+    let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_non_admin.token);
 
     let response = client
         .add_category(AddCategoryForm {
@@ -79,10 +86,12 @@ async fn it_should_not_allow_adding_a_new_category_to_non_admins() {
 }
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_allow_admins_to_add_new_categories() {
-    let logged_in_admin = logged_in_admin().await;
-    let client = TestEnv::running().await.authenticated_client(&logged_in_admin.token);
+    let mut env = TestEnv::new();
+    env.start().await;
+
+    let logged_in_admin = new_logged_in_admin(&env).await;
+    let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
 
     let category_name = random_category_name();
 
@@ -103,27 +112,31 @@ async fn it_should_allow_admins_to_add_new_categories() {
 }
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_not_allow_adding_duplicated_categories() {
+    let mut env = TestEnv::new();
+    env.start().await;
+
     // Add a category
     let random_category_name = random_category_name();
-    let response = add_category(&random_category_name).await;
+    let response = add_category(&random_category_name, &env).await;
     assert_eq!(response.status, 200);
 
     // Try to add the same category again
-    let response = add_category(&random_category_name).await;
+    let response = add_category(&random_category_name, &env).await;
     assert_eq!(response.status, 400);
 }
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_allow_admins_to_delete_categories() {
-    let logged_in_admin = logged_in_admin().await;
-    let client = TestEnv::running().await.authenticated_client(&logged_in_admin.token);
+    let mut env = TestEnv::new();
+    env.start().await;
+
+    let logged_in_admin = new_logged_in_admin(&env).await;
+    let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
 
     // Add a category
     let category_name = random_category_name();
-    let response = add_category(&category_name).await;
+    let response = add_category(&category_name, &env).await;
     assert_eq!(response.status, 200);
 
     let response = client
@@ -143,15 +156,17 @@ async fn it_should_allow_admins_to_delete_categories() {
 }
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_not_allow_non_admins_to_delete_categories() {
+    let mut env = TestEnv::new();
+    env.start().await;
+
     // Add a category
     let category_name = random_category_name();
-    let response = add_category(&category_name).await;
+    let response = add_category(&category_name, &env).await;
     assert_eq!(response.status, 200);
 
-    let logged_in_non_admin = logged_in_user().await;
-    let client = TestEnv::running().await.authenticated_client(&logged_in_non_admin.token);
+    let logged_in_non_admin = new_logged_in_user(&env).await;
+    let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_non_admin.token);
 
     let response = client
         .delete_category(DeleteCategoryForm {
@@ -164,14 +179,15 @@ async fn it_should_not_allow_non_admins_to_delete_categories() {
 }
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_not_allow_guests_to_delete_categories() {
+    let mut env = TestEnv::new();
+    env.start().await;
+    let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
     // Add a category
     let category_name = random_category_name();
-    let response = add_category(&category_name).await;
+    let response = add_category(&category_name, &env).await;
     assert_eq!(response.status, 200);
-
-    let client = TestEnv::running().await.unauthenticated_client();
 
     let response = client
         .delete_category(DeleteCategoryForm {

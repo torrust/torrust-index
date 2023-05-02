@@ -1,11 +1,12 @@
 //! API contract for `user` context.
+use crate::common::client::Client;
 use crate::common::contexts::user::fixtures::random_user_registration;
 use crate::common::contexts::user::forms::{LoginForm, TokenRenewalForm, TokenVerificationForm};
 use crate::common::contexts::user::responses::{
     SuccessfulLoginResponse, TokenRenewalData, TokenRenewalResponse, TokenVerifiedResponse,
 };
-use crate::e2e::contexts::user::steps::{logged_in_user, registered_user};
-use crate::environments::shared::TestEnv;
+use crate::e2e::contexts::user::steps::{new_logged_in_user, new_registered_user};
+use crate::e2e::environment::TestEnv;
 
 /*
 
@@ -36,9 +37,10 @@ the mailcatcher API.
 // Responses data
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_allow_a_guess_user_to_register() {
-    let client = TestEnv::running().await.unauthenticated_client();
+    let mut env = TestEnv::new();
+    env.start().await;
+    let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let form = random_user_registration();
 
@@ -52,11 +54,12 @@ async fn it_should_allow_a_guess_user_to_register() {
 }
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_allow_a_registered_user_to_login() {
-    let client = TestEnv::running().await.unauthenticated_client();
+    let mut env = TestEnv::new();
+    env.start().await;
+    let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
-    let registered_user = registered_user().await;
+    let registered_user = new_registered_user(&env).await;
 
     let response = client
         .login_user(LoginForm {
@@ -76,11 +79,12 @@ async fn it_should_allow_a_registered_user_to_login() {
 }
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_allow_a_logged_in_user_to_verify_an_authentication_token() {
-    let client = TestEnv::running().await.unauthenticated_client();
+    let mut env = TestEnv::new();
+    env.start().await;
+    let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
-    let logged_in_user = logged_in_user().await;
+    let logged_in_user = new_logged_in_user(&env).await;
 
     let response = client
         .verify_token(TokenVerificationForm {
@@ -98,10 +102,12 @@ async fn it_should_allow_a_logged_in_user_to_verify_an_authentication_token() {
 }
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_not_allow_a_logged_in_user_to_renew_an_authentication_token_which_is_still_valid_for_more_than_one_week() {
-    let logged_in_user = logged_in_user().await;
-    let client = TestEnv::running().await.authenticated_client(&logged_in_user.token);
+    let mut env = TestEnv::new();
+    env.start().await;
+
+    let logged_in_user = new_logged_in_user(&env).await;
+    let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_user.token);
 
     let response = client
         .renew_token(TokenRenewalForm {
@@ -126,18 +132,21 @@ async fn it_should_not_allow_a_logged_in_user_to_renew_an_authentication_token_w
 }
 
 mod banned_user_list {
+    use crate::common::client::Client;
     use crate::common::contexts::user::forms::Username;
     use crate::common::contexts::user::responses::BannedUserResponse;
-    use crate::e2e::contexts::user::steps::{logged_in_admin, logged_in_user, registered_user};
-    use crate::environments::shared::TestEnv;
+    use crate::e2e::contexts::user::steps::{new_logged_in_admin, new_logged_in_user, new_registered_user};
+    use crate::e2e::environment::TestEnv;
 
     #[tokio::test]
-    #[cfg_attr(not(feature = "e2e-tests"), ignore)]
     async fn it_should_allow_an_admin_to_ban_a_user() {
-        let logged_in_admin = logged_in_admin().await;
-        let client = TestEnv::running().await.authenticated_client(&logged_in_admin.token);
+        let mut env = TestEnv::new();
+        env.start().await;
 
-        let registered_user = registered_user().await;
+        let logged_in_admin = new_logged_in_admin(&env).await;
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+        let registered_user = new_registered_user(&env).await;
 
         let response = client.ban_user(Username::new(registered_user.username.clone())).await;
 
@@ -151,12 +160,14 @@ mod banned_user_list {
     }
 
     #[tokio::test]
-    #[cfg_attr(not(feature = "e2e-tests"), ignore)]
     async fn it_should_not_allow_a_non_admin_to_ban_a_user() {
-        let logged_non_admin = logged_in_user().await;
-        let client = TestEnv::running().await.authenticated_client(&logged_non_admin.token);
+        let mut env = TestEnv::new();
+        env.start().await;
 
-        let registered_user = registered_user().await;
+        let logged_non_admin = new_logged_in_user(&env).await;
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_non_admin.token);
+
+        let registered_user = new_registered_user(&env).await;
 
         let response = client.ban_user(Username::new(registered_user.username.clone())).await;
 
@@ -164,11 +175,12 @@ mod banned_user_list {
     }
 
     #[tokio::test]
-    #[cfg_attr(not(feature = "e2e-tests"), ignore)]
     async fn it_should_not_allow_guess_to_ban_a_user() {
-        let client = TestEnv::running().await.unauthenticated_client();
+        let mut env = TestEnv::new();
+        env.start().await;
+        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
-        let registered_user = registered_user().await;
+        let registered_user = new_registered_user(&env).await;
 
         let response = client.ban_user(Username::new(registered_user.username.clone())).await;
 

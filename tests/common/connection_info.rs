@@ -1,11 +1,3 @@
-pub fn anonymous_connection(bind_address: &str) -> ConnectionInfo {
-    ConnectionInfo::anonymous(bind_address)
-}
-
-pub fn authenticated_connection(bind_address: &str, token: &str) -> ConnectionInfo {
-    ConnectionInfo::new(bind_address, token)
-}
-
 #[derive(Clone)]
 pub struct ConnectionInfo {
     pub bind_address: String,

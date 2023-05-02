@@ -1,11 +1,13 @@
 //! API contract for `about` context.
 use crate::common::asserts::{assert_response_title, assert_text_ok};
-use crate::environments::shared::TestEnv;
+use crate::common::client::Client;
+use crate::e2e::environment::TestEnv;
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_load_the_about_page_with_information_about_the_api() {
-    let client = TestEnv::running().await.unauthenticated_client();
+    let mut env = TestEnv::new();
+    env.start().await;
+    let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let response = client.about().await;
 
@@ -14,9 +16,10 @@ async fn it_should_load_the_about_page_with_information_about_the_api() {
 }
 
 #[tokio::test]
-#[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_load_the_license_page_at_the_api_entrypoint() {
-    let client = TestEnv::running().await.unauthenticated_client();
+    let mut env = TestEnv::new();
+    env.start().await;
+    let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let response = client.license().await;
 
