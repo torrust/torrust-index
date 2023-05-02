@@ -3,8 +3,7 @@ use crate::integration::environment::TestEnv;
 
 #[tokio::test]
 async fn it_should_load_the_about_page_with_information_about_the_api() {
-    let env = TestEnv::running().await;
-    let client = env.unauthenticated_client();
+    let client = TestEnv::running().await.unauthenticated_client();
 
     let response = client.about().await;
 
@@ -14,8 +13,7 @@ async fn it_should_load_the_about_page_with_information_about_the_api() {
 
 #[tokio::test]
 async fn it_should_load_the_license_page_at_the_api_entrypoint() {
-    let env = TestEnv::running().await;
-    let client = env.unauthenticated_client();
+    let client = TestEnv::running().await.unauthenticated_client();
 
     let response = client.license().await;
 
