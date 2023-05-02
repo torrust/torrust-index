@@ -22,6 +22,12 @@ impl Client {
         }
     }
 
+    /// It checks if the server is running.
+    pub async fn server_is_running(&self) -> bool {
+        let response = self.http_client.inner_get("").await;
+        response.is_ok()
+    }
+
     // Context: about
 
     pub async fn about(&self) -> TextResponse {
@@ -179,6 +185,15 @@ impl Http {
                 .unwrap(),
         };
         BinaryResponse::from(response).await
+    }
+
+    pub async fn inner_get(&self, path: &str) -> Result<reqwest::Response, reqwest::Error> {
+        reqwest::Client::builder()
+            .build()
+            .unwrap()
+            .get(self.base_url(path).clone())
+            .send()
+            .await
     }
 
     pub async fn post<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> TextResponse {

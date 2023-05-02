@@ -23,7 +23,7 @@ pub async fn logged_in_admin() -> LoggedInUserData {
 }
 
 pub async fn logged_in_user() -> LoggedInUserData {
-    let client = TestEnv::default().unauthenticated_client();
+    let client = TestEnv::running().await.unauthenticated_client();
 
     let registered_user = registered_user().await;
 
@@ -39,7 +39,7 @@ pub async fn logged_in_user() -> LoggedInUserData {
 }
 
 pub async fn registered_user() -> RegisteredUser {
-    let client = TestEnv::default().unauthenticated_client();
+    let client = TestEnv::running().await.unauthenticated_client();
 
     let form = random_user_registration();
 

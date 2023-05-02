@@ -38,7 +38,7 @@ the mailcatcher API.
 #[tokio::test]
 #[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_allow_a_guess_user_to_register() {
-    let client = TestEnv::default().unauthenticated_client();
+    let client = TestEnv::running().await.unauthenticated_client();
 
     let form = random_user_registration();
 
@@ -54,7 +54,7 @@ async fn it_should_allow_a_guess_user_to_register() {
 #[tokio::test]
 #[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_allow_a_registered_user_to_login() {
-    let client = TestEnv::default().unauthenticated_client();
+    let client = TestEnv::running().await.unauthenticated_client();
 
     let registered_user = registered_user().await;
 
@@ -78,7 +78,7 @@ async fn it_should_allow_a_registered_user_to_login() {
 #[tokio::test]
 #[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_allow_a_logged_in_user_to_verify_an_authentication_token() {
-    let client = TestEnv::default().unauthenticated_client();
+    let client = TestEnv::running().await.unauthenticated_client();
 
     let logged_in_user = logged_in_user().await;
 
@@ -101,7 +101,7 @@ async fn it_should_allow_a_logged_in_user_to_verify_an_authentication_token() {
 #[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_not_allow_a_logged_in_user_to_renew_an_authentication_token_which_is_still_valid_for_more_than_one_week() {
     let logged_in_user = logged_in_user().await;
-    let client = TestEnv::default().authenticated_client(&logged_in_user.token);
+    let client = TestEnv::running().await.authenticated_client(&logged_in_user.token);
 
     let response = client
         .renew_token(TokenRenewalForm {
@@ -135,7 +135,7 @@ mod banned_user_list {
     #[cfg_attr(not(feature = "e2e-tests"), ignore)]
     async fn it_should_allow_an_admin_to_ban_a_user() {
         let logged_in_admin = logged_in_admin().await;
-        let client = TestEnv::default().authenticated_client(&logged_in_admin.token);
+        let client = TestEnv::running().await.authenticated_client(&logged_in_admin.token);
 
         let registered_user = registered_user().await;
 
@@ -154,7 +154,7 @@ mod banned_user_list {
     #[cfg_attr(not(feature = "e2e-tests"), ignore)]
     async fn it_should_not_allow_a_non_admin_to_ban_a_user() {
         let logged_non_admin = logged_in_user().await;
-        let client = TestEnv::default().authenticated_client(&logged_non_admin.token);
+        let client = TestEnv::running().await.authenticated_client(&logged_non_admin.token);
 
         let registered_user = registered_user().await;
 
@@ -166,7 +166,7 @@ mod banned_user_list {
     #[tokio::test]
     #[cfg_attr(not(feature = "e2e-tests"), ignore)]
     async fn it_should_not_allow_guess_to_ban_a_user() {
-        let client = TestEnv::default().unauthenticated_client();
+        let client = TestEnv::running().await.unauthenticated_client();
 
         let registered_user = registered_user().await;
 

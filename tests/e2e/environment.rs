@@ -6,6 +6,17 @@ pub struct TestEnv {
 }
 
 impl TestEnv {
+    pub async fn running() -> Self {
+        let env = Self::default();
+        let client = env.unauthenticated_client();
+        assert!(
+            client.server_is_running().await,
+            "Test server is not running on {}",
+            env.authority
+        );
+        env
+    }
+
     pub fn unauthenticated_client(&self) -> Client {
         Client::new(anonymous_connection(&self.authority))
     }

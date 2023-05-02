@@ -39,7 +39,7 @@ mod for_guests {
         let uploader = logged_in_user().await;
         let (_test_torrent, indexed_torrent) = upload_random_torrent_to_index(&uploader).await;
 
-        let client = TestEnv::default().unauthenticated_client();
+        let client = TestEnv::running().await.unauthenticated_client();
 
         let response = client.get_torrents().await;
 
@@ -56,7 +56,7 @@ mod for_guests {
         let uploader = logged_in_user().await;
         let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader).await;
 
-        let client = TestEnv::default().unauthenticated_client();
+        let client = TestEnv::running().await.unauthenticated_client();
 
         let response = client.get_torrent(uploaded_torrent.torrent_id).await;
 
@@ -103,7 +103,7 @@ mod for_guests {
         let uploader = logged_in_user().await;
         let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader).await;
 
-        let client = TestEnv::default().unauthenticated_client();
+        let client = TestEnv::running().await.unauthenticated_client();
 
         let response = client.download_torrent(uploaded_torrent.torrent_id).await;
 
@@ -132,7 +132,7 @@ mod for_guests {
         let uploader = logged_in_user().await;
         let (_test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader).await;
 
-        let client = TestEnv::default().unauthenticated_client();
+        let client = TestEnv::running().await.unauthenticated_client();
 
         let response = client.delete_torrent(uploaded_torrent.torrent_id).await;
 
@@ -152,7 +152,7 @@ mod for_authenticated_users {
     #[cfg_attr(not(feature = "e2e-tests"), ignore)]
     async fn it_should_allow_authenticated_users_to_upload_new_torrents() {
         let uploader = logged_in_user().await;
-        let client = TestEnv::default().authenticated_client(&uploader.token);
+        let client = TestEnv::running().await.authenticated_client(&uploader.token);
 
         let test_torrent = random_torrent();
 
@@ -175,7 +175,7 @@ mod for_authenticated_users {
     #[cfg_attr(not(feature = "e2e-tests"), ignore)]
     async fn it_should_not_allow_uploading_a_torrent_with_a_non_existing_category() {
         let uploader = logged_in_user().await;
-        let client = TestEnv::default().authenticated_client(&uploader.token);
+        let client = TestEnv::running().await.authenticated_client(&uploader.token);
 
         let mut test_torrent = random_torrent();
 
@@ -192,7 +192,7 @@ mod for_authenticated_users {
     #[cfg_attr(not(feature = "e2e-tests"), ignore)]
     async fn it_should_not_allow_uploading_a_torrent_with_a_title_that_already_exists() {
         let uploader = logged_in_user().await;
-        let client = TestEnv::default().authenticated_client(&uploader.token);
+        let client = TestEnv::running().await.authenticated_client(&uploader.token);
 
         // Upload the first torrent
         let first_torrent = random_torrent();
@@ -213,7 +213,7 @@ mod for_authenticated_users {
     #[cfg_attr(not(feature = "e2e-tests"), ignore)]
     async fn it_should_not_allow_uploading_a_torrent_with_a_infohash_that_already_exists() {
         let uploader = logged_in_user().await;
-        let client = TestEnv::default().authenticated_client(&uploader.token);
+        let client = TestEnv::running().await.authenticated_client(&uploader.token);
 
         // Upload the first torrent
         let first_torrent = random_torrent();
@@ -243,7 +243,7 @@ mod for_authenticated_users {
             let uploader = logged_in_user().await;
             let (_test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader).await;
 
-            let client = TestEnv::default().authenticated_client(&uploader.token);
+            let client = TestEnv::running().await.authenticated_client(&uploader.token);
 
             let response = client.delete_torrent(uploaded_torrent.torrent_id).await;
 
@@ -264,7 +264,7 @@ mod for_authenticated_users {
             let uploader = logged_in_user().await;
             let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader).await;
 
-            let client = TestEnv::default().authenticated_client(&uploader.token);
+            let client = TestEnv::running().await.authenticated_client(&uploader.token);
 
             let new_title = format!("{}-new-title", test_torrent.index_info.title);
             let new_description = format!("{}-new-description", test_torrent.index_info.description);
@@ -303,7 +303,7 @@ mod for_authenticated_users {
             let (_test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader).await;
 
             let admin = logged_in_admin().await;
-            let client = TestEnv::default().authenticated_client(&admin.token);
+            let client = TestEnv::running().await.authenticated_client(&admin.token);
 
             let response = client.delete_torrent(uploaded_torrent.torrent_id).await;
 
@@ -320,7 +320,7 @@ mod for_authenticated_users {
             let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader).await;
 
             let logged_in_admin = logged_in_admin().await;
-            let client = TestEnv::default().authenticated_client(&logged_in_admin.token);
+            let client = TestEnv::running().await.authenticated_client(&logged_in_admin.token);
 
             let new_title = format!("{}-new-title", test_torrent.index_info.title);
             let new_description = format!("{}-new-description", test_torrent.index_info.description);

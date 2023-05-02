@@ -7,7 +7,7 @@ use crate::e2e::environment::TestEnv;
 #[tokio::test]
 #[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_allow_guests_to_get_the_public_settings() {
-    let client = TestEnv::default().unauthenticated_client();
+    let client = TestEnv::running().await.unauthenticated_client();
 
     let response = client.get_public_settings().await;
 
@@ -31,7 +31,7 @@ async fn it_should_allow_guests_to_get_the_public_settings() {
 #[tokio::test]
 #[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_allow_guests_to_get_the_site_name() {
-    let client = TestEnv::default().unauthenticated_client();
+    let client = TestEnv::running().await.unauthenticated_client();
 
     let response = client.get_site_name().await;
 
@@ -48,7 +48,7 @@ async fn it_should_allow_guests_to_get_the_site_name() {
 #[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_allow_admins_to_get_all_the_settings() {
     let logged_in_admin = logged_in_admin().await;
-    let client = TestEnv::default().authenticated_client(&logged_in_admin.token);
+    let client = TestEnv::running().await.authenticated_client(&logged_in_admin.token);
 
     let response = client.get_settings().await;
 
@@ -102,7 +102,7 @@ async fn it_should_allow_admins_to_get_all_the_settings() {
 #[cfg_attr(not(feature = "e2e-tests"), ignore)]
 async fn it_should_allow_admins_to_update_all_the_settings() {
     let logged_in_admin = logged_in_admin().await;
-    let client = TestEnv::default().authenticated_client(&logged_in_admin.token);
+    let client = TestEnv::running().await.authenticated_client(&logged_in_admin.token);
 
     // todo: we can't actually change the settings because it would affect other E2E tests.
     // Location for the `config.toml` file is hardcoded. We could use a ENV variable to change it.

@@ -13,7 +13,7 @@ pub async fn upload_random_torrent_to_index(uploader: &LoggedInUserData) -> (Tes
 
 /// Upload a torrent to the index
 pub async fn upload_torrent(uploader: &LoggedInUserData, torrent: &TorrentIndexInfo) -> TorrentListedInIndex {
-    let client = TestEnv::default().authenticated_client(&uploader.token);
+    let client = TestEnv::running().await.authenticated_client(&uploader.token);
 
     let form: UploadTorrentMultipartForm = torrent.clone().into();
 

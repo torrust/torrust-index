@@ -5,7 +5,7 @@ use crate::e2e::environment::TestEnv;
 
 pub async fn add_category(category_name: &str) -> TextResponse {
     let logged_in_admin = logged_in_admin().await;
-    let client = TestEnv::default().authenticated_client(&logged_in_admin.token);
+    let client = TestEnv::running().await.authenticated_client(&logged_in_admin.token);
 
     client
         .add_category(AddCategoryForm {
