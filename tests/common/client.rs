@@ -16,10 +16,24 @@ pub struct Client {
 }
 
 impl Client {
+    pub fn unauthenticated(bind_address: &str) -> Self {
+        Self::new(ConnectionInfo::anonymous(bind_address))
+    }
+
+    pub fn authenticated(bind_address: &str, token: &str) -> Self {
+        Self::new(ConnectionInfo::new(bind_address, token))
+    }
+
     pub fn new(connection_info: ConnectionInfo) -> Self {
         Self {
             http_client: Http::new(connection_info),
         }
+    }
+
+    /// It checks if the server is running.
+    pub async fn server_is_running(&self) -> bool {
+        let response = self.http_client.inner_get("").await;
+        response.is_ok()
     }
 
     // Context: about
@@ -179,6 +193,15 @@ impl Http {
                 .unwrap(),
         };
         BinaryResponse::from(response).await
+    }
+
+    pub async fn inner_get(&self, path: &str) -> Result<reqwest::Response, reqwest::Error> {
+        reqwest::Client::builder()
+            .build()
+            .unwrap()
+            .get(self.base_url(path).clone())
+            .send()
+            .await
     }
 
     pub async fn post<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> TextResponse {

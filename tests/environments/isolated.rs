@@ -2,10 +2,11 @@ use tempfile::TempDir;
 use torrust_index_backend::config::{TorrustConfig, FREE_PORT};
 
 use super::app_starter::AppStarter;
-use crate::common::client::Client;
-use crate::common::connection_info::{anonymous_connection, authenticated_connection};
 use crate::common::random;
 
+/// Provides an isolated test environment for testing. The environment is
+/// launched with a temporary directory and a default ephemeral configuration
+/// before running the test.
 pub struct TestEnv {
     pub app_starter: AppStarter,
     pub temp_dir: TempDir,
@@ -14,13 +15,14 @@ pub struct TestEnv {
 impl TestEnv {
     /// Provides a running app instance for integration tests.
     pub async fn running() -> Self {
-        let mut env = TestEnv::with_test_configuration();
+        let mut env = Self::default();
         env.start().await;
         env
     }
 
     /// Provides a test environment with a default configuration for testing
     /// application.
+    #[must_use]
     pub fn with_test_configuration() -> Self {
         let temp_dir = TempDir::new().expect("failed to create a temporary directory");
 
@@ -36,28 +38,19 @@ impl TestEnv {
         self.app_starter.start().await;
     }
 
-    /// Provides an unauthenticated client for integration tests.
-    pub fn unauthenticated_client(&self) -> Client {
-        Client::new(anonymous_connection(
-            &self
-                .server_socket_addr()
-                .expect("app should be started to get the server socket address"),
-        ))
-    }
-
-    /// Provides an authenticated client for integration tests.
-    pub fn _authenticated_client(&self, token: &str) -> Client {
-        Client::new(authenticated_connection(
-            &self
-                .server_socket_addr()
-                .expect("app should be started to get the server socket address"),
-            token,
-        ))
-    }
-
     /// Provides the API server socket address.
-    fn server_socket_addr(&self) -> Option<String> {
+    pub fn server_socket_addr(&self) -> Option<String> {
         self.app_starter.server_socket_addr().map(|addr| addr.to_string())
+    }
+
+    pub fn database_connect_url(&self) -> String {
+        self.app_starter.database_connect_url()
+    }
+}
+
+impl Default for TestEnv {
+    fn default() -> Self {
+        Self::with_test_configuration()
     }
 }
 

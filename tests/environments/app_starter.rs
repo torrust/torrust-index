@@ -15,6 +15,7 @@ pub struct AppStarter {
 }
 
 impl AppStarter {
+    #[must_use]
     pub fn with_custom_configuration(configuration: TorrustConfig) -> Self {
         Self {
             configuration,
@@ -22,6 +23,9 @@ impl AppStarter {
         }
     }
 
+    /// # Panics
+    ///
+    /// Will panic if the app was dropped after spawning it.
     pub async fn start(&mut self) {
         let configuration = Configuration {
             settings: RwLock::new(self.configuration.clone()),
@@ -38,7 +42,7 @@ impl AppStarter {
             tx.send(AppStarted {
                 socket_addr: app.socket_address,
             })
-            .expect("the app should not be dropped");
+            .expect("the app starter should not be dropped");
 
             app.api_server.await
         });
@@ -67,8 +71,14 @@ impl AppStarter {
         }
     }
 
+    #[must_use]
     pub fn server_socket_addr(&self) -> Option<SocketAddr> {
         self.running_state.as_ref().map(|running_state| running_state.socket_addr)
+    }
+
+    #[must_use]
+    pub fn database_connect_url(&self) -> String {
+        self.configuration.database.connect_url.clone()
     }
 }
 

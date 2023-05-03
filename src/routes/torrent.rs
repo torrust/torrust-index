@@ -103,6 +103,8 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
         .await;
 
     // whitelist info hash on tracker
+    // code-review: why do we always try to whitelist the torrent on the tracker?
+    // shouldn't we only do this if the torrent is in "Listed" mode?
     if let Err(e) = app_data
         .tracker
         .whitelist_info_hash(torrent_request.torrent.info_hash())

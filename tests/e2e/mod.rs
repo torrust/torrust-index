@@ -1,33 +1,39 @@
-//! End-to-end tests.
+//! End-to-end tests
 //!
-//! Execute E2E tests with:
+//! These test can be executed against an out-of-process server (shared) or
+//! against an in-process server (isolated).
 //!
-//! ```
-//! cargo test --features e2e-tests
-//! cargo test --features e2e-tests -- --nocapture
-//! ```
+//! If you want to run the tests against an out-of-process server, you need to
+//! set the environment variable `TORRUST_IDX_BACK_E2E_SHARED` to `true`.
 //!
-//! or the Cargo alias:
+//! > **NOTICE**: The server must be running before running the tests. The
+//! server url is hardcoded to `http://localhost:3000` for now. We are planning
+//! to make it configurable in the future via a environment variable.
 //!
-//! ```
-//! cargo e2e
-//! ```
-//!
-//! > **NOTICE**: E2E tests are not executed by default, because they require
-//! a running instance of the API.
-//!
-//! You can also run only one test with:
-//!
-//! ```
-//! cargo test --features e2e-tests TEST_NAME -- --nocapture
-//! cargo test --features e2e-tests it_should_register_a_new_user -- --nocapture
+//! ```text
+//! TORRUST_IDX_BACK_E2E_SHARED=true cargo test
 //! ```
 //!
-//! > **NOTICE**: E2E tests always use the same databases
-//! `storage/database/torrust_index_backend_e2e_testing.db` and
-//! `./storage/database/torrust_tracker_e2e_testing.db`. If you want to use a
-//! clean database, delete the files before running the tests.
+//! If you want to run the tests against an isolated server, you need to execute
+//! the following command:
 //!
-//! See the [docker documentation](https://github.com/torrust/torrust-index-backend/tree/develop/docker) for more information on how to run the API.
-mod contexts;
+//! ```text
+//! cargo test
+//! ```
+//!
+//! > **NOTICE**: Some tests require the real tracker to be running, so they
+//! can only be run in shared mode until we implement a mock for the
+//! `torrust_index_backend::tracker::TrackerService`.
+//!
+//! You may have errors like `Too many open files (os error 24)`. If so, you
+//! need to increase the limit of open files for the current user. You can do
+//! it by executing the following command (on Ubuntu):
+//!
+//! ```text
+//! ulimit -n 4096
+//! ```
+//!
+//! You can also make that change permanent, please refer to your OS
+//! documentation.
+pub mod contexts;
 pub mod environment;

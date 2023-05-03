@@ -2,18 +2,20 @@ use std::sync::Arc;
 
 use torrust_index_backend::databases::database::connect_database;
 
+use crate::common::client::Client;
 use crate::common::contexts::user::fixtures::random_user_registration;
 use crate::common::contexts::user::forms::{LoginForm, RegisteredUser};
 use crate::common::contexts::user::responses::{LoggedInUserData, SuccessfulLoginResponse};
 use crate::e2e::environment::TestEnv;
 
-pub async fn logged_in_admin() -> LoggedInUserData {
-    let user = logged_in_user().await;
+pub async fn new_logged_in_admin(env: &TestEnv) -> LoggedInUserData {
+    let user = new_logged_in_user(env).await;
 
-    // todo: get from E2E config file `config-idx-back.toml.local`
-    let connect_url = "sqlite://storage/database/torrust_index_backend_e2e_testing.db?mode=rwc";
-
-    let database = Arc::new(connect_database(connect_url).await.expect("Database error."));
+    let database = Arc::new(
+        connect_database(&env.database_connect_url().unwrap())
+            .await
+            .expect("Database error."),
+    );
 
     let user_profile = database.get_user_profile_from_username(&user.username).await.unwrap();
 
@@ -22,10 +24,10 @@ pub async fn logged_in_admin() -> LoggedInUserData {
     user
 }
 
-pub async fn logged_in_user() -> LoggedInUserData {
-    let client = TestEnv::default().unauthenticated_client();
+pub async fn new_logged_in_user(env: &TestEnv) -> LoggedInUserData {
+    let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
-    let registered_user = registered_user().await;
+    let registered_user = new_registered_user(env).await;
 
     let response = client
         .login_user(LoginForm {
@@ -35,11 +37,32 @@ pub async fn logged_in_user() -> LoggedInUserData {
         .await;
 
     let res: SuccessfulLoginResponse = serde_json::from_str(&response.body).unwrap();
+
+    let user = res.data;
+
+    if !user.admin {
+        return user;
+    }
+
+    // The first registered user is always an admin, so we need to register
+    // a second user to ge a non admin user.
+
+    let second_registered_user = new_registered_user(env).await;
+
+    let response = client
+        .login_user(LoginForm {
+            login: second_registered_user.username.clone(),
+            password: second_registered_user.password.clone(),
+        })
+        .await;
+
+    let res: SuccessfulLoginResponse = serde_json::from_str(&response.body).unwrap();
+
     res.data
 }
 
-pub async fn registered_user() -> RegisteredUser {
-    let client = TestEnv::default().unauthenticated_client();
+pub async fn new_registered_user(env: &TestEnv) -> RegisteredUser {
+    let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let form = random_user_registration();
 
