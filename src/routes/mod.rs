@@ -2,6 +2,7 @@ use actix_web::web;
 
 pub mod about;
 pub mod category;
+pub mod proxy;
 pub mod root;
 pub mod settings;
 pub mod torrent;
@@ -13,5 +14,6 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
     category::init_routes(cfg);
     settings::init_routes(cfg);
     about::init_routes(cfg);
+    proxy::init_routes(cfg);
     root::init_routes(cfg);
 }

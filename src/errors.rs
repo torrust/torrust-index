@@ -114,6 +114,9 @@ pub enum ServiceError {
     #[display(fmt = "Sorry, we have an error with our tracker connection.")]
     TrackerOffline,
 
+    #[display(fmt = "Could not whitelist torrent.")]
+    WhitelistingError,
+
     #[display(fmt = "Failed to send verification email.")]
     FailedToSendVerificationEmail,
 
@@ -171,6 +174,8 @@ impl ResponseError for ServiceError {
             ServiceError::TorrentTitleAlreadyExists => StatusCode::BAD_REQUEST,
 
             ServiceError::TrackerOffline => StatusCode::INTERNAL_SERVER_ERROR,
+
+            ServiceError::WhitelistingError => StatusCode::INTERNAL_SERVER_ERROR,
 
             ServiceError::CategoryExists => StatusCode::BAD_REQUEST,
 

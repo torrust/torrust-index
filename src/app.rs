@@ -8,6 +8,7 @@ use log::info;
 
 use crate::auth::AuthorizationService;
 use crate::bootstrap::logging;
+use crate::cache::image::manager::ImageCacheService;
 use crate::common::AppData;
 use crate::config::Configuration;
 use crate::databases::database::connect_database;
@@ -45,6 +46,7 @@ pub async fn run(configuration: Configuration) -> Running {
     let auth = Arc::new(AuthorizationService::new(cfg.clone(), database.clone()));
     let tracker_service = Arc::new(TrackerService::new(cfg.clone(), database.clone()));
     let mailer_service = Arc::new(MailerService::new(cfg.clone()).await);
+    let image_cache_service = Arc::new(ImageCacheService::new(cfg.clone()).await);
 
     // Build app container
 
@@ -54,6 +56,7 @@ pub async fn run(configuration: Configuration) -> Running {
         auth.clone(),
         tracker_service.clone(),
         mailer_service,
+        image_cache_service
     ));
 
     // Start repeating task to import tracker torrent data and updating

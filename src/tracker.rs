@@ -65,7 +65,7 @@ impl TrackerService {
         if response.status().is_success() {
             Ok(())
         } else {
-            Err(ServiceError::InternalServerError)
+            Err(ServiceError::WhitelistingError)
         }
     }
 
