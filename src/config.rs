@@ -76,7 +76,7 @@ pub struct ImageCache {
     pub capacity: usize,
     pub entry_size_limit: usize,
     pub user_quota_period_seconds: u64,
-    pub user_quota_bytes: usize
+    pub user_quota_bytes: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -87,7 +87,7 @@ pub struct TorrustConfig {
     pub auth: Auth,
     pub database: Database,
     pub mail: Mail,
-    pub image_cache: ImageCache
+    pub image_cache: ImageCache,
 }
 
 impl TorrustConfig {
@@ -131,12 +131,11 @@ impl TorrustConfig {
                 capacity: 128_000_000,
                 entry_size_limit: 4_000_000,
                 user_quota_period_seconds: 3600,
-                user_quota_bytes: 64_000_000
-            }
+                user_quota_bytes: 64_000_000,
+            },
         }
     }
 }
-
 
 #[derive(Debug)]
 pub struct Configuration {

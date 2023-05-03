@@ -56,7 +56,7 @@ pub async fn run(configuration: Configuration) -> Running {
         auth.clone(),
         tracker_service.clone(),
         mailer_service,
-        image_cache_service
+        image_cache_service,
     ));
 
     // Start repeating task to import tracker torrent data and updating

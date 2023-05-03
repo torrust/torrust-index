@@ -133,7 +133,9 @@ impl ImageCacheService {
     }
 
     async fn get_image_from_url_as_bytes(&self, url: &str) -> Result<Bytes, Error> {
-        let res = self.reqwest_client.clone()
+        let res = self
+            .reqwest_client
+            .clone()
             .get(url)
             .send()
             .await
@@ -171,7 +173,14 @@ impl ImageCacheService {
     }
 
     async fn update_image_cache(&self, url: &str, image_bytes: &Bytes) -> Result<(), Error> {
-        if self.image_cache.write().await.set(url.to_string(), image_bytes.clone()).await.is_err() {
+        if self
+            .image_cache
+            .write()
+            .await
+            .set(url.to_string(), image_bytes.clone())
+            .await
+            .is_err()
+        {
             return Err(Error::ImageTooBig);
         }
 
@@ -181,7 +190,10 @@ impl ImageCacheService {
     async fn update_user_quota(&self, user: &UserCompact, amount: usize) -> Result<(), Error> {
         let settings = self.cfg.settings.read().await;
 
-        let mut quota = self.user_quotas.read().await
+        let mut quota = self
+            .user_quotas
+            .read()
+            .await
             .get(&user.user_id)
             .cloned()
             .unwrap_or(ImageCacheQuota::new(
@@ -196,5 +208,4 @@ impl ImageCacheService {
 
         Ok(())
     }
-
 }
