@@ -11,6 +11,7 @@ pub struct Settings {
     pub auth: Auth,
     pub database: Database,
     pub mail: Mail,
+    pub image_cache: ImageCache,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug)]
@@ -56,4 +57,13 @@ pub struct Mail {
     pub password: String,
     pub server: String,
     pub port: u64,
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Debug)]
+pub struct ImageCache {
+    pub max_request_timeout_ms: u64,
+    pub capacity: u64,
+    pub entry_size_limit: u64,
+    pub user_quota_period_seconds: u64,
+    pub user_quota_bytes: u64,
 }

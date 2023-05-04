@@ -1,7 +1,7 @@
 use crate::common::client::Client;
 use crate::common::contexts::settings::form::UpdateSettingsForm;
 use crate::common::contexts::settings::responses::{AllSettingsResponse, Public, PublicSettingsResponse, SiteNameResponse};
-use crate::common::contexts::settings::{Auth, Database, Mail, Net, Settings, Tracker, Website};
+use crate::common::contexts::settings::{Auth, Database, ImageCache, Mail, Net, Settings, Tracker, Website};
 use crate::e2e::contexts::user::steps::new_logged_in_admin;
 use crate::e2e::environment::TestEnv;
 
@@ -112,6 +112,13 @@ async fn it_should_allow_admins_to_update_all_the_settings() {
                 server: "mailcatcher".to_string(),
                 port: 1025,
             },
+            image_cache: ImageCache {
+                max_request_timeout_ms: 1000,
+                capacity: 128_000_000,
+                entry_size_limit: 4_000_000,
+                user_quota_period_seconds: 3600,
+                user_quota_bytes: 64_000_000,
+            },
         })
         .await;
 
@@ -152,7 +159,14 @@ async fn it_should_allow_admins_to_update_all_the_settings() {
                 password: String::new(),
                 server: "mailcatcher".to_string(),
                 port: 1025,
-            }
+            },
+            image_cache: ImageCache {
+                max_request_timeout_ms: 1000,
+                capacity: 128_000_000,
+                entry_size_limit: 4_000_000,
+                user_quota_period_seconds: 3600,
+                user_quota_bytes: 64_000_000,
+            },
         }
     );
     if let Some(content_type) = &response.content_type {
