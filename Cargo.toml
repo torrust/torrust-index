@@ -38,6 +38,9 @@ pbkdf2 = { version = "0.12", features = ["simple"] }
 text-colorizer = "1.0.0"
 log = "0.4"
 fern = "0.6"
+bytes = "1.4"
+text-to-png = "0.2"
+indexmap = "1.9"
 
 [dev-dependencies]
 rand = "0.8"
