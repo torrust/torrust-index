@@ -1,6 +1,6 @@
 use std::env;
 
-use crate::common::contexts::settings::{Auth, Database, Mail, Net, Settings, Tracker, Website};
+use crate::common::contexts::settings::{Auth, Database, ImageCache, Mail, Net, Settings, Tracker, Website};
 use crate::environments::{self, isolated, shared};
 
 enum State {
@@ -128,6 +128,13 @@ impl TestEnv {
                     server: "mailcatcher".to_string(),
                     port: 1025,
                 },
+                image_cache: ImageCache {
+                    max_request_timeout_ms: 1000,
+                    capacity: 128_000_000,
+                    entry_size_limit: 4_000_000,
+                    user_quota_period_seconds: 3600,
+                    user_quota_bytes: 64_000_000,
+                },
             }),
             State::RunningIsolated => Some(Settings {
                 website: Website {
@@ -159,6 +166,13 @@ impl TestEnv {
                     password: String::new(),
                     server: String::new(),
                     port: 25,
+                },
+                image_cache: ImageCache {
+                    max_request_timeout_ms: 1000,
+                    capacity: 128_000_000,
+                    entry_size_limit: 4_000_000,
+                    user_quota_period_seconds: 3600,
+                    user_quota_bytes: 64_000_000,
                 },
             }),
         }
