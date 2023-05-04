@@ -37,7 +37,7 @@ the mailcatcher API.
 // Responses data
 
 #[tokio::test]
-async fn it_should_allow_a_guess_user_to_register() {
+async fn it_should_allow_a_guest_user_to_register() {
     let mut env = TestEnv::new();
     env.start().await;
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
@@ -175,7 +175,7 @@ mod banned_user_list {
     }
 
     #[tokio::test]
-    async fn it_should_not_allow_guess_to_ban_a_user() {
+    async fn it_should_not_allow_a_guest_to_ban_a_user() {
         let mut env = TestEnv::new();
         env.start().await;
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());

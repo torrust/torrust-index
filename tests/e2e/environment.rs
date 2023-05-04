@@ -1,7 +1,8 @@
 use std::env;
 
-use crate::common::contexts::settings::{Auth, Database, ImageCache, Mail, Net, Settings, Tracker, Website};
-use crate::environments::{self, isolated, shared};
+use super::config::{init_shared_env_configuration, ENV_VAR_E2E_SHARED};
+use crate::common::contexts::settings::Settings;
+use crate::environments::{isolated, shared};
 
 enum State {
     Stopped,
@@ -9,182 +10,118 @@ enum State {
     RunningIsolated,
 }
 
+/// Test environment for E2E tests. It's a wrapper around the shared or isolated
+/// test environment.
+///
+/// Shared test environment:
+///
+/// - It's a out-of-process test environment.
+/// - It has to be started before running the tests.
+/// - All tests run against the same instance of the server.
+///
+/// Isolated test environment:
+///
+/// - It's an in-process test environment.
+/// - It's started automatically when the test starts.
+/// - Each test runs against a different instance of the server.
+#[derive(Default)]
 pub struct TestEnv {
-    mode: State,
+    /// Copy of the settings when the test environment was started.
+    starting_settings: Option<Settings>,
+    /// Shared independent test environment if we start using it.
     shared: Option<shared::TestEnv>,
+    /// Isolated test environment if we start an isolate test environment.
     isolated: Option<isolated::TestEnv>,
 }
 
 impl TestEnv {
-    // todo: this class needs a big refactor:
-    // - It should load the `server_settings` rom both shared or isolated env.
-    //   And `tracker_url`, `server_socket_addr`, `database_connect_url` methods
-    //   should get the values from `server_settings`.
-    // - We should consider extracting a trait for test environments, so we can
-    //   only one attribute like `AppStarter`.
+    // code-review: consider extracting a trait for test environments. The state
+    // could be only `Running` or `Stopped`, and we could have a single
+    // attribute with the current started test environment (`Option<RunningTEstEnv>`).
 
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub async fn start(&mut self) {
-        let e2e_shared = "TORRUST_IDX_BACK_E2E_SHARED"; // bool
-
-        if let Ok(_val) = env::var(e2e_shared) {
-            let env = shared::TestEnv::running().await;
-            self.mode = State::RunningShared;
-            self.shared = Some(env);
-        }
-
-        let isolated_env = isolated::TestEnv::running().await;
-        self.mode = State::RunningIsolated;
-        self.isolated = Some(isolated_env);
+    pub fn is_shared(&self) -> bool {
+        self.shared.is_some()
     }
 
-    pub fn tracker_url(&self) -> String {
-        // todo: get from `server_settings`
-        match self.mode {
-            // todo: for shared instance, get it from env var
-            // `TORRUST_IDX_BACK_CONFIG` or `TORRUST_IDX_BACK_CONFIG_PATH`
-            State::RunningShared => "udp://tracker:6969".to_string(),
-            // todo
-            State::RunningIsolated => "udp://localhost:6969".to_string(),
-            State::Stopped => panic!("TestEnv is not running"),
+    pub fn is_isolated(&self) -> bool {
+        self.isolated.is_some()
+    }
+
+    /// It starts the test environment. It can be a shared or isolated test
+    /// environment depending on the value of the `ENV_VAR_E2E_SHARED` env var.
+    pub async fn start(&mut self) {
+        let e2e_shared = ENV_VAR_E2E_SHARED; // bool
+
+        if let Ok(_e2e_test_env_is_shared) = env::var(e2e_shared) {
+            // Using the shared test env.
+            let shared_env = shared::TestEnv::running().await;
+
+            self.shared = Some(shared_env);
+            self.starting_settings = self.server_settings_for_shared_env().await;
+        } else {
+            // Using an isolated test env.
+            let isolated_env = isolated::TestEnv::running().await;
+
+            self.isolated = Some(isolated_env);
+            self.starting_settings = self.server_settings_for_isolated_env();
         }
     }
 
     /// Some test requires the real tracker to be running, so they can only
     /// be run in shared mode.
     pub fn provides_a_tracker(&self) -> bool {
-        matches!(self.mode, State::RunningShared)
+        self.is_shared()
     }
 
-    pub fn server_socket_addr(&self) -> Option<String> {
-        // todo: get from `server_settings`
-        match self.mode {
-            // todo: for shared instance, get it from env var
-            // `TORRUST_IDX_BACK_CONFIG` or `TORRUST_IDX_BACK_CONFIG_PATH`
-            State::RunningShared => match &self.shared {
-                Some(env) => env.server_socket_addr(),
-                None => panic!("TestEnv is not running"),
-            },
-            State::RunningIsolated => match &self.isolated {
-                Some(env) => env.server_socket_addr(),
-                None => panic!("TestEnv is not running"),
-            },
-            State::Stopped => panic!("TestEnv is not running"),
-        }
-    }
-
-    pub fn database_connect_url(&self) -> Option<String> {
-        // todo: get from `server_settings`
-        match self.mode {
-            State::Stopped => None,
-            State::RunningShared => Some("sqlite://storage/database/torrust_index_backend_e2e_testing.db?mode=rwc".to_string()),
-            State::RunningIsolated => self
-                .isolated
-                .as_ref()
-                .map(environments::isolated::TestEnv::database_connect_url),
-        }
-    }
-
+    /// Returns the server starting settings if the servers was already started.
+    /// We do not know the settings until we start the server.
     pub fn server_settings(&self) -> Option<Settings> {
-        // todo:
-        // - For shared instance, get it from env var: `TORRUST_IDX_BACK_CONFIG` or `TORRUST_IDX_BACK_CONFIG_PATH`.
-        // - For isolated instance, get it from the isolated env configuration (`TorrustConfig`).
-        match self.mode {
+        self.starting_settings.as_ref().cloned()
+    }
+
+    /// Provides the API server socket address.
+    /// For example: `localhost:3000`.
+    pub fn server_socket_addr(&self) -> Option<String> {
+        match self.state() {
+            State::RunningShared => self.shared.as_ref().unwrap().server_socket_addr(),
+            State::RunningIsolated => self.isolated.as_ref().unwrap().server_socket_addr(),
             State::Stopped => None,
-            State::RunningShared => Some(Settings {
-                website: Website {
-                    name: "Torrust".to_string(),
-                },
-                tracker: Tracker {
-                    url: self.tracker_url(),
-                    mode: "Public".to_string(),
-                    api_url: "http://tracker:1212".to_string(),
-                    token: "MyAccessToken".to_string(),
-                    token_valid_seconds: 7_257_600,
-                },
-                net: Net {
-                    port: 3000,
-                    base_url: None,
-                },
-                auth: Auth {
-                    email_on_signup: "Optional".to_string(),
-                    min_password_length: 6,
-                    max_password_length: 64,
-                    secret_key: "MaxVerstappenWC2021".to_string(),
-                },
-                database: Database {
-                    connect_url: self.database_connect_url().unwrap(),
-                    torrent_info_update_interval: 3600,
-                },
-                mail: Mail {
-                    email_verification_enabled: false,
-                    from: "example@email.com".to_string(),
-                    reply_to: "noreply@email.com".to_string(),
-                    username: String::new(),
-                    password: String::new(),
-                    server: "mailcatcher".to_string(),
-                    port: 1025,
-                },
-                image_cache: ImageCache {
-                    max_request_timeout_ms: 1000,
-                    capacity: 128_000_000,
-                    entry_size_limit: 4_000_000,
-                    user_quota_period_seconds: 3600,
-                    user_quota_bytes: 64_000_000,
-                },
-            }),
-            State::RunningIsolated => Some(Settings {
-                website: Website {
-                    name: "Torrust".to_string(),
-                },
-                tracker: Tracker {
-                    url: self.tracker_url(),
-                    mode: "Public".to_string(),
-                    api_url: "http://localhost:1212".to_string(),
-                    token: "MyAccessToken".to_string(),
-                    token_valid_seconds: 7_257_600,
-                },
-                net: Net { port: 0, base_url: None },
-                auth: Auth {
-                    email_on_signup: "Optional".to_string(),
-                    min_password_length: 6,
-                    max_password_length: 64,
-                    secret_key: "MaxVerstappenWC2021".to_string(),
-                },
-                database: Database {
-                    connect_url: self.database_connect_url().unwrap(),
-                    torrent_info_update_interval: 3600,
-                },
-                mail: Mail {
-                    email_verification_enabled: false,
-                    from: "example@email.com".to_string(),
-                    reply_to: "noreply@email.com".to_string(),
-                    username: String::new(),
-                    password: String::new(),
-                    server: String::new(),
-                    port: 25,
-                },
-                image_cache: ImageCache {
-                    max_request_timeout_ms: 1000,
-                    capacity: 128_000_000,
-                    entry_size_limit: 4_000_000,
-                    user_quota_period_seconds: 3600,
-                    user_quota_bytes: 64_000_000,
-                },
-            }),
         }
     }
-}
 
-impl Default for TestEnv {
-    fn default() -> Self {
-        Self {
-            mode: State::Stopped,
-            shared: None,
-            isolated: None,
+    /// Provides the database connect URL.
+    /// For example: `sqlite://storage/database/torrust_index_backend_e2e_testing.db?mode=rwc`.
+    pub fn database_connect_url(&self) -> Option<String> {
+        self.starting_settings
+            .as_ref()
+            .map(|settings| settings.database.connect_url.clone())
+    }
+
+    fn state(&self) -> State {
+        if self.is_shared() {
+            return State::RunningShared;
         }
+
+        if self.is_isolated() {
+            return State::RunningIsolated;
+        }
+
+        State::Stopped
+    }
+
+    fn server_settings_for_isolated_env(&self) -> Option<Settings> {
+        self.isolated
+            .as_ref()
+            .map(|env| Settings::from(env.app_starter.server_configuration()))
+    }
+
+    async fn server_settings_for_shared_env(&self) -> Option<Settings> {
+        let configuration = init_shared_env_configuration().await;
+        let settings = configuration.settings.read().await;
+        Some(Settings::from(settings.clone()))
     }
 }

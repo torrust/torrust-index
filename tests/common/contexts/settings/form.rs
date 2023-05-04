@@ -1,3 +1,3 @@
 use super::Settings;
 
-pub type UpdateSettingsForm = Settings;
+pub type UpdateSettings = Settings;

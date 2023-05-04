@@ -72,6 +72,11 @@ impl AppStarter {
     }
 
     #[must_use]
+    pub fn server_configuration(&self) -> TorrustConfig {
+        self.configuration.clone()
+    }
+
+    #[must_use]
     pub fn server_socket_addr(&self) -> Option<SocketAddr> {
         self.running_state.as_ref().map(|running_state| running_state.socket_addr)
     }
