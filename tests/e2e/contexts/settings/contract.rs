@@ -1,7 +1,5 @@
 use crate::common::client::Client;
-use crate::common::contexts::settings::form::UpdateSettingsForm;
 use crate::common::contexts::settings::responses::{AllSettingsResponse, Public, PublicSettingsResponse, SiteNameResponse};
-use crate::common::contexts::settings::{Auth, Database, ImageCache, Mail, Net, Settings, Tracker, Website};
 use crate::e2e::contexts::user::steps::new_logged_in_admin;
 use crate::e2e::environment::TestEnv;
 
@@ -69,106 +67,27 @@ async fn it_should_allow_admins_to_get_all_the_settings() {
 #[tokio::test]
 async fn it_should_allow_admins_to_update_all_the_settings() {
     let mut env = TestEnv::new();
+
+    if !env.is_isolated() {
+        // This test can't be executed in a non-isolated environment because
+        // it will change the settings for all the other tests.
+        return;
+    }
+
     env.start().await;
 
     let logged_in_admin = new_logged_in_admin(&env).await;
     let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
 
-    // todo: we can't actually change the settings because it would affect other E2E tests.
-    // Location for the `config.toml` file is hardcoded. We could use a ENV variable to change it.
+    let mut new_settings = env.server_settings().unwrap();
 
-    let response = client
-        .update_settings(UpdateSettingsForm {
-            website: Website {
-                name: "Torrust".to_string(),
-            },
-            tracker: Tracker {
-                url: "udp://tracker:6969".to_string(),
-                mode: "Public".to_string(),
-                api_url: "http://tracker:1212".to_string(),
-                token: "MyAccessToken".to_string(),
-                token_valid_seconds: 7_257_600,
-            },
-            net: Net {
-                port: 3000,
-                base_url: None,
-            },
-            auth: Auth {
-                email_on_signup: "Optional".to_string(),
-                min_password_length: 6,
-                max_password_length: 64,
-                secret_key: "MaxVerstappenWC2021".to_string(),
-            },
-            database: Database {
-                connect_url: "sqlite://storage/database/torrust_index_backend_e2e_testing.db?mode=rwc".to_string(),
-                torrent_info_update_interval: 3600,
-            },
-            mail: Mail {
-                email_verification_enabled: false,
-                from: "example@email.com".to_string(),
-                reply_to: "noreply@email.com".to_string(),
-                username: String::new(),
-                password: String::new(),
-                server: "mailcatcher".to_string(),
-                port: 1025,
-            },
-            image_cache: ImageCache {
-                max_request_timeout_ms: 1000,
-                capacity: 128_000_000,
-                entry_size_limit: 4_000_000,
-                user_quota_period_seconds: 3600,
-                user_quota_bytes: 64_000_000,
-            },
-        })
-        .await;
+    new_settings.website.name = "UPDATED NAME".to_string();
+
+    let response = client.update_settings(&new_settings).await;
 
     let res: AllSettingsResponse = serde_json::from_str(&response.body).unwrap();
 
-    assert_eq!(
-        res.data,
-        Settings {
-            website: Website {
-                name: "Torrust".to_string(),
-            },
-            tracker: Tracker {
-                url: "udp://tracker:6969".to_string(),
-                mode: "Public".to_string(),
-                api_url: "http://tracker:1212".to_string(),
-                token: "MyAccessToken".to_string(),
-                token_valid_seconds: 7_257_600,
-            },
-            net: Net {
-                port: 3000,
-                base_url: None,
-            },
-            auth: Auth {
-                email_on_signup: "Optional".to_string(),
-                min_password_length: 6,
-                max_password_length: 64,
-                secret_key: "MaxVerstappenWC2021".to_string(),
-            },
-            database: Database {
-                connect_url: "sqlite://storage/database/torrust_index_backend_e2e_testing.db?mode=rwc".to_string(),
-                torrent_info_update_interval: 3600,
-            },
-            mail: Mail {
-                email_verification_enabled: false,
-                from: "example@email.com".to_string(),
-                reply_to: "noreply@email.com".to_string(),
-                username: String::new(),
-                password: String::new(),
-                server: "mailcatcher".to_string(),
-                port: 1025,
-            },
-            image_cache: ImageCache {
-                max_request_timeout_ms: 1000,
-                capacity: 128_000_000,
-                entry_size_limit: 4_000_000,
-                user_quota_period_seconds: 3600,
-                user_quota_bytes: 64_000_000,
-            },
-        }
-    );
+    assert_eq!(res.data, new_settings);
     if let Some(content_type) = &response.content_type {
         assert_eq!(content_type, "application/json");
     }

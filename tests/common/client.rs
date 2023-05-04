@@ -3,7 +3,7 @@ use serde::Serialize;
 
 use super::connection_info::ConnectionInfo;
 use super::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
-use super::contexts::settings::form::UpdateSettingsForm;
+use super::contexts::settings::form::UpdateSettings;
 use super::contexts::torrent::forms::UpdateTorrentFrom;
 use super::contexts::torrent::requests::TorrentId;
 use super::contexts::user::forms::{LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username};
@@ -16,6 +16,9 @@ pub struct Client {
 }
 
 impl Client {
+    // todo: forms in POST requests can be passed by reference. It's already
+    // changed for the `update_settings` method.
+
     pub fn unauthenticated(bind_address: &str) -> Self {
         Self::new(ConnectionInfo::anonymous(bind_address))
     }
@@ -80,7 +83,7 @@ impl Client {
         self.http_client.get("settings", Query::empty()).await
     }
 
-    pub async fn update_settings(&self, update_settings_form: UpdateSettingsForm) -> TextResponse {
+    pub async fn update_settings(&self, update_settings_form: &UpdateSettings) -> TextResponse {
         self.http_client.post("settings", &update_settings_form).await
     }
 

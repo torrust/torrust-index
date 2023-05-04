@@ -27,6 +27,10 @@ impl TestEnv {
         Self::default()
     }
 
+    pub fn is_isolated(&self) -> bool {
+        matches!(self.mode, State::RunningIsolated)
+    }
+
     pub async fn start(&mut self) {
         let e2e_shared = "TORRUST_IDX_BACK_E2E_SHARED"; // bool
 
