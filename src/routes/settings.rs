@@ -1,6 +1,6 @@
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 
-use crate::bootstrap::config::CONFIG_PATH;
+use crate::bootstrap::config::ENV_VAR_DEFAULT_CONFIG_PATH;
 use crate::common::WebAppData;
 use crate::config::TorrustConfig;
 use crate::errors::{ServiceError, ServiceResult};
@@ -60,7 +60,10 @@ pub async fn update_settings(
         return Err(ServiceError::Unauthorized);
     }
 
-    let _ = app_data.cfg.update_settings(payload.into_inner(), CONFIG_PATH).await;
+    let _ = app_data
+        .cfg
+        .update_settings(payload.into_inner(), ENV_VAR_DEFAULT_CONFIG_PATH)
+        .await;
 
     let settings = app_data.cfg.settings.read().await;
 

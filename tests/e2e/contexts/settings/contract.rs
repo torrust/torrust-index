@@ -16,10 +16,10 @@ async fn it_should_allow_guests_to_get_the_public_settings() {
     assert_eq!(
         res.data,
         Public {
-            website_name: "Torrust".to_string(),
-            tracker_url: env.tracker_url(),
-            tracker_mode: "Public".to_string(),
-            email_on_signup: "Optional".to_string(),
+            website_name: env.server_settings().unwrap().website.name,
+            tracker_url: env.server_settings().unwrap().tracker.url,
+            tracker_mode: env.server_settings().unwrap().tracker.mode,
+            email_on_signup: env.server_settings().unwrap().auth.email_on_signup,
         }
     );
     if let Some(content_type) = &response.content_type {

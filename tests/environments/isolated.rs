@@ -38,11 +38,19 @@ impl TestEnv {
         self.app_starter.start().await;
     }
 
+    /// Provides the whole server configuration.
+    #[must_use]
+    pub fn server_configuration(&self) -> TorrustConfig {
+        self.app_starter.server_configuration()
+    }
+
     /// Provides the API server socket address.
+    #[must_use]
     pub fn server_socket_addr(&self) -> Option<String> {
         self.app_starter.server_socket_addr().map(|addr| addr.to_string())
     }
 
+    #[must_use]
     pub fn database_connect_url(&self) -> String {
         self.app_starter.database_connect_url()
     }

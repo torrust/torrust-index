@@ -46,7 +46,7 @@ docker run -it \
 
 ### With docker-compose
 
-The docker-compose configuration includes the MySQL service configuration. If you want to use MySQL instead of SQLite you have to change your `config.toml` or `config-idx-back.toml.local` configuration from:
+The docker-compose configuration includes the MySQL service configuration. If you want to use MySQL instead of SQLite you have to change your `config.toml` or `config-idx-back.local.toml` configuration from:
 
 ```toml
 connect_url = "sqlite://storage/database/data.db?mode=rwc"
@@ -64,8 +64,8 @@ Build and run it locally:
 
 ```s
 TORRUST_IDX_BACK_USER_UID=${TORRUST_IDX_BACK_USER_UID:-1000} \
-    TORRUST_IDX_BACK_CONFIG=$(cat config-idx-back.toml.local) \
-    TORRUST_TRACKER_CONFIG=$(cat config-tracker.toml.local) \
+    TORRUST_IDX_BACK_CONFIG=$(cat config-idx-back.local.toml) \
+    TORRUST_TRACKER_CONFIG=$(cat config-tracker.local.toml) \
     TORRUST_TRACKER_API_TOKEN=${TORRUST_TRACKER_API_TOKEN:-MyAccessToken} \
     docker compose up -d --build
 ```

@@ -1,7 +1,16 @@
+//! Initialize configuration from file or env var.
+//!
+//! All environment variables are prefixed with `TORRUST_IDX_BACK_`.
 use std::env;
 
-pub const CONFIG_PATH: &str = "./config.toml";
-pub const CONFIG_ENV_VAR_NAME: &str = "TORRUST_IDX_BACK_CONFIG";
+// Environment variables
+
+/// The whole `config.toml` file content. It has priority over the config file.
+pub const ENV_VAR_CONFIG: &str = "TORRUST_IDX_BACK_CONFIG";
+
+// Default values
+
+pub const ENV_VAR_DEFAULT_CONFIG_PATH: &str = "./config.toml";
 
 use crate::config::Configuration;
 
@@ -11,14 +20,14 @@ use crate::config::Configuration;
 ///
 /// Will panic if configuration is not found or cannot be parsed
 pub async fn init_configuration() -> Configuration {
-    if env::var(CONFIG_ENV_VAR_NAME).is_ok() {
-        println!("Loading configuration from env var `{}`", CONFIG_ENV_VAR_NAME);
+    if env::var(ENV_VAR_CONFIG).is_ok() {
+        println!("Loading configuration from env var `{}`", ENV_VAR_CONFIG);
 
-        Configuration::load_from_env_var(CONFIG_ENV_VAR_NAME).unwrap()
+        Configuration::load_from_env_var(ENV_VAR_CONFIG).unwrap()
     } else {
-        println!("Loading configuration from config file `{}`", CONFIG_PATH);
+        println!("Loading configuration from config file `{}`", ENV_VAR_DEFAULT_CONFIG_PATH);
 
-        match Configuration::load_from_file(CONFIG_PATH).await {
+        match Configuration::load_from_file(ENV_VAR_DEFAULT_CONFIG_PATH).await {
             Ok(config) => config,
             Err(error) => {
                 panic!("{}", error)
