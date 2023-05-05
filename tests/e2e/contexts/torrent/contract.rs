@@ -37,15 +37,12 @@ mod for_guests {
     #[tokio::test]
     async fn it_should_allow_guests_to_get_torrents() {
         let mut env = TestEnv::new();
+        env.start().await;
 
         if !env.provides_a_tracker() {
-            // This test requires the tracker to be running,
-            // because when you upload a torrent, it's added to the tracker
-            // whitelist.
+            println!("test skipped. It requires a tracker to be running.");
             return;
         }
-
-        env.start().await;
 
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
@@ -64,15 +61,12 @@ mod for_guests {
     #[tokio::test]
     async fn it_should_allow_guests_to_get_torrent_details_searching_by_id() {
         let mut env = TestEnv::new();
+        env.start().await;
 
         if !env.provides_a_tracker() {
-            // This test requires the tracker to be running,
-            // because when you upload a torrent, it's added to the tracker
-            // whitelist.
+            println!("test skipped. It requires a tracker to be running.");
             return;
         }
-
-        env.start().await;
 
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
@@ -121,15 +115,12 @@ mod for_guests {
     #[tokio::test]
     async fn it_should_allow_guests_to_download_a_torrent_file_searching_by_id() {
         let mut env = TestEnv::new();
+        env.start().await;
 
         if !env.provides_a_tracker() {
-            // This test requires the tracker to be running,
-            // because when you upload a torrent, it's added to the tracker
-            // whitelist.
+            println!("test skipped. It requires a tracker to be running.");
             return;
         }
-
-        env.start().await;
 
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
@@ -160,15 +151,12 @@ mod for_guests {
     #[tokio::test]
     async fn it_should_not_allow_guests_to_delete_torrents() {
         let mut env = TestEnv::new();
+        env.start().await;
 
         if !env.provides_a_tracker() {
-            // This test requires the tracker to be running,
-            // because when you upload a torrent, it's added to the tracker
-            // whitelist.
+            println!("test skipped. It requires a tracker to be running.");
             return;
         }
-
-        env.start().await;
 
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
@@ -193,15 +181,12 @@ mod for_authenticated_users {
     #[tokio::test]
     async fn it_should_allow_authenticated_users_to_upload_new_torrents() {
         let mut env = TestEnv::new();
+        env.start().await;
 
         if !env.provides_a_tracker() {
-            // This test requires the tracker to be running,
-            // because when you upload a torrent, it's added to the tracker
-            // whitelist.
+            println!("test skipped. It requires a tracker to be running.");
             return;
         }
-
-        env.start().await;
 
         let uploader = new_logged_in_user(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
@@ -245,13 +230,12 @@ mod for_authenticated_users {
     #[tokio::test]
     async fn it_should_not_allow_uploading_a_torrent_with_a_title_that_already_exists() {
         let mut env = TestEnv::new();
+        env.start().await;
 
         if !env.provides_a_tracker() {
-            // This test requires the tracker to be running
+            println!("test skipped. It requires a tracker to be running.");
             return;
         }
-
-        env.start().await;
 
         let uploader = new_logged_in_user(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
@@ -268,22 +252,19 @@ mod for_authenticated_users {
         let form: UploadTorrentMultipartForm = second_torrent.index_info.into();
         let response = client.upload_torrent(form.into()).await;
 
-        assert_eq!(response.body, "");
+        assert_eq!(response.body, "{\"error\":\"This torrent title has already been used.\"}");
         assert_eq!(response.status, 400);
     }
 
     #[tokio::test]
     async fn it_should_not_allow_uploading_a_torrent_with_a_infohash_that_already_exists() {
         let mut env = TestEnv::new();
+        env.start().await;
 
         if !env.provides_a_tracker() {
-            // This test requires the tracker to be running,
-            // because when you upload a torrent, it's added to the tracker
-            // whitelist.
+            println!("test skipped. It requires a tracker to be running.");
             return;
         }
-
-        env.start().await;
 
         let uploader = new_logged_in_user(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
@@ -314,15 +295,12 @@ mod for_authenticated_users {
         #[tokio::test]
         async fn it_should_not_allow_non_admins_to_delete_torrents() {
             let mut env = TestEnv::new();
+            env.start().await;
 
             if !env.provides_a_tracker() {
-                // This test requires the tracker to be running,
-                // because when you upload a torrent, it's added to the tracker
-                // whitelist.
+                println!("test skipped. It requires a tracker to be running.");
                 return;
             }
-
-            env.start().await;
 
             let uploader = new_logged_in_user(&env).await;
             let (_test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
@@ -346,15 +324,12 @@ mod for_authenticated_users {
         #[tokio::test]
         async fn it_should_allow_torrent_owners_to_update_their_torrents() {
             let mut env = TestEnv::new();
+            env.start().await;
 
             if !env.provides_a_tracker() {
-                // This test requires the tracker to be running,
-                // because when you upload a torrent, it's added to the tracker
-                // whitelist.
+                println!("test skipped. It requires a tracker to be running.");
                 return;
             }
-
-            env.start().await;
 
             let uploader = new_logged_in_user(&env).await;
             let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
@@ -395,15 +370,12 @@ mod for_authenticated_users {
         #[tokio::test]
         async fn it_should_allow_admins_to_delete_torrents_searching_by_id() {
             let mut env = TestEnv::new();
+            env.start().await;
 
             if !env.provides_a_tracker() {
-                // This test requires the tracker to be running,
-                // because when you upload a torrent, it's added to the tracker
-                // whitelist.
+                println!("test skipped. It requires a tracker to be running.");
                 return;
             }
-
-            env.start().await;
 
             let uploader = new_logged_in_user(&env).await;
             let (_test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
@@ -422,15 +394,12 @@ mod for_authenticated_users {
         #[tokio::test]
         async fn it_should_allow_admins_to_update_someone_elses_torrents() {
             let mut env = TestEnv::new();
+            env.start().await;
 
             if !env.provides_a_tracker() {
-                // This test requires the tracker to be running,
-                // because when you upload a torrent, it's added to the tracker
-                // whitelist.
+                println!("test skipped. It requires a tracker to be running.");
                 return;
             }
-
-            env.start().await;
 
             let uploader = new_logged_in_user(&env).await;
             let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
