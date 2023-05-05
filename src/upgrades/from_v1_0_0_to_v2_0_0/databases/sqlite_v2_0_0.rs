@@ -46,11 +46,12 @@ impl TorrentRecordV2 {
     }
 }
 
+#[must_use]
 pub fn convert_timestamp_to_datetime(timestamp: i64) -> String {
     // The expected format in database is: 2022-11-04 09:53:57
     // MySQL uses a DATETIME column and SQLite uses a TEXT column.
 
-    let naive_datetime = NaiveDateTime::from_timestamp(timestamp, 0);
+    let naive_datetime = NaiveDateTime::from_timestamp_opt(timestamp, 0).expect("Overflow of i64 seconds, very future!");
     let datetime_again: DateTime<Utc> = DateTime::from_utc(naive_datetime, Utc);
 
     // Format without timezone
