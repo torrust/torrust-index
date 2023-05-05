@@ -3,6 +3,7 @@ addrs
 AUTOINCREMENT
 bencode
 bencoded
+binascii
 btih
 chrono
 compatiblelicenses
@@ -16,6 +17,7 @@ Dont
 Grünwald
 hasher
 Hasher
+hexlify
 httpseeds
 imagoodboy
 imdl
@@ -27,6 +29,7 @@ LEECHERS
 lettre
 luckythelab
 mailcatcher
+metainfo
 nanos
 NCCA
 nilm
@@ -47,6 +50,7 @@ sublist
 subpoints
 tempdir
 tempfile
+thiserror
 torrust
 Torrust
 upgrader

@@ -5,7 +5,7 @@ use super::connection_info::ConnectionInfo;
 use super::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
 use super::contexts::settings::form::UpdateSettings;
 use super::contexts::torrent::forms::UpdateTorrentFrom;
-use super::contexts::torrent::requests::TorrentId;
+use super::contexts::torrent::requests::{InfoHash, TorrentId};
 use super::contexts::user::forms::{LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username};
 use super::http::{Query, ReqwestQuery};
 use super::responses::{self, BinaryResponse, TextResponse};
@@ -109,9 +109,9 @@ impl Client {
         self.http_client.post_multipart("torrent/upload", form).await
     }
 
-    pub async fn download_torrent(&self, id: TorrentId) -> responses::BinaryResponse {
+    pub async fn download_torrent(&self, info_hash: InfoHash) -> responses::BinaryResponse {
         self.http_client
-            .get_binary(&format!("torrent/download/{id}"), Query::empty())
+            .get_binary(&format!("torrent/download/{info_hash}"), Query::empty())
             .await
     }
 

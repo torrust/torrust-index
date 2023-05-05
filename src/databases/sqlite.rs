@@ -4,6 +4,7 @@ use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{query, query_as, Acquire, SqlitePool};
 
 use crate::databases::database::{Category, Database, DatabaseDriver, DatabaseError, Sorting, TorrentCompact};
+use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::{DbTorrentAnnounceUrl, DbTorrentFile, DbTorrentInfo, Torrent, TorrentFile};
@@ -523,25 +524,21 @@ impl Database for SqliteDatabase {
         }
     }
 
-    async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<Torrent, DatabaseError> {
-        let torrent_info = self.get_torrent_info_from_id(torrent_id).await?;
-
-        let torrent_files = self.get_torrent_files_from_id(torrent_id).await?;
-
-        let torrent_announce_urls = self.get_torrent_announce_urls_from_id(torrent_id).await?;
-
-        Ok(Torrent::from_db_info_files_and_announce_urls(
-            torrent_info,
-            torrent_files,
-            torrent_announce_urls,
-        ))
-    }
-
     async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, DatabaseError> {
         query_as::<_, DbTorrentInfo>(
-            "SELECT name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE torrent_id = ?",
+            "SELECT torrent_id, info_hash, name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE torrent_id = ?",
         )
         .bind(torrent_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|_| DatabaseError::TorrentNotFound)
+    }
+
+    async fn get_torrent_info_from_infohash(&self, info_hash: InfoHash) -> Result<DbTorrentInfo, DatabaseError> {
+        query_as::<_, DbTorrentInfo>(
+            "SELECT torrent_id, info_hash, name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE info_hash = ?",
+        )
+        .bind(info_hash.to_string().to_uppercase()) // info_hash is stored as uppercase
         .fetch_one(&self.pool)
         .await
         .map_err(|_| DatabaseError::TorrentNotFound)

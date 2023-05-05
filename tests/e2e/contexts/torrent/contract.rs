@@ -122,12 +122,13 @@ mod for_guests {
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
         let uploader = new_logged_in_user(&env).await;
-        let (test_torrent, torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+        let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
 
-        let response = client.download_torrent(torrent_listed_in_index.torrent_id).await;
+        let response = client.download_torrent(test_torrent.info_hash()).await;
 
-        let torrent = decode_torrent(&response.bytes).unwrap();
-        let uploaded_torrent = decode_torrent(&test_torrent.index_info.torrent_file.contents).unwrap();
+        let torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
+        let uploaded_torrent =
+            decode_torrent(&test_torrent.index_info.torrent_file.contents).expect("could not decode uploaded torrent");
         let expected_torrent = expected_torrent(uploaded_torrent, &env, &None).await;
         assert_eq!(torrent, expected_torrent);
         assert!(response.is_bittorrent_and_ok());
@@ -287,17 +288,18 @@ mod for_authenticated_users {
 
         // Given a previously uploaded torrent
         let uploader = new_logged_in_user(&env).await;
-        let (test_torrent, torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
-        let torrent_id = torrent_listed_in_index.torrent_id;
-        let uploaded_torrent = decode_torrent(&test_torrent.index_info.torrent_file.contents).unwrap();
+        let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+        let uploaded_torrent =
+            decode_torrent(&test_torrent.index_info.torrent_file.contents).expect("could not decode uploaded torrent");
 
         // And a logged in user who is going to download the torrent
         let downloader = new_logged_in_user(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &downloader.token);
 
         // When the user downloads the torrent
-        let response = client.download_torrent(torrent_id).await;
-        let torrent = decode_torrent(&response.bytes).unwrap();
+        let response = client.download_torrent(test_torrent.info_hash()).await;
+
+        let torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
 
         // Then the torrent should have the personal announce URL
         let expected_torrent = expected_torrent(uploaded_torrent, &env, &Some(downloader)).await;

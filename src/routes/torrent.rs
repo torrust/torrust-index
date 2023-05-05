@@ -1,4 +1,5 @@
 use std::io::{Cursor, Write};
+use std::str::FromStr;
 
 use actix_multipart::Multipart;
 use actix_web::web::Query;
@@ -10,6 +11,7 @@ use sqlx::FromRow;
 use crate::common::WebAppData;
 use crate::databases::database::Sorting;
 use crate::errors::{ServiceError, ServiceResult};
+use crate::models::info_hash::InfoHash;
 use crate::models::response::{NewTorrentResponse, OkResponse, TorrentResponse};
 use crate::models::torrent::TorrentRequest;
 use crate::utils::parse_torrent;
@@ -19,7 +21,7 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/torrent")
             .service(web::resource("/upload").route(web::post().to(upload_torrent)))
-            .service(web::resource("/download/{id}").route(web::get().to(download_torrent)))
+            .service(web::resource("/download/{info_hash}").route(web::get().to(download_torrent_handler)))
             .service(
                 web::resource("/{id}")
                     .route(web::get().to(get_torrent))
@@ -121,13 +123,18 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
     }))
 }
 
-pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let torrent_id = get_torrent_id_from_request(&req)?;
+/// Returns the torrent as a byte stream `application/x-bittorrent`.
+///
+/// # Errors
+///
+/// Returns `ServiceError::BadRequest` if the torrent infohash is invalid.
+pub async fn download_torrent_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let info_hash = get_torrent_info_hash_from_request(&req)?;
 
     // optional
     let user = app_data.auth.get_user_compact_from_request(&req).await;
 
-    let mut torrent = app_data.database.get_torrent_from_id(torrent_id).await?;
+    let mut torrent = app_data.database.get_torrent_from_info_hash(&info_hash).await?;
 
     let settings = app_data.cfg.settings.read().await;
 
@@ -327,6 +334,16 @@ fn get_torrent_id_from_request(req: &HttpRequest) -> Result<i64, ServiceError> {
     match req.match_info().get("id") {
         None => Err(ServiceError::BadRequest),
         Some(torrent_id) => match torrent_id.parse() {
+            Err(_) => Err(ServiceError::BadRequest),
+            Ok(v) => Ok(v),
+        },
+    }
+}
+
+fn get_torrent_info_hash_from_request(req: &HttpRequest) -> Result<InfoHash, ServiceError> {
+    match req.match_info().get("info_hash") {
+        None => Err(ServiceError::BadRequest),
+        Some(info_hash) => match InfoHash::from_str(info_hash) {
             Err(_) => Err(ServiceError::BadRequest),
             Ok(v) => Ok(v),
         },

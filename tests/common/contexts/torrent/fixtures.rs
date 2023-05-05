@@ -90,6 +90,10 @@ impl TestTorrent {
             index_info: torrent_to_index,
         }
     }
+
+    pub fn info_hash(&self) -> String {
+        self.file_info.info_hash.clone()
+    }
 }
 
 pub fn random_torrent() -> TestTorrent {
