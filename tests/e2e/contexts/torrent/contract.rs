@@ -30,6 +30,7 @@ mod for_guests {
     use crate::common::contexts::torrent::responses::{
         Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
     };
+    use crate::e2e::contexts::torrent::asserts::expected_torrent;
     use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
     use crate::e2e::contexts::user::steps::new_logged_in_user;
     use crate::e2e::environment::TestEnv;
@@ -125,25 +126,13 @@ mod for_guests {
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
         let uploader = new_logged_in_user(&env).await;
-        let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+        let (test_torrent, torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
 
-        let response = client.download_torrent(uploaded_torrent.torrent_id).await;
+        let response = client.download_torrent(torrent_listed_in_index.torrent_id).await;
 
         let torrent = decode_torrent(&response.bytes).unwrap();
-        let mut expected_torrent = decode_torrent(&test_torrent.index_info.torrent_file.contents).unwrap();
-
-        // code-review: The backend does not generate exactly the same torrent
-        // that was uploaded and created by the `imdl` command-line tool.
-        // So we need to update the expected torrent to match the one generated
-        // by the backend. For some of them it makes sense (`announce`  and `announce_list`),
-        // for others it does not.
-        expected_torrent.info.private = Some(0);
-        expected_torrent.announce = Some("udp://tracker:6969".to_string());
-        expected_torrent.encoding = None;
-        expected_torrent.announce_list = Some(vec![vec!["udp://tracker:6969".to_string()]]);
-        expected_torrent.creation_date = None;
-        expected_torrent.created_by = None;
-
+        let uploaded_torrent = decode_torrent(&test_torrent.index_info.torrent_file.contents).unwrap();
+        let expected_torrent = expected_torrent(uploaded_torrent);
         assert_eq!(torrent, expected_torrent);
         assert!(response.is_bittorrent_and_ok());
     }
