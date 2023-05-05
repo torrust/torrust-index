@@ -111,7 +111,7 @@ impl TrackerService {
     }
 
     // issue a new tracker key from tracker and save it in database, tied to a user
-    pub async fn retrieve_new_tracker_key(&self, user_id: i64) -> Result<TrackerKey, ServiceError> {
+    async fn retrieve_new_tracker_key(&self, user_id: i64) -> Result<TrackerKey, ServiceError> {
         let settings = self.cfg.settings.read().await;
 
         let request_url = format!(
