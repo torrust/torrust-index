@@ -13,8 +13,8 @@ use crate::errors::{ServiceError, ServiceResult};
 use crate::mailer::VerifyClaims;
 use crate::models::response::{OkResponse, TokenResponse};
 use crate::models::user::UserAuthentication;
+use crate::utils::clock::current_time;
 use crate::utils::regex::validate_email_address;
-use crate::utils::time::current_time;
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
