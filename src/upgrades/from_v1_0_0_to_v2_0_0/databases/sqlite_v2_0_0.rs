@@ -29,6 +29,7 @@ pub struct TorrentRecordV2 {
 }
 
 impl TorrentRecordV2 {
+    #[must_use]
     pub fn from_v1_data(torrent: &TorrentRecordV1, torrent_info: &TorrentInfo, uploader: &UserRecordV1) -> Self {
         Self {
             torrent_id: torrent.torrent_id,
@@ -75,7 +76,7 @@ impl SqliteDatabaseV2_0_0 {
         sqlx::migrate!("migrations/sqlite3")
             .run(&self.pool)
             .await
-            .expect("Could not run database migrations.")
+            .expect("Could not run database migrations.");
     }
 
     pub async fn reset_categories_sequence(&self) -> Result<SqliteQueryResult, DatabaseError> {

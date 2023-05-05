@@ -7,7 +7,7 @@ use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::errors::ServiceError;
 use crate::models::user::{UserClaims, UserCompact};
-use crate::utils::time::current_time;
+use crate::utils::clock::current_time;
 
 pub struct AuthorizationService {
     cfg: Arc<Configuration>,

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Configuration;
 use crate::errors::ServiceError;
-use crate::utils::time::current_time;
+use crate::utils::clock::current_time;
 
 pub struct MailerService {
     cfg: Arc<Configuration>,
