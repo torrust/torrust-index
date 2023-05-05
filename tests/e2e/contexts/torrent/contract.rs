@@ -3,10 +3,6 @@
 /*
 todo:
 
-Download torrent file:
-
-- It should allow authenticated users to download a torrent with a personal tracker url
-
 Delete torrent:
 
 - After deleting a torrent, it should be removed from the tracker whitelist
@@ -132,7 +128,7 @@ mod for_guests {
 
         let torrent = decode_torrent(&response.bytes).unwrap();
         let uploaded_torrent = decode_torrent(&test_torrent.index_info.torrent_file.contents).unwrap();
-        let expected_torrent = expected_torrent(uploaded_torrent);
+        let expected_torrent = expected_torrent(uploaded_torrent, &env, &None).await;
         assert_eq!(torrent, expected_torrent);
         assert!(response.is_bittorrent_and_ok());
     }
@@ -160,10 +156,14 @@ mod for_guests {
 
 mod for_authenticated_users {
 
+    use torrust_index_backend::utils::parse_torrent::decode_torrent;
+
     use crate::common::client::Client;
     use crate::common::contexts::torrent::fixtures::random_torrent;
     use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
     use crate::common::contexts::torrent::responses::UploadedTorrentResponse;
+    use crate::e2e::contexts::torrent::asserts::expected_torrent;
+    use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
     use crate::e2e::contexts::user::steps::new_logged_in_user;
     use crate::e2e::environment::TestEnv;
 
@@ -273,6 +273,37 @@ mod for_authenticated_users {
         let response = client.upload_torrent(form.into()).await;
 
         assert_eq!(response.status, 400);
+    }
+
+    #[tokio::test]
+    async fn it_should_allow_authenticated_users_to_download_a_torrent_with_a_personal_announce_url() {
+        let mut env = TestEnv::new();
+        env.start().await;
+
+        if !env.provides_a_tracker() {
+            println!("test skipped. It requires a tracker to be running.");
+            return;
+        }
+
+        // Given a previously uploaded torrent
+        let uploader = new_logged_in_user(&env).await;
+        let (test_torrent, torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+        let torrent_id = torrent_listed_in_index.torrent_id;
+        let uploaded_torrent = decode_torrent(&test_torrent.index_info.torrent_file.contents).unwrap();
+
+        // And a logged in user who is going to download the torrent
+        let downloader = new_logged_in_user(&env).await;
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &downloader.token);
+
+        // When the user downloads the torrent
+        let response = client.download_torrent(torrent_id).await;
+        let torrent = decode_torrent(&response.bytes).unwrap();
+
+        // Then the torrent should have the personal announce URL
+        let expected_torrent = expected_torrent(uploaded_torrent, &env, &Some(downloader)).await;
+
+        assert_eq!(torrent, expected_torrent);
+        assert!(response.is_bittorrent_and_ok());
     }
 
     mod and_non_admins {
