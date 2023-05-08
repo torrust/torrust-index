@@ -1,3 +1,4 @@
+pub mod info_hash;
 pub mod response;
 pub mod torrent;
 pub mod torrent_file;

@@ -1,4 +1,5 @@
 use std::io::{Cursor, Write};
+use std::str::FromStr;
 
 use actix_multipart::Multipart;
 use actix_web::web::Query;
@@ -10,6 +11,7 @@ use sqlx::FromRow;
 use crate::common::WebAppData;
 use crate::databases::database::Sorting;
 use crate::errors::{ServiceError, ServiceResult};
+use crate::models::info_hash::InfoHash;
 use crate::models::response::{NewTorrentResponse, OkResponse, TorrentResponse};
 use crate::models::torrent::TorrentRequest;
 use crate::utils::parse_torrent;
@@ -19,12 +21,12 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/torrent")
             .service(web::resource("/upload").route(web::post().to(upload_torrent)))
-            .service(web::resource("/download/{id}").route(web::get().to(download_torrent)))
+            .service(web::resource("/download/{info_hash}").route(web::get().to(download_torrent_handler)))
             .service(
-                web::resource("/{id}")
-                    .route(web::get().to(get_torrent))
-                    .route(web::put().to(update_torrent))
-                    .route(web::delete().to(delete_torrent)),
+                web::resource("/{info_hash}")
+                    .route(web::get().to(get_torrent_handler))
+                    .route(web::put().to(update_torrent_handler))
+                    .route(web::delete().to(delete_torrent_handler)),
             ),
     );
     cfg.service(web::scope("/torrents").service(web::resource("").route(web::get().to(get_torrents))));
@@ -121,13 +123,18 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
     }))
 }
 
-pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let torrent_id = get_torrent_id_from_request(&req)?;
+/// Returns the torrent as a byte stream `application/x-bittorrent`.
+///
+/// # Errors
+///
+/// Returns `ServiceError::BadRequest` if the torrent infohash is invalid.
+pub async fn download_torrent_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let info_hash = get_torrent_infohash_from_request(&req)?;
 
     // optional
     let user = app_data.auth.get_user_compact_from_request(&req).await;
 
-    let mut torrent = app_data.database.get_torrent_from_id(torrent_id).await?;
+    let mut torrent = app_data.database.get_torrent_from_infohash(&info_hash).await?;
 
     let settings = app_data.cfg.settings.read().await;
 
@@ -159,17 +166,25 @@ pub async fn download_torrent(req: HttpRequest, app_data: WebAppData) -> Service
     Ok(HttpResponse::Ok().content_type("application/x-bittorrent").body(buffer))
 }
 
-pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+pub async fn get_torrent_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
     // optional
     let user = app_data.auth.get_user_compact_from_request(&req).await;
 
     let settings = app_data.cfg.settings.read().await;
 
-    let torrent_id = get_torrent_id_from_request(&req)?;
+    let infohash = get_torrent_infohash_from_request(&req)?;
 
-    let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
+    println!("infohash: {}", infohash);
+
+    let torrent_listing = app_data.database.get_torrent_listing_from_infohash(&infohash).await?;
+
+    let torrent_id = torrent_listing.torrent_id;
+
+    println!("torrent_listing: {:#?}", torrent_listing);
 
     let category = app_data.database.get_category_from_id(torrent_listing.category_id).await?;
+
+    println!("category: {:#?}", category);
 
     let mut torrent_response = TorrentResponse::from_listing(torrent_listing);
 
@@ -181,8 +196,12 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
 
     torrent_response.files = app_data.database.get_torrent_files_from_id(torrent_id).await?;
 
+    println!("torrent_response.files: {:#?}", torrent_response.files);
+
     if torrent_response.files.len() == 1 {
-        let torrent_info = app_data.database.get_torrent_info_from_id(torrent_id).await?;
+        let torrent_info = app_data.database.get_torrent_info_from_infohash(&infohash).await?;
+
+        println!("torrent_info: {:#?}", torrent_info);
 
         torrent_response
             .files
@@ -195,6 +214,8 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
         .get_torrent_announce_urls_from_id(torrent_id)
         .await
         .map(|v| v.into_iter().flatten().collect())?;
+
+    println!("trackers: {:#?}", torrent_response.trackers);
 
     // add tracker url
     match user {
@@ -212,6 +233,8 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
             torrent_response.trackers.insert(0, tracker_url);
         }
     }
+
+    // todo: extract a struct or function to build the magnet links
 
     // add magnet link
     let mut magnet = format!(
@@ -240,16 +263,16 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
     Ok(HttpResponse::Ok().json(OkResponse { data: torrent_response }))
 }
 
-pub async fn update_torrent(
+pub async fn update_torrent_handler(
     req: HttpRequest,
     payload: web::Json<TorrentUpdate>,
     app_data: WebAppData,
 ) -> ServiceResult<impl Responder> {
     let user = app_data.auth.get_user_compact_from_request(&req).await?;
 
-    let torrent_id = get_torrent_id_from_request(&req)?;
+    let infohash = get_torrent_infohash_from_request(&req)?;
 
-    let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
+    let torrent_listing = app_data.database.get_torrent_listing_from_infohash(&infohash).await?;
 
     // check if user is owner or administrator
     if torrent_listing.uploader != user.username && !user.administrator {
@@ -258,22 +281,31 @@ pub async fn update_torrent(
 
     // update torrent title
     if let Some(title) = &payload.title {
-        app_data.database.update_torrent_title(torrent_id, title).await?;
+        app_data
+            .database
+            .update_torrent_title(torrent_listing.torrent_id, title)
+            .await?;
     }
 
     // update torrent description
     if let Some(description) = &payload.description {
-        app_data.database.update_torrent_description(torrent_id, description).await?;
+        app_data
+            .database
+            .update_torrent_description(torrent_listing.torrent_id, description)
+            .await?;
     }
 
-    let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
+    let torrent_listing = app_data
+        .database
+        .get_torrent_listing_from_id(torrent_listing.torrent_id)
+        .await?;
 
     let torrent_response = TorrentResponse::from_listing(torrent_listing);
 
     Ok(HttpResponse::Ok().json(OkResponse { data: torrent_response }))
 }
 
-pub async fn delete_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+pub async fn delete_torrent_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let user = app_data.auth.get_user_compact_from_request(&req).await?;
 
     // check if user is administrator
@@ -281,12 +313,12 @@ pub async fn delete_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceRe
         return Err(ServiceError::Unauthorized);
     }
 
-    let torrent_id = get_torrent_id_from_request(&req)?;
+    let infohash = get_torrent_infohash_from_request(&req)?;
 
     // needed later for removing torrent from tracker whitelist
-    let torrent_listing = app_data.database.get_torrent_listing_from_id(torrent_id).await?;
+    let torrent_listing = app_data.database.get_torrent_listing_from_infohash(&infohash).await?;
 
-    app_data.database.delete_torrent(torrent_id).await?;
+    app_data.database.delete_torrent(torrent_listing.torrent_id).await?;
 
     // remove info_hash from tracker whitelist
     let _ = app_data
@@ -295,7 +327,9 @@ pub async fn delete_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceRe
         .await;
 
     Ok(HttpResponse::Ok().json(OkResponse {
-        data: NewTorrentResponse { torrent_id },
+        data: NewTorrentResponse {
+            torrent_id: torrent_listing.torrent_id,
+        },
     }))
 }
 
@@ -323,10 +357,10 @@ pub async fn get_torrents(params: Query<TorrentSearch>, app_data: WebAppData) ->
     Ok(HttpResponse::Ok().json(OkResponse { data: torrents_response }))
 }
 
-fn get_torrent_id_from_request(req: &HttpRequest) -> Result<i64, ServiceError> {
-    match req.match_info().get("id") {
+fn get_torrent_infohash_from_request(req: &HttpRequest) -> Result<InfoHash, ServiceError> {
+    match req.match_info().get("info_hash") {
         None => Err(ServiceError::BadRequest),
-        Some(torrent_id) => match torrent_id.parse() {
+        Some(info_hash) => match InfoHash::from_str(info_hash) {
             Err(_) => Err(ServiceError::BadRequest),
             Ok(v) => Ok(v),
         },

@@ -5,7 +5,7 @@ use super::connection_info::ConnectionInfo;
 use super::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
 use super::contexts::settings::form::UpdateSettings;
 use super::contexts::torrent::forms::UpdateTorrentFrom;
-use super::contexts::torrent::requests::TorrentId;
+use super::contexts::torrent::requests::InfoHash;
 use super::contexts::user::forms::{LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username};
 use super::http::{Query, ReqwestQuery};
 use super::responses::{self, BinaryResponse, TextResponse};
@@ -93,25 +93,27 @@ impl Client {
         self.http_client.get("torrents", Query::empty()).await
     }
 
-    pub async fn get_torrent(&self, id: TorrentId) -> TextResponse {
-        self.http_client.get(&format!("torrent/{id}"), Query::empty()).await
+    pub async fn get_torrent(&self, infohash: &InfoHash) -> TextResponse {
+        self.http_client.get(&format!("torrent/{infohash}"), Query::empty()).await
     }
 
-    pub async fn delete_torrent(&self, id: TorrentId) -> TextResponse {
-        self.http_client.delete(&format!("torrent/{id}")).await
+    pub async fn delete_torrent(&self, infohash: &InfoHash) -> TextResponse {
+        self.http_client.delete(&format!("torrent/{infohash}")).await
     }
 
-    pub async fn update_torrent(&self, id: TorrentId, update_torrent_form: UpdateTorrentFrom) -> TextResponse {
-        self.http_client.put(&format!("torrent/{id}"), &update_torrent_form).await
+    pub async fn update_torrent(&self, infohash: &InfoHash, update_torrent_form: UpdateTorrentFrom) -> TextResponse {
+        self.http_client
+            .put(&format!("torrent/{infohash}"), &update_torrent_form)
+            .await
     }
 
     pub async fn upload_torrent(&self, form: multipart::Form) -> TextResponse {
         self.http_client.post_multipart("torrent/upload", form).await
     }
 
-    pub async fn download_torrent(&self, id: TorrentId) -> responses::BinaryResponse {
+    pub async fn download_torrent(&self, info_hash: &InfoHash) -> responses::BinaryResponse {
         self.http_client
-            .get_binary(&format!("torrent/download/{id}"), Query::empty())
+            .get_binary(&format!("torrent/download/{info_hash}"), Query::empty())
             .await
     }
 

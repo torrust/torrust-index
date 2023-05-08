@@ -4,6 +4,7 @@ use sqlx::mysql::MySqlPoolOptions;
 use sqlx::{query, query_as, Acquire, MySqlPool};
 
 use crate::databases::database::{Category, Database, DatabaseDriver, DatabaseError, Sorting, TorrentCompact};
+use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::{DbTorrentAnnounceUrl, DbTorrentFile, DbTorrentInfo, Torrent, TorrentFile};
@@ -405,7 +406,7 @@ impl Database for MysqlDatabase {
         let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, name, pieces, piece_length, private, root_hash, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())")
             .bind(uploader_id)
             .bind(category_id)
-            .bind(info_hash)
+            .bind(info_hash.to_uppercase())
             .bind(torrent.file_size())
             .bind(torrent.info.name.to_string())
             .bind(pieces)
@@ -528,25 +529,21 @@ impl Database for MysqlDatabase {
         }
     }
 
-    async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<Torrent, DatabaseError> {
-        let torrent_info = self.get_torrent_info_from_id(torrent_id).await?;
-
-        let torrent_files = self.get_torrent_files_from_id(torrent_id).await?;
-
-        let torrent_announce_urls = self.get_torrent_announce_urls_from_id(torrent_id).await?;
-
-        Ok(Torrent::from_db_info_files_and_announce_urls(
-            torrent_info,
-            torrent_files,
-            torrent_announce_urls,
-        ))
-    }
-
     async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, DatabaseError> {
         query_as::<_, DbTorrentInfo>(
-            "SELECT name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE torrent_id = ?",
+            "SELECT torrent_id, info_hash, name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE torrent_id = ?",
         )
         .bind(torrent_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|_| DatabaseError::TorrentNotFound)
+    }
+
+    async fn get_torrent_info_from_infohash(&self, infohash: &InfoHash) -> Result<DbTorrentInfo, DatabaseError> {
+        query_as::<_, DbTorrentInfo>(
+            "SELECT torrent_id, info_hash, name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE info_hash = ?",
+        )
+        .bind(infohash.to_hex_string().to_uppercase()) // `info_hash` is stored as uppercase hex string
         .fetch_one(&self.pool)
         .await
         .map_err(|_| DatabaseError::TorrentNotFound)
@@ -594,6 +591,24 @@ impl Database for MysqlDatabase {
             GROUP BY torrent_id"
         )
             .bind(torrent_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::TorrentNotFound)
+    }
+
+    async fn get_torrent_listing_from_infohash(&self, infohash: &InfoHash) -> Result<TorrentListing, DatabaseError> {
+        query_as::<_, TorrentListing>(
+            "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, DATE_FORMAT(tt.date_uploaded, '%Y-%m-%d %H:%i:%s') AS date_uploaded, tt.size AS file_size,
+            CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
+            CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
+            FROM torrust_torrents tt
+            INNER JOIN torrust_user_profiles tp ON tt.uploader_id = tp.user_id
+            INNER JOIN torrust_torrent_info ti ON tt.torrent_id = ti.torrent_id
+            LEFT JOIN torrust_torrent_tracker_stats ts ON tt.torrent_id = ts.torrent_id
+            WHERE tt.info_hash = ?
+            GROUP BY torrent_id"
+        )
+            .bind(infohash.to_hex_string().to_uppercase()) // `info_hash` is stored as uppercase hex string
             .fetch_one(&self.pool)
             .await
             .map_err(|_| DatabaseError::TorrentNotFound)

@@ -233,6 +233,8 @@ pub struct DbTorrentFile {
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DbTorrentInfo {
+    pub torrent_id: i64,
+    pub info_hash: String,
     pub name: String,
     pub pieces: String,
     pub piece_length: i64,
