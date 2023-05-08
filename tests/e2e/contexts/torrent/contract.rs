@@ -20,6 +20,7 @@ mod for_guests {
     use crate::common::client::Client;
     use crate::common::contexts::category::fixtures::software_predefined_category_id;
     use crate::common::contexts::torrent::asserts::assert_expected_torrent_details;
+    use crate::common::contexts::torrent::requests::InfoHash;
     use crate::common::contexts::torrent::responses::{
         Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
     };
@@ -53,7 +54,7 @@ mod for_guests {
     }
 
     #[tokio::test]
-    async fn it_should_allow_guests_to_get_torrent_details_searching_by_id() {
+    async fn it_should_allow_guests_to_get_torrent_details_searching_by_infohash() {
         let mut env = TestEnv::new();
         env.start().await;
 
@@ -67,7 +68,7 @@ mod for_guests {
         let uploader = new_logged_in_user(&env).await;
         let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
 
-        let response = client.get_torrent(uploaded_torrent.torrent_id).await;
+        let response = client.get_torrent(&test_torrent.infohash()).await;
 
         let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
 
@@ -116,7 +117,7 @@ mod for_guests {
     }
 
     #[tokio::test]
-    async fn it_should_allow_guests_to_download_a_torrent_file_searching_by_id() {
+    async fn it_should_allow_guests_to_download_a_torrent_file_searching_by_infohash() {
         let mut env = TestEnv::new();
         env.start().await;
 
@@ -130,7 +131,7 @@ mod for_guests {
         let uploader = new_logged_in_user(&env).await;
         let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
 
-        let response = client.download_torrent(test_torrent.info_hash()).await;
+        let response = client.download_torrent(&test_torrent.infohash()).await;
 
         let torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
         let uploaded_torrent =
@@ -152,9 +153,9 @@ mod for_guests {
 
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
-        let non_existing_info_hash = "443c7602b4fde83d1154d6d9da48808418b181b6".to_string();
+        let non_existing_info_hash: InfoHash = "443c7602b4fde83d1154d6d9da48808418b181b6".to_string();
 
-        let response = client.download_torrent(non_existing_info_hash).await;
+        let response = client.download_torrent(&non_existing_info_hash).await;
 
         // code-review: should this be 404?
         assert_eq!(response.status, 400);
@@ -173,9 +174,9 @@ mod for_guests {
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
         let uploader = new_logged_in_user(&env).await;
-        let (_test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+        let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
 
-        let response = client.delete_torrent(uploaded_torrent.torrent_id).await;
+        let response = client.delete_torrent(&test_torrent.infohash()).await;
 
         assert_eq!(response.status, 401);
     }
@@ -321,7 +322,7 @@ mod for_authenticated_users {
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &downloader.token);
 
         // When the user downloads the torrent
-        let response = client.download_torrent(test_torrent.info_hash()).await;
+        let response = client.download_torrent(&test_torrent.infohash()).await;
 
         let torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
 
@@ -355,11 +356,11 @@ mod for_authenticated_users {
             }
 
             let uploader = new_logged_in_user(&env).await;
-            let (_test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+            let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
 
             let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
 
-            let response = client.delete_torrent(uploaded_torrent.torrent_id).await;
+            let response = client.delete_torrent(&test_torrent.infohash()).await;
 
             assert_eq!(response.status, 403);
         }
@@ -376,7 +377,7 @@ mod for_authenticated_users {
 
             // Given a users uploads a torrent
             let uploader = new_logged_in_user(&env).await;
-            let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+            let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
 
             // Then another non admin user should not be able to update the torrent
             let not_the_uploader = new_logged_in_user(&env).await;
@@ -387,7 +388,7 @@ mod for_authenticated_users {
 
             let response = client
                 .update_torrent(
-                    uploaded_torrent.torrent_id,
+                    &test_torrent.infohash(),
                     UpdateTorrentFrom {
                         title: Some(new_title.clone()),
                         description: Some(new_description.clone()),
@@ -418,7 +419,7 @@ mod for_authenticated_users {
             }
 
             let uploader = new_logged_in_user(&env).await;
-            let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+            let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
 
             let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
 
@@ -427,7 +428,7 @@ mod for_authenticated_users {
 
             let response = client
                 .update_torrent(
-                    uploaded_torrent.torrent_id,
+                    &test_torrent.infohash(),
                     UpdateTorrentFrom {
                         title: Some(new_title.clone()),
                         description: Some(new_description.clone()),
@@ -454,7 +455,7 @@ mod for_authenticated_users {
         use crate::e2e::environment::TestEnv;
 
         #[tokio::test]
-        async fn it_should_allow_admins_to_delete_torrents_searching_by_id() {
+        async fn it_should_allow_admins_to_delete_torrents_searching_by_infohash() {
             let mut env = TestEnv::new();
             env.start().await;
 
@@ -464,12 +465,12 @@ mod for_authenticated_users {
             }
 
             let uploader = new_logged_in_user(&env).await;
-            let (_test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+            let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
 
             let admin = new_logged_in_admin(&env).await;
             let client = Client::authenticated(&env.server_socket_addr().unwrap(), &admin.token);
 
-            let response = client.delete_torrent(uploaded_torrent.torrent_id).await;
+            let response = client.delete_torrent(&test_torrent.infohash()).await;
 
             let deleted_torrent_response: DeletedTorrentResponse = serde_json::from_str(&response.body).unwrap();
 
@@ -488,7 +489,7 @@ mod for_authenticated_users {
             }
 
             let uploader = new_logged_in_user(&env).await;
-            let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+            let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
 
             let logged_in_admin = new_logged_in_admin(&env).await;
             let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
@@ -498,7 +499,7 @@ mod for_authenticated_users {
 
             let response = client
                 .update_torrent(
-                    uploaded_torrent.torrent_id,
+                    &test_torrent.infohash(),
                     UpdateTorrentFrom {
                         title: Some(new_title.clone()),
                         description: Some(new_description.clone()),

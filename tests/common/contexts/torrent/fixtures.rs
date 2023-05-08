@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use super::file::{create_torrent, parse_torrent, TorrentFileInfo};
 use super::forms::{BinaryFile, UploadTorrentMultipartForm};
+use super::requests::InfoHash;
 use super::responses::Id;
 use crate::common::contexts::category::fixtures::software_predefined_category_name;
 
@@ -91,7 +92,7 @@ impl TestTorrent {
         }
     }
 
-    pub fn info_hash(&self) -> String {
+    pub fn infohash(&self) -> InfoHash {
         self.file_info.info_hash.clone()
     }
 }

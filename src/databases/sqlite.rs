@@ -401,7 +401,7 @@ impl Database for SqliteDatabase {
         let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, name, pieces, piece_length, private, root_hash, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
             .bind(uploader_id)
             .bind(category_id)
-            .bind(info_hash)
+            .bind(info_hash.to_uppercase())
             .bind(torrent.file_size())
             .bind(torrent.info.name.to_string())
             .bind(pieces)
@@ -534,11 +534,11 @@ impl Database for SqliteDatabase {
         .map_err(|_| DatabaseError::TorrentNotFound)
     }
 
-    async fn get_torrent_info_from_infohash(&self, info_hash: InfoHash) -> Result<DbTorrentInfo, DatabaseError> {
+    async fn get_torrent_info_from_infohash(&self, infohash: &InfoHash) -> Result<DbTorrentInfo, DatabaseError> {
         query_as::<_, DbTorrentInfo>(
             "SELECT torrent_id, info_hash, name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE info_hash = ?",
         )
-        .bind(info_hash.to_string().to_uppercase()) // info_hash is stored as uppercase
+        .bind(infohash.to_hex_string().to_uppercase()) // `info_hash` is stored as uppercase hex string
         .fetch_one(&self.pool)
         .await
         .map_err(|_| DatabaseError::TorrentNotFound)
@@ -586,6 +586,24 @@ impl Database for SqliteDatabase {
             GROUP BY ts.torrent_id"
         )
             .bind(torrent_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|_| DatabaseError::TorrentNotFound)
+    }
+
+    async fn get_torrent_listing_from_infohash(&self, infohash: &InfoHash) -> Result<TorrentListing, DatabaseError> {
+        query_as::<_, TorrentListing>(
+            "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, tt.date_uploaded, tt.size AS file_size,
+            CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
+            CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
+            FROM torrust_torrents tt
+            INNER JOIN torrust_user_profiles tp ON tt.uploader_id = tp.user_id
+            INNER JOIN torrust_torrent_info ti ON tt.torrent_id = ti.torrent_id
+            LEFT JOIN torrust_torrent_tracker_stats ts ON tt.torrent_id = ts.torrent_id
+            WHERE tt.info_hash = ?
+            GROUP BY ts.torrent_id"
+        )
+            .bind(infohash.to_string().to_uppercase()) // `info_hash` is stored as uppercase
             .fetch_one(&self.pool)
             .await
             .map_err(|_| DatabaseError::TorrentNotFound)

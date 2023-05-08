@@ -156,8 +156,8 @@ pub trait Database: Sync + Send {
     ) -> Result<i64, DatabaseError>;
 
     /// Get `Torrent` from `InfoHash`.
-    async fn get_torrent_from_info_hash(&self, info_hash: &InfoHash) -> Result<Torrent, DatabaseError> {
-        let torrent_info = self.get_torrent_info_from_infohash(*info_hash).await?;
+    async fn get_torrent_from_infohash(&self, infohash: &InfoHash) -> Result<Torrent, DatabaseError> {
+        let torrent_info = self.get_torrent_info_from_infohash(infohash).await?;
 
         let torrent_files = self.get_torrent_files_from_id(torrent_info.torrent_id).await?;
 
@@ -189,7 +189,7 @@ pub trait Database: Sync + Send {
     async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, DatabaseError>;
 
     /// Get torrent's info as `DbTorrentInfo` from torrent `InfoHash`.
-    async fn get_torrent_info_from_infohash(&self, info_hash: InfoHash) -> Result<DbTorrentInfo, DatabaseError>;
+    async fn get_torrent_info_from_infohash(&self, info_hash: &InfoHash) -> Result<DbTorrentInfo, DatabaseError>;
 
     /// Get all torrent's files as `Vec<TorrentFile>` from `torrent_id`.
     async fn get_torrent_files_from_id(&self, torrent_id: i64) -> Result<Vec<TorrentFile>, DatabaseError>;
@@ -199,6 +199,9 @@ pub trait Database: Sync + Send {
 
     /// Get `TorrentListing` from `torrent_id`.
     async fn get_torrent_listing_from_id(&self, torrent_id: i64) -> Result<TorrentListing, DatabaseError>;
+
+    /// Get `TorrentListing` from `InfoHash`.
+    async fn get_torrent_listing_from_infohash(&self, infohash: &InfoHash) -> Result<TorrentListing, DatabaseError>;
 
     /// Get all torrents as `Vec<TorrentCompact>`.
     async fn get_all_torrents_compact(&self) -> Result<Vec<TorrentCompact>, DatabaseError>;
