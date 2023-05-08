@@ -89,8 +89,8 @@ impl Client {
 
     // Context: torrent
 
-    pub async fn get_torrents(&self) -> TextResponse {
-        self.http_client.get("torrents", Query::empty()).await
+    pub async fn get_torrents(&self, params: Query) -> TextResponse {
+        self.http_client.get("torrents", params).await
     }
 
     pub async fn get_torrent(&self, infohash: &InfoHash) -> TextResponse {
