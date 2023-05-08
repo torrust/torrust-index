@@ -290,7 +290,7 @@ impl Database for MysqlDatabase {
         categories: &Option<Vec<String>>,
         sort: &Sorting,
         offset: u64,
-        page_size: u8,
+        limit: u8,
     ) -> Result<TorrentsResponse, DatabaseError> {
         let title = match search {
             None => "%".to_string(),
@@ -365,7 +365,7 @@ impl Database for MysqlDatabase {
         let res: Vec<TorrentListing> = sqlx::query_as::<_, TorrentListing>(&query_string)
             .bind(title)
             .bind(offset as i64)
-            .bind(page_size)
+            .bind(limit)
             .fetch_all(&self.pool)
             .await
             .map_err(|_| DatabaseError::Error)?;

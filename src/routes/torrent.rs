@@ -328,14 +328,18 @@ pub async fn delete_torrent_handler(req: HttpRequest, app_data: WebAppData) -> S
 ///
 /// Returns a `ServiceError::DatabaseError` if the database query fails.
 pub async fn get_torrents_handler(params: Query<TorrentSearch>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let settings = app_data.cfg.settings.read().await;
+
     let sort = params.sort.unwrap_or(Sorting::UploadedDesc);
 
     let page = params.page.unwrap_or(0);
 
-    let page_size = params.page_size.unwrap_or(default_page_size());
+    let page_size = params.page_size.unwrap_or(settings.api.default_torrent_page_size);
 
-    let page_size = if page_size > max_torrent_page_size() {
-        max_torrent_page_size()
+    // Guard that page size does not exceed the maximum
+    let max_torrent_page_size = settings.api.max_torrent_page_size;
+    let page_size = if page_size > max_torrent_page_size {
+        max_torrent_page_size
     } else {
         page_size
     };
@@ -350,14 +354,6 @@ pub async fn get_torrents_handler(params: Query<TorrentSearch>, app_data: WebApp
         .await?;
 
     Ok(HttpResponse::Ok().json(OkResponse { data: torrents_response }))
-}
-
-fn max_torrent_page_size() -> u8 {
-    30
-}
-
-fn default_page_size() -> u8 {
-    10
 }
 
 fn get_torrent_infohash_from_request(req: &HttpRequest) -> Result<InfoHash, ServiceError> {

@@ -3,8 +3,9 @@ pub mod responses;
 
 use serde::{Deserialize, Serialize};
 use torrust_index_backend::config::{
-    Auth as DomainAuth, Database as DomainDatabase, ImageCache as DomainImageCache, Mail as DomainMail, Network as DomainNetwork,
-    TorrustConfig as DomainSettings, Tracker as DomainTracker, Website as DomainWebsite,
+    Api as DomainApi, AppConfiguration as DomainSettings, Auth as DomainAuth, Database as DomainDatabase,
+    ImageCache as DomainImageCache, Mail as DomainMail, Network as DomainNetwork, Tracker as DomainTracker,
+    Website as DomainWebsite,
 };
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -16,6 +17,7 @@ pub struct Settings {
     pub database: Database,
     pub mail: Mail,
     pub image_cache: ImageCache,
+    pub api: Api,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -72,6 +74,12 @@ pub struct ImageCache {
     pub user_quota_bytes: usize,
 }
 
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+pub struct Api {
+    pub default_torrent_page_size: u8,
+    pub max_torrent_page_size: u8,
+}
+
 impl From<DomainSettings> for Settings {
     fn from(settings: DomainSettings) -> Self {
         Settings {
@@ -82,19 +90,20 @@ impl From<DomainSettings> for Settings {
             database: Database::from(settings.database),
             mail: Mail::from(settings.mail),
             image_cache: ImageCache::from(settings.image_cache),
+            api: Api::from(settings.api),
         }
     }
 }
 
 impl From<DomainWebsite> for Website {
     fn from(website: DomainWebsite) -> Self {
-        Website { name: website.name }
+        Self { name: website.name }
     }
 }
 
 impl From<DomainTracker> for Tracker {
     fn from(tracker: DomainTracker) -> Self {
-        Tracker {
+        Self {
             url: tracker.url,
             mode: format!("{:?}", tracker.mode),
             api_url: tracker.api_url,
@@ -106,7 +115,7 @@ impl From<DomainTracker> for Tracker {
 
 impl From<DomainNetwork> for Network {
     fn from(net: DomainNetwork) -> Self {
-        Network {
+        Self {
             port: net.port,
             base_url: net.base_url,
         }
@@ -115,7 +124,7 @@ impl From<DomainNetwork> for Network {
 
 impl From<DomainAuth> for Auth {
     fn from(auth: DomainAuth) -> Self {
-        Auth {
+        Self {
             email_on_signup: format!("{:?}", auth.email_on_signup),
             min_password_length: auth.min_password_length,
             max_password_length: auth.max_password_length,
@@ -126,7 +135,7 @@ impl From<DomainAuth> for Auth {
 
 impl From<DomainDatabase> for Database {
     fn from(database: DomainDatabase) -> Self {
-        Database {
+        Self {
             connect_url: database.connect_url,
             torrent_info_update_interval: database.torrent_info_update_interval,
         }
@@ -135,7 +144,7 @@ impl From<DomainDatabase> for Database {
 
 impl From<DomainMail> for Mail {
     fn from(mail: DomainMail) -> Self {
-        Mail {
+        Self {
             email_verification_enabled: mail.email_verification_enabled,
             from: mail.from,
             reply_to: mail.reply_to,
@@ -149,12 +158,21 @@ impl From<DomainMail> for Mail {
 
 impl From<DomainImageCache> for ImageCache {
     fn from(image_cache: DomainImageCache) -> Self {
-        ImageCache {
+        Self {
             max_request_timeout_ms: image_cache.max_request_timeout_ms,
             capacity: image_cache.capacity,
             entry_size_limit: image_cache.entry_size_limit,
             user_quota_period_seconds: image_cache.user_quota_period_seconds,
             user_quota_bytes: image_cache.user_quota_bytes,
+        }
+    }
+}
+
+impl From<DomainApi> for Api {
+    fn from(api: DomainApi) -> Self {
+        Self {
+            default_torrent_page_size: api.default_torrent_page_size,
+            max_torrent_page_size: api.max_torrent_page_size,
         }
     }
 }

@@ -80,7 +80,13 @@ pub struct ImageCache {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TorrustConfig {
+pub struct Api {
+    pub default_torrent_page_size: u8,
+    pub max_torrent_page_size: u8,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppConfiguration {
     pub website: Website,
     pub tracker: Tracker,
     pub net: Network,
@@ -88,10 +94,11 @@ pub struct TorrustConfig {
     pub database: Database,
     pub mail: Mail,
     pub image_cache: ImageCache,
+    pub api: Api,
 }
 
-impl TorrustConfig {
-    pub fn default() -> Self {
+impl Default for AppConfiguration {
+    fn default() -> Self {
         Self {
             website: Website {
                 name: "Torrust".to_string(),
@@ -121,9 +128,9 @@ impl TorrustConfig {
                 email_verification_enabled: false,
                 from: "example@email.com".to_string(),
                 reply_to: "noreply@email.com".to_string(),
-                username: "".to_string(),
-                password: "".to_string(),
-                server: "".to_string(),
+                username: String::new(),
+                password: String::new(),
+                server: String::new(),
                 port: 25,
             },
             image_cache: ImageCache {
@@ -133,22 +140,28 @@ impl TorrustConfig {
                 user_quota_period_seconds: 3600,
                 user_quota_bytes: 64_000_000,
             },
+            api: Api {
+                default_torrent_page_size: 10,
+                max_torrent_page_size: 30,
+            },
         }
     }
 }
 
 #[derive(Debug)]
 pub struct Configuration {
-    pub settings: RwLock<TorrustConfig>,
+    pub settings: RwLock<AppConfiguration>,
+}
+
+impl Default for Configuration {
+    fn default() -> Self {
+        Self {
+            settings: RwLock::new(AppConfiguration::default()),
+        }
+    }
 }
 
 impl Configuration {
-    pub fn default() -> Configuration {
-        Configuration {
-            settings: RwLock::new(TorrustConfig::default()),
-        }
-    }
-
     /// Loads the configuration from the configuration file.
     pub async fn load_from_file(config_path: &str) -> Result<Configuration, ConfigError> {
         let config_builder = Config::builder();
@@ -168,7 +181,7 @@ impl Configuration {
             ));
         }
 
-        let torrust_config: TorrustConfig = match config.try_deserialize() {
+        let torrust_config: AppConfiguration = match config.try_deserialize() {
             Ok(data) => Ok(data),
             Err(e) => Err(ConfigError::Message(format!("Errors while processing config: {}.", e))),
         }?;
@@ -191,16 +204,14 @@ impl Configuration {
                 let config_builder = Config::builder()
                     .add_source(File::from_str(&config_toml, FileFormat::Toml))
                     .build()?;
-                let torrust_config: TorrustConfig = config_builder.try_deserialize()?;
+                let torrust_config: AppConfiguration = config_builder.try_deserialize()?;
                 Ok(Configuration {
                     settings: RwLock::new(torrust_config),
                 })
             }
-            Err(_) => {
-                return Err(ConfigError::Message(
-                    "Unable to load configuration from the configuration environment variable.".to_string(),
-                ))
-            }
+            Err(_) => Err(ConfigError::Message(
+                "Unable to load configuration from the configuration environment variable.".to_string(),
+            )),
         }
     }
 
@@ -215,7 +226,7 @@ impl Configuration {
         Ok(())
     }
 
-    pub async fn update_settings(&self, new_settings: TorrustConfig, config_path: &str) -> Result<(), ()> {
+    pub async fn update_settings(&self, new_settings: AppConfiguration, config_path: &str) -> Result<(), ()> {
         let mut settings = self.settings.write().await;
         *settings = new_settings;
 
@@ -225,9 +236,7 @@ impl Configuration {
 
         Ok(())
     }
-}
 
-impl Configuration {
     pub async fn get_public(&self) -> ConfigurationPublic {
         let settings_lock = self.settings.read().await;
 
