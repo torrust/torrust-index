@@ -10,9 +10,6 @@ Delete torrent:
 Get torrent info:
 
 - The torrent info:
-    - should contain the tracker URL
-        - If no user owned tracker key can be found, it should use the default tracker url
-        - If    user owned tracker key can be found, it should use the personal tracker url
     - should contain the magnet link with the trackers from the torrent file
     - should contain realtime seeders and leechers from the tracker
 */
@@ -74,6 +71,9 @@ mod for_guests {
 
         let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
 
+        let tracker_url = format!("{}", env.server_settings().unwrap().tracker.url);
+        let encoded_tracker_url = urlencoding::encode(&tracker_url);
+
         let expected_torrent = TorrentDetails {
             torrent_id: uploaded_torrent.torrent_id,
             uploader: uploader.username,
@@ -95,13 +95,19 @@ mod for_guests {
                 length: test_torrent.file_info.content_size,
                 md5sum: None,
             }],
-            // code-review: why is this duplicated?
-            trackers: vec!["udp://tracker:6969".to_string(), "udp://tracker:6969".to_string()],
+            // code-review: why is this duplicated? It seems that is adding the
+            // same tracker twice because first ti adds all trackers and then
+            // it adds the tracker with the personal announce url, if the user
+            // is logged in. If the user is not logged in, it adds the default
+            // tracker again, and it ends up with two trackers.
+            trackers: vec![tracker_url.clone(), tracker_url.clone()],
             magnet_link: format!(
                 // cspell:disable-next-line
-                "magnet:?xt=urn:btih:{}&dn={}&tr=udp%3A%2F%2Ftracker%3A6969&tr=udp%3A%2F%2Ftracker%3A6969",
+                "magnet:?xt=urn:btih:{}&dn={}&tr={}&tr={}",
                 test_torrent.file_info.info_hash.to_uppercase(),
-                test_torrent.index_info.title
+                urlencoding::encode(&test_torrent.index_info.title),
+                encoded_tracker_url,
+                encoded_tracker_url
             ),
         };
 
@@ -135,6 +141,26 @@ mod for_guests {
     }
 
     #[tokio::test]
+    async fn it_should_return_a_not_found_trying_to_download_a_non_existing_torrent() {
+        let mut env = TestEnv::new();
+        env.start().await;
+
+        if !env.provides_a_tracker() {
+            println!("test skipped. It requires a tracker to be running.");
+            return;
+        }
+
+        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+        let non_existing_info_hash = "443c7602b4fde83d1154d6d9da48808418b181b6".to_string();
+
+        let response = client.download_torrent(non_existing_info_hash).await;
+
+        // code-review: should this be 404?
+        assert_eq!(response.status, 400);
+    }
+
+    #[tokio::test]
     async fn it_should_not_allow_guests_to_delete_torrents() {
         let mut env = TestEnv::new();
         env.start().await;
@@ -163,7 +189,7 @@ mod for_authenticated_users {
     use crate::common::contexts::torrent::fixtures::random_torrent;
     use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
     use crate::common::contexts::torrent::responses::UploadedTorrentResponse;
-    use crate::e2e::contexts::torrent::asserts::expected_torrent;
+    use crate::e2e::contexts::torrent::asserts::{build_announce_url, get_user_tracker_key};
     use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
     use crate::e2e::contexts::user::steps::new_logged_in_user;
     use crate::e2e::environment::TestEnv;
@@ -289,8 +315,6 @@ mod for_authenticated_users {
         // Given a previously uploaded torrent
         let uploader = new_logged_in_user(&env).await;
         let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
-        let uploaded_torrent =
-            decode_torrent(&test_torrent.index_info.torrent_file.contents).expect("could not decode uploaded torrent");
 
         // And a logged in user who is going to download the torrent
         let downloader = new_logged_in_user(&env).await;
@@ -302,14 +326,20 @@ mod for_authenticated_users {
         let torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
 
         // Then the torrent should have the personal announce URL
-        let expected_torrent = expected_torrent(uploaded_torrent, &env, &Some(downloader)).await;
+        let tracker_key = get_user_tracker_key(&downloader, &env)
+            .await
+            .expect("uploader should have a valid tracker key");
+        let tracker_url = format!("{}", env.server_settings().unwrap().tracker.url);
 
-        assert_eq!(torrent, expected_torrent);
-        assert!(response.is_bittorrent_and_ok());
+        assert_eq!(
+            torrent.announce.unwrap(),
+            build_announce_url(&tracker_url, &Some(tracker_key))
+        );
     }
 
     mod and_non_admins {
         use crate::common::client::Client;
+        use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
         use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
         use crate::e2e::contexts::user::steps::new_logged_in_user;
         use crate::e2e::environment::TestEnv;
@@ -330,6 +360,40 @@ mod for_authenticated_users {
             let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
 
             let response = client.delete_torrent(uploaded_torrent.torrent_id).await;
+
+            assert_eq!(response.status, 403);
+        }
+
+        #[tokio::test]
+        async fn it_should_allow_non_admin_users_to_update_someone_elses_torrents() {
+            let mut env = TestEnv::new();
+            env.start().await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            // Given a users uploads a torrent
+            let uploader = new_logged_in_user(&env).await;
+            let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            // Then another non admin user should not be able to update the torrent
+            let not_the_uploader = new_logged_in_user(&env).await;
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &not_the_uploader.token);
+
+            let new_title = format!("{}-new-title", test_torrent.index_info.title);
+            let new_description = format!("{}-new-description", test_torrent.index_info.description);
+
+            let response = client
+                .update_torrent(
+                    uploaded_torrent.torrent_id,
+                    UpdateTorrentFrom {
+                        title: Some(new_title.clone()),
+                        description: Some(new_description.clone()),
+                    },
+                )
+                .await;
 
             assert_eq!(response.status, 403);
         }

@@ -34,7 +34,7 @@ pub async fn expected_torrent(mut uploaded_torrent: Torrent, env: &TestEnv, down
     uploaded_torrent
 }
 
-async fn get_user_tracker_key(logged_in_user: &LoggedInUserData, env: &TestEnv) -> Option<TrackerKey> {
+pub async fn get_user_tracker_key(logged_in_user: &LoggedInUserData, env: &TestEnv) -> Option<TrackerKey> {
     // code-review: could we add a new endpoint to get the user's tracker key?
     // `/user/keys/recent` or `/user/keys/latest
     // We could use that endpoint to get the user's tracker key instead of
@@ -43,7 +43,7 @@ async fn get_user_tracker_key(logged_in_user: &LoggedInUserData, env: &TestEnv) 
     let database = Arc::new(
         connect_database(&env.database_connect_url().unwrap())
             .await
-            .expect("Database error."),
+            .expect("database connection to be established."),
     );
 
     // Get the logged-in user id
@@ -53,12 +53,15 @@ async fn get_user_tracker_key(logged_in_user: &LoggedInUserData, env: &TestEnv) 
         .unwrap();
 
     // Get the user's tracker key
-    let tracker_key = database.get_user_tracker_key(user_profile.user_id).await.unwrap();
+    let tracker_key = database
+        .get_user_tracker_key(user_profile.user_id)
+        .await
+        .expect("user to have a tracker key");
 
     Some(tracker_key)
 }
 
-fn build_announce_url(tracker_url: &str, tracker_key: &Option<TrackerKey>) -> String {
+pub fn build_announce_url(tracker_url: &str, tracker_key: &Option<TrackerKey>) -> String {
     if let Some(key) = &tracker_key {
         format!("{tracker_url}/{}", key.key)
     } else {

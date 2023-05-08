@@ -220,6 +220,8 @@ pub async fn get_torrent(req: HttpRequest, app_data: WebAppData) -> ServiceResul
         }
     }
 
+    // todo: extract a struct or function to build the magnet links
+
     // add magnet link
     let mut magnet = format!(
         "magnet:?xt=urn:btih:{}&dn={}",
