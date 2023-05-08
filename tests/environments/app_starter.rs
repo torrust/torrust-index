@@ -8,6 +8,7 @@ use torrust_index_backend::config::{AppConfiguration, Configuration};
 /// It launches the app and provides a way to stop it.
 pub struct AppStarter {
     configuration: AppConfiguration,
+    config_path: Option<String>,
     /// The application binary state (started or not):
     ///  - `None`: if the app is not started,
     ///  - `RunningState`: if the app was started.
@@ -16,9 +17,10 @@ pub struct AppStarter {
 
 impl AppStarter {
     #[must_use]
-    pub fn with_custom_configuration(configuration: AppConfiguration) -> Self {
+    pub fn with_custom_configuration(configuration: AppConfiguration, config_path: Option<String>) -> Self {
         Self {
             configuration,
+            config_path,
             running_state: None,
         }
     }
@@ -29,6 +31,7 @@ impl AppStarter {
     pub async fn start(&mut self) {
         let configuration = Configuration {
             settings: RwLock::new(self.configuration.clone()),
+            config_path: self.config_path.clone(),
         };
 
         // Open a channel to communicate back with this function
