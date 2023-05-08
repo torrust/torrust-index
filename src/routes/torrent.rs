@@ -174,17 +174,11 @@ pub async fn get_torrent_handler(req: HttpRequest, app_data: WebAppData) -> Serv
 
     let infohash = get_torrent_infohash_from_request(&req)?;
 
-    println!("infohash: {}", infohash);
-
     let torrent_listing = app_data.database.get_torrent_listing_from_infohash(&infohash).await?;
 
     let torrent_id = torrent_listing.torrent_id;
 
-    println!("torrent_listing: {:#?}", torrent_listing);
-
     let category = app_data.database.get_category_from_id(torrent_listing.category_id).await?;
-
-    println!("category: {:#?}", category);
 
     let mut torrent_response = TorrentResponse::from_listing(torrent_listing);
 
@@ -196,12 +190,8 @@ pub async fn get_torrent_handler(req: HttpRequest, app_data: WebAppData) -> Serv
 
     torrent_response.files = app_data.database.get_torrent_files_from_id(torrent_id).await?;
 
-    println!("torrent_response.files: {:#?}", torrent_response.files);
-
     if torrent_response.files.len() == 1 {
         let torrent_info = app_data.database.get_torrent_info_from_infohash(&infohash).await?;
-
-        println!("torrent_info: {:#?}", torrent_info);
 
         torrent_response
             .files
@@ -214,8 +204,6 @@ pub async fn get_torrent_handler(req: HttpRequest, app_data: WebAppData) -> Serv
         .get_torrent_announce_urls_from_id(torrent_id)
         .await
         .map(|v| v.into_iter().flatten().collect())?;
-
-    println!("trackers: {:#?}", torrent_response.trackers);
 
     // add tracker url
     match user {
