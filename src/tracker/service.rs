@@ -1,39 +1,10 @@
 use std::sync::Arc;
 
-use log::{error, info};
-use serde::{Deserialize, Serialize};
-
 use super::api::{Client, ConnectionInfo};
 use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::errors::ServiceError;
 use crate::models::tracker_key::TrackerKey;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TorrentInfo {
-    pub info_hash: String,
-    pub seeders: i64,
-    pub completed: i64,
-    pub leechers: i64,
-    pub peers: Vec<Peer>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Peer {
-    pub peer_id: Option<PeerId>,
-    pub peer_addr: Option<String>,
-    pub updated: Option<i64>,
-    pub uploaded: Option<i64>,
-    pub downloaded: Option<i64>,
-    pub left: Option<i64>,
-    pub event: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PeerId {
-    pub id: Option<String>,
-    pub client: Option<String>,
-}
 
 pub struct Service {
     database: Arc<Box<dyn Database>>,
@@ -152,54 +123,5 @@ impl Service {
 
         // return tracker key
         Ok(tracker_key)
-    }
-
-    /// Get torrent info from tracker API
-    ///
-    /// # Errors
-    ///
-    /// Will return an error if the HTTP request failed or the torrent is not
-    /// found.
-    pub async fn get_torrent_info(&self, torrent_id: i64, info_hash: &str) -> Result<TorrentInfo, ServiceError> {
-        let response = self
-            .api_client
-            .get_torrent_info(info_hash)
-            .await
-            .map_err(|_| ServiceError::InternalServerError)?;
-
-        if let Ok(torrent_info) = response.json::<TorrentInfo>().await {
-            let _ = self
-                .database
-                .update_tracker_info(torrent_id, &self.tracker_url, torrent_info.seeders, torrent_info.leechers)
-                .await;
-            Ok(torrent_info)
-        } else {
-            let _ = self.database.update_tracker_info(torrent_id, &self.tracker_url, 0, 0).await;
-            Err(ServiceError::TorrentNotFound)
-        }
-    }
-
-    pub async fn update_torrents(&self) -> Result<(), ServiceError> {
-        info!("Updating torrents ...");
-        let torrents = self.database.get_all_torrents_compact().await?;
-
-        for torrent in torrents {
-            info!("Updating torrent {} ...", torrent.torrent_id);
-            let ret = self
-                .update_torrent_tracker_stats(torrent.torrent_id, &torrent.info_hash)
-                .await;
-            if let Some(err) = ret.err() {
-                error!(
-                    "Error updating torrent tracker stats for torrent {}: {:?}",
-                    torrent.torrent_id, err
-                );
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn update_torrent_tracker_stats(&self, torrent_id: i64, info_hash: &str) -> Result<TorrentInfo, ServiceError> {
-        self.get_torrent_info(torrent_id, info_hash).await
     }
 }
