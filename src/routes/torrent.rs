@@ -29,7 +29,7 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::delete().to(delete_torrent_handler)),
             ),
     );
-    cfg.service(web::scope("/torrents").service(web::resource("").route(web::get().to(get_torrents))));
+    cfg.service(web::scope("/torrents").service(web::resource("").route(web::get().to(get_torrents_handler))));
 }
 
 #[derive(FromRow)]
@@ -321,25 +321,36 @@ pub async fn delete_torrent_handler(req: HttpRequest, app_data: WebAppData) -> S
     }))
 }
 
-// eg: /torrents?categories=music,other,movie&search=bunny&sort=size_DESC
-pub async fn get_torrents(params: Query<TorrentSearch>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+/// It returns a list of torrents matching the search criteria.
+/// Eg: `/torrents?categories=music,other,movie&search=bunny&sort=size_DESC`
+///
+/// # Errors
+///
+/// Returns a `ServiceError::DatabaseError` if the database query fails.
+pub async fn get_torrents_handler(params: Query<TorrentSearch>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let settings = app_data.cfg.settings.read().await;
+
     let sort = params.sort.unwrap_or(Sorting::UploadedDesc);
 
     let page = params.page.unwrap_or(0);
 
-    // make sure the min page size = 10
-    let page_size = match params.page_size.unwrap_or(30) {
-        0..=9 => 10,
-        v => v,
+    let page_size = params.page_size.unwrap_or(settings.api.default_torrent_page_size);
+
+    // Guard that page size does not exceed the maximum
+    let max_torrent_page_size = settings.api.max_torrent_page_size;
+    let page_size = if page_size > max_torrent_page_size {
+        max_torrent_page_size
+    } else {
+        page_size
     };
 
-    let offset = (page * page_size as u32) as u64;
+    let offset = u64::from(page * u32::from(page_size));
 
     let categories = params.categories.as_csv::<String>().unwrap_or(None);
 
     let torrents_response = app_data
         .database
-        .get_torrents_search_sorted_paginated(&params.search, &categories, &sort, offset, page_size as u8)
+        .get_torrents_search_sorted_paginated(&params.search, &categories, &sort, offset, page_size)
         .await?;
 
     Ok(HttpResponse::Ok().json(OkResponse { data: torrents_response }))

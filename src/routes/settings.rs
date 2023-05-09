@@ -2,7 +2,7 @@ use actix_web::{web, HttpRequest, HttpResponse, Responder};
 
 use crate::bootstrap::config::ENV_VAR_DEFAULT_CONFIG_PATH;
 use crate::common::WebAppData;
-use crate::config::TorrustConfig;
+use crate::config::AppConfiguration;
 use crate::errors::{ServiceError, ServiceResult};
 use crate::models::response::OkResponse;
 
@@ -28,7 +28,7 @@ pub async fn get_settings(req: HttpRequest, app_data: WebAppData) -> ServiceResu
         return Err(ServiceError::Unauthorized);
     }
 
-    let settings: tokio::sync::RwLockReadGuard<TorrustConfig> = app_data.cfg.settings.read().await;
+    let settings: tokio::sync::RwLockReadGuard<AppConfiguration> = app_data.cfg.settings.read().await;
 
     Ok(HttpResponse::Ok().json(OkResponse { data: &*settings }))
 }
@@ -49,7 +49,7 @@ pub async fn get_site_name(app_data: WebAppData) -> ServiceResult<impl Responder
 
 pub async fn update_settings(
     req: HttpRequest,
-    payload: web::Json<TorrustConfig>,
+    payload: web::Json<AppConfiguration>,
     app_data: WebAppData,
 ) -> ServiceResult<impl Responder> {
     // check for user

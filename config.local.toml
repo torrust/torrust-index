@@ -36,3 +36,7 @@ capacity = 128000000
 entry_size_limit = 4000000
 user_quota_period_seconds = 3600
 user_quota_bytes = 64000000
+
+[api]
+default_torrent_page_size = 10
+max_torrent_page_size = 30

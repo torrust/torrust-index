@@ -2,7 +2,7 @@
 
 # Generate the default settings file if it does not exist
 if ! [ -f "./config.toml" ]; then
-    cp ./config.toml.local ./config.toml
+    cp ./config.local.toml ./config.toml
 fi
 
 # Generate storage directory if it does not exist

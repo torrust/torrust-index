@@ -3,11 +3,11 @@ use std::net::SocketAddr;
 use log::info;
 use tokio::sync::{oneshot, RwLock};
 use torrust_index_backend::app;
-use torrust_index_backend::config::{Configuration, TorrustConfig};
+use torrust_index_backend::config::{AppConfiguration, Configuration};
 
 /// It launches the app and provides a way to stop it.
 pub struct AppStarter {
-    configuration: TorrustConfig,
+    configuration: AppConfiguration,
     /// The application binary state (started or not):
     ///  - `None`: if the app is not started,
     ///  - `RunningState`: if the app was started.
@@ -16,7 +16,7 @@ pub struct AppStarter {
 
 impl AppStarter {
     #[must_use]
-    pub fn with_custom_configuration(configuration: TorrustConfig) -> Self {
+    pub fn with_custom_configuration(configuration: AppConfiguration) -> Self {
         Self {
             configuration,
             running_state: None,
@@ -72,7 +72,7 @@ impl AppStarter {
     }
 
     #[must_use]
-    pub fn server_configuration(&self) -> TorrustConfig {
+    pub fn server_configuration(&self) -> AppConfiguration {
         self.configuration.clone()
     }
 

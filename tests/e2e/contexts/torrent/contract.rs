@@ -24,6 +24,7 @@ mod for_guests {
     use crate::common::contexts::torrent::responses::{
         Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
     };
+    use crate::common::http::{Query, QueryParam};
     use crate::e2e::contexts::torrent::asserts::expected_torrent;
     use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
     use crate::e2e::contexts::user::steps::new_logged_in_user;
@@ -44,12 +45,112 @@ mod for_guests {
         let uploader = new_logged_in_user(&env).await;
         let (_test_torrent, indexed_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
 
-        let response = client.get_torrents().await;
+        let response = client.get_torrents(Query::empty()).await;
 
         let torrent_list_response: TorrentListResponse = serde_json::from_str(&response.body).unwrap();
 
         assert!(torrent_list_response.data.total > 0);
         assert!(torrent_list_response.data.contains(indexed_torrent.torrent_id));
+        assert!(response.is_json_and_ok());
+    }
+
+    #[tokio::test]
+    async fn it_should_allow_to_get_torrents_with_pagination() {
+        let mut env = TestEnv::new();
+        env.start().await;
+
+        if !env.provides_a_tracker() {
+            println!("test skipped. It requires a tracker to be running.");
+            return;
+        }
+
+        let uploader = new_logged_in_user(&env).await;
+
+        // Given we insert two torrents
+        let (_test_torrent, _indexed_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+        let (_test_torrent, _indexed_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+        // When we request only one torrent per page
+        let response = client
+            .get_torrents(Query::with_params([QueryParam::new("page_size", "1")].to_vec()))
+            .await;
+
+        let torrent_list_response: TorrentListResponse = serde_json::from_str(&response.body).unwrap();
+
+        // Then we should have only one torrent per page
+        assert_eq!(torrent_list_response.data.results.len(), 1);
+        assert!(response.is_json_and_ok());
+    }
+
+    #[tokio::test]
+    async fn it_should_allow_to_limit_the_number_of_torrents_per_request() {
+        let mut env = TestEnv::new();
+        env.start().await;
+
+        if !env.provides_a_tracker() {
+            println!("test skipped. It requires a tracker to be running.");
+            return;
+        }
+
+        let uploader = new_logged_in_user(&env).await;
+
+        let max_torrent_page_size = 30;
+
+        // Given we insert one torrent more than the page size limit
+        for _ in 0..max_torrent_page_size {
+            let (_test_torrent, _indexed_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+        }
+
+        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+        // When we request more torrents than the page size limit
+        let response = client
+            .get_torrents(Query::with_params(
+                [QueryParam::new(
+                    "page_size",
+                    &format!("{}", (max_torrent_page_size + 1).to_string()),
+                )]
+                .to_vec(),
+            ))
+            .await;
+
+        let torrent_list_response: TorrentListResponse = serde_json::from_str(&response.body).unwrap();
+
+        // Then we should get only the page size limit
+        assert_eq!(torrent_list_response.data.results.len(), max_torrent_page_size);
+        assert!(response.is_json_and_ok());
+    }
+
+    #[tokio::test]
+    async fn it_should_return_a_default_amount_of_torrents_per_request_if_no_page_size_is_provided() {
+        let mut env = TestEnv::new();
+        env.start().await;
+
+        if !env.provides_a_tracker() {
+            println!("test skipped. It requires a tracker to be running.");
+            return;
+        }
+
+        let uploader = new_logged_in_user(&env).await;
+
+        let default_torrent_page_size = 10;
+
+        // Given we insert one torrent more than the default page size
+        for _ in 0..default_torrent_page_size {
+            let (_test_torrent, _indexed_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+        }
+
+        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+        // When we request more torrents than the default page size limit
+        let response = client.get_torrents(Query::empty()).await;
+
+        let torrent_list_response: TorrentListResponse = serde_json::from_str(&response.body).unwrap();
+
+        // Then we should get only the default number of torrents per page
+        assert_eq!(torrent_list_response.data.results.len(), default_torrent_page_size);
         assert!(response.is_json_and_ok());
     }
 
