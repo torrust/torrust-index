@@ -14,7 +14,7 @@ use crate::config::Configuration;
 use crate::databases::database::connect_database;
 use crate::mailer::MailerService;
 use crate::routes;
-use crate::tracker::TrackerService;
+use crate::tracker::service::TrackerService;
 
 pub struct Running {
     pub api_server: Server,

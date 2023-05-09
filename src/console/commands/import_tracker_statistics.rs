@@ -9,7 +9,7 @@ use text_colorizer::*;
 use crate::bootstrap::config::init_configuration;
 use crate::bootstrap::logging;
 use crate::databases::database::connect_database;
-use crate::tracker::TrackerService;
+use crate::tracker::service::TrackerService;
 
 const NUMBER_OF_ARGUMENTS: usize = 0;
 

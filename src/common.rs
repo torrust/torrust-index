@@ -5,7 +5,7 @@ use crate::cache::image::manager::ImageCacheService;
 use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::mailer::MailerService;
-use crate::tracker::TrackerService;
+use crate::tracker::service::TrackerService;
 
 pub type Username = String;
 
