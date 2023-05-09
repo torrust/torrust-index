@@ -46,7 +46,8 @@ pub async fn run(configuration: Configuration) -> Running {
     let database = Arc::new(connect_database(&database_connect_url).await.expect("Database error."));
     let auth = Arc::new(AuthorizationService::new(cfg.clone(), database.clone()));
     let tracker_service = Arc::new(Service::new(cfg.clone(), database.clone()).await);
-    let tracker_statistics_importer = Arc::new(StatisticsImporter::new(cfg.clone(), database.clone()).await);
+    let tracker_statistics_importer =
+        Arc::new(StatisticsImporter::new(cfg.clone(), tracker_service.clone(), database.clone()).await);
     let mailer_service = Arc::new(MailerService::new(cfg.clone()).await);
     let image_cache_service = Arc::new(ImageCacheService::new(cfg.clone()).await);
 

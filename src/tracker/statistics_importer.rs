@@ -1,61 +1,26 @@
 use std::sync::Arc;
 
 use log::{error, info};
-use serde::{Deserialize, Serialize};
 
-use super::api::{Client, ConnectionInfo};
+use super::service::{Service, TorrentInfo};
 use crate::config::Configuration;
 use crate::databases::database::{Database, DatabaseError};
 use crate::errors::ServiceError;
 
-// If `TorrentInfo` struct is used in the future for other purposes, it should
-// be moved to a separate file. Maybe a `ClientWrapper` struct which returns
-// `TorrentInfo` and `TrackerKey` structs instead of `Response` structs.
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TorrentInfo {
-    pub info_hash: String,
-    pub seeders: i64,
-    pub completed: i64,
-    pub leechers: i64,
-    pub peers: Vec<Peer>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Peer {
-    pub peer_id: Option<PeerId>,
-    pub peer_addr: Option<String>,
-    pub updated: Option<i64>,
-    pub uploaded: Option<i64>,
-    pub downloaded: Option<i64>,
-    pub left: Option<i64>,
-    pub event: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PeerId {
-    pub id: Option<String>,
-    pub client: Option<String>,
-}
-
 pub struct StatisticsImporter {
     database: Arc<Box<dyn Database>>,
-    api_client: Client,
+    tracker_service: Arc<Service>,
     tracker_url: String,
 }
 
 impl StatisticsImporter {
-    pub async fn new(cfg: Arc<Configuration>, database: Arc<Box<dyn Database>>) -> Self {
+    pub async fn new(cfg: Arc<Configuration>, tracker_service: Arc<Service>, database: Arc<Box<dyn Database>>) -> Self {
         let settings = cfg.settings.read().await;
-        let api_client = Client::new(ConnectionInfo::new(
-            settings.tracker.api_url.clone(),
-            settings.tracker.token.clone(),
-        ));
         let tracker_url = settings.tracker.url.clone();
         drop(settings);
         Self {
             database,
-            api_client,
+            tracker_service,
             tracker_url,
         }
     }
@@ -102,13 +67,7 @@ impl StatisticsImporter {
     /// Will return an error if the HTTP request failed or the torrent is not
     /// found.
     pub async fn import_torrent_statistics(&self, torrent_id: i64, info_hash: &str) -> Result<TorrentInfo, ServiceError> {
-        let response = self
-            .api_client
-            .get_torrent_info(info_hash)
-            .await
-            .map_err(|_| ServiceError::InternalServerError)?;
-
-        if let Ok(torrent_info) = response.json::<TorrentInfo>().await {
+        if let Ok(torrent_info) = self.tracker_service.get_torrent_info(info_hash).await {
             let _ = self
                 .database
                 .update_tracker_info(torrent_id, &self.tracker_url, torrent_info.seeders, torrent_info.leechers)

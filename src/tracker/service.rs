@@ -1,10 +1,39 @@
 use std::sync::Arc;
 
+use log::error;
+use serde::{Deserialize, Serialize};
+
 use super::api::{Client, ConnectionInfo};
 use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::errors::ServiceError;
 use crate::models::tracker_key::TrackerKey;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TorrentInfo {
+    pub info_hash: String,
+    pub seeders: i64,
+    pub completed: i64,
+    pub leechers: i64,
+    pub peers: Vec<Peer>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Peer {
+    pub peer_id: Option<PeerId>,
+    pub peer_addr: Option<String>,
+    pub updated: Option<i64>,
+    pub uploaded: Option<i64>,
+    pub downloaded: Option<i64>,
+    pub left: Option<i64>,
+    pub event: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PeerId {
+    pub id: Option<String>,
+    pub client: Option<String>,
+}
 
 pub struct Service {
     database: Arc<Box<dyn Database>>,
@@ -93,6 +122,27 @@ impl Service {
                 Ok(v) => Ok(self.announce_url_with_key(&v)),
                 Err(_) => Err(ServiceError::TrackerOffline),
             },
+        }
+    }
+
+    /// Get torrent info from tracker.
+    ///
+    /// # Errors
+    ///
+    /// Will return an error if the HTTP request to get torrent info fails or
+    /// if the response cannot be parsed.
+    pub async fn get_torrent_info(&self, info_hash: &str) -> Result<TorrentInfo, ServiceError> {
+        let response = self
+            .api_client
+            .get_torrent_info(info_hash)
+            .await
+            .map_err(|_| ServiceError::InternalServerError)?;
+
+        if let Ok(torrent_info) = response.json::<TorrentInfo>().await {
+            Ok(torrent_info)
+        } else {
+            error!("Failed to parse torrent info from tracker response");
+            Err(ServiceError::InternalServerError)
         }
     }
 
