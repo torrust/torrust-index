@@ -9,7 +9,7 @@ use text_colorizer::*;
 use crate::bootstrap::config::init_configuration;
 use crate::bootstrap::logging;
 use crate::databases::database::connect_database;
-use crate::tracker::service::TrackerService;
+use crate::tracker::service::Service;
 
 const NUMBER_OF_ARGUMENTS: usize = 0;
 
@@ -76,7 +76,7 @@ pub async fn import(_args: &Arguments) {
             .expect("Database error."),
     );
 
-    let tracker_service = Arc::new(TrackerService::new(cfg.clone(), database.clone()).await);
+    let tracker_service = Arc::new(Service::new(cfg.clone(), database.clone()).await);
 
     tracker_service.update_torrents().await.unwrap();
 }

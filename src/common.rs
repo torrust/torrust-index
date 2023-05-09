@@ -5,7 +5,7 @@ use crate::cache::image::manager::ImageCacheService;
 use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::mailer::MailerService;
-use crate::tracker::service::TrackerService;
+use crate::tracker::service::Service;
 
 pub type Username = String;
 
@@ -15,7 +15,7 @@ pub struct AppData {
     pub cfg: Arc<Configuration>,
     pub database: Arc<Box<dyn Database>>,
     pub auth: Arc<AuthorizationService>,
-    pub tracker: Arc<TrackerService>,
+    pub tracker: Arc<Service>,
     pub mailer: Arc<MailerService>,
     pub image_cache_manager: Arc<ImageCacheService>,
 }
@@ -25,7 +25,7 @@ impl AppData {
         cfg: Arc<Configuration>,
         database: Arc<Box<dyn Database>>,
         auth: Arc<AuthorizationService>,
-        tracker: Arc<TrackerService>,
+        tracker: Arc<Service>,
         mailer: Arc<MailerService>,
         image_cache_manager: Arc<ImageCacheService>,
     ) -> AppData {

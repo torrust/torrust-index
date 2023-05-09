@@ -3,7 +3,7 @@ use std::sync::Arc;
 use log::{error, info};
 use serde::{Deserialize, Serialize};
 
-use super::api::{ApiClient, ApiConnectionInfo};
+use super::api::{Client, ConnectionInfo};
 use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::errors::ServiceError;
@@ -35,24 +35,24 @@ pub struct PeerId {
     pub client: Option<String>,
 }
 
-pub struct TrackerService {
+pub struct Service {
     database: Arc<Box<dyn Database>>,
-    api_client: ApiClient,
+    api_client: Client,
     token_valid_seconds: u64,
     tracker_url: String,
 }
 
-impl TrackerService {
-    pub async fn new(cfg: Arc<Configuration>, database: Arc<Box<dyn Database>>) -> TrackerService {
+impl Service {
+    pub async fn new(cfg: Arc<Configuration>, database: Arc<Box<dyn Database>>) -> Service {
         let settings = cfg.settings.read().await;
-        let api_client = ApiClient::new(ApiConnectionInfo::new(
+        let api_client = Client::new(ConnectionInfo::new(
             settings.tracker.api_url.clone(),
             settings.tracker.token.clone(),
         ));
         let token_valid_seconds = settings.tracker.token_valid_seconds;
         let tracker_url = settings.tracker.url.clone();
         drop(settings);
-        TrackerService {
+        Service {
             database,
             api_client,
             token_valid_seconds,
@@ -67,7 +67,7 @@ impl TrackerService {
     /// Will return an error if the HTTP request failed (for example if the
     /// tracker API is offline) or if the tracker API returned an error.
     pub async fn whitelist_info_hash(&self, info_hash: String) -> Result<(), ServiceError> {
-        let response = self.api_client.whitelist_info_hash(&info_hash).await;
+        let response = self.api_client.whitelist_torrent(&info_hash).await;
 
         match response {
             Ok(response) => {
@@ -88,7 +88,7 @@ impl TrackerService {
     /// Will return an error if the HTTP request failed (for example if the
     /// tracker API is offline) or if the tracker API returned an error.
     pub async fn remove_info_hash_from_whitelist(&self, info_hash: String) -> Result<(), ServiceError> {
-        let response = self.api_client.remove_info_hash_from_whitelist(&info_hash).await;
+        let response = self.api_client.remove_torrent_from_whitelist(&info_hash).await;
 
         match response {
             Ok(response) => {
