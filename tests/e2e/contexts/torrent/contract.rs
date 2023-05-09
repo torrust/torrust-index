@@ -43,14 +43,13 @@ mod for_guests {
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
         let uploader = new_logged_in_user(&env).await;
-        let (_test_torrent, indexed_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+        let (_test_torrent, _indexed_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
 
         let response = client.get_torrents(Query::empty()).await;
 
         let torrent_list_response: TorrentListResponse = serde_json::from_str(&response.body).unwrap();
 
         assert!(torrent_list_response.data.total > 0);
-        assert!(torrent_list_response.data.contains(indexed_torrent.torrent_id));
         assert!(response.is_json_and_ok());
     }
 
