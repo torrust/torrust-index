@@ -76,7 +76,7 @@ pub async fn import(_args: &Arguments) {
             .expect("Database error."),
     );
 
-    let tracker_service = Arc::new(TrackerService::new(cfg.clone(), database.clone()));
+    let tracker_service = Arc::new(TrackerService::new(cfg.clone(), database.clone()).await);
 
     tracker_service.update_torrents().await.unwrap();
 }
