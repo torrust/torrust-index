@@ -67,14 +67,13 @@ async fn it_should_allow_admins_to_get_all_the_settings() {
 #[tokio::test]
 async fn it_should_allow_admins_to_update_all_the_settings() {
     let mut env = TestEnv::new();
+    env.start().await;
 
     if !env.is_isolated() {
         // This test can't be executed in a non-isolated environment because
         // it will change the settings for all the other tests.
         return;
     }
-
-    env.start().await;
 
     let logged_in_admin = new_logged_in_admin(&env).await;
     let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);

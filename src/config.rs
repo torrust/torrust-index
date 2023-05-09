@@ -151,12 +151,14 @@ impl Default for AppConfiguration {
 #[derive(Debug)]
 pub struct Configuration {
     pub settings: RwLock<AppConfiguration>,
+    pub config_path: Option<String>,
 }
 
 impl Default for Configuration {
     fn default() -> Self {
         Self {
             settings: RwLock::new(AppConfiguration::default()),
+            config_path: None,
         }
     }
 }
@@ -188,6 +190,7 @@ impl Configuration {
 
         Ok(Configuration {
             settings: RwLock::new(torrust_config),
+            config_path: Some(config_path.to_string()),
         })
     }
 
@@ -207,6 +210,7 @@ impl Configuration {
                 let torrust_config: AppConfiguration = config_builder.try_deserialize()?;
                 Ok(Configuration {
                     settings: RwLock::new(torrust_config),
+                    config_path: None,
                 })
             }
             Err(_) => Err(ConfigError::Message(
@@ -215,7 +219,7 @@ impl Configuration {
         }
     }
 
-    pub async fn save_to_file(&self, config_path: &str) -> Result<(), ()> {
+    pub async fn save_to_file(&self, config_path: &str) {
         let settings = self.settings.read().await;
 
         let toml_string = toml::to_string(&*settings).expect("Could not encode TOML value");
@@ -223,18 +227,28 @@ impl Configuration {
         drop(settings);
 
         fs::write(config_path, toml_string).expect("Could not write to file!");
-        Ok(())
     }
 
-    pub async fn update_settings(&self, new_settings: AppConfiguration, config_path: &str) -> Result<(), ()> {
-        let mut settings = self.settings.write().await;
-        *settings = new_settings;
+    /// Updates the settings and saves them to the configuration file.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the configuration file path is not defined. That happens
+    /// when the configuration was loaded from the environment variable.
+    pub async fn update_settings(&self, new_settings: AppConfiguration) {
+        match &self.config_path {
+            Some(config_path) => {
+                let mut settings = self.settings.write().await;
+                *settings = new_settings;
 
-        drop(settings);
+                drop(settings);
 
-        let _ = self.save_to_file(config_path).await;
-
-        Ok(())
+                let _ = self.save_to_file(config_path).await;
+            }
+            None => panic!(
+                "Cannot update settings when the config file path is not defined. For example: when it's loaded from env var."
+            ),
+        }
     }
 
     pub async fn get_public(&self) -> ConfigurationPublic {
