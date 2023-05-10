@@ -18,7 +18,9 @@ jobs:
       - name: Check
         run: cargo check --all-targets
       - name: Clippy
-        run: cargo clippy --all-targets -- -D clippy::pedantic
+        run: cargo clippy --version && cargo clippy --all-targets -- -D clippy::pedantic
+        env:
+          CARGO_INCREMENTAL: 0
       - name: Install torrent edition tool (needed for testing)
         run: cargo install imdl
       - name: Unit and integration tests
