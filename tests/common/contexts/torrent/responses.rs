@@ -21,7 +21,7 @@ pub struct TorrentList {
 }
 
 impl TorrentList {
-    pub fn contains(&self, torrent_id: Id) -> bool {
+    pub fn _contains(&self, torrent_id: Id) -> bool {
         self.results.iter().any(|item| item.torrent_id == torrent_id)
     }
 }

@@ -14,7 +14,8 @@ use crate::config::Configuration;
 use crate::databases::database::connect_database;
 use crate::mailer::MailerService;
 use crate::routes;
-use crate::tracker::TrackerService;
+use crate::tracker::service::Service;
+use crate::tracker::statistics_importer::StatisticsImporter;
 
 pub struct Running {
     pub api_server: Server,
@@ -44,7 +45,9 @@ pub async fn run(configuration: Configuration) -> Running {
 
     let database = Arc::new(connect_database(&database_connect_url).await.expect("Database error."));
     let auth = Arc::new(AuthorizationService::new(cfg.clone(), database.clone()));
-    let tracker_service = Arc::new(TrackerService::new(cfg.clone(), database.clone()));
+    let tracker_service = Arc::new(Service::new(cfg.clone(), database.clone()).await);
+    let tracker_statistics_importer =
+        Arc::new(StatisticsImporter::new(cfg.clone(), tracker_service.clone(), database.clone()).await);
     let mailer_service = Arc::new(MailerService::new(cfg.clone()).await);
     let image_cache_service = Arc::new(ImageCacheService::new(cfg.clone()).await);
 
@@ -55,6 +58,7 @@ pub async fn run(configuration: Configuration) -> Running {
         database.clone(),
         auth.clone(),
         tracker_service.clone(),
+        tracker_statistics_importer.clone(),
         mailer_service,
         image_cache_service,
     ));
@@ -62,16 +66,16 @@ pub async fn run(configuration: Configuration) -> Running {
     // Start repeating task to import tracker torrent data and updating
     // seeders and leechers info.
 
-    let weak_tracker_service = Arc::downgrade(&tracker_service);
+    let weak_tracker_statistics_importer = Arc::downgrade(&tracker_statistics_importer);
 
-    let tracker_data_importer_handle = tokio::spawn(async move {
+    let tracker_statistics_importer_handle = tokio::spawn(async move {
         let interval = std::time::Duration::from_secs(database_torrent_info_update_interval);
         let mut interval = tokio::time::interval(interval);
         interval.tick().await; // first tick is immediate...
         loop {
             interval.tick().await;
-            if let Some(tracker) = weak_tracker_service.upgrade() {
-                let _ = tracker.update_torrents().await;
+            if let Some(tracker) = weak_tracker_statistics_importer.upgrade() {
+                let _ = tracker.import_all_torrents_statistics().await;
             } else {
                 break;
             }
@@ -105,6 +109,6 @@ pub async fn run(configuration: Configuration) -> Running {
     Running {
         api_server: running_server,
         socket_address,
-        tracker_data_importer_handle,
+        tracker_data_importer_handle: tracker_statistics_importer_handle,
     }
 }

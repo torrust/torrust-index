@@ -100,15 +100,15 @@ pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebA
 
     // update torrent tracker stats
     let _ = app_data
-        .tracker
-        .update_torrent_tracker_stats(torrent_id, &torrent_request.torrent.info_hash())
+        .tracker_statistics_importer
+        .import_torrent_statistics(torrent_id, &torrent_request.torrent.info_hash())
         .await;
 
     // whitelist info hash on tracker
     // code-review: why do we always try to whitelist the torrent on the tracker?
     // shouldn't we only do this if the torrent is in "Listed" mode?
     if let Err(e) = app_data
-        .tracker
+        .tracker_service
         .whitelist_info_hash(torrent_request.torrent.info_hash())
         .await
     {
@@ -146,7 +146,7 @@ pub async fn download_torrent_handler(req: HttpRequest, app_data: WebAppData) ->
     match user {
         Ok(user) => {
             let personal_announce_url = app_data
-                .tracker
+                .tracker_service
                 .get_personal_announce_url(user.user_id)
                 .await
                 .unwrap_or(tracker_url);
@@ -210,7 +210,7 @@ pub async fn get_torrent_handler(req: HttpRequest, app_data: WebAppData) -> Serv
         Ok(user) => {
             // if no user owned tracker key can be found, use default tracker url
             let personal_announce_url = app_data
-                .tracker
+                .tracker_service
                 .get_personal_announce_url(user.user_id)
                 .await
                 .unwrap_or(tracker_url);
@@ -240,8 +240,8 @@ pub async fn get_torrent_handler(req: HttpRequest, app_data: WebAppData) -> Serv
 
     // get realtime seeders and leechers
     if let Ok(torrent_info) = app_data
-        .tracker
-        .get_torrent_info(torrent_response.torrent_id, &torrent_response.info_hash)
+        .tracker_statistics_importer
+        .import_torrent_statistics(torrent_response.torrent_id, &torrent_response.info_hash)
         .await
     {
         torrent_response.seeders = torrent_info.seeders;
@@ -310,7 +310,7 @@ pub async fn delete_torrent_handler(req: HttpRequest, app_data: WebAppData) -> S
 
     // remove info_hash from tracker whitelist
     let _ = app_data
-        .tracker
+        .tracker_service
         .remove_info_hash_from_whitelist(torrent_listing.info_hash)
         .await;
 
