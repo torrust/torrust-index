@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Configuration;
 use crate::errors::ServiceError;
-use crate::utils::clock::current_time;
+use crate::utils::clock;
 
-pub struct MailerService {
+pub struct Service {
     cfg: Arc<Configuration>,
     mailer: Arc<Mailer>,
 }
@@ -30,8 +30,8 @@ struct VerifyTemplate {
     verification_url: String,
 }
 
-impl MailerService {
-    pub async fn new(cfg: Arc<Configuration>) -> MailerService {
+impl Service {
+    pub async fn new(cfg: Arc<Configuration>) -> Service {
         let mailer = Arc::new(Self::get_mailer(&cfg).await);
 
         Self { cfg, mailer }
@@ -57,6 +57,11 @@ impl MailerService {
         }
     }
 
+    /// Send Verification Email
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if unable to send an email.
     pub async fn send_verification_mail(
         &self,
         to: &str,
@@ -96,10 +101,13 @@ impl MailerService {
                     .singlepart(
                         SinglePart::builder()
                             .header(lettre::message::header::ContentType::TEXT_HTML)
-                            .body(ctx.render_once().unwrap()),
+                            .body(
+                                ctx.render_once()
+                                    .expect("value `ctx` must have some internal error passed into it"),
+                            ),
                     ),
             )
-            .unwrap();
+            .expect("the `multipart` builder had an error");
 
         match self.mailer.send(mail).await {
             Ok(_res) => Ok(()),
@@ -129,7 +137,7 @@ impl MailerService {
         let claims = VerifyClaims {
             iss: String::from("email-verification"),
             sub: user_id,
-            exp: current_time() + 315_569_260, // 10 years from now
+            exp: clock::now() + 315_569_260, // 10 years from now
         };
 
         let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(key)).unwrap();

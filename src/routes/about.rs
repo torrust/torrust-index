@@ -3,11 +3,11 @@ use actix_web::{web, HttpResponse, Responder};
 
 use crate::errors::ServiceResult;
 
-pub fn init_routes(cfg: &mut web::ServiceConfig) {
+pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/about")
-            .service(web::resource("").route(web::get().to(get_about)))
-            .service(web::resource("/license").route(web::get().to(get_license))),
+            .service(web::resource("").route(web::get().to(get)))
+            .service(web::resource("/license").route(web::get().to(license))),
     );
 }
 
@@ -29,7 +29,13 @@ const ABOUT: &str = r#"
     </html>
 "#;
 
-pub async fn get_about() -> ServiceResult<impl Responder> {
+/// Get About Section HTML
+///
+/// # Errors
+///
+/// This function will not return an error.
+#[allow(clippy::unused_async)]
+pub async fn get() -> ServiceResult<impl Responder> {
     Ok(HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
         .body(ABOUT))
@@ -63,7 +69,13 @@ const LICENSE: &str = r#"
     </html>
 "#;
 
-pub async fn get_license() -> ServiceResult<impl Responder> {
+/// Get the License in HTML
+///
+/// # Errors
+///
+/// This function will not return an error.
+#[allow(clippy::unused_async)]
+pub async fn license() -> ServiceResult<impl Responder> {
     Ok(HttpResponse::build(StatusCode::OK)
         .content_type("text/html; charset=utf-8")
         .body(LICENSE))

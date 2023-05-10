@@ -15,7 +15,7 @@ use std::env;
 use std::time::SystemTime;
 
 use chrono::prelude::{DateTime, Utc};
-use text_colorizer::*;
+use text_colorizer::Colorize;
 
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::{current_db, migrate_target_database, new_db, reset_target_database};
 use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrers::category_transferrer::transfer_categories;
@@ -67,7 +67,7 @@ fn parse_args() -> Arguments {
     }
 }
 
-pub async fn run_upgrader() {
+pub async fn run() {
     let now = datetime_iso_8601();
     upgrade(&parse_args(), &now).await;
 }
@@ -102,6 +102,7 @@ pub async fn upgrade(args: &Arguments, date_imported: &str) {
 
 /// Current datetime in ISO8601 without time zone.
 /// For example: 2022-11-10 10:35:15
+#[must_use]
 pub fn datetime_iso_8601() -> String {
     let dt: DateTime<Utc> = SystemTime::now().into();
     format!("{}", dt.format("%Y-%m-%d %H:%M:%S"))

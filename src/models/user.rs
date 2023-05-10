@@ -8,12 +8,14 @@ pub struct User {
     pub administrator: bool,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct UserAuthentication {
     pub user_id: i64,
     pub password_hash: String,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct UserProfile {
     pub user_id: i64,
@@ -24,6 +26,7 @@ pub struct UserProfile {
     pub avatar: String,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct UserCompact {
     pub user_id: i64,
@@ -31,6 +34,7 @@ pub struct UserCompact {
     pub administrator: bool,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct UserFull {
     pub user_id: i64,
@@ -44,6 +48,7 @@ pub struct UserFull {
     pub avatar: String,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UserClaims {
     pub user: UserCompact,

@@ -41,8 +41,8 @@ impl TorrentTester {
             "
                 .to_string(),
             ),
-            upload_date: 1667546358, // 2022-11-04 07:19:18
-            file_size: 9219566,
+            upload_date: 1_667_546_358, // 2022-11-04 07:19:18
+            file_size: 9_219_566,
             seeders: 0,
             leechers: 0,
         };
@@ -61,8 +61,8 @@ impl TorrentTester {
                     "
                 .to_string(),
             ),
-            upload_date: 1667546358, // 2022-11-04 07:19:18
-            file_size: 9219566,
+            upload_date: 1_667_546_358, // 2022-11-04 07:19:18
+            file_size: 9_219_566,
             seeders: 0,
             leechers: 0,
         };
@@ -77,26 +77,28 @@ impl TorrentTester {
         }
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub async fn load_data_into_source_db(&self) {
         for torrent in &self.test_data.torrents {
-            self.source_database.insert_torrent(&torrent).await.unwrap();
+            self.source_database.insert_torrent(torrent).await.unwrap();
         }
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub async fn assert_data_in_target_db(&self, upload_path: &str) {
         for torrent in &self.test_data.torrents {
-            let filepath = self.torrent_file_path(upload_path, torrent.torrent_id);
+            let filepath = Self::torrent_file_path(upload_path, torrent.torrent_id);
 
             let torrent_file = read_torrent_from_file(&filepath).unwrap();
 
-            self.assert_torrent(&torrent, &torrent_file).await;
-            self.assert_torrent_info(&torrent).await;
-            self.assert_torrent_announce_urls(&torrent, &torrent_file).await;
-            self.assert_torrent_files(&torrent, &torrent_file).await;
+            self.assert_torrent(torrent, &torrent_file).await;
+            self.assert_torrent_info(torrent).await;
+            self.assert_torrent_announce_urls(torrent, &torrent_file).await;
+            self.assert_torrent_files(torrent, &torrent_file).await;
         }
     }
 
-    pub fn torrent_file_path(&self, upload_path: &str, torrent_id: i64) -> String {
+    pub fn torrent_file_path(upload_path: &str, torrent_id: i64) -> String {
         format!("{}/{}.torrent", &upload_path, &torrent_id)
     }
 

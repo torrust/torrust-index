@@ -6,7 +6,7 @@ use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
 use derive_more::{Display, Error};
 use serde::{Deserialize, Serialize};
 
-use crate::databases::database::DatabaseError;
+use crate::databases::database;
 
 pub type ServiceResult<V> = Result<V, ServiceError>;
 
@@ -131,6 +131,7 @@ pub struct ErrorToResponse {
 
 impl ResponseError for ServiceError {
     fn status_code(&self) -> StatusCode {
+        #[allow(clippy::match_same_arms)]
         match self {
             ServiceError::ClosedForRegistration => StatusCode::FORBIDDEN,
             ServiceError::EmailInvalid => StatusCode::BAD_REQUEST,
@@ -139,47 +140,34 @@ impl ResponseError for ServiceError {
             ServiceError::UsernameNotFound => StatusCode::NOT_FOUND,
             ServiceError::UserNotFound => StatusCode::NOT_FOUND,
             ServiceError::AccountNotFound => StatusCode::NOT_FOUND,
-
             ServiceError::ProfanityError => StatusCode::BAD_REQUEST,
             ServiceError::BlacklistError => StatusCode::BAD_REQUEST,
             ServiceError::UsernameCaseMappedError => StatusCode::BAD_REQUEST,
-
             ServiceError::PasswordTooShort => StatusCode::BAD_REQUEST,
             ServiceError::PasswordTooLong => StatusCode::BAD_REQUEST,
             ServiceError::PasswordsDontMatch => StatusCode::BAD_REQUEST,
-
             ServiceError::UsernameTaken => StatusCode::BAD_REQUEST,
             ServiceError::UsernameInvalid => StatusCode::BAD_REQUEST,
             ServiceError::EmailTaken => StatusCode::BAD_REQUEST,
             ServiceError::EmailNotVerified => StatusCode::FORBIDDEN,
-
             ServiceError::TokenNotFound => StatusCode::UNAUTHORIZED,
             ServiceError::TokenExpired => StatusCode::UNAUTHORIZED,
             ServiceError::TokenInvalid => StatusCode::UNAUTHORIZED,
-
             ServiceError::TorrentNotFound => StatusCode::BAD_REQUEST,
-
             ServiceError::InvalidTorrentFile => StatusCode::BAD_REQUEST,
             ServiceError::InvalidTorrentPiecesLength => StatusCode::BAD_REQUEST,
             ServiceError::InvalidFileType => StatusCode::BAD_REQUEST,
-
             ServiceError::BadRequest => StatusCode::BAD_REQUEST,
-
             ServiceError::InvalidCategory => StatusCode::BAD_REQUEST,
-
             ServiceError::Unauthorized => StatusCode::FORBIDDEN,
-
             ServiceError::InfoHashAlreadyExists => StatusCode::BAD_REQUEST,
-
             ServiceError::TorrentTitleAlreadyExists => StatusCode::BAD_REQUEST,
-
             ServiceError::TrackerOffline => StatusCode::INTERNAL_SERVER_ERROR,
-
-            ServiceError::WhitelistingError => StatusCode::INTERNAL_SERVER_ERROR,
-
             ServiceError::CategoryExists => StatusCode::BAD_REQUEST,
-
-            _ => StatusCode::INTERNAL_SERVER_ERROR,
+            ServiceError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
+            ServiceError::EmailMissing => StatusCode::NOT_FOUND,
+            ServiceError::FailedToSendVerificationEmail => StatusCode::INTERNAL_SERVER_ERROR,
+            ServiceError::WhitelistingError => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
@@ -192,7 +180,7 @@ impl ResponseError for ServiceError {
 
 impl From<sqlx::Error> for ServiceError {
     fn from(e: sqlx::Error) -> Self {
-        eprintln!("{:?}", e);
+        eprintln!("{e:?}");
 
         if let Some(err) = e.as_database_error() {
             return if err.code() == Some(Cow::from("2067")) {
@@ -210,47 +198,48 @@ impl From<sqlx::Error> for ServiceError {
     }
 }
 
-impl From<DatabaseError> for ServiceError {
-    fn from(e: DatabaseError) -> Self {
+impl From<database::Error> for ServiceError {
+    fn from(e: database::Error) -> Self {
+        #[allow(clippy::match_same_arms)]
         match e {
-            DatabaseError::Error => ServiceError::InternalServerError,
-            DatabaseError::UsernameTaken => ServiceError::UsernameTaken,
-            DatabaseError::EmailTaken => ServiceError::EmailTaken,
-            DatabaseError::UserNotFound => ServiceError::UserNotFound,
-            DatabaseError::CategoryAlreadyExists => ServiceError::CategoryExists,
-            DatabaseError::CategoryNotFound => ServiceError::InvalidCategory,
-            DatabaseError::TorrentNotFound => ServiceError::TorrentNotFound,
-            DatabaseError::TorrentAlreadyExists => ServiceError::InfoHashAlreadyExists,
-            DatabaseError::TorrentTitleAlreadyExists => ServiceError::TorrentTitleAlreadyExists,
-            DatabaseError::UnrecognizedDatabaseDriver => ServiceError::InternalServerError,
+            database::Error::Error => ServiceError::InternalServerError,
+            database::Error::UsernameTaken => ServiceError::UsernameTaken,
+            database::Error::EmailTaken => ServiceError::EmailTaken,
+            database::Error::UserNotFound => ServiceError::UserNotFound,
+            database::Error::CategoryAlreadyExists => ServiceError::CategoryExists,
+            database::Error::CategoryNotFound => ServiceError::InvalidCategory,
+            database::Error::TorrentNotFound => ServiceError::TorrentNotFound,
+            database::Error::TorrentAlreadyExists => ServiceError::InfoHashAlreadyExists,
+            database::Error::TorrentTitleAlreadyExists => ServiceError::TorrentTitleAlreadyExists,
+            database::Error::UnrecognizedDatabaseDriver => ServiceError::InternalServerError,
         }
     }
 }
 
 impl From<argon2::password_hash::Error> for ServiceError {
     fn from(e: argon2::password_hash::Error) -> Self {
-        eprintln!("{}", e);
+        eprintln!("{e}");
         ServiceError::InternalServerError
     }
 }
 
 impl From<std::io::Error> for ServiceError {
     fn from(e: std::io::Error) -> Self {
-        eprintln!("{}", e);
+        eprintln!("{e}");
         ServiceError::InternalServerError
     }
 }
 
 impl From<Box<dyn error::Error>> for ServiceError {
     fn from(e: Box<dyn error::Error>) -> Self {
-        eprintln!("{}", e);
+        eprintln!("{e}");
         ServiceError::InternalServerError
     }
 }
 
 impl From<serde_json::Error> for ServiceError {
     fn from(e: serde_json::Error) -> Self {
-        eprintln!("{}", e);
+        eprintln!("{e}");
         ServiceError::InternalServerError
     }
 }

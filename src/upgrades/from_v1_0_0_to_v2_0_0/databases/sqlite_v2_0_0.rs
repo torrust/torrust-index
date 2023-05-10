@@ -1,10 +1,12 @@
+#![allow(clippy::missing_errors_doc)]
+
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqlitePoolOptions, SqliteQueryResult};
 use sqlx::{query, query_as, SqlitePool};
 
 use super::sqlite_v1_0_0::{TorrentRecordV1, UserRecordV1};
-use crate::databases::database::DatabaseError;
+use crate::databases::database;
 use crate::models::torrent_file::{TorrentFile, TorrentInfo};
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -79,21 +81,21 @@ impl SqliteDatabaseV2_0_0 {
             .expect("Could not run database migrations.");
     }
 
-    pub async fn reset_categories_sequence(&self) -> Result<SqliteQueryResult, DatabaseError> {
+    pub async fn reset_categories_sequence(&self) -> Result<SqliteQueryResult, database::Error> {
         query("DELETE FROM `sqlite_sequence` WHERE `name` = 'torrust_categories'")
             .execute(&self.pool)
             .await
-            .map_err(|_| DatabaseError::Error)
+            .map_err(|_| database::Error::Error)
     }
 
-    pub async fn get_categories(&self) -> Result<Vec<CategoryRecordV2>, DatabaseError> {
+    pub async fn get_categories(&self) -> Result<Vec<CategoryRecordV2>, database::Error> {
         query_as::<_, CategoryRecordV2>("SELECT tc.category_id, tc.name, COUNT(tt.category_id) as num_torrents FROM torrust_categories tc LEFT JOIN torrust_torrents tt on tc.category_id = tt.category_id GROUP BY tc.name")
             .fetch_all(&self.pool)
             .await
-            .map_err(|_| DatabaseError::Error)
+            .map_err(|_| database::Error::Error)
     }
 
-    pub async fn insert_category_and_get_id(&self, category_name: &str) -> Result<i64, DatabaseError> {
+    pub async fn insert_category_and_get_id(&self, category_name: &str) -> Result<i64, database::Error> {
         query("INSERT INTO torrust_categories (name) VALUES (?)")
             .bind(category_name)
             .execute(&self.pool)
@@ -102,12 +104,12 @@ impl SqliteDatabaseV2_0_0 {
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
                     if err.message().contains("UNIQUE") {
-                        DatabaseError::CategoryAlreadyExists
+                        database::Error::CategoryAlreadyExists
                     } else {
-                        DatabaseError::Error
+                        database::Error::Error
                     }
                 }
-                _ => DatabaseError::Error,
+                _ => database::Error::Error,
             })
     }
 
@@ -257,7 +259,8 @@ impl SqliteDatabaseV2_0_0 {
             .map(|v| v.last_insert_rowid())
     }
 
-    pub async fn delete_all_database_rows(&self) -> Result<(), DatabaseError> {
+    #[allow(clippy::missing_panics_doc)]
+    pub async fn delete_all_database_rows(&self) -> Result<(), database::Error> {
         query("DELETE FROM torrust_categories").execute(&self.pool).await.unwrap();
 
         query("DELETE FROM torrust_torrents").execute(&self.pool).await.unwrap();

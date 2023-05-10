@@ -21,7 +21,7 @@ impl TrackerKeyTester {
             key_id: 1,
             user_id,
             key: "rRstSTM5rx0sgxjLkRSJf3rXODcRBI5T".to_string(),
-            valid_until: 2456956800, // 11-10-2047 00:00:00 UTC
+            valid_until: 2_456_956_800, // 11-10-2047 00:00:00 UTC
         };
 
         Self {
@@ -31,6 +31,7 @@ impl TrackerKeyTester {
         }
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub async fn load_data_into_source_db(&self) {
         self.source_database
             .insert_tracker_key(&self.test_data.tracker_key)
@@ -38,6 +39,7 @@ impl TrackerKeyTester {
             .unwrap();
     }
 
+    #[allow(clippy::missing_panics_doc)]
     /// Table `torrust_tracker_keys`
     pub async fn assert_data_in_target_db(&self) {
         let imported_key = self

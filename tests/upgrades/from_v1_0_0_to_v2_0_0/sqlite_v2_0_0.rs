@@ -1,3 +1,5 @@
+#![allow(clippy::missing_errors_doc)]
+
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{query_as, SqlitePool};

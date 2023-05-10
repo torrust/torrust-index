@@ -26,7 +26,7 @@ const ERROR_IMAGE_TOO_BIG_TEXT: &str = "Image is too big.";
 const ERROR_IMAGE_USER_QUOTA_MET_TEXT: &str = "Image proxy quota met.";
 const ERROR_IMAGE_UNAUTHENTICATED_TEXT: &str = "Sign in to see image.";
 
-pub fn init_routes(cfg: &mut web::ServiceConfig) {
+pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(web::scope("/proxy").service(web::resource("/image/{url}").route(web::get().to(get_proxy_image))));
 
     load_error_images();
@@ -53,6 +53,11 @@ fn load_error_images() {
     });
 }
 
+/// Get the proxy image.
+///
+/// # Errors
+///
+/// This function will return `Ok` only for now.
 pub async fn get_proxy_image(req: HttpRequest, app_data: WebAppData, path: web::Path<String>) -> ServiceResult<impl Responder> {
     // Check for optional user.
     let opt_user = app_data.auth.get_user_compact_from_request(&req).await.ok();

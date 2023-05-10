@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
-use crate::databases::mysql::MysqlDatabase;
-use crate::databases::sqlite::SqliteDatabase;
+use crate::databases::mysql::Mysql;
+use crate::databases::sqlite::Sqlite;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
@@ -13,7 +13,7 @@ use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
 
 /// Database drivers.
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
-pub enum DatabaseDriver {
+pub enum Driver {
     Sqlite3,
     Mysql,
 }
@@ -50,7 +50,7 @@ pub enum Sorting {
 
 /// Database errors.
 #[derive(Debug)]
-pub enum DatabaseError {
+pub enum Error {
     Error,
     UnrecognizedDatabaseDriver, // when the db path does not start with sqlite or mysql
     UsernameTaken,
@@ -63,77 +63,93 @@ pub enum DatabaseError {
     TorrentTitleAlreadyExists,
 }
 
-/// Connect to a database.
-pub async fn connect_database(db_path: &str) -> Result<Box<dyn Database>, DatabaseError> {
+/// Get the Driver of the Database from the Connection String
+///
+/// # Errors
+///
+/// This function will return an `Error::UnrecognizedDatabaseDriver` if unable to match database type.
+pub fn get_driver(db_path: &str) -> Result<Driver, Error> {
     match &db_path.chars().collect::<Vec<char>>() as &[char] {
-        ['s', 'q', 'l', 'i', 't', 'e', ..] => {
-            let db = SqliteDatabase::new(db_path).await;
-            Ok(Box::new(db))
-        }
-        ['m', 'y', 's', 'q', 'l', ..] => {
-            let db = MysqlDatabase::new(db_path).await;
-            Ok(Box::new(db))
-        }
-        _ => Err(DatabaseError::UnrecognizedDatabaseDriver),
+        ['s', 'q', 'l', 'i', 't', 'e', ..] => Ok(Driver::Sqlite3),
+        ['m', 'y', 's', 'q', 'l', ..] => Ok(Driver::Mysql),
+        _ => Err(Error::UnrecognizedDatabaseDriver),
     }
+}
+
+/// Connect to a database.
+///
+/// # Errors
+///
+/// This function will return an `Error::UnrecognizedDatabaseDriver` if unable to match database type.
+pub async fn connect(db_path: &str) -> Result<Box<dyn Database>, Error> {
+    let db_driver = self::get_driver(db_path)?;
+
+    Ok(match db_driver {
+        self::Driver::Sqlite3 => Box::new(Sqlite::new(db_path).await),
+        self::Driver::Mysql => Box::new(Mysql::new(db_path).await),
+    })
 }
 
 /// Trait for database implementations.
 #[async_trait]
 pub trait Database: Sync + Send {
     /// Return current database driver.
-    fn get_database_driver(&self) -> DatabaseDriver;
+    fn get_database_driver(&self) -> Driver;
+
+    async fn new(db_path: &str) -> Self
+    where
+        Self: Sized;
 
     /// Add new user and return the newly inserted `user_id`.
-    async fn insert_user_and_get_id(&self, username: &str, email: &str, password: &str) -> Result<i64, DatabaseError>;
+    async fn insert_user_and_get_id(&self, username: &str, email: &str, password: &str) -> Result<i64, Error>;
 
     /// Get `User` from `user_id`.
-    async fn get_user_from_id(&self, user_id: i64) -> Result<User, DatabaseError>;
+    async fn get_user_from_id(&self, user_id: i64) -> Result<User, Error>;
 
     /// Get `UserAuthentication` from `user_id`.
-    async fn get_user_authentication_from_id(&self, user_id: i64) -> Result<UserAuthentication, DatabaseError>;
+    async fn get_user_authentication_from_id(&self, user_id: i64) -> Result<UserAuthentication, Error>;
 
     /// Get `UserProfile` from `username`.
-    async fn get_user_profile_from_username(&self, username: &str) -> Result<UserProfile, DatabaseError>;
+    async fn get_user_profile_from_username(&self, username: &str) -> Result<UserProfile, Error>;
 
     /// Get `UserCompact` from `user_id`.
-    async fn get_user_compact_from_id(&self, user_id: i64) -> Result<UserCompact, DatabaseError>;
+    async fn get_user_compact_from_id(&self, user_id: i64) -> Result<UserCompact, Error>;
 
     /// Get a user's `TrackerKey`.
     async fn get_user_tracker_key(&self, user_id: i64) -> Option<TrackerKey>;
 
     /// Get total user count.
-    async fn count_users(&self) -> Result<i64, DatabaseError>;
+    async fn count_users(&self) -> Result<i64, Error>;
 
     /// Ban user with `user_id`, `reason` and `date_expiry`.
-    async fn ban_user(&self, user_id: i64, reason: &str, date_expiry: NaiveDateTime) -> Result<(), DatabaseError>;
+    async fn ban_user(&self, user_id: i64, reason: &str, date_expiry: NaiveDateTime) -> Result<(), Error>;
 
     /// Grant a user the administrator role.
-    async fn grant_admin_role(&self, user_id: i64) -> Result<(), DatabaseError>;
+    async fn grant_admin_role(&self, user_id: i64) -> Result<(), Error>;
 
     /// Verify a user's email with `user_id`.
-    async fn verify_email(&self, user_id: i64) -> Result<(), DatabaseError>;
+    async fn verify_email(&self, user_id: i64) -> Result<(), Error>;
 
     /// Link a `TrackerKey` to a certain user with `user_id`.
-    async fn add_tracker_key(&self, user_id: i64, tracker_key: &TrackerKey) -> Result<(), DatabaseError>;
+    async fn add_tracker_key(&self, user_id: i64, tracker_key: &TrackerKey) -> Result<(), Error>;
 
     /// Delete user and all related user data with `user_id`.
-    async fn delete_user(&self, user_id: i64) -> Result<(), DatabaseError>;
+    async fn delete_user(&self, user_id: i64) -> Result<(), Error>;
 
     /// Add a new category and return `category_id`.
-    async fn insert_category_and_get_id(&self, category_name: &str) -> Result<i64, DatabaseError>;
+    async fn insert_category_and_get_id(&self, category_name: &str) -> Result<i64, Error>;
 
     /// Get `Category` from `category_id`.
-    async fn get_category_from_id(&self, category_id: i64) -> Result<Category, DatabaseError>;
+    async fn get_category_from_id(&self, category_id: i64) -> Result<Category, Error>;
 
     /// Get `Category` from `category_name`.
-    async fn get_category_from_name(&self, category_name: &str) -> Result<Category, DatabaseError>;
+    async fn get_category_from_name(&self, category_name: &str) -> Result<Category, Error>;
 
     /// Get all categories as `Vec<Category>`.
-    async fn get_categories(&self) -> Result<Vec<Category>, DatabaseError>;
+    async fn get_categories(&self) -> Result<Vec<Category>, Error>;
 
     /// Delete category with `category_name`.
-    async fn delete_category(&self, category_name: &str) -> Result<(), DatabaseError>;
+    async fn delete_category(&self, category_name: &str) -> Result<(), Error>;
 
     /// Get results of a torrent search in a paginated and sorted form as `TorrentsResponse` from `search`, `categories`, `sort`, `offset` and `page_size`.
     async fn get_torrents_search_sorted_paginated(
@@ -143,7 +159,7 @@ pub trait Database: Sync + Send {
         sort: &Sorting,
         offset: u64,
         page_size: u8,
-    ) -> Result<TorrentsResponse, DatabaseError>;
+    ) -> Result<TorrentsResponse, Error>;
 
     /// Add new torrent and return the newly inserted `torrent_id` with `torrent`, `uploader_id`, `category_id`, `title` and `description`.
     async fn insert_torrent_and_get_id(
@@ -153,10 +169,10 @@ pub trait Database: Sync + Send {
         category_id: i64,
         title: &str,
         description: &str,
-    ) -> Result<i64, DatabaseError>;
+    ) -> Result<i64, Error>;
 
     /// Get `Torrent` from `InfoHash`.
-    async fn get_torrent_from_infohash(&self, infohash: &InfoHash) -> Result<Torrent, DatabaseError> {
+    async fn get_torrent_from_infohash(&self, infohash: &InfoHash) -> Result<Torrent, Error> {
         let torrent_info = self.get_torrent_info_from_infohash(infohash).await?;
 
         let torrent_files = self.get_torrent_files_from_id(torrent_info.torrent_id).await?;
@@ -171,7 +187,7 @@ pub trait Database: Sync + Send {
     }
 
     /// Get `Torrent` from `torrent_id`.
-    async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<Torrent, DatabaseError> {
+    async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<Torrent, Error> {
         let torrent_info = self.get_torrent_info_from_id(torrent_id).await?;
 
         let torrent_files = self.get_torrent_files_from_id(torrent_id).await?;
@@ -186,44 +202,38 @@ pub trait Database: Sync + Send {
     }
 
     /// Get torrent's info as `DbTorrentInfo` from `torrent_id`.
-    async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, DatabaseError>;
+    async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, Error>;
 
     /// Get torrent's info as `DbTorrentInfo` from torrent `InfoHash`.
-    async fn get_torrent_info_from_infohash(&self, info_hash: &InfoHash) -> Result<DbTorrentInfo, DatabaseError>;
+    async fn get_torrent_info_from_infohash(&self, info_hash: &InfoHash) -> Result<DbTorrentInfo, Error>;
 
     /// Get all torrent's files as `Vec<TorrentFile>` from `torrent_id`.
-    async fn get_torrent_files_from_id(&self, torrent_id: i64) -> Result<Vec<TorrentFile>, DatabaseError>;
+    async fn get_torrent_files_from_id(&self, torrent_id: i64) -> Result<Vec<TorrentFile>, Error>;
 
     /// Get all torrent's announce urls as `Vec<Vec<String>>` from `torrent_id`.
-    async fn get_torrent_announce_urls_from_id(&self, torrent_id: i64) -> Result<Vec<Vec<String>>, DatabaseError>;
+    async fn get_torrent_announce_urls_from_id(&self, torrent_id: i64) -> Result<Vec<Vec<String>>, Error>;
 
     /// Get `TorrentListing` from `torrent_id`.
-    async fn get_torrent_listing_from_id(&self, torrent_id: i64) -> Result<TorrentListing, DatabaseError>;
+    async fn get_torrent_listing_from_id(&self, torrent_id: i64) -> Result<TorrentListing, Error>;
 
     /// Get `TorrentListing` from `InfoHash`.
-    async fn get_torrent_listing_from_infohash(&self, infohash: &InfoHash) -> Result<TorrentListing, DatabaseError>;
+    async fn get_torrent_listing_from_infohash(&self, infohash: &InfoHash) -> Result<TorrentListing, Error>;
 
     /// Get all torrents as `Vec<TorrentCompact>`.
-    async fn get_all_torrents_compact(&self) -> Result<Vec<TorrentCompact>, DatabaseError>;
+    async fn get_all_torrents_compact(&self) -> Result<Vec<TorrentCompact>, Error>;
 
     /// Update a torrent's title with `torrent_id` and `title`.
-    async fn update_torrent_title(&self, torrent_id: i64, title: &str) -> Result<(), DatabaseError>;
+    async fn update_torrent_title(&self, torrent_id: i64, title: &str) -> Result<(), Error>;
 
     /// Update a torrent's description with `torrent_id` and `description`.
-    async fn update_torrent_description(&self, torrent_id: i64, description: &str) -> Result<(), DatabaseError>;
+    async fn update_torrent_description(&self, torrent_id: i64, description: &str) -> Result<(), Error>;
 
     /// Update the seeders and leechers info for a torrent with `torrent_id`, `tracker_url`, `seeders` and `leechers`.
-    async fn update_tracker_info(
-        &self,
-        torrent_id: i64,
-        tracker_url: &str,
-        seeders: i64,
-        leechers: i64,
-    ) -> Result<(), DatabaseError>;
+    async fn update_tracker_info(&self, torrent_id: i64, tracker_url: &str, seeders: i64, leechers: i64) -> Result<(), Error>;
 
     /// Delete a torrent with `torrent_id`.
-    async fn delete_torrent(&self, torrent_id: i64) -> Result<(), DatabaseError>;
+    async fn delete_torrent(&self, torrent_id: i64) -> Result<(), Error>;
 
     /// DELETES ALL DATABASE ROWS, ONLY CALL THIS IF YOU KNOW WHAT YOU'RE DOING!
-    async fn delete_all_database_rows(&self) -> Result<(), DatabaseError>;
+    async fn delete_all_database_rows(&self) -> Result<(), Error>;
 }

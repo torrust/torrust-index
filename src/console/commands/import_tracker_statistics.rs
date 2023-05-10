@@ -4,11 +4,11 @@ use std::env;
 use std::sync::Arc;
 
 use derive_more::{Display, Error};
-use text_colorizer::*;
+use text_colorizer::Colorize;
 
 use crate::bootstrap::config::init_configuration;
 use crate::bootstrap::logging;
-use crate::databases::database::connect_database;
+use crate::databases::database;
 use crate::tracker::service::Service;
 use crate::tracker::statistics_importer::StatisticsImporter;
 
@@ -53,9 +53,14 @@ fn print_usage() {
 }
 
 pub async fn run_importer() {
-    import(&parse_args().unwrap()).await;
+    import(&parse_args().expect("unable to parse command arguments")).await;
 }
 
+/// Import Command Arguments
+///
+/// # Panics
+///
+/// Panics if `Configuration::load_from_file` has any error.
 pub async fn import(_args: &Arguments) {
     println!("Importing statistics from linked tracker ...");
 
@@ -72,14 +77,17 @@ pub async fn import(_args: &Arguments) {
     eprintln!("Tracker url: {}", tracker_url.green());
 
     let database = Arc::new(
-        connect_database(&settings.database.connect_url)
+        database::connect(&settings.database.connect_url)
             .await
-            .expect("Database error."),
+            .expect("unable to connect to db"),
     );
 
     let tracker_service = Arc::new(Service::new(cfg.clone(), database.clone()).await);
     let tracker_statistics_importer =
         Arc::new(StatisticsImporter::new(cfg.clone(), tracker_service.clone(), database.clone()).await);
 
-    tracker_statistics_importer.import_all_torrents_statistics().await.unwrap();
+    tracker_statistics_importer
+        .import_all_torrents_statistics()
+        .await
+        .expect("variable `tracker_service` is unable to `update_torrents`");
 }

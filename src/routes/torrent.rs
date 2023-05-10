@@ -17,45 +17,50 @@ use crate::models::torrent::TorrentRequest;
 use crate::utils::parse_torrent;
 use crate::AsCSV;
 
-pub fn init_routes(cfg: &mut web::ServiceConfig) {
+pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/torrent")
-            .service(web::resource("/upload").route(web::post().to(upload_torrent)))
+            .service(web::resource("/upload").route(web::post().to(upload)))
             .service(web::resource("/download/{info_hash}").route(web::get().to(download_torrent_handler)))
             .service(
                 web::resource("/{info_hash}")
-                    .route(web::get().to(get_torrent_handler))
-                    .route(web::put().to(update_torrent_handler))
-                    .route(web::delete().to(delete_torrent_handler)),
+                    .route(web::get().to(get))
+                    .route(web::put().to(update))
+                    .route(web::delete().to(delete)),
             ),
     );
     cfg.service(web::scope("/torrents").service(web::resource("").route(web::get().to(get_torrents_handler))));
 }
 
 #[derive(FromRow)]
-pub struct TorrentCount {
+pub struct Count {
     pub count: i32,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CreateTorrent {
+pub struct Create {
     pub title: String,
     pub description: String,
     pub category: String,
 }
 
-impl CreateTorrent {
+impl Create {
+    /// Returns the verify of this [`Create`].
+    ///
+    /// # Errors
+    ///
+    /// This function will return an `BadRequest` error if the `title` or the `category` is empty.
     pub fn verify(&self) -> Result<(), ServiceError> {
-        if !self.title.is_empty() && !self.category.is_empty() {
-            return Ok(());
+        if self.title.is_empty() || self.category.is_empty() {
+            Err(ServiceError::BadRequest)
+        } else {
+            Ok(())
         }
-
-        Err(ServiceError::BadRequest)
     }
 }
 
 #[derive(Debug, Deserialize)]
-pub struct TorrentSearch {
+pub struct Search {
     page_size: Option<u8>,
     page: Option<u32>,
     sort: Option<Sorting>,
@@ -65,12 +70,21 @@ pub struct TorrentSearch {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct TorrentUpdate {
+pub struct Update {
     title: Option<String>,
     description: Option<String>,
 }
 
-pub async fn upload_torrent(req: HttpRequest, payload: Multipart, app_data: WebAppData) -> ServiceResult<impl Responder> {
+/// Upload a Torrent to the Index
+///
+/// # Errors
+///
+/// This function will return an error if unable to get the user from the database.
+/// This function will return an error if unable to get torrent request from payload.
+/// This function will return an error if unable to get the category from the database.
+/// This function will return an error if unable to insert the torrent into the database.
+/// This function will return an error if unable to add the torrent to the whitelist.
+pub async fn upload(req: HttpRequest, payload: Multipart, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let user = app_data.auth.get_user_compact_from_request(&req).await?;
 
     // get torrent and fields from request
@@ -166,7 +180,17 @@ pub async fn download_torrent_handler(req: HttpRequest, app_data: WebAppData) ->
     Ok(HttpResponse::Ok().content_type("application/x-bittorrent").body(buffer))
 }
 
-pub async fn get_torrent_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+/// Get Torrent from the Index
+///
+/// # Errors
+///
+/// This function will return an error if unable to get torrent ID.
+/// This function will return an error if unable to get torrent listing from id.
+/// This function will return an error if unable to get torrent category from id.
+/// This function will return an error if unable to get torrent files from id.
+/// This function will return an error if unable to get torrent info from id.
+/// This function will return an error if unable to get torrent announce url(s) from id.
+pub async fn get(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
     // optional
     let user = app_data.auth.get_user_compact_from_request(&req).await;
 
@@ -251,11 +275,16 @@ pub async fn get_torrent_handler(req: HttpRequest, app_data: WebAppData) -> Serv
     Ok(HttpResponse::Ok().json(OkResponse { data: torrent_response }))
 }
 
-pub async fn update_torrent_handler(
-    req: HttpRequest,
-    payload: web::Json<TorrentUpdate>,
-    app_data: WebAppData,
-) -> ServiceResult<impl Responder> {
+/// Update a Torrent in the Index
+///
+/// # Errors
+///
+/// This function will return an error if unable to get user.
+/// This function will return an error if unable to get torrent id from request.
+/// This function will return an error if unable to get listing from id.
+/// This function will return an `ServiceError::Unauthorized` if user is not a owner or an administrator.
+/// This function will return an error if unable to update the torrent tile or description.
+pub async fn update(req: HttpRequest, payload: web::Json<Update>, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let user = app_data.auth.get_user_compact_from_request(&req).await?;
 
     let infohash = get_torrent_infohash_from_request(&req)?;
@@ -293,7 +322,15 @@ pub async fn update_torrent_handler(
     Ok(HttpResponse::Ok().json(OkResponse { data: torrent_response }))
 }
 
-pub async fn delete_torrent_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+/// Delete a Torrent from the Index
+///
+/// # Errors
+///
+/// This function will return an error if unable to get the user.
+/// This function will return an `ServiceError::Unauthorized` if the user is not an administrator.
+/// This function will return an error if unable to get the torrent listing from it's ID.
+/// This function will return an error if unable to delete the torrent from the database.
+pub async fn delete(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let user = app_data.auth.get_user_compact_from_request(&req).await?;
 
     // check if user is administrator
@@ -327,7 +364,7 @@ pub async fn delete_torrent_handler(req: HttpRequest, app_data: WebAppData) -> S
 /// # Errors
 ///
 /// Returns a `ServiceError::DatabaseError` if the database query fails.
-pub async fn get_torrents_handler(params: Query<TorrentSearch>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+pub async fn get_torrents_handler(params: Query<Search>, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let settings = app_data.cfg.settings.read().await;
 
     let sort = params.sort.unwrap_or(Sorting::UploadedDesc);
@@ -370,9 +407,9 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
     let torrent_buffer = vec![0u8];
     let mut torrent_cursor = Cursor::new(torrent_buffer);
 
-    let mut title = "".to_string();
-    let mut description = "".to_string();
-    let mut category = "".to_string();
+    let mut title = String::new();
+    let mut description = String::new();
+    let mut category = String::new();
 
     while let Ok(Some(mut field)) = payload.try_next().await {
         match field.content_disposition().get_name().unwrap() {
@@ -405,7 +442,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
         }
     }
 
-    let fields = CreateTorrent {
+    let fields = Create {
         title,
         description,
         category,
@@ -413,7 +450,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
 
     fields.verify()?;
 
-    let position = torrent_cursor.position() as usize;
+    let position = usize::try_from(torrent_cursor.position()).map_err(|_| ServiceError::InvalidTorrentFile)?;
     let inner = torrent_cursor.get_ref();
 
     let torrent = parse_torrent::decode_torrent(&inner[..position]).map_err(|_| ServiceError::InvalidTorrentFile)?;

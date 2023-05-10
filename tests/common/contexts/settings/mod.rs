@@ -3,9 +3,8 @@ pub mod responses;
 
 use serde::{Deserialize, Serialize};
 use torrust_index_backend::config::{
-    Api as DomainApi, AppConfiguration as DomainSettings, Auth as DomainAuth, Database as DomainDatabase,
-    ImageCache as DomainImageCache, Mail as DomainMail, Network as DomainNetwork, Tracker as DomainTracker,
-    Website as DomainWebsite,
+    Api as DomainApi, Auth as DomainAuth, Database as DomainDatabase, ImageCache as DomainImageCache, Mail as DomainMail,
+    Network as DomainNetwork, TorrustBackend as DomainSettings, Tracker as DomainTracker, Website as DomainWebsite,
 };
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]

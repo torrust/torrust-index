@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
 
+#[allow(clippy::missing_panics_doc)]
 pub async fn transfer_users(
     source_database: Arc<SqliteDatabaseV1_0_0>,
     target_database: Arc<SqliteDatabaseV2_0_0>,
@@ -27,9 +28,11 @@ pub async fn transfer_users(
             .await
             .unwrap();
 
-        if id != user.user_id {
-            panic!("Error copying user {:?} from source DB to the target DB", &user.user_id);
-        }
+        assert!(
+            id == user.user_id,
+            "Error copying user {:?} from source DB to the target DB",
+            &user.user_id
+        );
 
         println!("[v2][torrust_users] user: {:?} {:?} added.", &user.user_id, &user.username);
 

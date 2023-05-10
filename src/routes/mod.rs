@@ -8,12 +8,12 @@ pub mod settings;
 pub mod torrent;
 pub mod user;
 
-pub fn init_routes(cfg: &mut web::ServiceConfig) {
-    user::init_routes(cfg);
-    torrent::init_routes(cfg);
-    category::init_routes(cfg);
-    settings::init_routes(cfg);
-    about::init_routes(cfg);
-    proxy::init_routes(cfg);
-    root::init_routes(cfg);
+pub fn init(cfg: &mut web::ServiceConfig) {
+    user::init(cfg);
+    torrent::init(cfg);
+    category::init(cfg);
+    settings::init(cfg);
+    about::init(cfg);
+    proxy::init(cfg);
+    root::init(cfg);
 }

@@ -4,7 +4,7 @@ use log::{error, info};
 
 use super::service::{Service, TorrentInfo};
 use crate::config::Configuration;
-use crate::databases::database::{Database, DatabaseError};
+use crate::databases::database::{self, Database};
 use crate::errors::ServiceError;
 
 pub struct StatisticsImporter {
@@ -30,7 +30,7 @@ impl StatisticsImporter {
     /// # Errors
     ///
     /// Will return an error if the database query failed.
-    pub async fn import_all_torrents_statistics(&self) -> Result<(), DatabaseError> {
+    pub async fn import_all_torrents_statistics(&self) -> Result<(), database::Error> {
         info!("Importing torrents statistics from tracker ...");
         let torrents = self.database.get_all_torrents_compact().await?;
 

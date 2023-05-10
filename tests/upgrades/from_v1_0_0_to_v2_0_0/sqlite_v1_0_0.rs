@@ -1,3 +1,5 @@
+#![allow(clippy::missing_errors_doc)]
+
 use std::fs;
 
 use sqlx::sqlite::SqlitePoolOptions;
@@ -63,6 +65,7 @@ impl SqliteDatabaseV1_0_0 {
             .map(|v| v.last_insert_rowid())
     }
 
+    #[allow(clippy::missing_panics_doc)]
     pub async fn delete_all_categories(&self) -> Result<(), sqlx::Error> {
         query("DELETE FROM torrust_categories").execute(&self.pool).await.unwrap();
         Ok(())

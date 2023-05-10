@@ -8,16 +8,19 @@ pub enum OkResponses {
     TokenResponse(TokenResponse),
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct OkResponse<T> {
     pub data: T,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ErrorResponse<T> {
     pub errors: Vec<T>,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TokenResponse {
     pub token: String,
@@ -25,11 +28,13 @@ pub struct TokenResponse {
     pub admin: bool,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewTorrentResponse {
     pub torrent_id: i64,
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct TorrentResponse {
     pub torrent_id: i64,
@@ -48,6 +53,7 @@ pub struct TorrentResponse {
 }
 
 impl TorrentResponse {
+    #[must_use]
     pub fn from_listing(torrent_listing: TorrentListing) -> TorrentResponse {
         TorrentResponse {
             torrent_id: torrent_listing.torrent_id,
@@ -57,7 +63,7 @@ impl TorrentResponse {
             description: torrent_listing.description,
             category: Category {
                 category_id: 0,
-                name: "".to_string(),
+                name: String::new(),
                 num_torrents: 0,
             },
             upload_date: torrent_listing.date_uploaded,
@@ -66,11 +72,12 @@ impl TorrentResponse {
             leechers: torrent_listing.leechers,
             files: vec![],
             trackers: vec![],
-            magnet_link: "".to_string(),
+            magnet_link: String::new(),
         }
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug, sqlx::FromRow)]
 pub struct TorrentsResponse {
     pub total: u32,

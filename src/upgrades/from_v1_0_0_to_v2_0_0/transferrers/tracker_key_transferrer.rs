@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
 
+#[allow(clippy::missing_panics_doc)]
 pub async fn transfer_tracker_keys(source_database: Arc<SqliteDatabaseV1_0_0>, target_database: Arc<SqliteDatabaseV2_0_0>) {
     println!("Transferring tracker keys ...");
 
@@ -28,12 +29,11 @@ pub async fn transfer_tracker_keys(source_database: Arc<SqliteDatabaseV1_0_0>, t
             .await
             .unwrap();
 
-        if id != tracker_key.key_id {
-            panic!(
-                "Error copying tracker key {:?} from source DB to the target DB",
-                &tracker_key.key_id
-            );
-        }
+        assert!(
+            id == tracker_key.key_id,
+            "Error copying tracker key {:?} from source DB to the target DB",
+            &tracker_key.key_id
+        );
 
         println!(
             "[v2][torrust_tracker_keys] tracker key with id {:?} added.",

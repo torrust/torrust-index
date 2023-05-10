@@ -1,8 +1,10 @@
+#![allow(clippy::missing_errors_doc)]
+
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{query_as, SqlitePool};
 
-use crate::databases::database::DatabaseError;
+use crate::databases::database;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct CategoryRecordV1 {
@@ -64,11 +66,11 @@ impl SqliteDatabaseV1_0_0 {
         Self { pool: db }
     }
 
-    pub async fn get_categories_order_by_id(&self) -> Result<Vec<CategoryRecordV1>, DatabaseError> {
+    pub async fn get_categories_order_by_id(&self) -> Result<Vec<CategoryRecordV1>, database::Error> {
         query_as::<_, CategoryRecordV1>("SELECT category_id, name FROM torrust_categories ORDER BY category_id ASC")
             .fetch_all(&self.pool)
             .await
-            .map_err(|_| DatabaseError::Error)
+            .map_err(|_| database::Error::Error)
     }
 
     pub async fn get_users(&self) -> Result<Vec<UserRecordV1>, sqlx::Error> {
