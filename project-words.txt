@@ -21,6 +21,7 @@ hexlify
 httpseeds
 imagoodboy
 imdl
+indexmap
 infohash
 jsonwebtoken
 leechers

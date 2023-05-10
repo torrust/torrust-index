@@ -87,7 +87,7 @@ impl TorrentTester {
     #[allow(clippy::missing_panics_doc)]
     pub async fn assert_data_in_target_db(&self, upload_path: &str) {
         for torrent in &self.test_data.torrents {
-            let filepath = self.torrent_file_path(upload_path, torrent.torrent_id);
+            let filepath = Self::torrent_file_path(upload_path, torrent.torrent_id);
 
             let torrent_file = read_torrent_from_file(&filepath).unwrap();
 
@@ -98,7 +98,7 @@ impl TorrentTester {
         }
     }
 
-    pub fn torrent_file_path(&self, upload_path: &str, torrent_id: i64) -> String {
+    pub fn torrent_file_path(upload_path: &str, torrent_id: i64) -> String {
         format!("{}/{}.torrent", &upload_path, &torrent_id)
     }
 

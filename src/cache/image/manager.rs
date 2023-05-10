@@ -5,7 +5,7 @@ use std::time::{Duration, SystemTime};
 use bytes::Bytes;
 use tokio::sync::RwLock;
 
-use crate::cache::cache::BytesCache;
+use crate::cache::BytesCache;
 use crate::config::Configuration;
 use crate::models::user::UserCompact;
 
@@ -21,10 +21,10 @@ type UserQuotas = HashMap<i64, ImageCacheQuota>;
 
 #[must_use]
 pub fn now_in_secs() -> u64 {
-    match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-        Ok(n) => n.as_secs(),
-        Err(_) => panic!("SystemTime before UNIX EPOCH!"),
-    }
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .expect("SystemTime before UNIX EPOCH!")
+        .as_secs()
 }
 
 #[derive(Clone)]
@@ -48,14 +48,19 @@ impl ImageCacheQuota {
         }
     }
 
-    pub fn add_usage(&mut self, amount: usize) -> Result<(), ()> {
+    /// Add Usage Quota
+    ///
+    /// # Errors
+    ///
+    /// This function will return a `Error::UserQuotaMet` if user quota has been met.
+    pub fn add_usage(&mut self, amount: usize) -> Result<(), Error> {
         // Check if quota needs to be reset.
         if now_in_secs() - self.date_start_secs > self.period_secs {
             self.reset();
         }
 
         if self.is_reached() {
-            return Err(());
+            return Err(Error::UserQuotaMet);
         }
 
         self.usage = self.usage.saturating_add(amount);
@@ -92,7 +97,7 @@ impl ImageCacheService {
         let reqwest_client = reqwest::Client::builder()
             .timeout(Duration::from_millis(settings.image_cache.max_request_timeout_ms))
             .build()
-            .unwrap();
+            .expect("unable to build client request");
 
         drop(settings);
 
@@ -106,33 +111,37 @@ impl ImageCacheService {
 
     /// Get an image from the url and insert it into the cache if it isn't cached already.
     /// Unauthenticated users can only get already cached images.
+    ///
+    /// # Errors
+    ///
+    /// Return a `Error::Unauthenticated` if the user has not been authenticated.
     pub async fn get_image_by_url(&self, url: &str, opt_user: Option<UserCompact>) -> Result<Bytes, Error> {
         if let Some(entry) = self.image_cache.read().await.get(url).await {
             return Ok(entry.bytes);
         }
 
-        if opt_user.is_none() {
-            return Err(Error::Unauthenticated);
+        match opt_user {
+            None => Err(Error::Unauthenticated),
+
+            Some(user) => {
+                self.check_user_quota(&user).await?;
+
+                let image_bytes = self.get_image_from_url_as_bytes(url).await?;
+
+                self.check_image_size(&image_bytes).await?;
+
+                // These two functions could be executed after returning the image to the client,
+                // but than we would need a dedicated task or thread that executes these functions.
+                // This can be problematic if a task is spawned after every user request.
+                // Since these functions execute very fast, I don't see a reason to further optimize this.
+                // For now.
+                self.update_image_cache(url, &image_bytes).await?;
+
+                self.update_user_quota(&user, image_bytes.len()).await?;
+
+                Ok(image_bytes)
+            }
         }
-
-        let user = opt_user.unwrap();
-
-        self.check_user_quota(&user).await?;
-
-        let image_bytes = self.get_image_from_url_as_bytes(url).await?;
-
-        self.check_image_size(&image_bytes).await?;
-
-        // These two functions could be executed after returning the image to the client,
-        // but than we would need a dedicated task or thread that executes these functions.
-        // This can be problematic if a task is spawned after every user request.
-        // Since these functions execute very fast, I don't see a reason to further optimize this.
-        // For now.
-        self.update_image_cache(url, &image_bytes).await?;
-
-        self.update_user_quota(&user, image_bytes.len()).await?;
-
-        Ok(image_bytes)
     }
 
     async fn get_image_from_url_as_bytes(&self, url: &str) -> Result<Bytes, Error> {

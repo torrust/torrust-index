@@ -53,6 +53,11 @@ fn load_error_images() {
     });
 }
 
+/// Get the proxy image.
+///
+/// # Errors
+///
+/// This function will return `Ok` only for now.
 pub async fn get_proxy_image(req: HttpRequest, app_data: WebAppData, path: web::Path<String>) -> ServiceResult<impl Responder> {
     // Check for optional user.
     let opt_user = app_data.auth.get_user_compact_from_request(&req).await.ok();
