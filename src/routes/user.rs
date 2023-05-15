@@ -333,7 +333,7 @@ pub async fn ban(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl R
     app_data.database.ban_user(user_profile.user_id, &reason, date_expiry).await?;
 
     Ok(HttpResponse::Ok().json(OkResponse {
-        data: format!("Banned user: {}", to_be_banned_username),
+        data: format!("Banned user: {to_be_banned_username}"),
     }))
 }
 

@@ -17,7 +17,7 @@ pub async fn expected_torrent(mut uploaded_torrent: Torrent, env: &TestEnv, down
     // by the backend. For some of them it makes sense (`announce`  and `announce_list`),
     // for others it does not.
 
-    let tracker_url = format!("{}", env.server_settings().unwrap().tracker.url);
+    let tracker_url = env.server_settings().unwrap().tracker.url.to_string();
 
     let tracker_key = match downloader {
         Some(logged_in_user) => get_user_tracker_key(logged_in_user, env).await,
@@ -65,7 +65,7 @@ pub fn build_announce_url(tracker_url: &str, tracker_key: &Option<TrackerKey>) -
     if let Some(key) = &tracker_key {
         format!("{tracker_url}/{}", key.key)
     } else {
-        format!("{tracker_url}")
+        tracker_url.to_string()
     }
 }
 

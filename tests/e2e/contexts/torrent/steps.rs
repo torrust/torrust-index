@@ -23,7 +23,7 @@ pub async fn upload_torrent(uploader: &LoggedInUserData, torrent: &TorrentIndexI
     let res = serde_json::from_str::<UploadedTorrentResponse>(&response.body);
 
     if res.is_err() {
-        println!("Error deserializing response: {:?}", res);
+        println!("Error deserializing response: {res:?}");
     }
 
     TorrentListedInIndex::from(torrent.clone(), res.unwrap().data.torrent_id)

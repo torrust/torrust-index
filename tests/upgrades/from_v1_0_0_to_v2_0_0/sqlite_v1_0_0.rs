@@ -14,7 +14,7 @@ pub struct SqliteDatabaseV1_0_0 {
 
 impl SqliteDatabaseV1_0_0 {
     pub async fn db_connection(database_file: &str) -> Self {
-        let connect_url = format!("sqlite://{}?mode=rwc", database_file);
+        let connect_url = format!("sqlite://{database_file}?mode=rwc");
         Self::new(&connect_url).await
     }
 
@@ -28,7 +28,7 @@ impl SqliteDatabaseV1_0_0 {
 
     /// Execute migrations for database in version v1.0.0
     pub async fn migrate(&self, fixtures_dir: &str) {
-        let migrations_dir = format!("{}database/v1.0.0/migrations/", fixtures_dir);
+        let migrations_dir = format!("{fixtures_dir}database/v1.0.0/migrations/");
 
         let migrations = vec![
             "20210831113004_torrust_users.sql",
@@ -47,13 +47,13 @@ impl SqliteDatabaseV1_0_0 {
     }
 
     async fn run_migration_from_file(&self, migration_file_path: &str) {
-        println!("Executing migration: {:?}", migration_file_path);
+        println!("Executing migration: {migration_file_path:?}");
 
         let sql = fs::read_to_string(migration_file_path).expect("Should have been able to read the file");
 
         let res = sqlx::query(&sql).execute(&self.pool).await;
 
-        println!("Migration result {:?}", res);
+        println!("Migration result {res:?}");
     }
 
     pub async fn insert_category(&self, category: &CategoryRecordV1) -> Result<i64, sqlx::Error> {

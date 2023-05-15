@@ -236,7 +236,7 @@ impl Configuration {
 
         let torrust_config: TorrustBackend = match config.try_deserialize() {
             Ok(data) => Ok(data),
-            Err(e) => Err(ConfigError::Message(format!("Errors while processing config: {}.", e))),
+            Err(e) => Err(ConfigError::Message(format!("Errors while processing config: {e}."))),
         }?;
 
         Ok(Configuration {
