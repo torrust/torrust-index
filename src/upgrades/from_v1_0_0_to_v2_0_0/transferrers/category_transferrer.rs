@@ -11,7 +11,7 @@ pub async fn transfer_categories(source_database: Arc<SqliteDatabaseV1_0_0>, tar
     println!("[v1] categories: {:?}", &source_categories);
 
     let result = target_database.reset_categories_sequence().await.unwrap();
-    println!("[v2] reset categories sequence result: {:?}", result);
+    println!("[v2] reset categories sequence result: {result:?}");
 
     for cat in &source_categories {
         println!("[v2] adding category {:?} with id {:?} ...", &cat.name, &cat.category_id);

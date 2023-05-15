@@ -74,14 +74,13 @@ impl Service {
 
         let mail_body = format!(
             r#"
-                Welcome to Torrust, {}!
+                Welcome to Torrust, {username}!
 
                 Please click the confirmation link below to verify your account.
-                {}
+                {verification_url}
 
                 If this account wasn't made by you, you can ignore this email.
-            "#,
-            username, verification_url
+            "#
         );
 
         let ctx = VerifyTemplate {
@@ -112,7 +111,7 @@ impl Service {
         match self.mailer.send(mail).await {
             Ok(_res) => Ok(()),
             Err(e) => {
-                eprintln!("Failed to send email: {}", e);
+                eprintln!("Failed to send email: {e}");
                 Err(ServiceError::FailedToSendVerificationEmail)
             }
         }
@@ -147,7 +146,7 @@ impl Service {
             base_url = cfg_base_url;
         }
 
-        format!("{}/user/email/verify/{}", base_url, token)
+        format!("{base_url}/user/email/verify/{token}")
     }
 }
 

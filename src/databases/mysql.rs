@@ -298,7 +298,7 @@ impl Database for Mysql {
     ) -> Result<TorrentsResponse, database::Error> {
         let title = match search {
             None => "%".to_string(),
-            Some(v) => format!("%{}%", v),
+            Some(v) => format!("%{v}%"),
         };
 
         let sort_query: String = match sort {
@@ -322,7 +322,7 @@ impl Database for Mysql {
                 if let Ok(sanitized_category) = self.get_category_from_name(category).await {
                     let mut str = format!("tc.name = '{}'", sanitized_category.name);
                     if i > 0 {
-                        str = format!(" OR {}", str);
+                        str = format!(" OR {str}");
                     }
                     category_filters.push_str(&str);
                     i += 1;
@@ -331,10 +331,7 @@ impl Database for Mysql {
             if category_filters.is_empty() {
                 String::new()
             } else {
-                format!(
-                    "INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND ({}) ",
-                    category_filters
-                )
+                format!("INNER JOIN torrust_categories tc ON tt.category_id = tc.category_id AND ({category_filters}) ")
             }
         } else {
             String::new()
@@ -344,16 +341,15 @@ impl Database for Mysql {
             "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, DATE_FORMAT(tt.date_uploaded, '%Y-%m-%d %H:%i:%s') AS date_uploaded, tt.size AS file_size,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
-            FROM torrust_torrents tt {}
+            FROM torrust_torrents tt {category_filter_query}
             INNER JOIN torrust_user_profiles tp ON tt.uploader_id = tp.user_id
             INNER JOIN torrust_torrent_info ti ON tt.torrent_id = ti.torrent_id
             LEFT JOIN torrust_torrent_tracker_stats ts ON tt.torrent_id = ts.torrent_id
             WHERE title LIKE ?
-            GROUP BY tt.torrent_id",
-            category_filter_query
+            GROUP BY tt.torrent_id"
         );
 
-        let count_query = format!("SELECT COUNT(*) as count FROM ({}) AS count_table", query_string);
+        let count_query = format!("SELECT COUNT(*) as count FROM ({query_string}) AS count_table");
 
         let count_result: Result<i64, database::Error> = query_as(&count_query)
             .bind(title.clone())
@@ -364,7 +360,7 @@ impl Database for Mysql {
 
         let count = count_result?;
 
-        query_string = format!("{} ORDER BY {} LIMIT ?, ?", query_string, sort_query);
+        query_string = format!("{query_string} ORDER BY {sort_query} LIMIT ?, ?");
 
         let res: Vec<TorrentListing> = sqlx::query_as::<_, TorrentListing>(&query_string)
             .bind(title)

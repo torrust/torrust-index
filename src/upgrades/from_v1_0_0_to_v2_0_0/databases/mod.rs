@@ -7,12 +7,12 @@ pub mod sqlite_v1_0_0;
 pub mod sqlite_v2_0_0;
 
 pub async fn current_db(db_filename: &str) -> Arc<SqliteDatabaseV1_0_0> {
-    let source_database_connect_url = format!("sqlite://{}?mode=ro", db_filename);
+    let source_database_connect_url = format!("sqlite://{db_filename}?mode=ro");
     Arc::new(SqliteDatabaseV1_0_0::new(&source_database_connect_url).await)
 }
 
 pub async fn new_db(db_filename: &str) -> Arc<SqliteDatabaseV2_0_0> {
-    let target_database_connect_url = format!("sqlite://{}?mode=rwc", db_filename);
+    let target_database_connect_url = format!("sqlite://{db_filename}?mode=rwc");
     Arc::new(SqliteDatabaseV2_0_0::new(&target_database_connect_url).await)
 }
 

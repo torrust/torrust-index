@@ -72,7 +72,7 @@ pub struct SqliteDatabaseV2_0_0 {
 
 impl SqliteDatabaseV2_0_0 {
     pub async fn db_connection(database_file: &str) -> Self {
-        let connect_url = format!("sqlite://{}?mode=rwc", database_file);
+        let connect_url = format!("sqlite://{database_file}?mode=rwc");
         Self::new(&connect_url).await
     }
 

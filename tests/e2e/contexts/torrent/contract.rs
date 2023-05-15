@@ -107,11 +107,7 @@ mod for_guests {
         // When we request more torrents than the page size limit
         let response = client
             .get_torrents(Query::with_params(
-                [QueryParam::new(
-                    "page_size",
-                    &format!("{}", (max_torrent_page_size + 1).to_string()),
-                )]
-                .to_vec(),
+                [QueryParam::new("page_size", &format!("{}", (max_torrent_page_size + 1)))].to_vec(),
             ))
             .await;
 
@@ -172,7 +168,7 @@ mod for_guests {
 
         let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
 
-        let tracker_url = format!("{}", env.server_settings().unwrap().tracker.url);
+        let tracker_url = env.server_settings().unwrap().tracker.url;
         let encoded_tracker_url = urlencoding::encode(&tracker_url);
 
         let expected_torrent = TorrentDetails {
@@ -396,7 +392,7 @@ mod for_authenticated_users {
         // Upload the second torrent with the same infohash as the first one.
         // We need to change the title otherwise the torrent will be rejected
         // because of the duplicate title.
-        first_torrent_clone.index_info.title = format!("{}-clone", first_torrent_title);
+        first_torrent_clone.index_info.title = format!("{first_torrent_title}-clone");
         let form: UploadTorrentMultipartForm = first_torrent_clone.index_info.into();
         let response = client.upload_torrent(form.into()).await;
 
@@ -430,7 +426,8 @@ mod for_authenticated_users {
         let tracker_key = get_user_tracker_key(&downloader, &env)
             .await
             .expect("uploader should have a valid tracker key");
-        let tracker_url = format!("{}", env.server_settings().unwrap().tracker.url);
+
+        let tracker_url = env.server_settings().unwrap().tracker.url;
 
         assert_eq!(
             torrent.announce.unwrap(),
