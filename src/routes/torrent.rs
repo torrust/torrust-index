@@ -133,7 +133,10 @@ pub async fn upload(req: HttpRequest, payload: Multipart, app_data: WebAppData) 
 
     // respond with the newly uploaded torrent id
     Ok(HttpResponse::Ok().json(OkResponse {
-        data: NewTorrentResponse { torrent_id },
+        data: NewTorrentResponse {
+            torrent_id,
+            info_hash: torrent_request.torrent.info_hash(),
+        },
     }))
 }
 
@@ -348,12 +351,13 @@ pub async fn delete(req: HttpRequest, app_data: WebAppData) -> ServiceResult<imp
     // remove info_hash from tracker whitelist
     let _ = app_data
         .tracker_service
-        .remove_info_hash_from_whitelist(torrent_listing.info_hash)
+        .remove_info_hash_from_whitelist(torrent_listing.info_hash.clone())
         .await;
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: NewTorrentResponse {
             torrent_id: torrent_listing.torrent_id,
+            info_hash: torrent_listing.info_hash,
         },
     }))
 }

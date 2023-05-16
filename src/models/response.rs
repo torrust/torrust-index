@@ -32,6 +32,7 @@ pub struct TokenResponse {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewTorrentResponse {
     pub torrent_id: i64,
+    pub info_hash: String,
 }
 
 #[allow(clippy::module_name_repetitions)]

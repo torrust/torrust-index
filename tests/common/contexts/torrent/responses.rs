@@ -84,6 +84,7 @@ pub struct UploadedTorrentResponse {
 #[derive(Deserialize, PartialEq, Debug)]
 pub struct UploadedTorrent {
     pub torrent_id: Id,
+    pub info_hash: String,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
