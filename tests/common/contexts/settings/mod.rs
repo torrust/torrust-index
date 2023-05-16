@@ -4,7 +4,8 @@ pub mod responses;
 use serde::{Deserialize, Serialize};
 use torrust_index_backend::config::{
     Api as DomainApi, Auth as DomainAuth, Database as DomainDatabase, ImageCache as DomainImageCache, Mail as DomainMail,
-    Network as DomainNetwork, TorrustBackend as DomainSettings, Tracker as DomainTracker, Website as DomainWebsite,
+    Network as DomainNetwork, TorrustBackend as DomainSettings, Tracker as DomainTracker,
+    TrackerStatisticsImporter as DomainTrackerStatisticsImporter, Website as DomainWebsite,
 };
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -17,6 +18,7 @@ pub struct Settings {
     pub mail: Mail,
     pub image_cache: ImageCache,
     pub api: Api,
+    pub tracker_statistics_importer: TrackerStatisticsImporter,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -50,7 +52,6 @@ pub struct Auth {
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Database {
     pub connect_url: String,
-    pub torrent_info_update_interval: u64,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -79,6 +80,11 @@ pub struct Api {
     pub max_torrent_page_size: u8,
 }
 
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+pub struct TrackerStatisticsImporter {
+    pub torrent_info_update_interval: u64,
+}
+
 impl From<DomainSettings> for Settings {
     fn from(settings: DomainSettings) -> Self {
         Settings {
@@ -90,6 +96,7 @@ impl From<DomainSettings> for Settings {
             mail: Mail::from(settings.mail),
             image_cache: ImageCache::from(settings.image_cache),
             api: Api::from(settings.api),
+            tracker_statistics_importer: TrackerStatisticsImporter::from(settings.tracker_statistics_importer),
         }
     }
 }
@@ -136,7 +143,6 @@ impl From<DomainDatabase> for Database {
     fn from(database: DomainDatabase) -> Self {
         Self {
             connect_url: database.connect_url,
-            torrent_info_update_interval: database.torrent_info_update_interval,
         }
     }
 }
@@ -172,6 +178,14 @@ impl From<DomainApi> for Api {
         Self {
             default_torrent_page_size: api.default_torrent_page_size,
             max_torrent_page_size: api.max_torrent_page_size,
+        }
+    }
+}
+
+impl From<DomainTrackerStatisticsImporter> for TrackerStatisticsImporter {
+    fn from(tracker_statistics_importer: DomainTrackerStatisticsImporter) -> Self {
+        Self {
+            torrent_info_update_interval: tracker_statistics_importer.torrent_info_update_interval,
         }
     }
 }

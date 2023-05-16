@@ -19,7 +19,6 @@ secret_key = "MaxVerstappenWC2021"
 
 [database]
 connect_url = "sqlite://data.db?mode=rwc"
-torrent_info_update_interval = 3600
 
 [mail]
 email_verification_enabled = false
@@ -40,3 +39,6 @@ user_quota_bytes = 64000000
 [api]
 default_torrent_page_size = 10
 max_torrent_page_size = 30
+
+[tracker_statistics_importer]
+torrent_info_update_interval = 3600

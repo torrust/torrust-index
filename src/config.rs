@@ -108,14 +108,12 @@ impl Default for Auth {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Database {
     pub connect_url: String,
-    pub torrent_info_update_interval: u64,
 }
 
 impl Default for Database {
     fn default() -> Self {
         Self {
             connect_url: "sqlite://data.db?mode=rwc".to_string(),
-            torrent_info_update_interval: 3600,
         }
     }
 }
@@ -170,6 +168,19 @@ impl Default for Api {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrackerStatisticsImporter {
+    pub torrent_info_update_interval: u64,
+}
+
+impl Default for TrackerStatisticsImporter {
+    fn default() -> Self {
+        Self {
+            torrent_info_update_interval: 3600,
+        }
+    }
+}
+
 impl Default for ImageCache {
     fn default() -> Self {
         Self {
@@ -192,6 +203,7 @@ pub struct TorrustBackend {
     pub mail: Mail,
     pub image_cache: ImageCache,
     pub api: Api,
+    pub tracker_statistics_importer: TrackerStatisticsImporter,
 }
 
 #[derive(Debug)]
