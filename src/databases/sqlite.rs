@@ -531,11 +531,11 @@ impl Database for Sqlite {
         .map_err(|_| database::Error::TorrentNotFound)
     }
 
-    async fn get_torrent_info_from_infohash(&self, infohash: &InfoHash) -> Result<DbTorrentInfo, database::Error> {
+    async fn get_torrent_info_from_info_hash(&self, info_hash: &InfoHash) -> Result<DbTorrentInfo, database::Error> {
         query_as::<_, DbTorrentInfo>(
             "SELECT torrent_id, info_hash, name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE info_hash = ?",
         )
-        .bind(infohash.to_hex_string().to_uppercase()) // `info_hash` is stored as uppercase hex string
+        .bind(info_hash.to_hex_string().to_uppercase()) // `info_hash` is stored as uppercase hex string
         .fetch_one(&self.pool)
         .await
         .map_err(|_| database::Error::TorrentNotFound)
@@ -593,7 +593,7 @@ impl Database for Sqlite {
             .map_err(|_| database::Error::TorrentNotFound)
     }
 
-    async fn get_torrent_listing_from_infohash(&self, infohash: &InfoHash) -> Result<TorrentListing, database::Error> {
+    async fn get_torrent_listing_from_info_hash(&self, info_hash: &InfoHash) -> Result<TorrentListing, database::Error> {
         query_as::<_, TorrentListing>(
             "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, tt.date_uploaded, tt.size AS file_size,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
@@ -605,7 +605,7 @@ impl Database for Sqlite {
             WHERE tt.info_hash = ?
             GROUP BY ts.torrent_id"
         )
-            .bind(infohash.to_string().to_uppercase()) // `info_hash` is stored as uppercase
+            .bind(info_hash.to_string().to_uppercase()) // `info_hash` is stored as uppercase
             .fetch_one(&self.pool)
             .await
             .map_err(|_| database::Error::TorrentNotFound)
