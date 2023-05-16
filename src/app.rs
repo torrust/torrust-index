@@ -32,7 +32,7 @@ pub async fn run(configuration: Configuration) -> Running {
     let settings = cfg.settings.read().await;
 
     let database_connect_url = settings.database.connect_url.clone();
-    let database_torrent_info_update_interval = settings.database.torrent_info_update_interval;
+    let torrent_info_update_interval = settings.tracker_statistics_importer.torrent_info_update_interval;
     let net_port = settings.net.port;
 
     // IMPORTANT: drop settings before starting server to avoid read locks that
@@ -67,7 +67,7 @@ pub async fn run(configuration: Configuration) -> Running {
     let weak_tracker_statistics_importer = Arc::downgrade(&tracker_statistics_importer);
 
     let tracker_statistics_importer_handle = tokio::spawn(async move {
-        let interval = std::time::Duration::from_secs(database_torrent_info_update_interval);
+        let interval = std::time::Duration::from_secs(torrent_info_update_interval);
         let mut interval = tokio::time::interval(interval);
         interval.tick().await; // first tick is immediate...
         loop {
