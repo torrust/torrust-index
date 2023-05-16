@@ -6,11 +6,11 @@
 //! See [BEP 3. The `BitTorrent` Protocol Specification](https://www.bittorrent.org/beps/bep_0003.html)
 //! for the official specification.
 //!
-//! This modules provides a type that can be used to represent infohashes.
+//! This modules provides a type that can be used to represent info-hashes.
 //!
 //! > **NOTICE**: It only supports Info Hash v1.
 //!
-//! Typically infohashes are represented as hex strings, but internally they are
+//! Typically info-hashes are represented as hex strings, but internally they are
 //! a 20-byte array.
 //!
 //! # Calculating the info-hash of a torrent file
@@ -109,7 +109,7 @@
 //!  }
 //! ```
 //!
-//! The infohash is the [SHA1](https://en.wikipedia.org/wiki/SHA-1) hash
+//! The info-hash is the [SHA1](https://en.wikipedia.org/wiki/SHA-1) hash
 //! of the `info` attribute. That is, the SHA1 hash of:
 //!
 //! ```text
@@ -217,14 +217,14 @@ impl std::convert::From<[u8; 20]> for InfoHash {
 /// Errors that can occur when converting from a `Vec<u8>` to an `InfoHash`.
 #[derive(Error, Debug)]
 pub enum ConversionError {
-    /// Not enough bytes for infohash. An infohash is 20 bytes.
-    #[error("not enough bytes for infohash: {message} {location}")]
+    /// Not enough bytes for info-hash. An info-hash is 20 bytes.
+    #[error("not enough bytes for info-hash: {message} {location}")]
     NotEnoughBytes {
         location: &'static Location<'static>,
         message: String,
     },
-    /// Too many bytes for infohash. An infohash is 20 bytes.
-    #[error("too many bytes for infohash: {message} {location}")]
+    /// Too many bytes for info-hash. An info-hash is 20 bytes.
+    #[error("too many bytes for info-hash: {message} {location}")]
     TooManyBytes {
         location: &'static Location<'static>,
         message: String,

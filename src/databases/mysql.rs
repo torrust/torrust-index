@@ -541,11 +541,11 @@ impl Database for Mysql {
         .map_err(|_| database::Error::TorrentNotFound)
     }
 
-    async fn get_torrent_info_from_infohash(&self, infohash: &InfoHash) -> Result<DbTorrentInfo, database::Error> {
+    async fn get_torrent_info_from_info_hash(&self, info_hash: &InfoHash) -> Result<DbTorrentInfo, database::Error> {
         query_as::<_, DbTorrentInfo>(
             "SELECT torrent_id, info_hash, name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE info_hash = ?",
         )
-        .bind(infohash.to_hex_string().to_uppercase()) // `info_hash` is stored as uppercase hex string
+        .bind(info_hash.to_hex_string().to_uppercase()) // `info_hash` is stored as uppercase hex string
         .fetch_one(&self.pool)
         .await
         .map_err(|_| database::Error::TorrentNotFound)
@@ -603,7 +603,7 @@ impl Database for Mysql {
             .map_err(|_| database::Error::TorrentNotFound)
     }
 
-    async fn get_torrent_listing_from_infohash(&self, infohash: &InfoHash) -> Result<TorrentListing, database::Error> {
+    async fn get_torrent_listing_from_info_hash(&self, info_hash: &InfoHash) -> Result<TorrentListing, database::Error> {
         query_as::<_, TorrentListing>(
             "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, DATE_FORMAT(tt.date_uploaded, '%Y-%m-%d %H:%i:%s') AS date_uploaded, tt.size AS file_size,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
@@ -615,7 +615,7 @@ impl Database for Mysql {
             WHERE tt.info_hash = ?
             GROUP BY torrent_id"
         )
-            .bind(infohash.to_hex_string().to_uppercase()) // `info_hash` is stored as uppercase hex string
+            .bind(info_hash.to_hex_string().to_uppercase()) // `info_hash` is stored as uppercase hex string
             .fetch_one(&self.pool)
             .await
             .map_err(|_| database::Error::TorrentNotFound)

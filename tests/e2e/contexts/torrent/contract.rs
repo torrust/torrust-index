@@ -150,7 +150,7 @@ mod for_guests {
     }
 
     #[tokio::test]
-    async fn it_should_allow_guests_to_get_torrent_details_searching_by_infohash() {
+    async fn it_should_allow_guests_to_get_torrent_details_searching_by_info_hash() {
         let mut env = TestEnv::new();
         env.start().await;
 
@@ -164,7 +164,7 @@ mod for_guests {
         let uploader = new_logged_in_user(&env).await;
         let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
 
-        let response = client.get_torrent(&test_torrent.infohash()).await;
+        let response = client.get_torrent(&test_torrent.info_hash()).await;
 
         let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
 
@@ -213,7 +213,7 @@ mod for_guests {
     }
 
     #[tokio::test]
-    async fn it_should_allow_guests_to_download_a_torrent_file_searching_by_infohash() {
+    async fn it_should_allow_guests_to_download_a_torrent_file_searching_by_info_hash() {
         let mut env = TestEnv::new();
         env.start().await;
 
@@ -227,7 +227,7 @@ mod for_guests {
         let uploader = new_logged_in_user(&env).await;
         let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
 
-        let response = client.download_torrent(&test_torrent.infohash()).await;
+        let response = client.download_torrent(&test_torrent.info_hash()).await;
 
         let torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
         let uploaded_torrent =
@@ -272,7 +272,7 @@ mod for_guests {
         let uploader = new_logged_in_user(&env).await;
         let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
 
-        let response = client.delete_torrent(&test_torrent.infohash()).await;
+        let response = client.delete_torrent(&test_torrent.info_hash()).await;
 
         assert_eq!(response.status, 401);
     }
@@ -305,7 +305,7 @@ mod for_authenticated_users {
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
 
         let test_torrent = random_torrent();
-        let infohash = test_torrent.infohash().clone();
+        let info_hash = test_torrent.info_hash().clone();
 
         let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
@@ -315,7 +315,7 @@ mod for_authenticated_users {
 
         assert_eq!(
             uploaded_torrent_response.data.info_hash.to_lowercase(),
-            infohash.to_lowercase()
+            info_hash.to_lowercase()
         );
         assert!(response.is_json_and_ok());
     }
@@ -369,7 +369,7 @@ mod for_authenticated_users {
     }
 
     #[tokio::test]
-    async fn it_should_not_allow_uploading_a_torrent_with_a_infohash_that_already_exists() {
+    async fn it_should_not_allow_uploading_a_torrent_with_a_info_hash_that_already_exists() {
         let mut env = TestEnv::new();
         env.start().await;
 
@@ -388,7 +388,7 @@ mod for_authenticated_users {
         let form: UploadTorrentMultipartForm = first_torrent.index_info.into();
         let _response = client.upload_torrent(form.into()).await;
 
-        // Upload the second torrent with the same infohash as the first one.
+        // Upload the second torrent with the same info-hash as the first one.
         // We need to change the title otherwise the torrent will be rejected
         // because of the duplicate title.
         first_torrent_clone.index_info.title = format!("{first_torrent_title}-clone");
@@ -417,7 +417,7 @@ mod for_authenticated_users {
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &downloader.token);
 
         // When the user downloads the torrent
-        let response = client.download_torrent(&test_torrent.infohash()).await;
+        let response = client.download_torrent(&test_torrent.info_hash()).await;
 
         let torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
 
@@ -456,7 +456,7 @@ mod for_authenticated_users {
 
             let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
 
-            let response = client.delete_torrent(&test_torrent.infohash()).await;
+            let response = client.delete_torrent(&test_torrent.info_hash()).await;
 
             assert_eq!(response.status, 403);
         }
@@ -484,7 +484,7 @@ mod for_authenticated_users {
 
             let response = client
                 .update_torrent(
-                    &test_torrent.infohash(),
+                    &test_torrent.info_hash(),
                     UpdateTorrentFrom {
                         title: Some(new_title.clone()),
                         description: Some(new_description.clone()),
@@ -524,7 +524,7 @@ mod for_authenticated_users {
 
             let response = client
                 .update_torrent(
-                    &test_torrent.infohash(),
+                    &test_torrent.info_hash(),
                     UpdateTorrentFrom {
                         title: Some(new_title.clone()),
                         description: Some(new_description.clone()),
@@ -551,7 +551,7 @@ mod for_authenticated_users {
         use crate::e2e::environment::TestEnv;
 
         #[tokio::test]
-        async fn it_should_allow_admins_to_delete_torrents_searching_by_infohash() {
+        async fn it_should_allow_admins_to_delete_torrents_searching_by_info_hash() {
             let mut env = TestEnv::new();
             env.start().await;
 
@@ -566,7 +566,7 @@ mod for_authenticated_users {
             let admin = new_logged_in_admin(&env).await;
             let client = Client::authenticated(&env.server_socket_addr().unwrap(), &admin.token);
 
-            let response = client.delete_torrent(&test_torrent.infohash()).await;
+            let response = client.delete_torrent(&test_torrent.info_hash()).await;
 
             let deleted_torrent_response: DeletedTorrentResponse = serde_json::from_str(&response.body).unwrap();
 
@@ -595,7 +595,7 @@ mod for_authenticated_users {
 
             let response = client
                 .update_torrent(
-                    &test_torrent.infohash(),
+                    &test_torrent.info_hash(),
                     UpdateTorrentFrom {
                         title: Some(new_title.clone()),
                         description: Some(new_description.clone()),

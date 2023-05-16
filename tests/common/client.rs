@@ -93,17 +93,17 @@ impl Client {
         self.http_client.get("torrents", params).await
     }
 
-    pub async fn get_torrent(&self, infohash: &InfoHash) -> TextResponse {
-        self.http_client.get(&format!("torrent/{infohash}"), Query::empty()).await
+    pub async fn get_torrent(&self, info_hash: &InfoHash) -> TextResponse {
+        self.http_client.get(&format!("torrent/{info_hash}"), Query::empty()).await
     }
 
-    pub async fn delete_torrent(&self, infohash: &InfoHash) -> TextResponse {
-        self.http_client.delete(&format!("torrent/{infohash}")).await
+    pub async fn delete_torrent(&self, info_hash: &InfoHash) -> TextResponse {
+        self.http_client.delete(&format!("torrent/{info_hash}")).await
     }
 
-    pub async fn update_torrent(&self, infohash: &InfoHash, update_torrent_form: UpdateTorrentFrom) -> TextResponse {
+    pub async fn update_torrent(&self, info_hash: &InfoHash, update_torrent_form: UpdateTorrentFrom) -> TextResponse {
         self.http_client
-            .put(&format!("torrent/{infohash}"), &update_torrent_form)
+            .put(&format!("torrent/{info_hash}"), &update_torrent_form)
             .await
     }
 
