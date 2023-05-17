@@ -4,10 +4,11 @@ use crate::common::WebAppData;
 use crate::config;
 use crate::errors::{ServiceError, ServiceResult};
 use crate::models::response::OkResponse;
+use crate::routes::API_VERSION;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/settings")
+        web::scope(&format!("/{API_VERSION}/settings"))
             .service(web::resource("").route(web::get().to(get)).route(web::post().to(update)))
             .service(web::resource("/name").route(web::get().to(site_name)))
             .service(web::resource("/public").route(web::get().to(get_public))),

@@ -2,10 +2,11 @@ use actix_web::http::StatusCode;
 use actix_web::{web, HttpResponse, Responder};
 
 use crate::errors::ServiceResult;
+use crate::routes::API_VERSION;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/about")
+        web::scope(&format!("/{API_VERSION}/about"))
             .service(web::resource("").route(web::get().to(get)))
             .service(web::resource("/license").route(web::get().to(license))),
     );

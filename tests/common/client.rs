@@ -19,12 +19,16 @@ impl Client {
     // todo: forms in POST requests can be passed by reference. It's already
     // changed for the `update_settings` method.
 
+    fn base_path() -> String {
+        "/v1".to_string()
+    }
+
     pub fn unauthenticated(bind_address: &str) -> Self {
-        Self::new(ConnectionInfo::anonymous(bind_address))
+        Self::new(ConnectionInfo::anonymous(bind_address, &Self::base_path()))
     }
 
     pub fn authenticated(bind_address: &str, token: &str) -> Self {
-        Self::new(ConnectionInfo::new(bind_address, token))
+        Self::new(ConnectionInfo::new(bind_address, &Self::base_path(), token))
     }
 
     pub fn new(connection_info: ConnectionInfo) -> Self {
@@ -42,25 +46,25 @@ impl Client {
     // Context: about
 
     pub async fn about(&self) -> TextResponse {
-        self.http_client.get("about", Query::empty()).await
+        self.http_client.get("/about", Query::empty()).await
     }
 
     pub async fn license(&self) -> TextResponse {
-        self.http_client.get("about/license", Query::empty()).await
+        self.http_client.get("/about/license", Query::empty()).await
     }
 
     // Context: category
 
     pub async fn get_categories(&self) -> TextResponse {
-        self.http_client.get("category", Query::empty()).await
+        self.http_client.get("/category", Query::empty()).await
     }
 
     pub async fn add_category(&self, add_category_form: AddCategoryForm) -> TextResponse {
-        self.http_client.post("category", &add_category_form).await
+        self.http_client.post("/category", &add_category_form).await
     }
 
     pub async fn delete_category(&self, delete_category_form: DeleteCategoryForm) -> TextResponse {
-        self.http_client.delete_with_body("category", &delete_category_form).await
+        self.http_client.delete_with_body("/category", &delete_category_form).await
     }
 
     // Context: root
@@ -72,86 +76,82 @@ impl Client {
     // Context: settings
 
     pub async fn get_public_settings(&self) -> TextResponse {
-        self.http_client.get("settings/public", Query::empty()).await
+        self.http_client.get("/settings/public", Query::empty()).await
     }
 
     pub async fn get_site_name(&self) -> TextResponse {
-        self.http_client.get("settings/name", Query::empty()).await
+        self.http_client.get("/settings/name", Query::empty()).await
     }
 
     pub async fn get_settings(&self) -> TextResponse {
-        self.http_client.get("settings", Query::empty()).await
+        self.http_client.get("/settings", Query::empty()).await
     }
 
     pub async fn update_settings(&self, update_settings_form: &UpdateSettings) -> TextResponse {
-        self.http_client.post("settings", &update_settings_form).await
+        self.http_client.post("/settings", &update_settings_form).await
     }
 
     // Context: torrent
 
     pub async fn get_torrents(&self, params: Query) -> TextResponse {
-        self.http_client.get("torrents", params).await
+        self.http_client.get("/torrents", params).await
     }
 
     pub async fn get_torrent(&self, info_hash: &InfoHash) -> TextResponse {
-        self.http_client.get(&format!("torrent/{info_hash}"), Query::empty()).await
+        self.http_client.get(&format!("/torrent/{info_hash}"), Query::empty()).await
     }
 
     pub async fn delete_torrent(&self, info_hash: &InfoHash) -> TextResponse {
-        self.http_client.delete(&format!("torrent/{info_hash}")).await
+        self.http_client.delete(&format!("/torrent/{info_hash}")).await
     }
 
     pub async fn update_torrent(&self, info_hash: &InfoHash, update_torrent_form: UpdateTorrentFrom) -> TextResponse {
         self.http_client
-            .put(&format!("torrent/{info_hash}"), &update_torrent_form)
+            .put(&format!("/torrent/{info_hash}"), &update_torrent_form)
             .await
     }
 
     pub async fn upload_torrent(&self, form: multipart::Form) -> TextResponse {
-        self.http_client.post_multipart("torrent/upload", form).await
+        self.http_client.post_multipart("/torrent/upload", form).await
     }
 
     pub async fn download_torrent(&self, info_hash: &InfoHash) -> responses::BinaryResponse {
         self.http_client
-            .get_binary(&format!("torrent/download/{info_hash}"), Query::empty())
+            .get_binary(&format!("/torrent/download/{info_hash}"), Query::empty())
             .await
     }
 
     // Context: user
 
     pub async fn register_user(&self, registration_form: RegistrationForm) -> TextResponse {
-        self.http_client.post("user/register", &registration_form).await
+        self.http_client.post("/user/register", &registration_form).await
     }
 
     pub async fn login_user(&self, registration_form: LoginForm) -> TextResponse {
-        self.http_client.post("user/login", &registration_form).await
+        self.http_client.post("/user/login", &registration_form).await
     }
 
     pub async fn verify_token(&self, token_verification_form: TokenVerificationForm) -> TextResponse {
-        self.http_client.post("user/token/verify", &token_verification_form).await
+        self.http_client.post("/user/token/verify", &token_verification_form).await
     }
 
     pub async fn renew_token(&self, token_verification_form: TokenRenewalForm) -> TextResponse {
-        self.http_client.post("user/token/renew", &token_verification_form).await
+        self.http_client.post("/user/token/renew", &token_verification_form).await
     }
 
     pub async fn ban_user(&self, username: Username) -> TextResponse {
-        self.http_client.delete(&format!("user/ban/{}", &username.value)).await
+        self.http_client.delete(&format!("/user/ban/{}", &username.value)).await
     }
 }
 
 /// Generic HTTP Client
 struct Http {
     connection_info: ConnectionInfo,
-    base_path: String,
 }
 
 impl Http {
     pub fn new(connection_info: ConnectionInfo) -> Self {
-        Self {
-            connection_info,
-            base_path: "/".to_string(),
-        }
+        Self { connection_info }
     }
 
     pub async fn get(&self, path: &str, params: Query) -> TextResponse {
@@ -307,6 +307,9 @@ impl Http {
     }
 
     fn base_url(&self, path: &str) -> String {
-        format!("http://{}{}{path}", &self.connection_info.bind_address, &self.base_path)
+        format!(
+            "http://{}{}{path}",
+            &self.connection_info.bind_address, &self.connection_info.base_path
+        )
     }
 }

@@ -8,6 +8,7 @@ use text_to_png::TextRenderer;
 use crate::cache::image::manager::Error;
 use crate::common::WebAppData;
 use crate::errors::ServiceResult;
+use crate::routes::API_VERSION;
 
 static ERROR_IMAGE_LOADER: Once = Once::new();
 
@@ -27,7 +28,9 @@ const ERROR_IMAGE_USER_QUOTA_MET_TEXT: &str = "Image proxy quota met.";
 const ERROR_IMAGE_UNAUTHENTICATED_TEXT: &str = "Sign in to see image.";
 
 pub fn init(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::scope("/proxy").service(web::resource("/image/{url}").route(web::get().to(get_proxy_image))));
+    cfg.service(
+        web::scope(&format!("/{API_VERSION}/proxy")).service(web::resource("/image/{url}").route(web::get().to(get_proxy_image))),
+    );
 
     load_error_images();
 }
