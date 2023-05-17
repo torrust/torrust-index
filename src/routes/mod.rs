@@ -8,6 +8,8 @@ pub mod settings;
 pub mod torrent;
 pub mod user;
 
+pub const API_VERSION: &str = "v1";
+
 pub fn init(cfg: &mut web::ServiceConfig) {
     user::init(cfg);
     torrent::init(cfg);

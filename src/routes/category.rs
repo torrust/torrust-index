@@ -4,10 +4,11 @@ use serde::{Deserialize, Serialize};
 use crate::common::WebAppData;
 use crate::errors::{ServiceError, ServiceResult};
 use crate::models::response::OkResponse;
+use crate::routes::API_VERSION;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/category").service(
+        web::scope(&format!("/{API_VERSION}/category")).service(
             web::resource("")
                 .route(web::get().to(get))
                 .route(web::post().to(add))

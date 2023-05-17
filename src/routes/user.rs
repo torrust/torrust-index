@@ -13,12 +13,13 @@ use crate::errors::{ServiceError, ServiceResult};
 use crate::mailer::VerifyClaims;
 use crate::models::response::{OkResponse, TokenResponse};
 use crate::models::user::UserAuthentication;
+use crate::routes::API_VERSION;
 use crate::utils::clock;
 use crate::utils::regex::validate_email_address;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/user")
+        web::scope(&format!("/{API_VERSION}/user"))
             .service(web::resource("/register").route(web::post().to(register)))
             .service(web::resource("/login").route(web::post().to(login)))
             // code-review: should not this be a POST method? We add the user to the blacklist. We do not delete the user.

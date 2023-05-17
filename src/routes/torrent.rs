@@ -14,12 +14,13 @@ use crate::errors::{ServiceError, ServiceResult};
 use crate::models::info_hash::InfoHash;
 use crate::models::response::{NewTorrentResponse, OkResponse, TorrentResponse};
 use crate::models::torrent::TorrentRequest;
+use crate::routes::API_VERSION;
 use crate::utils::parse_torrent;
 use crate::AsCSV;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope("/torrent")
+        web::scope(&format!("/{API_VERSION}/torrent"))
             .service(web::resource("/upload").route(web::post().to(upload)))
             .service(web::resource("/download/{info_hash}").route(web::get().to(download_torrent_handler)))
             .service(
@@ -29,7 +30,9 @@ pub fn init(cfg: &mut web::ServiceConfig) {
                     .route(web::delete().to(delete)),
             ),
     );
-    cfg.service(web::scope("/torrents").service(web::resource("").route(web::get().to(get_torrents_handler))));
+    cfg.service(
+        web::scope(&format!("/{API_VERSION}/torrents")).service(web::resource("").route(web::get().to(get_torrents_handler))),
+    );
 }
 
 #[derive(FromRow)]
