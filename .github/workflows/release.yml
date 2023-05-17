@@ -23,6 +23,8 @@ jobs:
         run: sleep 15s
         shell: bash
       - uses: Swatinem/rust-cache@v1
+      - name: Install torrent edition tool (needed for testing)
+        run: cargo install imdl      
       - name: Run tests
         run: cargo test
       - name: Stop databases

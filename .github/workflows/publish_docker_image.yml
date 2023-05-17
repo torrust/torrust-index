@@ -35,6 +35,8 @@ jobs:
           toolchain: stable
           components: llvm-tools-preview
       - uses: Swatinem/rust-cache@v2
+      - name: Install torrent edition tool (needed for testing)
+        run: cargo install imdl      
       - name: Run Tests
         run: cargo test
 
