@@ -6,7 +6,7 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::errors::ServiceError;
-use crate::models::user::{UserClaims, UserCompact};
+use crate::models::user::{UserClaims, UserCompact, UserId};
 use crate::utils::clock;
 
 pub struct AuthorizationService {
@@ -93,5 +93,15 @@ impl AuthorizationService {
             .get_user_compact_from_id(claims.user.user_id)
             .await
             .map_err(|_| ServiceError::UserNotFound)
+    }
+
+    /// Get User id from Request
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if it can get claims from the request
+    pub async fn get_user_id_from_request(&self, req: &HttpRequest) -> Result<UserId, ServiceError> {
+        let claims = self.get_claims_from_request(req).await?;
+        Ok(claims.user.user_id)
     }
 }

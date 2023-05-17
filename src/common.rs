@@ -4,6 +4,8 @@ use crate::auth::AuthorizationService;
 use crate::cache::image::manager::ImageCacheService;
 use crate::config::Configuration;
 use crate::databases::database::Database;
+use crate::services::category::{self, DbCategoryRepository};
+use crate::services::user::DbUserRepository;
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::{mailer, tracker};
 pub type Username = String;
@@ -18,9 +20,13 @@ pub struct AppData {
     pub tracker_statistics_importer: Arc<StatisticsImporter>,
     pub mailer: Arc<mailer::Service>,
     pub image_cache_manager: Arc<ImageCacheService>,
+    pub category_repository: Arc<DbCategoryRepository>,
+    pub user_repository: Arc<DbUserRepository>,
+    pub category_service: Arc<category::Service>,
 }
 
 impl AppData {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         cfg: Arc<Configuration>,
         database: Arc<Box<dyn Database>>,
@@ -29,6 +35,9 @@ impl AppData {
         tracker_statistics_importer: Arc<StatisticsImporter>,
         mailer: Arc<mailer::Service>,
         image_cache_manager: Arc<ImageCacheService>,
+        category_repository: Arc<DbCategoryRepository>,
+        user_repository: Arc<DbUserRepository>,
+        category_service: Arc<category::Service>,
     ) -> AppData {
         AppData {
             cfg,
@@ -38,6 +47,9 @@ impl AppData {
             tracker_statistics_importer,
             mailer,
             image_cache_manager,
+            category_repository,
+            user_repository,
+            category_service,
         }
     }
 }

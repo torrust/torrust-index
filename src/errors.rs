@@ -120,8 +120,14 @@ pub enum ServiceError {
     #[display(fmt = "Failed to send verification email.")]
     FailedToSendVerificationEmail,
 
-    #[display(fmt = "Category already exists..")]
+    #[display(fmt = "Category already exists.")]
     CategoryExists,
+
+    #[display(fmt = "Category not found.")]
+    CategoryNotFound,
+
+    #[display(fmt = "Database error.")]
+    DatabaseError,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -168,6 +174,8 @@ impl ResponseError for ServiceError {
             ServiceError::EmailMissing => StatusCode::NOT_FOUND,
             ServiceError::FailedToSendVerificationEmail => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceError::WhitelistingError => StatusCode::INTERNAL_SERVER_ERROR,
+            ServiceError::DatabaseError => StatusCode::INTERNAL_SERVER_ERROR,
+            ServiceError::CategoryNotFound => StatusCode::NOT_FOUND,
         }
     }
 
