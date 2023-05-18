@@ -5,8 +5,8 @@ use crate::cache::image::manager::ImageCacheService;
 use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::services::category::{self, DbCategoryRepository};
-use crate::services::proxy;
 use crate::services::user::DbUserRepository;
+use crate::services::{proxy, settings};
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::{mailer, tracker};
 pub type Username = String;
@@ -25,6 +25,7 @@ pub struct AppData {
     pub user_repository: Arc<DbUserRepository>,
     pub category_service: Arc<category::Service>,
     pub proxy_service: Arc<proxy::Service>,
+    pub settings_service: Arc<settings::Service>,
 }
 
 impl AppData {
@@ -41,6 +42,7 @@ impl AppData {
         user_repository: Arc<DbUserRepository>,
         category_service: Arc<category::Service>,
         proxy_service: Arc<proxy::Service>,
+        settings_service: Arc<settings::Service>,
     ) -> AppData {
         AppData {
             cfg,
@@ -54,6 +56,7 @@ impl AppData {
             user_repository,
             category_service,
             proxy_service,
+            settings_service,
         }
     }
 }

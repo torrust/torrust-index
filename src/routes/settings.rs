@@ -2,16 +2,20 @@ use actix_web::{web, HttpRequest, HttpResponse, Responder};
 
 use crate::common::WebAppData;
 use crate::config;
-use crate::errors::{ServiceError, ServiceResult};
+use crate::errors::ServiceResult;
 use crate::models::response::OkResponse;
 use crate::routes::API_VERSION;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope(&format!("/{API_VERSION}/settings"))
-            .service(web::resource("").route(web::get().to(get)).route(web::post().to(update)))
-            .service(web::resource("/name").route(web::get().to(site_name)))
-            .service(web::resource("/public").route(web::get().to(get_public))),
+            .service(
+                web::resource("")
+                    .route(web::get().to(get_all_handler))
+                    .route(web::post().to(update_handler)),
+            )
+            .service(web::resource("/name").route(web::get().to(get_site_name_handler)))
+            .service(web::resource("/public").route(web::get().to(get_public_handler))),
     );
 }
 
@@ -20,42 +24,12 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 /// # Errors
 ///
 /// This function will return an error if unable to get user from database.
-pub async fn get(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    // check for user
-    let user = app_data.auth.get_user_compact_from_request(&req).await?;
+pub async fn get_all_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
 
-    // check if user is administrator
-    if !user.administrator {
-        return Err(ServiceError::Unauthorized);
-    }
+    let all_settings = app_data.settings_service.get_all(&user_id).await?;
 
-    let settings: tokio::sync::RwLockReadGuard<config::TorrustBackend> = app_data.cfg.settings.read().await;
-
-    Ok(HttpResponse::Ok().json(OkResponse { data: &*settings }))
-}
-
-/// Get Public Settings
-///
-/// # Errors
-///
-/// This function should not return an error.
-pub async fn get_public(app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let public_settings = app_data.cfg.get_public().await;
-
-    Ok(HttpResponse::Ok().json(OkResponse { data: public_settings }))
-}
-
-/// Get Name of Website
-///
-/// # Errors
-///
-/// This function should not return an error.
-pub async fn site_name(app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let settings = app_data.cfg.settings.read().await;
-
-    Ok(HttpResponse::Ok().json(OkResponse {
-        data: &settings.website.name,
-    }))
+    Ok(HttpResponse::Ok().json(OkResponse { data: all_settings }))
 }
 
 /// Update the settings
@@ -67,22 +41,36 @@ pub async fn site_name(app_data: WebAppData) -> ServiceResult<impl Responder> {
 /// - There is no logged-in user.
 /// - The user is not an administrator.
 /// - The settings could not be updated because they were loaded from env vars.
-pub async fn update(
+pub async fn update_handler(
     req: HttpRequest,
     payload: web::Json<config::TorrustBackend>,
     app_data: WebAppData,
 ) -> ServiceResult<impl Responder> {
-    // check for user
-    let user = app_data.auth.get_user_compact_from_request(&req).await?;
+    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
 
-    // check if user is administrator
-    if !user.administrator {
-        return Err(ServiceError::Unauthorized);
-    }
+    let new_settings = app_data.settings_service.update_all(payload.into_inner(), &user_id).await?;
 
-    let _ = app_data.cfg.update_settings(payload.into_inner()).await;
+    Ok(HttpResponse::Ok().json(OkResponse { data: new_settings }))
+}
 
-    let settings = app_data.cfg.settings.read().await;
+/// Get Public Settings
+///
+/// # Errors
+///
+/// This function should not return an error.
+pub async fn get_public_handler(app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let public_settings = app_data.settings_service.get_public().await;
 
-    Ok(HttpResponse::Ok().json(OkResponse { data: &*settings }))
+    Ok(HttpResponse::Ok().json(OkResponse { data: public_settings }))
+}
+
+/// Get Name of Website
+///
+/// # Errors
+///
+/// This function should not return an error.
+pub async fn get_site_name_handler(app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let site_name = app_data.settings_service.get_site_name().await;
+
+    Ok(HttpResponse::Ok().json(OkResponse { data: site_name }))
 }
