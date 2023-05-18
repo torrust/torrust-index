@@ -13,6 +13,7 @@ use crate::common::AppData;
 use crate::config::Configuration;
 use crate::databases::database;
 use crate::services::category::{self, DbCategoryRepository};
+use crate::services::proxy;
 use crate::services::user::DbUserRepository;
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::{mailer, routes, tracker};
@@ -49,10 +50,11 @@ pub async fn run(configuration: Configuration) -> Running {
     let tracker_statistics_importer =
         Arc::new(StatisticsImporter::new(cfg.clone(), tracker_service.clone(), database.clone()).await);
     let mailer_service = Arc::new(mailer::Service::new(cfg.clone()).await);
-    let image_cache_service = Arc::new(ImageCacheService::new(cfg.clone()).await);
+    let image_cache_service: Arc<ImageCacheService> = Arc::new(ImageCacheService::new(cfg.clone()).await);
     let category_repository = Arc::new(DbCategoryRepository::new(database.clone()));
     let user_repository = Arc::new(DbUserRepository::new(database.clone()));
     let category_service = Arc::new(category::Service::new(category_repository.clone(), user_repository.clone()));
+    let proxy_service = Arc::new(proxy::Service::new(image_cache_service.clone(), user_repository.clone()));
 
     // Build app container
 
@@ -67,6 +69,7 @@ pub async fn run(configuration: Configuration) -> Running {
         category_repository,
         user_repository,
         category_service,
+        proxy_service,
     ));
 
     // Start repeating task to import tracker torrent data and updating
