@@ -1,9 +1,186 @@
 //! User repository.
 use std::sync::Arc;
 
-use crate::databases::database::Database;
+use argon2::password_hash::SaltString;
+use argon2::{Argon2, PasswordHasher};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use log::info;
+use pbkdf2::password_hash::rand_core::OsRng;
+
+use crate::config::{Configuration, EmailOnSignup};
+use crate::databases::database::{Database, Error};
 use crate::errors::ServiceError;
+use crate::mailer;
+use crate::mailer::VerifyClaims;
 use crate::models::user::{UserCompact, UserId};
+use crate::routes::user::RegistrationForm;
+use crate::utils::regex::validate_email_address;
+
+/// Since user email could be optional, we need a way to represent "no email"
+/// in the database. This function returns the string that should be used for
+/// that purpose.
+fn no_email() -> String {
+    String::new()
+}
+
+pub struct RegistrationService {
+    configuration: Arc<Configuration>,
+    mailer: Arc<mailer::Service>,
+    user_repository: Arc<DbUserRepository>,
+    user_profile_repository: Arc<DbUserProfileRepository>,
+}
+
+impl RegistrationService {
+    #[must_use]
+    pub fn new(
+        configuration: Arc<Configuration>,
+        mailer: Arc<mailer::Service>,
+        user_repository: Arc<DbUserRepository>,
+        user_profile_repository: Arc<DbUserProfileRepository>,
+    ) -> Self {
+        Self {
+            configuration,
+            mailer,
+            user_repository,
+            user_profile_repository,
+        }
+    }
+
+    /// It registers a new user.
+    ///
+    /// # Errors
+    ///
+    /// This function will return a:
+    ///
+    /// * `ServiceError::EmailMissing` if email is required, but missing.
+    /// * `ServiceError::EmailInvalid` if supplied email is badly formatted.
+    /// * `ServiceError::PasswordsDontMatch` if the supplied passwords do not match.
+    /// * `ServiceError::PasswordTooShort` if the supplied password is too short.
+    /// * `ServiceError::PasswordTooLong` if the supplied password is too long.
+    /// * `ServiceError::UsernameInvalid` if the supplied username is badly formatted.
+    /// * `ServiceError::FailedToSendVerificationEmail` if unable to send the required verification email.
+    /// * An error if unable to successfully hash the password.
+    /// * An error if unable to insert user into the database.
+    pub async fn register_user(&self, registration_form: &RegistrationForm, api_base_url: &str) -> Result<UserId, ServiceError> {
+        info!("registering user: {}", registration_form.username);
+
+        let settings = self.configuration.settings.read().await;
+
+        let opt_email = match settings.auth.email_on_signup {
+            EmailOnSignup::Required => {
+                if registration_form.email.is_none() {
+                    return Err(ServiceError::EmailMissing);
+                }
+                registration_form.email.clone()
+            }
+            EmailOnSignup::None => None,
+            EmailOnSignup::Optional => registration_form.email.clone(),
+        };
+
+        if let Some(email) = &registration_form.email {
+            if !validate_email_address(email) {
+                return Err(ServiceError::EmailInvalid);
+            }
+        }
+
+        if registration_form.password != registration_form.confirm_password {
+            return Err(ServiceError::PasswordsDontMatch);
+        }
+
+        let password_length = registration_form.password.len();
+
+        if password_length <= settings.auth.min_password_length {
+            return Err(ServiceError::PasswordTooShort);
+        }
+
+        if password_length >= settings.auth.max_password_length {
+            return Err(ServiceError::PasswordTooLong);
+        }
+
+        let salt = SaltString::generate(&mut OsRng);
+
+        // Argon2 with default params (Argon2id v19)
+        let argon2 = Argon2::default();
+
+        // Hash password to PHC string ($argon2id$v=19$...)
+        let password_hash = argon2
+            .hash_password(registration_form.password.as_bytes(), &salt)?
+            .to_string();
+
+        if registration_form.username.contains('@') {
+            return Err(ServiceError::UsernameInvalid);
+        }
+
+        let user_id = self
+            .user_repository
+            .add(
+                &registration_form.username,
+                &opt_email.clone().unwrap_or(no_email()),
+                &password_hash,
+            )
+            .await?;
+
+        // If this is the first created account, give administrator rights
+        if user_id == 1 {
+            let _ = self.user_repository.grant_admin_role(&user_id).await;
+        }
+
+        if settings.mail.email_verification_enabled && opt_email.is_some() {
+            let mail_res = self
+                .mailer
+                .send_verification_mail(
+                    &opt_email.expect("variable `email` is checked above"),
+                    &registration_form.username,
+                    user_id,
+                    api_base_url,
+                )
+                .await;
+
+            if mail_res.is_err() {
+                let _ = self.user_repository.delete(&user_id).await;
+                return Err(ServiceError::FailedToSendVerificationEmail);
+            }
+        }
+
+        Ok(user_id)
+    }
+
+    /// It verifies the email address of a user via the token sent to the
+    /// user's email.
+    ///
+    /// # Errors
+    ///
+    /// This function will return a `ServiceError::DatabaseError` if unable to
+    /// update the user's email verification status.
+    pub async fn verify_email(&self, token: &str) -> Result<bool, ServiceError> {
+        let settings = self.configuration.settings.read().await;
+
+        let token_data = match decode::<VerifyClaims>(
+            token,
+            &DecodingKey::from_secret(settings.auth.secret_key.as_bytes()),
+            &Validation::new(Algorithm::HS256),
+        ) {
+            Ok(token_data) => {
+                if !token_data.claims.iss.eq("email-verification") {
+                    return Ok(false);
+                }
+
+                token_data.claims
+            }
+            Err(_) => return Ok(false),
+        };
+
+        drop(settings);
+
+        let user_id = token_data.sub;
+
+        if self.user_profile_repository.verify_email(&user_id).await.is_err() {
+            return Err(ServiceError::DatabaseError);
+        };
+
+        Ok(true)
+    }
+}
 
 pub struct DbUserRepository {
     database: Arc<Box<dyn Database>>,
@@ -20,12 +197,59 @@ impl DbUserRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn get_compact_user(&self, user_id: &UserId) -> Result<UserCompact, ServiceError> {
+    pub async fn get_compact(&self, user_id: &UserId) -> Result<UserCompact, ServiceError> {
         // todo: persistence layer should have its own errors instead of
         // returning a `ServiceError`.
         self.database
             .get_user_compact_from_id(*user_id)
             .await
             .map_err(|_| ServiceError::UserNotFound)
+    }
+
+    /// It grants the admin role to the user.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn grant_admin_role(&self, user_id: &UserId) -> Result<(), Error> {
+        self.database.grant_admin_role(*user_id).await
+    }
+
+    /// It deletes the user.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn delete(&self, user_id: &UserId) -> Result<(), Error> {
+        self.database.delete_user(*user_id).await
+    }
+
+    /// It adds a new user.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn add(&self, username: &str, email: &str, password_hash: &str) -> Result<UserId, Error> {
+        self.database.insert_user_and_get_id(username, email, password_hash).await
+    }
+}
+
+pub struct DbUserProfileRepository {
+    database: Arc<Box<dyn Database>>,
+}
+
+impl DbUserProfileRepository {
+    #[must_use]
+    pub fn new(database: Arc<Box<dyn Database>>) -> Self {
+        Self { database }
+    }
+
+    /// It marks the user's email as verified.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn verify_email(&self, user_id: &UserId) -> Result<(), Error> {
+        self.database.verify_email(*user_id).await
     }
 }

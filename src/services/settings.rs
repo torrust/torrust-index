@@ -25,7 +25,7 @@ impl Service {
     ///
     /// It returns an error if the user does not have the required permissions.
     pub async fn get_all(&self, user_id: &UserId) -> Result<TorrustBackend, ServiceError> {
-        let user = self.user_repository.get_compact_user(user_id).await?;
+        let user = self.user_repository.get_compact(user_id).await?;
 
         // Check if user is administrator
         // todo: extract authorization service
@@ -42,7 +42,7 @@ impl Service {
     ///
     /// It returns an error if the user does not have the required permissions.
     pub async fn update_all(&self, torrust_backend: TorrustBackend, user_id: &UserId) -> Result<TorrustBackend, ServiceError> {
-        let user = self.user_repository.get_compact_user(user_id).await?;
+        let user = self.user_repository.get_compact(user_id).await?;
 
         // Check if user is administrator
         // todo: extract authorization service

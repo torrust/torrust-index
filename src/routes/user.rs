@@ -1,37 +1,38 @@
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
-use argon2::password_hash::SaltString;
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
-use log::{debug, info};
-use pbkdf2::password_hash::rand_core::OsRng;
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use log::debug;
 use pbkdf2::Pbkdf2;
 use serde::{Deserialize, Serialize};
 
 use crate::common::WebAppData;
-use crate::config::EmailOnSignup;
 use crate::errors::{ServiceError, ServiceResult};
-use crate::mailer::VerifyClaims;
 use crate::models::response::{OkResponse, TokenResponse};
 use crate::models::user::UserAuthentication;
 use crate::routes::API_VERSION;
 use crate::utils::clock;
-use crate::utils::regex::validate_email_address;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope(&format!("/{API_VERSION}/user"))
-            .service(web::resource("/register").route(web::post().to(register)))
+            // Registration
+            .service(web::resource("/register").route(web::post().to(registration_handler)))
+            // code-review: should this be part of the REST API?
+            // - This endpoint should only verify the email.
+            // - There should be an independent service (web app) serving the email verification page.
+            //   The wep app can user this endpoint to verify the email and render the page accordingly.
+            .service(web::resource("/email/verify/{token}").route(web::get().to(email_verification_handler)))
+            // Authentication
             .service(web::resource("/login").route(web::post().to(login)))
-            // code-review: should not this be a POST method? We add the user to the blacklist. We do not delete the user.
-            .service(web::resource("/ban/{user}").route(web::delete().to(ban)))
             .service(web::resource("/token/verify").route(web::post().to(verify_token)))
             .service(web::resource("/token/renew").route(web::post().to(renew_token)))
-            .service(web::resource("/email/verify/{token}").route(web::get().to(verify_email))),
+            // User Access Ban
+            // code-review: should not this be a POST method? We add the user to the blacklist. We do not delete the user.
+            .service(web::resource("/ban/{user}").route(web::delete().to(ban))),
     );
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Register {
+pub struct RegistrationForm {
     pub username: String,
     pub email: Option<String>,
     pub password: String,
@@ -53,93 +54,21 @@ pub struct Token {
 ///
 /// # Errors
 ///
-/// This function will return a `ServiceError::EmailMissing` if email is required, but missing.
-/// This function will return a `ServiceError::EmailInvalid` if supplied email is badly formatted.
-/// This function will return a `ServiceError::PasswordsDontMatch` if the supplied passwords do not match.
-/// This function will return a `ServiceError::PasswordTooShort` if the supplied password is too short.
-/// This function will return a `ServiceError::PasswordTooLong` if the supplied password is too long.
-/// This function will return a `ServiceError::UsernameInvalid` if the supplied username is badly formatted.
-/// This function will return an error if unable to successfully hash the password.
-/// This function will return an error if unable to insert user into the database.
-/// This function will return a `ServiceError::FailedToSendVerificationEmail` if unable to send the required verification email.
-pub async fn register(req: HttpRequest, mut payload: web::Json<Register>, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    info!("registering user: {}", payload.username);
-
-    let settings = app_data.cfg.settings.read().await;
-
-    match settings.auth.email_on_signup {
-        EmailOnSignup::Required => {
-            if payload.email.is_none() {
-                return Err(ServiceError::EmailMissing);
-            }
-        }
-        EmailOnSignup::None => payload.email = None,
-        EmailOnSignup::Optional => {}
-    }
-
-    if let Some(email) = &payload.email {
-        // check if email address is valid
-        if !validate_email_address(email) {
-            return Err(ServiceError::EmailInvalid);
-        }
-    }
-
-    if payload.password != payload.confirm_password {
-        return Err(ServiceError::PasswordsDontMatch);
-    }
-
-    let password_length = payload.password.len();
-
-    if password_length <= settings.auth.min_password_length {
-        return Err(ServiceError::PasswordTooShort);
-    }
-
-    if password_length >= settings.auth.max_password_length {
-        return Err(ServiceError::PasswordTooLong);
-    }
-
-    let salt = SaltString::generate(&mut OsRng);
-
-    // Argon2 with default params (Argon2id v19)
-    let argon2 = Argon2::default();
-
-    // Hash password to PHC string ($argon2id$v=19$...)
-    let password_hash = argon2.hash_password(payload.password.as_bytes(), &salt)?.to_string();
-
-    if payload.username.contains('@') {
-        return Err(ServiceError::UsernameInvalid);
-    }
-
-    let email = payload.email.as_ref().unwrap_or(&String::new()).to_string();
-
-    let user_id = app_data
-        .database
-        .insert_user_and_get_id(&payload.username, &email, &password_hash)
-        .await?;
-
-    // if this is the first created account, give administrator rights
-    if user_id == 1 {
-        let _ = app_data.database.grant_admin_role(user_id).await;
-    }
-
+/// This function will return an error if the user could not be registered.
+pub async fn registration_handler(
+    req: HttpRequest,
+    registration_form: web::Json<RegistrationForm>,
+    app_data: WebAppData,
+) -> ServiceResult<impl Responder> {
     let conn_info = req.connection_info().clone();
+    // todo: we should add this in the configuration. It does not work is the
+    // server is behind a reverse proxy.
+    let api_base_url = format!("{}://{}", conn_info.scheme(), conn_info.host());
 
-    if settings.mail.email_verification_enabled && payload.email.is_some() {
-        let mail_res = app_data
-            .mailer
-            .send_verification_mail(
-                payload.email.as_ref().expect("variable `email` is checked above"),
-                &payload.username,
-                user_id,
-                format!("{}://{}", conn_info.scheme(), conn_info.host()).as_str(),
-            )
-            .await;
-
-        if mail_res.is_err() {
-            let _ = app_data.database.delete_user(user_id).await;
-            return Err(ServiceError::FailedToSendVerificationEmail);
-        }
-    }
+    let _user_id = app_data
+        .registration_service
+        .register_user(&registration_form, &api_base_url)
+        .await?;
 
     Ok(HttpResponse::Ok())
 }
@@ -266,35 +195,17 @@ pub async fn renew_token(payload: web::Json<Token>, app_data: WebAppData) -> Ser
     }))
 }
 
-pub async fn verify_email(req: HttpRequest, app_data: WebAppData) -> String {
-    let settings = app_data.cfg.settings.read().await;
+pub async fn email_verification_handler(req: HttpRequest, app_data: WebAppData) -> String {
+    // Get token from URL path
     let token = match req.match_info().get("token").ok_or(ServiceError::InternalServerError) {
         Ok(token) => token,
         Err(err) => return err.to_string(),
     };
 
-    let token_data = match decode::<VerifyClaims>(
-        token,
-        &DecodingKey::from_secret(settings.auth.secret_key.as_bytes()),
-        &Validation::new(Algorithm::HS256),
-    ) {
-        Ok(token_data) => {
-            if !token_data.claims.iss.eq("email-verification") {
-                return ServiceError::TokenInvalid.to_string();
-            }
-
-            token_data.claims
-        }
-        Err(_) => return ServiceError::TokenInvalid.to_string(),
-    };
-
-    drop(settings);
-
-    if app_data.database.verify_email(token_data.sub).await.is_err() {
-        return ServiceError::InternalServerError.to_string();
-    };
-
-    String::from("Email verified, you can close this page.")
+    match app_data.registration_service.verify_email(token).await {
+        Ok(_) => String::from("Email verified, you can close this page."),
+        Err(error) => error.to_string(),
+    }
 }
 
 /// Ban a user from the Index

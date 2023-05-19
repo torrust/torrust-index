@@ -17,7 +17,7 @@ use crate::services::torrent::{
     DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator,
     DbTorrentRepository,
 };
-use crate::services::user::DbUserRepository;
+use crate::services::user::{self, DbUserProfileRepository, DbUserRepository};
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::{mailer, routes, tracker};
@@ -28,6 +28,7 @@ pub struct Running {
     pub tracker_data_importer_handle: tokio::task::JoinHandle<()>,
 }
 
+#[allow(clippy::too_many_lines)]
 pub async fn run(configuration: Configuration) -> Running {
     logging::setup();
 
@@ -58,6 +59,7 @@ pub async fn run(configuration: Configuration) -> Running {
     // Repositories
     let category_repository = Arc::new(DbCategoryRepository::new(database.clone()));
     let user_repository = Arc::new(DbUserRepository::new(database.clone()));
+    let user_profile_repository = Arc::new(DbUserProfileRepository::new(database.clone()));
     let torrent_repository = Arc::new(DbTorrentRepository::new(database.clone()));
     let torrent_info_repository = Arc::new(DbTorrentInfoRepository::new(database.clone()));
     let torrent_file_repository = Arc::new(DbTorrentFileRepository::new(database.clone()));
@@ -79,6 +81,12 @@ pub async fn run(configuration: Configuration) -> Running {
         torrent_announce_url_repository.clone(),
         torrent_listing_generator.clone(),
     ));
+    let registration_service = Arc::new(user::RegistrationService::new(
+        configuration.clone(),
+        mailer_service.clone(),
+        user_repository.clone(),
+        user_profile_repository.clone(),
+    ));
 
     // Build app container
 
@@ -93,6 +101,7 @@ pub async fn run(configuration: Configuration) -> Running {
         // Repositories
         category_repository,
         user_repository,
+        user_profile_repository,
         torrent_repository,
         torrent_info_repository,
         torrent_file_repository,
@@ -103,6 +112,7 @@ pub async fn run(configuration: Configuration) -> Running {
         proxy_service,
         settings_service,
         torrent_index,
+        registration_service,
     ));
 
     // Start repeating task to import tracker torrent data and updating

@@ -39,7 +39,7 @@ impl Service {
     /// * The image is too big.
     /// * The user quota is met.
     pub async fn get_image_by_url(&self, url: &str, user_id: &UserId) -> Result<Bytes, Error> {
-        let user = self.user_repository.get_compact_user(user_id).await.ok();
+        let user = self.user_repository.get_compact(user_id).await.ok();
 
         self.image_cache_service.get_image_by_url(url, user).await
     }

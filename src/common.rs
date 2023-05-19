@@ -9,7 +9,7 @@ use crate::services::torrent::{
     DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator,
     DbTorrentRepository,
 };
-use crate::services::user::DbUserRepository;
+use crate::services::user::{self, DbUserProfileRepository, DbUserRepository};
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::{mailer, tracker};
@@ -28,6 +28,7 @@ pub struct AppData {
     // Repositories
     pub category_repository: Arc<DbCategoryRepository>,
     pub user_repository: Arc<DbUserRepository>,
+    pub user_profile_repository: Arc<DbUserProfileRepository>,
     pub torrent_repository: Arc<DbTorrentRepository>,
     pub torrent_info_repository: Arc<DbTorrentInfoRepository>,
     pub torrent_file_repository: Arc<DbTorrentFileRepository>,
@@ -38,6 +39,7 @@ pub struct AppData {
     pub proxy_service: Arc<proxy::Service>,
     pub settings_service: Arc<settings::Service>,
     pub torrent_service: Arc<torrent::Index>,
+    pub registration_service: Arc<user::RegistrationService>,
 }
 
 impl AppData {
@@ -53,6 +55,7 @@ impl AppData {
         // Repositories
         category_repository: Arc<DbCategoryRepository>,
         user_repository: Arc<DbUserRepository>,
+        user_profile_repository: Arc<DbUserProfileRepository>,
         torrent_repository: Arc<DbTorrentRepository>,
         torrent_info_repository: Arc<DbTorrentInfoRepository>,
         torrent_file_repository: Arc<DbTorrentFileRepository>,
@@ -63,6 +66,7 @@ impl AppData {
         proxy_service: Arc<proxy::Service>,
         settings_service: Arc<settings::Service>,
         torrent_service: Arc<torrent::Index>,
+        registration_service: Arc<user::RegistrationService>,
     ) -> AppData {
         AppData {
             cfg,
@@ -75,6 +79,7 @@ impl AppData {
             // Repositories
             category_repository,
             user_repository,
+            user_profile_repository,
             torrent_repository,
             torrent_info_repository,
             torrent_file_repository,
@@ -85,6 +90,7 @@ impl AppData {
             proxy_service,
             settings_service,
             torrent_service,
+            registration_service,
         }
     }
 }

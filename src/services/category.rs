@@ -30,7 +30,7 @@ impl Service {
     /// * The user does not have the required permissions.
     /// * There is a database error.
     pub async fn add_category(&self, category_name: &str, user_id: &UserId) -> Result<i64, ServiceError> {
-        let user = self.user_repository.get_compact_user(user_id).await?;
+        let user = self.user_repository.get_compact(user_id).await?;
 
         // Check if user is administrator
         // todo: extract authorization service
@@ -56,7 +56,7 @@ impl Service {
     /// * The user does not have the required permissions.
     /// * There is a database error.
     pub async fn delete_category(&self, category_name: &str, user_id: &UserId) -> Result<(), ServiceError> {
-        let user = self.user_repository.get_compact_user(user_id).await?;
+        let user = self.user_repository.get_compact(user_id).await?;
 
         // Check if user is administrator
         // todo: extract authorization service

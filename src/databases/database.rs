@@ -101,7 +101,7 @@ pub trait Database: Sync + Send {
         Self: Sized;
 
     /// Add new user and return the newly inserted `user_id`.
-    async fn insert_user_and_get_id(&self, username: &str, email: &str, password: &str) -> Result<i64, Error>;
+    async fn insert_user_and_get_id(&self, username: &str, email: &str, password: &str) -> Result<UserId, Error>;
 
     /// Get `User` from `user_id`.
     async fn get_user_from_id(&self, user_id: i64) -> Result<User, Error>;

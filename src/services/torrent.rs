@@ -164,7 +164,7 @@ impl Index {
     /// * Unable to get the torrent listing from it's ID.
     /// * Unable to delete the torrent from the database.
     pub async fn delete_torrent(&self, info_hash: &InfoHash, user_id: &UserId) -> Result<DeletedTorrentResponse, ServiceError> {
-        let user = self.user_repository.get_compact_user(user_id).await?;
+        let user = self.user_repository.get_compact(user_id).await?;
 
         // Only administrator can delete torrents.
         // todo: move this to an authorization service.
@@ -343,7 +343,7 @@ impl Index {
         description: &Option<String>,
         user_id: &UserId,
     ) -> Result<TorrentResponse, ServiceError> {
-        let updater = self.user_repository.get_compact_user(user_id).await?;
+        let updater = self.user_repository.get_compact(user_id).await?;
 
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
 
