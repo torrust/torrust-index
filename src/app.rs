@@ -13,8 +13,12 @@ use crate::common::AppData;
 use crate::config::Configuration;
 use crate::databases::database;
 use crate::services::category::{self, DbCategoryRepository};
+use crate::services::torrent::{
+    DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator,
+    DbTorrentRepository,
+};
 use crate::services::user::DbUserRepository;
-use crate::services::{proxy, settings};
+use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::{mailer, routes, tracker};
 
@@ -27,12 +31,12 @@ pub struct Running {
 pub async fn run(configuration: Configuration) -> Running {
     logging::setup();
 
-    let cfg = Arc::new(configuration);
+    let configuration = Arc::new(configuration);
 
     // Get configuration settings needed to build the app dependencies and
     // services: main API server and tracker torrents importer.
 
-    let settings = cfg.settings.read().await;
+    let settings = configuration.settings.read().await;
 
     let database_connect_url = settings.database.connect_url.clone();
     let torrent_info_update_interval = settings.tracker_statistics_importer.torrent_info_update_interval;
@@ -45,33 +49,60 @@ pub async fn run(configuration: Configuration) -> Running {
     // Build app dependencies
 
     let database = Arc::new(database::connect(&database_connect_url).await.expect("Database error."));
-    let auth = Arc::new(AuthorizationService::new(cfg.clone(), database.clone()));
-    let tracker_service = Arc::new(tracker::service::Service::new(cfg.clone(), database.clone()).await);
+    let auth = Arc::new(AuthorizationService::new(configuration.clone(), database.clone()));
+    let tracker_service = Arc::new(tracker::service::Service::new(configuration.clone(), database.clone()).await);
     let tracker_statistics_importer =
-        Arc::new(StatisticsImporter::new(cfg.clone(), tracker_service.clone(), database.clone()).await);
-    let mailer_service = Arc::new(mailer::Service::new(cfg.clone()).await);
-    let image_cache_service: Arc<ImageCacheService> = Arc::new(ImageCacheService::new(cfg.clone()).await);
+        Arc::new(StatisticsImporter::new(configuration.clone(), tracker_service.clone(), database.clone()).await);
+    let mailer_service = Arc::new(mailer::Service::new(configuration.clone()).await);
+    let image_cache_service: Arc<ImageCacheService> = Arc::new(ImageCacheService::new(configuration.clone()).await);
+    // Repositories
     let category_repository = Arc::new(DbCategoryRepository::new(database.clone()));
     let user_repository = Arc::new(DbUserRepository::new(database.clone()));
+    let torrent_repository = Arc::new(DbTorrentRepository::new(database.clone()));
+    let torrent_info_repository = Arc::new(DbTorrentInfoRepository::new(database.clone()));
+    let torrent_file_repository = Arc::new(DbTorrentFileRepository::new(database.clone()));
+    let torrent_announce_url_repository = Arc::new(DbTorrentAnnounceUrlRepository::new(database.clone()));
+    let torrent_listing_generator = Arc::new(DbTorrentListingGenerator::new(database.clone()));
+    // Services
     let category_service = Arc::new(category::Service::new(category_repository.clone(), user_repository.clone()));
     let proxy_service = Arc::new(proxy::Service::new(image_cache_service.clone(), user_repository.clone()));
-    let settings_service = Arc::new(settings::Service::new(cfg.clone(), user_repository.clone()));
+    let settings_service = Arc::new(settings::Service::new(configuration.clone(), user_repository.clone()));
+    let torrent_index = Arc::new(torrent::Index::new(
+        configuration.clone(),
+        tracker_statistics_importer.clone(),
+        tracker_service.clone(),
+        user_repository.clone(),
+        category_repository.clone(),
+        torrent_repository.clone(),
+        torrent_info_repository.clone(),
+        torrent_file_repository.clone(),
+        torrent_announce_url_repository.clone(),
+        torrent_listing_generator.clone(),
+    ));
 
     // Build app container
 
     let app_data = Arc::new(AppData::new(
-        cfg.clone(),
+        configuration.clone(),
         database.clone(),
         auth.clone(),
         tracker_service.clone(),
         tracker_statistics_importer.clone(),
         mailer_service,
         image_cache_service,
+        // Repositories
         category_repository,
         user_repository,
+        torrent_repository,
+        torrent_info_repository,
+        torrent_file_repository,
+        torrent_announce_url_repository,
+        torrent_listing_generator,
+        // Services
         category_service,
         proxy_service,
         settings_service,
+        torrent_index,
     ));
 
     // Start repeating task to import tracker torrent data and updating

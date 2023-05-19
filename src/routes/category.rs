@@ -23,7 +23,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 ///
 /// This function will return an error if there is a database error.
 pub async fn get(app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let categories = app_data.category_repository.get_categories().await?;
+    let categories = app_data.category_repository.get_all().await?;
 
     Ok(HttpResponse::Ok().json(OkResponse { data: categories }))
 }

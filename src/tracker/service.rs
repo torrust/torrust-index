@@ -8,6 +8,7 @@ use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::errors::ServiceError;
 use crate::models::tracker_key::TrackerKey;
+use crate::models::user::UserId;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TorrentInfo {
@@ -113,7 +114,7 @@ impl Service {
     ///
     /// Will return an error if the HTTP request to get generated a new
     /// user tracker key failed.
-    pub async fn get_personal_announce_url(&self, user_id: i64) -> Result<String, ServiceError> {
+    pub async fn get_personal_announce_url(&self, user_id: UserId) -> Result<String, ServiceError> {
         let tracker_key = self.database.get_user_tracker_key(user_id).await;
 
         match tracker_key {

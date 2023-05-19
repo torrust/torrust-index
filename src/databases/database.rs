@@ -9,7 +9,7 @@ use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
 use crate::models::tracker_key::TrackerKey;
-use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
+use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
 
 /// Database drivers.
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
@@ -165,7 +165,7 @@ pub trait Database: Sync + Send {
     async fn insert_torrent_and_get_id(
         &self,
         torrent: &Torrent,
-        uploader_id: i64,
+        uploader_id: UserId,
         category_id: i64,
         title: &str,
         description: &str,

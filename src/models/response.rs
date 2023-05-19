@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use super::torrent::TorrentId;
 use crate::databases::database::Category;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::TorrentFile;
@@ -31,7 +32,14 @@ pub struct TokenResponse {
 #[allow(clippy::module_name_repetitions)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewTorrentResponse {
-    pub torrent_id: i64,
+    pub torrent_id: TorrentId,
+    pub info_hash: String,
+}
+
+#[allow(clippy::module_name_repetitions)]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DeletedTorrentResponse {
+    pub torrent_id: TorrentId,
     pub info_hash: String,
 }
 
@@ -55,18 +63,14 @@ pub struct TorrentResponse {
 
 impl TorrentResponse {
     #[must_use]
-    pub fn from_listing(torrent_listing: TorrentListing) -> TorrentResponse {
+    pub fn from_listing(torrent_listing: TorrentListing, category: Category) -> TorrentResponse {
         TorrentResponse {
             torrent_id: torrent_listing.torrent_id,
             uploader: torrent_listing.uploader,
             info_hash: torrent_listing.info_hash,
             title: torrent_listing.title,
             description: torrent_listing.description,
-            category: Category {
-                category_id: 0,
-                name: String::new(),
-                num_torrents: 0,
-            },
+            category,
             upload_date: torrent_listing.date_uploaded,
             file_size: torrent_listing.file_size,
             seeders: torrent_listing.seeders,

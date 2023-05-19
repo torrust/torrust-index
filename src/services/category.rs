@@ -38,7 +38,7 @@ impl Service {
             return Err(ServiceError::Unauthorized);
         }
 
-        match self.category_repository.add_category(category_name).await {
+        match self.category_repository.add(category_name).await {
             Ok(id) => Ok(id),
             Err(e) => match e {
                 DatabaseError::CategoryAlreadyExists => Err(ServiceError::CategoryExists),
@@ -64,7 +64,7 @@ impl Service {
             return Err(ServiceError::Unauthorized);
         }
 
-        match self.category_repository.delete_category(category_name).await {
+        match self.category_repository.delete(category_name).await {
             Ok(_) => Ok(()),
             Err(e) => match e {
                 DatabaseError::CategoryNotFound => Err(ServiceError::CategoryNotFound),
@@ -89,7 +89,7 @@ impl DbCategoryRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn get_categories(&self) -> Result<Vec<Category>, DatabaseError> {
+    pub async fn get_all(&self) -> Result<Vec<Category>, DatabaseError> {
         self.database.get_categories().await
     }
 
@@ -98,7 +98,7 @@ impl DbCategoryRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn add_category(&self, category_name: &str) -> Result<CategoryId, DatabaseError> {
+    pub async fn add(&self, category_name: &str) -> Result<CategoryId, DatabaseError> {
         self.database.insert_category_and_get_id(category_name).await
     }
 
@@ -107,7 +107,25 @@ impl DbCategoryRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn delete_category(&self, category_name: &str) -> Result<(), DatabaseError> {
+    pub async fn delete(&self, category_name: &str) -> Result<(), DatabaseError> {
         self.database.delete_category(category_name).await
+    }
+
+    /// It finds a category by name
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn get_by_name(&self, category_name: &str) -> Result<Category, DatabaseError> {
+        self.database.get_category_from_name(category_name).await
+    }
+
+    /// It finds a category by id
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn get_by_id(&self, category_id: &CategoryId) -> Result<Category, DatabaseError> {
+        self.database.get_category_from_id(*category_id).await
     }
 }

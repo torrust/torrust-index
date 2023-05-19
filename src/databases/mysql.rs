@@ -10,7 +10,7 @@ use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::{DbTorrentAnnounceUrl, DbTorrentFile, DbTorrentInfo, Torrent, TorrentFile};
 use crate::models::tracker_key::TrackerKey;
-use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
+use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
 use crate::utils::clock;
 use crate::utils::hex::from_bytes;
 
@@ -380,7 +380,7 @@ impl Database for Mysql {
     async fn insert_torrent_and_get_id(
         &self,
         torrent: &Torrent,
-        uploader_id: i64,
+        uploader_id: UserId,
         category_id: i64,
         title: &str,
         description: &str,
