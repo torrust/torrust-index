@@ -108,7 +108,7 @@ impl Database for Sqlite {
             .map_err(|_| database::Error::UserNotFound)
     }
 
-    async fn get_user_authentication_from_id(&self, user_id: i64) -> Result<UserAuthentication, database::Error> {
+    async fn get_user_authentication_from_id(&self, user_id: UserId) -> Result<UserAuthentication, database::Error> {
         query_as::<_, UserAuthentication>("SELECT * FROM torrust_user_authentication WHERE user_id = ?")
             .bind(user_id)
             .fetch_one(&self.pool)

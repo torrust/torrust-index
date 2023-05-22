@@ -6,12 +6,13 @@ use actix_web::dev::Server;
 use actix_web::{middleware, web, App, HttpServer};
 use log::info;
 
-use crate::auth::AuthorizationService;
+use crate::auth::Authentication;
 use crate::bootstrap::logging;
 use crate::cache::image::manager::ImageCacheService;
 use crate::common::AppData;
 use crate::config::Configuration;
 use crate::databases::database;
+use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
 use crate::services::category::{self, DbCategoryRepository};
 use crate::services::torrent::{
     DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator,
@@ -50,15 +51,13 @@ pub async fn run(configuration: Configuration) -> Running {
     // Build app dependencies
 
     let database = Arc::new(database::connect(&database_connect_url).await.expect("Database error."));
-    let auth = Arc::new(AuthorizationService::new(configuration.clone(), database.clone()));
-    let tracker_service = Arc::new(tracker::service::Service::new(configuration.clone(), database.clone()).await);
-    let tracker_statistics_importer =
-        Arc::new(StatisticsImporter::new(configuration.clone(), tracker_service.clone(), database.clone()).await);
-    let mailer_service = Arc::new(mailer::Service::new(configuration.clone()).await);
-    let image_cache_service: Arc<ImageCacheService> = Arc::new(ImageCacheService::new(configuration.clone()).await);
+    let json_web_token = Arc::new(JsonWebToken::new(configuration.clone()));
+    let auth = Arc::new(Authentication::new(json_web_token.clone()));
+
     // Repositories
     let category_repository = Arc::new(DbCategoryRepository::new(database.clone()));
     let user_repository = Arc::new(DbUserRepository::new(database.clone()));
+    let user_authentication_repository = Arc::new(DbUserAuthenticationRepository::new(database.clone()));
     let user_profile_repository = Arc::new(DbUserProfileRepository::new(database.clone()));
     let torrent_repository = Arc::new(DbTorrentRepository::new(database.clone()));
     let torrent_info_repository = Arc::new(DbTorrentInfoRepository::new(database.clone()));
@@ -66,7 +65,13 @@ pub async fn run(configuration: Configuration) -> Running {
     let torrent_announce_url_repository = Arc::new(DbTorrentAnnounceUrlRepository::new(database.clone()));
     let torrent_listing_generator = Arc::new(DbTorrentListingGenerator::new(database.clone()));
     let banned_user_list = Arc::new(DbBannedUserList::new(database.clone()));
+
     // Services
+    let tracker_service = Arc::new(tracker::service::Service::new(configuration.clone(), database.clone()).await);
+    let tracker_statistics_importer =
+        Arc::new(StatisticsImporter::new(configuration.clone(), tracker_service.clone(), database.clone()).await);
+    let mailer_service = Arc::new(mailer::Service::new(configuration.clone()).await);
+    let image_cache_service: Arc<ImageCacheService> = Arc::new(ImageCacheService::new(configuration.clone()).await);
     let category_service = Arc::new(category::Service::new(category_repository.clone(), user_repository.clone()));
     let proxy_service = Arc::new(proxy::Service::new(image_cache_service.clone(), user_repository.clone()));
     let settings_service = Arc::new(settings::Service::new(configuration.clone(), user_repository.clone()));
@@ -93,20 +98,29 @@ pub async fn run(configuration: Configuration) -> Running {
         user_profile_repository.clone(),
         banned_user_list.clone(),
     ));
+    let authentication_service = Arc::new(Service::new(
+        configuration.clone(),
+        json_web_token.clone(),
+        user_repository.clone(),
+        user_profile_repository.clone(),
+        user_authentication_repository.clone(),
+    ));
 
     // Build app container
 
     let app_data = Arc::new(AppData::new(
         configuration.clone(),
         database.clone(),
+        json_web_token.clone(),
         auth.clone(),
+        authentication_service,
         tracker_service.clone(),
         tracker_statistics_importer.clone(),
         mailer_service,
         image_cache_service,
-        // Repositories
         category_repository,
         user_repository,
+        user_authentication_repository,
         user_profile_repository,
         torrent_repository,
         torrent_info_repository,
@@ -114,7 +128,6 @@ pub async fn run(configuration: Configuration) -> Running {
         torrent_announce_url_repository,
         torrent_listing_generator,
         banned_user_list,
-        // Services
         category_service,
         proxy_service,
         settings_service,

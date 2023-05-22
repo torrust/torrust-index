@@ -107,7 +107,7 @@ pub trait Database: Sync + Send {
     async fn get_user_from_id(&self, user_id: i64) -> Result<User, Error>;
 
     /// Get `UserAuthentication` from `user_id`.
-    async fn get_user_authentication_from_id(&self, user_id: i64) -> Result<UserAuthentication, Error>;
+    async fn get_user_authentication_from_id(&self, user_id: UserId) -> Result<UserAuthentication, Error>;
 
     /// Get `UserProfile` from `username`.
     async fn get_user_profile_from_username(&self, username: &str) -> Result<UserProfile, Error>;
