@@ -4,7 +4,7 @@ use std::sync::Arc;
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
-use log::info;
+use log::{debug, info};
 use pbkdf2::password_hash::rand_core::OsRng;
 
 use crate::config::{Configuration, EmailOnSignup};
@@ -12,7 +12,7 @@ use crate::databases::database::{Database, Error};
 use crate::errors::ServiceError;
 use crate::mailer;
 use crate::mailer::VerifyClaims;
-use crate::models::user::{UserCompact, UserId};
+use crate::models::user::{UserCompact, UserId, UserProfile};
 use crate::routes::user::RegistrationForm;
 use crate::utils::regex::validate_email_address;
 
@@ -182,6 +182,56 @@ impl RegistrationService {
     }
 }
 
+pub struct BanService {
+    user_repository: Arc<DbUserRepository>,
+    user_profile_repository: Arc<DbUserProfileRepository>,
+    banned_user_list: Arc<DbBannedUserList>,
+}
+
+impl BanService {
+    #[must_use]
+    pub fn new(
+        user_repository: Arc<DbUserRepository>,
+        user_profile_repository: Arc<DbUserProfileRepository>,
+        banned_user_list: Arc<DbBannedUserList>,
+    ) -> Self {
+        Self {
+            user_repository,
+            user_profile_repository,
+            banned_user_list,
+        }
+    }
+
+    /// Ban a user from the Index.
+    ///
+    /// # Errors
+    ///
+    /// This function will return a:
+    ///
+    /// * `ServiceError::InternalServerError` if unable get user from the request.
+    /// * An error if unable to get user profile from supplied username.
+    /// * An error if unable to set the ban of the user in the database.
+    pub async fn ban_user(&self, username_to_be_banned: &str, user_id: &UserId) -> Result<(), ServiceError> {
+        debug!("user with ID {user_id} banning username: {username_to_be_banned}");
+
+        let user = self.user_repository.get_compact(user_id).await?;
+
+        // Check if user is administrator
+        if !user.administrator {
+            return Err(ServiceError::Unauthorized);
+        }
+
+        let user_profile = self
+            .user_profile_repository
+            .get_user_profile_from_username(username_to_be_banned)
+            .await?;
+
+        self.banned_user_list.add(&user_profile.user_id).await?;
+
+        Ok(())
+    }
+}
+
 pub struct DbUserRepository {
     database: Arc<Box<dyn Database>>,
 }
@@ -251,5 +301,45 @@ impl DbUserProfileRepository {
     /// It returns an error if there is a database error.
     pub async fn verify_email(&self, user_id: &UserId) -> Result<(), Error> {
         self.database.verify_email(*user_id).await
+    }
+
+    /// It get the user profile from the username.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn get_user_profile_from_username(&self, username: &str) -> Result<UserProfile, Error> {
+        self.database.get_user_profile_from_username(username).await
+    }
+}
+
+pub struct DbBannedUserList {
+    database: Arc<Box<dyn Database>>,
+}
+
+impl DbBannedUserList {
+    #[must_use]
+    pub fn new(database: Arc<Box<dyn Database>>) -> Self {
+        Self { database }
+    }
+
+    /// It add a user to the banned users list.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn add(&self, user_id: &UserId) -> Result<(), Error> {
+        // todo: add reason and `date_expiry` parameters to request.
+
+        // code-review: add the user ID of the user who banned the user.
+
+        // For the time being, we will not use a reason for banning a user.
+        let reason = "no reason".to_string();
+
+        // User will be banned until the year 9999
+        let date_expiry = chrono::NaiveDateTime::parse_from_str("9999-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
+            .expect("Could not parse date from 9999-01-01 00:00:00.");
+
+        self.database.ban_user(*user_id, &reason, date_expiry).await
     }
 }

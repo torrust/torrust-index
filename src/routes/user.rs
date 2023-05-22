@@ -1,6 +1,5 @@
 use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
-use log::debug;
 use pbkdf2::Pbkdf2;
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +26,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
             .service(web::resource("/token/renew").route(web::post().to(renew_token)))
             // User Access Ban
             // code-review: should not this be a POST method? We add the user to the blacklist. We do not delete the user.
-            .service(web::resource("/ban/{user}").route(web::delete().to(ban))),
+            .service(web::resource("/ban/{user}").route(web::delete().to(ban_handler))),
     );
 }
 
@@ -214,35 +213,12 @@ pub async fn email_verification_handler(req: HttpRequest, app_data: WebAppData) 
 ///
 /// # Errors
 ///
-/// This function will return a `ServiceError::InternalServerError` if unable get user from the request.
-/// This function will return an error if unable to get user profile from supplied username.
-/// This function will return an error if unable to ser the ban of the user in the database.
-pub async fn ban(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    debug!("banning user");
-
-    let user = app_data.auth.get_user_compact_from_request(&req).await?;
-
-    // check if user is administrator
-    if !user.administrator {
-        return Err(ServiceError::Unauthorized);
-    }
-
+/// This function will return if the user could not be banned.
+pub async fn ban_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
+    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
     let to_be_banned_username = req.match_info().get("user").ok_or(ServiceError::InternalServerError)?;
 
-    debug!("user to be banned: {}", to_be_banned_username);
-
-    let user_profile = app_data
-        .database
-        .get_user_profile_from_username(to_be_banned_username)
-        .await?;
-
-    let reason = "no reason".to_string();
-
-    // user will be banned until the year 9999
-    let date_expiry = chrono::NaiveDateTime::parse_from_str("9999-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
-        .expect("Could not parse date from 9999-01-01 00:00:00.");
-
-    app_data.database.ban_user(user_profile.user_id, &reason, date_expiry).await?;
+    app_data.ban_service.ban_user(to_be_banned_username, &user_id).await?;
 
     Ok(HttpResponse::Ok().json(OkResponse {
         data: format!("Banned user: {to_be_banned_username}"),

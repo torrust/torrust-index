@@ -17,7 +17,7 @@ use crate::services::torrent::{
     DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator,
     DbTorrentRepository,
 };
-use crate::services::user::{self, DbUserProfileRepository, DbUserRepository};
+use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::{mailer, routes, tracker};
@@ -65,6 +65,7 @@ pub async fn run(configuration: Configuration) -> Running {
     let torrent_file_repository = Arc::new(DbTorrentFileRepository::new(database.clone()));
     let torrent_announce_url_repository = Arc::new(DbTorrentAnnounceUrlRepository::new(database.clone()));
     let torrent_listing_generator = Arc::new(DbTorrentListingGenerator::new(database.clone()));
+    let banned_user_list = Arc::new(DbBannedUserList::new(database.clone()));
     // Services
     let category_service = Arc::new(category::Service::new(category_repository.clone(), user_repository.clone()));
     let proxy_service = Arc::new(proxy::Service::new(image_cache_service.clone(), user_repository.clone()));
@@ -87,6 +88,11 @@ pub async fn run(configuration: Configuration) -> Running {
         user_repository.clone(),
         user_profile_repository.clone(),
     ));
+    let ban_service = Arc::new(user::BanService::new(
+        user_repository.clone(),
+        user_profile_repository.clone(),
+        banned_user_list.clone(),
+    ));
 
     // Build app container
 
@@ -107,12 +113,14 @@ pub async fn run(configuration: Configuration) -> Running {
         torrent_file_repository,
         torrent_announce_url_repository,
         torrent_listing_generator,
+        banned_user_list,
         // Services
         category_service,
         proxy_service,
         settings_service,
         torrent_index,
         registration_service,
+        ban_service,
     ));
 
     // Start repeating task to import tracker torrent data and updating

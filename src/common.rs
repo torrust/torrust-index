@@ -9,7 +9,7 @@ use crate::services::torrent::{
     DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator,
     DbTorrentRepository,
 };
-use crate::services::user::{self, DbUserProfileRepository, DbUserRepository};
+use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::{mailer, tracker};
@@ -34,12 +34,14 @@ pub struct AppData {
     pub torrent_file_repository: Arc<DbTorrentFileRepository>,
     pub torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
     pub torrent_listing_generator: Arc<DbTorrentListingGenerator>,
+    pub banned_user_list: Arc<DbBannedUserList>,
     // Services
     pub category_service: Arc<category::Service>,
     pub proxy_service: Arc<proxy::Service>,
     pub settings_service: Arc<settings::Service>,
     pub torrent_service: Arc<torrent::Index>,
     pub registration_service: Arc<user::RegistrationService>,
+    pub ban_service: Arc<user::BanService>,
 }
 
 impl AppData {
@@ -61,12 +63,14 @@ impl AppData {
         torrent_file_repository: Arc<DbTorrentFileRepository>,
         torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
         torrent_listing_generator: Arc<DbTorrentListingGenerator>,
+        banned_user_list: Arc<DbBannedUserList>,
         // Services
         category_service: Arc<category::Service>,
         proxy_service: Arc<proxy::Service>,
         settings_service: Arc<settings::Service>,
         torrent_service: Arc<torrent::Index>,
         registration_service: Arc<user::RegistrationService>,
+        ban_service: Arc<user::BanService>,
     ) -> AppData {
         AppData {
             cfg,
@@ -85,12 +89,14 @@ impl AppData {
             torrent_file_repository,
             torrent_announce_url_repository,
             torrent_listing_generator,
+            banned_user_list,
             // Services
             category_service,
             proxy_service,
             settings_service,
             torrent_service,
             registration_service,
+            ban_service,
         }
     }
 }
