@@ -321,6 +321,12 @@ impl Configuration {
         }
     }
 
+    pub async fn get_all(&self) -> TorrustBackend {
+        let settings_lock = self.settings.read().await;
+
+        settings_lock.clone()
+    }
+
     pub async fn get_public(&self) -> ConfigurationPublic {
         let settings_lock = self.settings.read().await;
 
@@ -330,6 +336,12 @@ impl Configuration {
             tracker_mode: settings_lock.tracker.mode.clone(),
             email_on_signup: settings_lock.auth.email_on_signup.clone(),
         }
+    }
+
+    pub async fn get_site_name(&self) -> String {
+        let settings_lock = self.settings.read().await;
+
+        settings_lock.website.name.clone()
     }
 }
 

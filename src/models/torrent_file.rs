@@ -165,7 +165,9 @@ impl Torrent {
         }
     }
 
-    pub async fn set_torrust_config(&mut self, cfg: &Configuration) {
+    /// Sets the announce url to the tracker url and removes all other trackers
+    /// if the torrent is private.
+    pub async fn set_announce_urls(&mut self, cfg: &Configuration) {
         let settings = cfg.settings.read().await;
 
         self.announce = Some(settings.tracker.url.clone());

@@ -4,10 +4,13 @@ use crate::models::torrent_file::Torrent;
 use crate::routes::torrent::Create;
 
 #[allow(clippy::module_name_repetitions)]
+pub type TorrentId = i64;
+
+#[allow(clippy::module_name_repetitions)]
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
 pub struct TorrentListing {
-    pub torrent_id: i64,
+    pub torrent_id: TorrentId,
     pub uploader: String,
     pub info_hash: String,
     pub title: String,

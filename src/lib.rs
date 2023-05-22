@@ -10,7 +10,9 @@ pub mod errors;
 pub mod mailer;
 pub mod models;
 pub mod routes;
+pub mod services;
 pub mod tracker;
+pub mod ui;
 pub mod upgrades;
 pub mod utils;
 

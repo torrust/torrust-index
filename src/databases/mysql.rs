@@ -10,7 +10,7 @@ use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::{DbTorrentAnnounceUrl, DbTorrentFile, DbTorrentInfo, Torrent, TorrentFile};
 use crate::models::tracker_key::TrackerKey;
-use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
+use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
 use crate::utils::clock;
 use crate::utils::hex::from_bytes;
 
@@ -107,7 +107,7 @@ impl Database for Mysql {
             .map_err(|_| database::Error::UserNotFound)
     }
 
-    async fn get_user_authentication_from_id(&self, user_id: i64) -> Result<UserAuthentication, database::Error> {
+    async fn get_user_authentication_from_id(&self, user_id: UserId) -> Result<UserAuthentication, database::Error> {
         query_as::<_, UserAuthentication>("SELECT * FROM torrust_user_authentication WHERE user_id = ?")
             .bind(user_id)
             .fetch_one(&self.pool)
@@ -380,7 +380,7 @@ impl Database for Mysql {
     async fn insert_torrent_and_get_id(
         &self,
         torrent: &Torrent,
-        uploader_id: i64,
+        uploader_id: UserId,
         category_id: i64,
         title: &str,
         description: &str,

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Configuration;
 use crate::errors::ServiceError;
+use crate::routes::API_VERSION;
 use crate::utils::clock;
 
 pub struct Service {
@@ -146,7 +147,7 @@ impl Service {
             base_url = cfg_base_url;
         }
 
-        format!("{base_url}/user/email/verify/{token}")
+        format!("{base_url}/{API_VERSION}/user/email/verify/{token}")
     }
 }
 

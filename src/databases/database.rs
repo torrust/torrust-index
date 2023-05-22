@@ -9,7 +9,7 @@ use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
 use crate::models::tracker_key::TrackerKey;
-use crate::models::user::{User, UserAuthentication, UserCompact, UserProfile};
+use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
 
 /// Database drivers.
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
@@ -101,13 +101,13 @@ pub trait Database: Sync + Send {
         Self: Sized;
 
     /// Add new user and return the newly inserted `user_id`.
-    async fn insert_user_and_get_id(&self, username: &str, email: &str, password: &str) -> Result<i64, Error>;
+    async fn insert_user_and_get_id(&self, username: &str, email: &str, password: &str) -> Result<UserId, Error>;
 
     /// Get `User` from `user_id`.
     async fn get_user_from_id(&self, user_id: i64) -> Result<User, Error>;
 
     /// Get `UserAuthentication` from `user_id`.
-    async fn get_user_authentication_from_id(&self, user_id: i64) -> Result<UserAuthentication, Error>;
+    async fn get_user_authentication_from_id(&self, user_id: UserId) -> Result<UserAuthentication, Error>;
 
     /// Get `UserProfile` from `username`.
     async fn get_user_profile_from_username(&self, username: &str) -> Result<UserProfile, Error>;
@@ -165,7 +165,7 @@ pub trait Database: Sync + Send {
     async fn insert_torrent_and_get_id(
         &self,
         torrent: &Torrent,
-        uploader_id: i64,
+        uploader_id: UserId,
         category_id: i64,
         title: &str,
         description: &str,
