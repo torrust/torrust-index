@@ -211,6 +211,7 @@ impl From<database::Error> for ServiceError {
         #[allow(clippy::match_same_arms)]
         match e {
             database::Error::Error => ServiceError::InternalServerError,
+            database::Error::ErrorWithText(_) => ServiceError::InternalServerError,
             database::Error::UsernameTaken => ServiceError::UsernameTaken,
             database::Error::EmailTaken => ServiceError::EmailTaken,
             database::Error::UserNotFound => ServiceError::UserNotFound,

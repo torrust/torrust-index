@@ -7,6 +7,7 @@ pub mod root;
 pub mod settings;
 pub mod torrent;
 pub mod user;
+pub mod tag;
 
 pub const API_VERSION: &str = "v1";
 
@@ -17,5 +18,6 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     settings::init(cfg);
     about::init(cfg);
     proxy::init(cfg);
+    tag::init(cfg);
     root::init(cfg);
 }

@@ -8,6 +8,7 @@ use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
+use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
 
@@ -52,6 +53,7 @@ pub enum Sorting {
 #[derive(Debug)]
 pub enum Error {
     Error,
+    ErrorWithText(String),
     UnrecognizedDatabaseDriver, // when the db path does not start with sqlite or mysql
     UsernameTaken,
     EmailTaken,
@@ -227,6 +229,30 @@ pub trait Database: Sync + Send {
 
     /// Update a torrent's description with `torrent_id` and `description`.
     async fn update_torrent_description(&self, torrent_id: i64, description: &str) -> Result<(), Error>;
+
+    /// Add a new tag.
+    async fn add_tag(&self, name: &str) -> Result<TorrentTag, Error>;
+
+    /// Delete a tag.
+    async fn delete_tag(&self, tag_id: TagId) -> Result<TorrentTag, Error>;
+
+    /// Add a tag to torrent.
+    async fn add_torrent_tag_link(&self, torrent_id: i64, tag_id: TagId) -> Result<(), Error>;
+
+    /// Add multiple tags to a torrent at once.
+    async fn add_torrent_tag_links(&self, torrent_id: i64, tag_ids: &Vec<TagId>) -> Result<(), Error>;
+
+    /// Remove a tag from torrent.
+    async fn delete_torrent_tag_link(&self, torrent_id: i64, tag_id: TagId) -> Result<(), Error>;
+
+    /// Remove all tags from torrent.
+    async fn delete_all_torrent_tag_links(&self, torrent_id: i64) -> Result<(), Error>;
+
+    /// Get all tags as `Vec<TorrentTag>`.
+    async fn get_tags(&self) -> Result<Vec<TorrentTag>, Error>;
+
+    /// Get tags for `torrent_id`.
+    async fn get_tags_for_torrent_id(&self, torrent_id: i64) -> Result<Vec<TorrentTag>, Error>;
 
     /// Update the seeders and leechers info for a torrent with `torrent_id`, `tracker_url`, `seeders` and `leechers`.
     async fn update_tracker_info(&self, torrent_id: i64, tracker_url: &str, seeders: i64, leechers: i64) -> Result<(), Error>;

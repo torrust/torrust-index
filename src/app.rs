@@ -14,10 +14,7 @@ use crate::config::Configuration;
 use crate::databases::database;
 use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
 use crate::services::category::{self, DbCategoryRepository};
-use crate::services::torrent::{
-    DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator,
-    DbTorrentRepository,
-};
+use crate::services::torrent::{DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator, DbTorrentRepository, DbTorrentTagRepository};
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
@@ -63,6 +60,7 @@ pub async fn run(configuration: Configuration) -> Running {
     let torrent_info_repository = Arc::new(DbTorrentInfoRepository::new(database.clone()));
     let torrent_file_repository = Arc::new(DbTorrentFileRepository::new(database.clone()));
     let torrent_announce_url_repository = Arc::new(DbTorrentAnnounceUrlRepository::new(database.clone()));
+    let torrent_tag_repository = Arc::new(DbTorrentTagRepository::new(database.clone()));
     let torrent_listing_generator = Arc::new(DbTorrentListingGenerator::new(database.clone()));
     let banned_user_list = Arc::new(DbBannedUserList::new(database.clone()));
 
@@ -85,6 +83,7 @@ pub async fn run(configuration: Configuration) -> Running {
         torrent_info_repository.clone(),
         torrent_file_repository.clone(),
         torrent_announce_url_repository.clone(),
+        torrent_tag_repository.clone(),
         torrent_listing_generator.clone(),
     ));
     let registration_service = Arc::new(user::RegistrationService::new(
@@ -126,6 +125,7 @@ pub async fn run(configuration: Configuration) -> Running {
         torrent_info_repository,
         torrent_file_repository,
         torrent_announce_url_repository,
+        torrent_tag_repository,
         torrent_listing_generator,
         banned_user_list,
         category_service,
