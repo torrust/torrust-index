@@ -46,10 +46,10 @@ pub async fn add_tag(req: HttpRequest, payload: web::Json<AddTag>, app_data: Web
         return Err(ServiceError::Unauthorized);
     }
 
-    let tag = app_data.torrent_tag_repository.add_tag(&payload.name).await?;
+    app_data.torrent_tag_repository.add_tag(&payload.name).await?;
 
     Ok(HttpResponse::Ok().json(OkResponse {
-        data: tag,
+        data: payload.name.to_string(),
     }))
 }
 
@@ -72,9 +72,9 @@ pub async fn delete_tag(
         return Err(ServiceError::Unauthorized);
     }
 
-    let tag = app_data.torrent_tag_repository.delete_tag(&payload.tag_id).await?;
+    app_data.torrent_tag_repository.delete_tag(&payload.tag_id).await?;
 
     Ok(HttpResponse::Ok().json(OkResponse {
-        data: tag,
+        data: payload.tag_id,
     }))
 }

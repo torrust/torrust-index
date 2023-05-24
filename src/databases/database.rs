@@ -231,10 +231,10 @@ pub trait Database: Sync + Send {
     async fn update_torrent_description(&self, torrent_id: i64, description: &str) -> Result<(), Error>;
 
     /// Add a new tag.
-    async fn add_tag(&self, name: &str) -> Result<TorrentTag, Error>;
+    async fn add_tag(&self, name: &str) -> Result<(), Error>;
 
     /// Delete a tag.
-    async fn delete_tag(&self, tag_id: TagId) -> Result<TorrentTag, Error>;
+    async fn delete_tag(&self, tag_id: TagId) -> Result<(), Error>;
 
     /// Add a tag to torrent.
     async fn add_torrent_tag_link(&self, torrent_id: i64, tag_id: TagId) -> Result<(), Error>;

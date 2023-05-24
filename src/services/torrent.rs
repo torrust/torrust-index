@@ -121,7 +121,7 @@ impl Index {
             return Err(e);
         }
 
-        let _ = self.torrent_tag_repository.link_torrent_to_tags(&torrent_id, &torrent_request.fields.tags).await?;
+        self.torrent_tag_repository.link_torrent_to_tags(&torrent_id, &torrent_request.fields.tags).await?;
 
         Ok(torrent_id)
     }
@@ -549,7 +549,7 @@ impl DbTorrentTagRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn add_tag(&self, tag_name: &str) -> Result<TorrentTag, Error> {
+    pub async fn add_tag(&self, tag_name: &str) -> Result<(), Error> {
         self.database.add_tag(tag_name).await
     }
 
@@ -594,7 +594,7 @@ impl DbTorrentTagRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn delete_tag(&self, tag_id: &TagId) -> Result<TorrentTag, Error> {
+    pub async fn delete_tag(&self, tag_id: &TagId) -> Result<(), Error> {
         self.database.delete_tag(*tag_id).await
     }
 

@@ -660,19 +660,21 @@ impl Database for Sqlite {
             })
     }
 
-    async fn add_tag(&self, name: &str) -> Result<TorrentTag, database::Error> {
-        query_as("INSERT INTO torrust_torrent_tags (name) VALUES (?) RETURNING id, name")
+    async fn add_tag(&self, name: &str) -> Result<(), database::Error> {
+        query("INSERT INTO torrust_torrent_tags (name) VALUES (?)")
             .bind(name)
-            .fetch_one(&self.pool)
+            .execute(&self.pool)
             .await
+            .map(|_| ())
             .map_err(|err| database::Error::ErrorWithText(err.to_string()))
     }
 
-    async fn delete_tag(&self, tag_id: TagId) -> Result<TorrentTag, database::Error> {
-        query_as("DELETE FROM torrust_torrent_tags WHERE tag_id = ? RETURNING id, name")
+    async fn delete_tag(&self, tag_id: TagId) -> Result<(), database::Error> {
+        query("DELETE FROM torrust_torrent_tags WHERE tag_id = ?")
             .bind(tag_id)
-            .fetch_one(&self.pool)
+            .execute(&self.pool)
             .await
+            .map(|_| ())
             .map_err(|err| database::Error::ErrorWithText(err.to_string()))
     }
 
