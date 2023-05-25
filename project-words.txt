@@ -3,6 +3,7 @@ addrs
 AUTOINCREMENT
 bencode
 bencoded
+Benoit
 binascii
 btih
 chrono
@@ -21,6 +22,7 @@ hexlify
 httpseeds
 imagoodboy
 imdl
+indexadmin
 indexmap
 infohash
 jsonwebtoken
@@ -30,6 +32,7 @@ LEECHERS
 lettre
 luckythelab
 mailcatcher
+mandelbrotset
 metainfo
 nanos
 NCCA
@@ -38,6 +41,7 @@ nocapture
 Oberhachingerstr
 oneshot
 ppassword
+proxied
 reqwest
 Roadmap
 ROADMAP
@@ -54,6 +58,8 @@ tempfile
 thiserror
 torrust
 Torrust
+unban
+Ununauthorized
 upgrader
 Uragqm
 urlencoding
