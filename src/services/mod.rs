@@ -1,3 +1,4 @@
+//! App services.
 pub mod about;
 pub mod authentication;
 pub mod category;

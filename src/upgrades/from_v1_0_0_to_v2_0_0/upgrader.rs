@@ -10,7 +10,6 @@
 //!
 //! - In v2, the table `torrust_user_profiles` contains two new fields: `bio` and `avatar`.
 //!   Empty string is used as default value.
-
 use std::env;
 use std::time::SystemTime;
 

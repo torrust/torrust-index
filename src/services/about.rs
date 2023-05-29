@@ -1,5 +1,4 @@
 //! Templates for "about" static pages.
-
 use crate::routes::API_VERSION;
 
 #[must_use]

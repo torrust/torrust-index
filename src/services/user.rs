@@ -1,4 +1,4 @@
-//! User repository.
+//! User services.
 use std::sync::Arc;
 
 use argon2::password_hash::SaltString;
