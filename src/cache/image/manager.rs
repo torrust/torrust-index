@@ -153,6 +153,8 @@ impl ImageCacheService {
             .await
             .map_err(|_| Error::UrlIsUnreachable)?;
 
+        // code-review: we could get a HTTP 304 response, which doesn't contain a body (the image bytes).
+
         if let Some(content_type) = res.headers().get("Content-Type") {
             if content_type != "image/jpeg" && content_type != "image/png" {
                 return Err(Error::UrlIsNotAnImage);

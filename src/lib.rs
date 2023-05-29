@@ -1,3 +1,12 @@
+//! Documentation for [Torrust Tracker Index Backend](https://github.com/torrust/torrust-index-backend) API.
+//!
+//! This is the backend API for [Torrust Tracker Index](https://github.com/torrust/torrust-index).
+//!
+//! It is written in Rust and uses the actix-web framework. It is designed to be
+//! used with by the [Torrust Tracker Index Frontend](https://github.com/torrust/torrust-index-frontend).
+//!
+//! If you are looking for information on how to use the API, please see the
+//! [API v1](crate::web::api::v1) section of the documentation.
 pub mod app;
 pub mod auth;
 pub mod bootstrap;
@@ -15,6 +24,7 @@ pub mod tracker;
 pub mod ui;
 pub mod upgrades;
 pub mod utils;
+pub mod web;
 
 trait AsCSV {
     fn as_csv<T>(&self) -> Result<Option<Vec<T>>, ()>
