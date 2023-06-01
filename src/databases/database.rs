@@ -60,6 +60,8 @@ pub enum Error {
     UserNotFound,
     CategoryAlreadyExists,
     CategoryNotFound,
+    TagAlreadyExists,
+    TagNotFound,
     TorrentNotFound,
     TorrentAlreadyExists, // when uploading an already uploaded info_hash
     TorrentTitleAlreadyExists,
@@ -158,6 +160,7 @@ pub trait Database: Sync + Send {
         &self,
         search: &Option<String>,
         categories: &Option<Vec<String>>,
+        tags: &Option<Vec<String>>,
         sort: &Sorting,
         offset: u64,
         page_size: u8,
@@ -247,6 +250,9 @@ pub trait Database: Sync + Send {
 
     /// Remove all tags from torrent.
     async fn delete_all_torrent_tag_links(&self, torrent_id: i64) -> Result<(), Error>;
+
+    /// Get tag from name.
+    async fn get_tag_from_name(&self, name: &str) -> Result<TorrentTag, Error>;
 
     /// Get all tags as `Vec<TorrentTag>`.
     async fn get_tags(&self) -> Result<Vec<TorrentTag>, Error>;

@@ -283,6 +283,7 @@ impl Database for Sqlite {
         &self,
         search: &Option<String>,
         categories: &Option<Vec<String>>,
+        tags: &Option<Vec<String>>,
         sort: &Sorting,
         offset: u64,
         limit: u8,
@@ -328,11 +329,36 @@ impl Database for Sqlite {
             String::new()
         };
 
+        let tag_filter_query = if let Some(t) = tags {
+            let mut i = 0;
+            let mut tag_filters = String::new();
+            for tag in t.iter() {
+                // don't take user input in the db query
+                if let Ok(sanitized_tag) = self.get_tag_from_name(tag).await {
+                    let mut str = format!("tl.tag_id = '{}'", sanitized_tag.tag_id);
+                    if i > 0 {
+                        str = format!(" OR {str}");
+                    }
+                    tag_filters.push_str(&str);
+                    i += 1;
+                }
+            }
+            if tag_filters.is_empty() {
+                String::new()
+            } else {
+                format!("INNER JOIN torrust_torrent_tag_links tl ON tt.torrent_id = tl.torrent_id AND ({tag_filters}) ")
+            }
+        } else {
+            String::new()
+        };
+
         let mut query_string = format!(
-            "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, tt.date_uploaded, tt.size AS file_size,
+            "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, DATE_FORMAT(tt.date_uploaded, '%Y-%m-%d %H:%i:%s') AS date_uploaded, tt.size AS file_size,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
-            FROM torrust_torrents tt {category_filter_query}
+            FROM torrust_torrents tt
+            {category_filter_query}
+            {tag_filter_query}
             INNER JOIN torrust_user_profiles tp ON tt.uploader_id = tp.user_id
             INNER JOIN torrust_torrent_info ti ON tt.torrent_id = ti.torrent_id
             LEFT JOIN torrust_torrent_tracker_stats ts ON tt.torrent_id = ts.torrent_id
@@ -724,6 +750,14 @@ impl Database for Sqlite {
             .await
             .map(|_| ())
             .map_err(|err| database::Error::ErrorWithText(err.to_string()))
+    }
+
+    async fn get_tag_from_name(&self, name: &str) -> Result<TorrentTag, database::Error> {
+        query_as::<_, TorrentTag>("SELECT tag_id, name FROM torrust_torrent_tags WHERE name = ?")
+            .bind(name)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|err| database::Error::TagNotFound)
     }
 
     async fn get_tags(&self) -> Result<Vec<TorrentTag>, database::Error> {

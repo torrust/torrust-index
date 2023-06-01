@@ -38,6 +38,8 @@ pub struct ListingRequest {
     pub sort: Option<Sorting>,
     /// Expects comma separated string, eg: "?categories=movie,other,app"
     pub categories: Option<String>,
+    /// Expects comma separated string, eg: "?tags=Linux,Ubuntu"
+    pub tags: Option<String>,
     pub search: Option<String>,
 }
 
@@ -46,6 +48,7 @@ pub struct ListingRequest {
 pub struct ListingSpecification {
     pub search: Option<String>,
     pub categories: Option<Vec<String>>,
+    pub tags: Option<Vec<String>>,
     pub sort: Sorting,
     pub offset: u64,
     pub page_size: u8,
@@ -325,9 +328,12 @@ impl Index {
 
         let categories = request.categories.as_csv::<String>().unwrap_or(None);
 
+        let tags = request.tags.as_csv::<String>().unwrap_or(None);
+
         ListingSpecification {
             search: request.search.clone(),
             categories,
+            tags,
             sort,
             offset,
             page_size,
@@ -655,6 +661,7 @@ impl DbTorrentListingGenerator {
             .get_torrents_search_sorted_paginated(
                 &specification.search,
                 &specification.categories,
+                &specification.tags,
                 &specification.sort,
                 specification.offset,
                 specification.page_size,

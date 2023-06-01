@@ -102,6 +102,9 @@ pub enum ServiceError {
     #[display(fmt = "Selected category does not exist.")]
     InvalidCategory,
 
+    #[display(fmt = "Selected tag does not exist.")]
+    InvalidTag,
+
     #[display(fmt = "Unauthorized action.")]
     Unauthorized,
 
@@ -122,6 +125,9 @@ pub enum ServiceError {
 
     #[display(fmt = "Category already exists.")]
     CategoryExists,
+
+    #[display(fmt = "Tag already exists.")]
+    TagExists,
 
     #[display(fmt = "Category not found.")]
     CategoryNotFound,
@@ -165,11 +171,13 @@ impl ResponseError for ServiceError {
             ServiceError::InvalidFileType => StatusCode::BAD_REQUEST,
             ServiceError::BadRequest => StatusCode::BAD_REQUEST,
             ServiceError::InvalidCategory => StatusCode::BAD_REQUEST,
+            ServiceError::InvalidTag => StatusCode::BAD_REQUEST,
             ServiceError::Unauthorized => StatusCode::FORBIDDEN,
             ServiceError::InfoHashAlreadyExists => StatusCode::BAD_REQUEST,
             ServiceError::TorrentTitleAlreadyExists => StatusCode::BAD_REQUEST,
             ServiceError::TrackerOffline => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceError::CategoryExists => StatusCode::BAD_REQUEST,
+            ServiceError::TagExists => StatusCode::BAD_REQUEST,
             ServiceError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceError::EmailMissing => StatusCode::NOT_FOUND,
             ServiceError::FailedToSendVerificationEmail => StatusCode::INTERNAL_SERVER_ERROR,
@@ -217,6 +225,8 @@ impl From<database::Error> for ServiceError {
             database::Error::UserNotFound => ServiceError::UserNotFound,
             database::Error::CategoryAlreadyExists => ServiceError::CategoryExists,
             database::Error::CategoryNotFound => ServiceError::InvalidCategory,
+            database::Error::TagAlreadyExists => ServiceError::TagExists,
+            database::Error::TagNotFound => ServiceError::InvalidTag,
             database::Error::TorrentNotFound => ServiceError::TorrentNotFound,
             database::Error::TorrentAlreadyExists => ServiceError::InfoHashAlreadyExists,
             database::Error::TorrentTitleAlreadyExists => ServiceError::TorrentTitleAlreadyExists,
