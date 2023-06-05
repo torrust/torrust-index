@@ -50,10 +50,11 @@ impl StatisticsImporter {
             // ```
 
             if let Some(err) = ret.err() {
-                error!(
+                let message = format!(
                     "Error updating torrent tracker stats for torrent with id {}: {:?}",
                     torrent.torrent_id, err
                 );
+                error!("{}", message);
             }
         }
 
