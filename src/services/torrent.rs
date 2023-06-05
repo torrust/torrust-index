@@ -1,3 +1,4 @@
+//! Torrent service.
 use std::sync::Arc;
 
 use serde_derive::Deserialize;

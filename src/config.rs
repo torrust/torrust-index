@@ -1,3 +1,4 @@
+//! Configuration for the application.
 use std::path::Path;
 use std::{env, fs};
 
@@ -6,8 +7,10 @@ use log::warn;
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
+/// Information displayed to the user in the website.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Website {
+    /// The name of the website.
     pub name: String,
 }
 
@@ -19,12 +22,18 @@ impl Default for Website {
     }
 }
 
+/// See `TrackerMode` in [`torrust-tracker-primitives`](https://docs.rs/torrust-tracker-primitives)
+/// crate for more information.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TrackerMode {
     // todo: use https://crates.io/crates/torrust-tracker-primitives
+    /// Will track every new info hash and serve every peer.
     Public,
+    /// Will only serve authenticated peers.
     Private,
+    /// Will only track whitelisted info hashes.
     Whitelisted,
+    /// Will only track whitelisted info hashes and serve authenticated peers.
     PrivateWhitelisted,
 }
 
@@ -34,12 +43,20 @@ impl Default for TrackerMode {
     }
 }
 
+/// Configuration for the associated tracker.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tracker {
+    /// Connection string for the tracker. For example: `udp://TRACKER_IP:6969`.
     pub url: String,
+    /// The mode of the tracker. For example: `Public`.
+    /// See `TrackerMode` in [`torrust-tracker-primitives`](https://docs.rs/torrust-tracker-primitives)
+    /// crate for more information.
     pub mode: TrackerMode,
+    /// The url of the tracker API. For example: `http://localhost:1212`.
     pub api_url: String,
+    /// The token used to authenticate with the tracker API.
     pub token: String,
+    /// The amount of seconds the token is valid.
     pub token_valid_seconds: u64,
 }
 
@@ -55,12 +72,18 @@ impl Default for Tracker {
     }
 }
 
-/// Port 0 means that the OS will choose a random free port.
+/// Port number representing that the OS will choose one randomly from the available ports.
+///
+/// It's the port number `0`
 pub const FREE_PORT: u16 = 0;
 
+/// The the base URL for the API.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Network {
+    /// The port to listen on. Default to `3000`.
     pub port: u16,
+    /// The base URL for the API. For example: `http://localhost`.
+    /// If not set, the base URL will be inferred from the request.
     pub base_url: Option<String>,
 }
 
@@ -73,11 +96,15 @@ impl Default for Network {
     }
 }
 
+/// Whether the email is required on signup or not.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EmailOnSignup {
+    /// The email is required on signup.
     Required,
+    /// The email is optional on signup.
     Optional,
-    None,
+    /// The email is not allowed on signup. It will only be ignored if provided.
+    None, // code-review: rename to `Ignored`?
 }
 
 impl Default for EmailOnSignup {
@@ -86,11 +113,16 @@ impl Default for EmailOnSignup {
     }
 }
 
+/// Authentication options.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Auth {
+    /// Whether or not to require an email on signup.
     pub email_on_signup: EmailOnSignup,
+    /// The minimum password length.
     pub min_password_length: usize,
+    /// The maximum password length.
     pub max_password_length: usize,
+    /// The secret key used to sign JWT tokens.
     pub secret_key: String,
 }
 
@@ -105,8 +137,10 @@ impl Default for Auth {
     }
 }
 
+/// Database configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Database {
+    /// The connection string for the database. For example: `sqlite://data.db?mode=rwc`.
     pub connect_url: String,
 }
 
@@ -118,14 +152,22 @@ impl Default for Database {
     }
 }
 
+/// SMTP configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Mail {
+    /// Whether or not to enable email verification on signup.
     pub email_verification_enabled: bool,
+    /// The email address to send emails from.
     pub from: String,
+    /// The email address to reply to.
     pub reply_to: String,
+    /// The username to use for SMTP authentication.
     pub username: String,
+    /// The password to use for SMTP authentication.
     pub password: String,
+    /// The SMTP server to use.
     pub server: String,
+    /// The SMTP port to use.
     pub port: u16,
 }
 
@@ -143,19 +185,36 @@ impl Default for Mail {
     }
 }
 
+/// Configuration for the image proxy cache.
+///
+/// Users have a cache quota per period. For example: 100MB per day.
+/// When users are navigating the site, they will be downloading images that are
+/// embedded in the torrent description. These images will be cached in the
+/// proxy. The proxy will not download new images if the user has reached the
+/// quota.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageCache {
+    /// Maximum time in seconds to wait for downloading the image form the original source.
     pub max_request_timeout_ms: u64,
+    /// Cache size in bytes.
     pub capacity: usize,
+    /// Maximum size in bytes for a single image.
     pub entry_size_limit: usize,
+    /// Users have a cache quota per period. For example: 100MB per day.
+    /// This is the period in seconds (1 day in seconds).
     pub user_quota_period_seconds: u64,
+    /// Users have a cache quota per period. For example: 100MB per day.
+    /// This is the maximum size in bytes (100MB in bytes).    
     pub user_quota_bytes: usize,
 }
 
+/// Core configuration for the API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Api {
+    /// The default page size for torrent lists.
     pub default_torrent_page_size: u8,
+    /// The maximum page size for torrent lists.
     pub max_torrent_page_size: u8,
 }
 
@@ -168,8 +227,10 @@ impl Default for Api {
     }
 }
 
+/// Configuration for the tracker statistics importer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrackerStatisticsImporter {
+    /// The interval in seconds to get statistics from the tracker.
     pub torrent_info_update_interval: u64,
 }
 
@@ -193,22 +254,36 @@ impl Default for ImageCache {
     }
 }
 
+/// The whole configuration for the backend.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct TorrustBackend {
+    /// The website customizable values.
     pub website: Website,
+    /// The tracker configuration.
     pub tracker: Tracker,
+    /// The network configuration.
     pub net: Network,
+    /// The authentication configuration.
     pub auth: Auth,
+    /// The database configuration.
     pub database: Database,
+    /// The SMTP configuration.
     pub mail: Mail,
+    /// The image proxy cache configuration.
     pub image_cache: ImageCache,
+    /// The API configuration.
     pub api: Api,
+    /// The tracker statistics importer job configuration.
     pub tracker_statistics_importer: TrackerStatisticsImporter,
 }
 
+/// The configuration service.
 #[derive(Debug)]
 pub struct Configuration {
+    /// The state of the configuration.
     pub settings: RwLock<TorrustBackend>,
+    /// The path to the configuration file. This is `None` if the configuration
+    /// was loaded from the environment.
     pub config_path: Option<String>,
 }
 
@@ -237,13 +312,14 @@ impl Configuration {
         if Path::new(config_path).exists() {
             config = config_builder.add_source(File::with_name(config_path)).build()?;
         } else {
-            warn!("No config file found.");
-            warn!("Creating config file..");
+            warn!("No config file found. Creating default config file ...");
+
             let config = Configuration::default();
             let _ = config.save_to_file(config_path).await;
-            return Err(ConfigError::Message(
-                "Please edit the config.TOML in the root folder and restart the tracker.".to_string(),
-            ));
+
+            return Err(ConfigError::Message(format!(
+                "No config file found. Created default config file in {config_path}. Edit the file and start the application."
+            )));
         }
 
         let torrust_config: TorrustBackend = match config.try_deserialize() {
@@ -345,6 +421,8 @@ impl Configuration {
     }
 }
 
+/// The public backend configuration.
+/// There is an endpoint to get this configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigurationPublic {
     website_name: String,

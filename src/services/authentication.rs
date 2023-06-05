@@ -1,3 +1,4 @@
+//! Authentication services.
 use std::sync::Arc;
 
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
