@@ -1,8 +1,26 @@
 //! It imports statistics for all torrents from the linked tracker.
 //!
-//! It imports the number of seeders and leechers for all torrent from the linked tracker.
+//! It imports the number of seeders and leechers for all torrents from the
+//! associated tracker.
 //!
-//! You can execute it with: `cargo run --bin import_tracker_statistics`
+//! You can execute it with: `cargo run --bin import_tracker_statistics`.
+//!
+//! After running it you will see the following output:
+//!
+//! ```text
+//! Importing statistics from linked tracker ...
+//! Loading configuration from config file `./config.toml`
+//! Tracker url: udp://localhost:6969
+//! ```
+//!
+//! Statistics are also imported:
+//!
+//! - Periodically by the importer job. The importer job is executed every hour
+//! by default. See [`TrackerStatisticsImporter`](crate::config::TrackerStatisticsImporter)
+//! for more details.
+//! - When a new torrent is added.
+//! - When the API returns data about a torrent statistics are collected from
+//! the tracker in real time.
 use std::env;
 use std::sync::Arc;
 

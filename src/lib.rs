@@ -20,6 +20,9 @@
 //!     - [Development](#development)
 //! - [Configuration](#configuration)
 //! - [Usage](#usage)
+//!     - [API](#api)
+//!     - [Tracker Statistics Importer](#tracker-statistics-importer)
+//!     - [Upgrader](#upgrader)
 //! - [Contributing](#contributing)
 //! - [Documentation](#documentation)
 //!
@@ -218,12 +221,24 @@
 //!
 //! # Usage
 //!
+//! ## API
+//!
 //! Running the tracker with the default configuration will expose the REST API on port 3000: <http://localhost:3000>
 //!
-//! You can also run console commands:
+//! ## Tracker Statistics Importer
 //!
-//! - [`Import tracker statistics`](crate::console::commands::import_tracker_statistics).
-//! - [`Upgrade app from version 1.0.0 to 2.0.0`](crate::upgrades::from_v1_0_0_to_v2_0_0::upgrader).
+//! This console command allows you to manually import the tracker statistics.
+//!
+//! For more information about this command you can visit the documentation for
+//! the [`Import tracker statistics`](crate::console::commands::import_tracker_statistics) module.
+//!
+//! ## Upgrader
+//!
+//! This console command allows you to manually upgrade the application from one
+//! version to another.
+//!
+//! For more information about this command you can visit the documentation for
+//! the [`Upgrade app from version 1.0.0 to 2.0.0`](crate::upgrades::from_v1_0_0_to_v2_0_0::upgrader) module.
 //!
 //! Refer to the documentation of each command for more information.
 //!
