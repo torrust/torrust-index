@@ -1,68 +1,56 @@
 # Torrust Index Backend
 
-This repository serves as the backend for the [Torrust Index](https://github.com/torrust/torrust-index) project, that implements the [Torrust Index Application Interface](https://github.com/torrust/torrust-index-api-lib).
+[![Development Checks](https://github.com/torrust/torrust-index-backend/actions/workflows/develop.yml/badge.svg)](https://github.com/torrust/torrust-index-backend/actions/workflows/develop.yml) [![Publish crate](https://github.com/torrust/torrust-index-backend/actions/workflows/publish_crate.yml/badge.svg)](https://github.com/torrust/torrust-index-backend/actions/workflows/publish_crate.yml) [![Publish Docker Image](https://github.com/torrust/torrust-index-backend/actions/workflows/publish_docker_image.yml/badge.svg)](https://github.com/torrust/torrust-index-backend/actions/workflows/publish_docker_image.yml) [![Publish Github Release](https://github.com/torrust/torrust-index-backend/actions/workflows/release.yml/badge.svg)](https://github.com/torrust/torrust-index-backend/actions/workflows/release.yml) [![Test Docker build](https://github.com/torrust/torrust-index-backend/actions/workflows/test_docker.yml/badge.svg)](https://github.com/torrust/torrust-index-backend/actions/workflows/test_docker.yml)
 
-We also provide the [Torrust Index Frontend](https://github.com/torrust/torrust-index-frontend) project, that is our reference web-application that consumes the API provided here.
+This repository serves as the backend for the [Torrust Index](https://github.com/torrust/torrust-index) project, which implements the [Torrust Index Application Interface](https://github.com/torrust/torrust-index-api-lib).
+
+We also provide the [Torrust Index Frontend](https://github.com/torrust/torrust-index-frontend) project, which is our reference web application that consumes the API provided here.
+
+![Torrust Architecture](https://raw.githubusercontent.com/torrust/.github/main/img/torrust-architecture.webp)
+
+## Key Features
+
+* [X] Rest API
+* [X] Categories and tags
+* [X] Image proxy cache
+
+## Getting Started
+
+Requirements:
+
+* Rust Stable `1.68`
+
+You can follow the [documentation](https://docs.rs/torrust-index-backend) to install and use Torrust Index Backend in different ways, but if you want to give it a quick try, you can use the following commands:
+
+```s
+git clone https://github.com/torrust/torrust-index-backend.git \
+  && cd torrust-index-backend \
+  && cargo build --release
+```
+
+And then run `cargo run` twice. The first time to generate the `config.toml` file and the second time to run the backend with the default configuration.
+
+After running the tracker the API will be available at <http://localhost:3000>.
 
 ## Documentation
 
-You can read the Torrust Index documentation [here](https://torrust.com/torrust-index/install/#installing-the-backend).
+The technical documentation is available at [docs.rs](https://docs.rs/torrust-index-backend).
 
-## Installation
+## Contributing
 
-1. Setup [Rust / Cargo](https://www.rust-lang.org/) in your Environment.
+We welcome contributions from the community!
 
-2. Clone this repo.
+How can you contribute?
 
-3. Set the database connection URI in the projects `/.env` file:
+* Bug reports and feature requests.
+* Code contributions. You can start by looking at the issues labeled ["good first issues"](https://github.com/torrust/torrust-index-backend/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+* Documentation improvements. Check the [documentation](torrust-index-backend) for typos, errors, or missing information.
+* Participation in the community. You can help by answering questions in the [discussions](https://github.com/torrust/torrust-index-backend/discussions).
 
-    ```bash
-    cd torrust-index-backend
-    echo "DATABASE_URL=sqlite://data.db?mode=rwc" >> .env
-    ```
+## License
 
-4. Install sqlx-cli and build the sqlite database:
+The project is licensed under a dual license. See [COPYRIGHT](./COPYRIGHT).
 
-    ```bash
-    cargo install sqlx-cli
-    sqlx db setup
-    ```
+## Acknowledgments
 
-5. Build the binaries:
-
-    ```bash
-    cargo build --release
-    ```
-
-6. Run the backend once to generate the `config.toml` file:
-
-    ```bash
-    ./target/release/torrust-index-backend
-    ```
-
-7. Review and edit the default `/config.toml` file.
-
-> _Please view the [configuration documentation](https://torrust.github.io/torrust-tracker/CONFIG.html)._
-
-8. Run the backend again:
-
-    ```bash
-    ./target/torrust-index-backend
-    ```
-
-## Contact and Contributing
-
-Please consider the [Torrust Contribution Guide](https://github.com/torrust/.github/blob/main/info/contributing.md).
-
-Please report issues:
-
-* Torrust Index Backend specifically: [here](https://github.com/torrust/torrust-index-backend/issues).
-* Torrust Index in general: [here](https://github.com/torrust/torrust-index/issues).
-
----
-
-## Credits & Sponsors
-
-This project was developed by [Dutch Bits](https://dutchbits.nl) for [Nautilus Cyberneering GmbH](https://nautilus-cyberneering.de/).
-
-The project has been possible through the support and contribution of both Nautilus Cyberneering, its team and collaborators, as well as that of our great open source contributors. Thank you to you all!
+This project was a joint effort by [Nautilus Cyberneering GmbH](https://nautilus-cyberneering.de/), [Dutch Bits](https://dutchbits.nl) and collaborators.  Thank you to you all!
