@@ -1,15 +1,51 @@
-//! It updates the application from version v1.0.0 to v2.0.0.
+//! A console command to upgrade the application from version `v1.0.0` to `v2.0.0`.
+//!
+//! # Usage
+//!
+//! ```bash
+//! cargo run --bin upgrade SOURCE_DB_FILE TARGET_DB_FILE TORRENT_UPLOAD_DIR
+//! ```
+//!
+//! Where:
+//!
+//! - `SOURCE_DB_FILE` is the source database in version `v1.0.0` we want to migrate.
+//! - `TARGET_DB_FILE` is the new migrated database in version `v2.0.0`.
+//! - `TORRENT_UPLOAD_DIR` is the relative dir where torrent files are stored.
+//!
+//! For example:
+//!
+//! ```bash
+//! cargo run --bin upgrade ./data.db ./data_v2.db ./uploads
+//! ```
+//!
+//! This command was created to help users to migrate from version `v1.0.0` to
+//! `v2.0.0`. The main changes in version `v2.0.0` were:
+//!
+//! - The database schema was changed.
+//! - The torrents are now stored entirely in the database. The torrent files
+//! are not stored in the filesystem anymore. This command reads the torrent
+//! files from the filesystem and store them in the database.
+//!
+//! We recommend to download your production database and the torrent files dir.
+//! And run the command in a local environment with the version `v2.0.0.`. Then,
+//! you can run the app locally and make sure all the data was migrated
+//! correctly.
+//!
+//! # Notes
 //!
 //! NOTES for `torrust_users` table transfer:
 //!
-//! - In v2, the table `torrust_user` contains a field `date_registered` non existing in v1.
-//!   We changed that columns to allow NULL. We also added the new column `date_imported` with
-//!   the datetime when the upgrader was executed.
+//! - In v2, the table `torrust_user` contains a field `date_registered` non
+//! existing in v1. We changed that column to allow `NULL`. We also added the
+//! new column `date_imported` with the datetime when the upgrader was executed.
 //!
 //! NOTES for `torrust_user_profiles` table transfer:
 //!
-//! - In v2, the table `torrust_user_profiles` contains two new fields: `bio` and `avatar`.
-//!   Empty string is used as default value.
+//! - In v2, the table `torrust_user_profiles` contains two new fields: `bio`
+//! and `avatar`. Empty string is used as default value.
+//!
+//!
+//! If you want more information about this command you can read the [issue 56](https://github.com/torrust/torrust-index-backend/issues/56).
 use std::env;
 use std::time::SystemTime;
 
@@ -26,9 +62,12 @@ const NUMBER_OF_ARGUMENTS: usize = 3;
 
 #[derive(Debug)]
 pub struct Arguments {
-    pub source_database_file: String, // The source database in version v1.0.0 we want to migrate
-    pub target_database_file: String, // The new migrated database in version v2.0.0
-    pub upload_path: String,          // The relative dir where torrent files are stored
+    /// The source database in version v1.0.0 we want to migrate
+    pub source_database_file: String,
+    /// The new migrated database in version v2.0.0
+    pub target_database_file: String,
+    // The relative dir where torrent files are stored
+    pub upload_path: String,
 }
 
 fn print_usage() {
@@ -100,7 +139,7 @@ pub async fn upgrade(args: &Arguments, date_imported: &str) {
 }
 
 /// Current datetime in ISO8601 without time zone.
-/// For example: 2022-11-10 10:35:15
+/// For example: `2022-11-10 10:35:15`
 #[must_use]
 pub fn datetime_iso_8601() -> String {
     let dt: DateTime<Utc> = SystemTime::now().into();
