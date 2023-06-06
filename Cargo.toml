@@ -46,6 +46,8 @@ text-to-png = "0.2"
 indexmap = "1.9"
 thiserror = "1.0"
 binascii = "0.1"
+axum = "0.6.18"
+hyper = "0.14.26"
 
 [dev-dependencies]
 rand = "0.8"
