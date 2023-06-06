@@ -1,3 +1,5 @@
+use torrust_index_backend::web::api;
+
 use crate::common::client::Client;
 use crate::common::contexts::settings::responses::{AllSettingsResponse, Public, PublicSettingsResponse, SiteNameResponse};
 use crate::e2e::contexts::user::steps::new_logged_in_admin;
@@ -6,7 +8,7 @@ use crate::e2e::environment::TestEnv;
 #[tokio::test]
 async fn it_should_allow_guests_to_get_the_public_settings() {
     let mut env = TestEnv::new();
-    env.start().await;
+    env.start(api::Implementation::ActixWeb).await;
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let response = client.get_public_settings().await;
@@ -31,7 +33,7 @@ async fn it_should_allow_guests_to_get_the_public_settings() {
 #[tokio::test]
 async fn it_should_allow_guests_to_get_the_site_name() {
     let mut env = TestEnv::new();
-    env.start().await;
+    env.start(api::Implementation::ActixWeb).await;
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let response = client.get_site_name().await;
@@ -48,7 +50,7 @@ async fn it_should_allow_guests_to_get_the_site_name() {
 #[tokio::test]
 async fn it_should_allow_admins_to_get_all_the_settings() {
     let mut env = TestEnv::new();
-    env.start().await;
+    env.start(api::Implementation::ActixWeb).await;
 
     let logged_in_admin = new_logged_in_admin(&env).await;
     let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
@@ -67,7 +69,7 @@ async fn it_should_allow_admins_to_get_all_the_settings() {
 #[tokio::test]
 async fn it_should_allow_admins_to_update_all_the_settings() {
     let mut env = TestEnv::new();
-    env.start().await;
+    env.start(api::Implementation::ActixWeb).await;
 
     if !env.is_isolated() {
         // This test can't be executed in a non-isolated environment because

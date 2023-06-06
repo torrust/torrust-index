@@ -1,5 +1,7 @@
 use std::env;
 
+use torrust_index_backend::web::api::Implementation;
+
 use super::config::{init_shared_env_configuration, ENV_VAR_E2E_SHARED};
 use crate::common::contexts::settings::Settings;
 use crate::environments::{isolated, shared};
@@ -53,7 +55,7 @@ impl TestEnv {
 
     /// It starts the test environment. It can be a shared or isolated test
     /// environment depending on the value of the `ENV_VAR_E2E_SHARED` env var.
-    pub async fn start(&mut self) {
+    pub async fn start(&mut self, api_implementation: Implementation) {
         let e2e_shared = ENV_VAR_E2E_SHARED; // bool
 
         if let Ok(_e2e_test_env_is_shared) = env::var(e2e_shared) {
@@ -64,7 +66,7 @@ impl TestEnv {
             self.starting_settings = self.server_settings_for_shared_env().await;
         } else {
             // Using an isolated test env.
-            let isolated_env = isolated::TestEnv::running().await;
+            let isolated_env = isolated::TestEnv::running(api_implementation).await;
 
             self.isolated = Some(isolated_env);
             self.starting_settings = self.server_settings_for_isolated_env();

@@ -1,10 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use actix_cors::Cors;
-use actix_web::dev::Server;
-use actix_web::{middleware, web, App, HttpServer};
-use log::info;
+use tokio::task::JoinHandle;
 
 use crate::auth::Authentication;
 use crate::bootstrap::logging;
@@ -21,16 +18,18 @@ use crate::services::torrent::{
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
-use crate::{mailer, routes, tracker};
+use crate::web::api::{start, Implementation};
+use crate::{mailer, tracker};
 
 pub struct Running {
-    pub api_server: Server,
-    pub socket_address: SocketAddr,
+    pub api_socket_addr: SocketAddr,
+    pub actix_web_api_server: Option<JoinHandle<std::result::Result<(), std::io::Error>>>,
+    pub axum_api_server: Option<JoinHandle<std::result::Result<(), std::io::Error>>>,
     pub tracker_data_importer_handle: tokio::task::JoinHandle<()>,
 }
 
 #[allow(clippy::too_many_lines)]
-pub async fn run(configuration: Configuration) -> Running {
+pub async fn run(configuration: Configuration, api_implementation: &Implementation) -> Running {
     logging::setup();
 
     let configuration = Arc::new(configuration);
@@ -42,6 +41,7 @@ pub async fn run(configuration: Configuration) -> Running {
 
     let database_connect_url = settings.database.connect_url.clone();
     let torrent_info_update_interval = settings.tracker_statistics_importer.torrent_info_update_interval;
+    let net_ip = "0.0.0.0".to_string();
     let net_port = settings.net.port;
 
     // IMPORTANT: drop settings before starting server to avoid read locks that
@@ -155,33 +155,14 @@ pub async fn run(configuration: Configuration) -> Running {
         }
     });
 
-    // Start main API server
+    // Start API server
 
-    // todo: get IP from settings
-    let ip = "0.0.0.0".to_string();
-
-    let server = HttpServer::new(move || {
-        App::new()
-            .wrap(Cors::permissive())
-            .app_data(web::Data::new(app_data.clone()))
-            .wrap(middleware::Logger::default())
-            .configure(routes::init)
-    })
-    .bind((ip, net_port))
-    .expect("can't bind server to socket address");
-
-    let socket_address = server.addrs()[0];
-
-    let running_server = server.run();
-
-    let starting_message = format!("Listening on http://{socket_address}");
-    info!("{}", starting_message);
-    // Logging could be disabled or redirected to file. So print to stdout too.
-    println!("{starting_message}");
+    let running_api = start(app_data, &net_ip, net_port, api_implementation).await;
 
     Running {
-        api_server: running_server,
-        socket_address,
+        api_socket_addr: running_api.socket_addr,
+        actix_web_api_server: running_api.actix_web_api_server,
+        axum_api_server: running_api.axum_api_server,
         tracker_data_importer_handle: tracker_statistics_importer_handle,
     }
 }

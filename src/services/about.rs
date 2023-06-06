@@ -3,6 +3,11 @@ use crate::routes::API_VERSION;
 
 #[must_use]
 pub fn index_page() -> String {
+    page()
+}
+
+#[must_use]
+pub fn page() -> String {
     format!(
         r#"
     <html>
