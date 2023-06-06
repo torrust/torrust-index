@@ -240,8 +240,6 @@
 //! For more information about this command you can visit the documentation for
 //! the [`Upgrade app from version 1.0.0 to 2.0.0`](crate::upgrades::from_v1_0_0_to_v2_0_0::upgrader) module.
 //!
-//! Refer to the documentation of each command for more information.
-//!
 //! # Contributing
 //!
 //! If you want to contribute to this documentation you can:
