@@ -1,8 +1,26 @@
 //! It imports statistics for all torrents from the linked tracker.
 //!
-//! It imports the number of seeders and leechers for all torrent from the linked tracker.
+//! It imports the number of seeders and leechers for all torrents from the
+//! associated tracker.
 //!
-//! You can execute it with: `cargo run --bin import_tracker_statistics`
+//! You can execute it with: `cargo run --bin import_tracker_statistics`.
+//!
+//! After running it you will see the following output:
+//!
+//! ```text
+//! Importing statistics from linked tracker ...
+//! Loading configuration from config file `./config.toml`
+//! Tracker url: udp://localhost:6969
+//! ```
+//!
+//! Statistics are also imported:
+//!
+//! - Periodically by the importer job. The importer job is executed every hour
+//! by default. See [`TrackerStatisticsImporter`](crate::config::TrackerStatisticsImporter)
+//! for more details.
+//! - When a new torrent is added.
+//! - When the API returns data about a torrent statistics are collected from
+//! the tracker in real time.
 use std::env;
 use std::sync::Arc;
 
@@ -17,9 +35,6 @@ use crate::tracker::statistics_importer::StatisticsImporter;
 
 const NUMBER_OF_ARGUMENTS: usize = 0;
 
-#[derive(Debug)]
-pub struct Arguments {}
-
 #[derive(Debug, Display, PartialEq, Error)]
 #[allow(dead_code)]
 pub enum ImportError {
@@ -27,7 +42,7 @@ pub enum ImportError {
     WrongNumberOfArgumentsError,
 }
 
-fn parse_args() -> Result<Arguments, ImportError> {
+fn parse_args() -> Result<(), ImportError> {
     let args: Vec<String> = env::args().skip(1).collect();
 
     if args.len() != NUMBER_OF_ARGUMENTS {
@@ -41,7 +56,7 @@ fn parse_args() -> Result<Arguments, ImportError> {
         return Err(ImportError::WrongNumberOfArgumentsError);
     }
 
-    Ok(Arguments {})
+    Ok(())
 }
 
 fn print_usage() {
@@ -56,7 +71,8 @@ fn print_usage() {
 }
 
 pub async fn run_importer() {
-    import(&parse_args().expect("unable to parse command arguments")).await;
+    parse_args().expect("unable to parse command arguments");
+    import().await;
 }
 
 /// Import Command Arguments
@@ -64,7 +80,7 @@ pub async fn run_importer() {
 /// # Panics
 ///
 /// Panics if `Configuration::load_from_file` has any error.
-pub async fn import(_args: &Arguments) {
+pub async fn import() {
     println!("Importing statistics from linked tracker ...");
 
     let configuration = init_configuration().await;
@@ -92,5 +108,5 @@ pub async fn import(_args: &Arguments) {
     tracker_statistics_importer
         .import_all_torrents_statistics()
         .await
-        .expect("variable `tracker_service` is unable to `update_torrents`");
+        .expect("should import all torrents statistics");
 }
