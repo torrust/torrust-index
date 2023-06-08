@@ -70,7 +70,10 @@ impl Default for TestEnv {
 
 /// Provides a configuration with ephemeral data for testing.
 fn ephemeral(temp_dir: &TempDir) -> config::TorrustBackend {
-    let mut configuration = config::TorrustBackend::default();
+    let mut configuration = config::TorrustBackend {
+        log_level: Some("off".to_owned()), // Change to `debug` for tests debugging
+        ..config::TorrustBackend::default()
+    };
 
     // Ephemeral API port
     configuration.net.port = FREE_PORT;
