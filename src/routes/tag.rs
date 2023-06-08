@@ -9,20 +9,13 @@ use crate::routes::API_VERSION;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::scope(&format!("/{API_VERSION}/tag"))
-            .service(
+        web::scope(&format!("/{API_VERSION}/tag")).service(
             web::resource("")
                 .route(web::post().to(add_tag))
                 .route(web::delete().to(delete_tag)),
-            )
+        ),
     );
-    cfg.service(
-        web::scope(&format!("/{API_VERSION}/tags"))
-            .service(
-            web::resource("")
-                .route(web::get().to(get_tags))
-            )
-    );
+    cfg.service(web::scope(&format!("/{API_VERSION}/tags")).service(web::resource("").route(web::get().to(get_tags))));
 }
 
 pub async fn get_tags(app_data: WebAppData) -> ServiceResult<impl Responder> {
@@ -58,11 +51,7 @@ pub struct DeleteTag {
     pub tag_id: TagId,
 }
 
-pub async fn delete_tag(
-    req: HttpRequest,
-    payload: web::Json<DeleteTag>,
-    app_data: WebAppData,
-) -> ServiceResult<impl Responder> {
+pub async fn delete_tag(req: HttpRequest, payload: web::Json<DeleteTag>, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let user_id = app_data.auth.get_user_id_from_request(&req).await?;
 
     let user = app_data.user_repository.get_compact(&user_id).await?;
@@ -74,7 +63,5 @@ pub async fn delete_tag(
 
     app_data.torrent_tag_repository.delete_tag(&payload.tag_id).await?;
 
-    Ok(HttpResponse::Ok().json(OkResponse {
-        data: payload.tag_id,
-    }))
+    Ok(HttpResponse::Ok().json(OkResponse { data: payload.tag_id }))
 }

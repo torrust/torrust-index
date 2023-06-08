@@ -11,10 +11,10 @@ use crate::models::info_hash::InfoHash;
 use crate::models::response::{DeletedTorrentResponse, TorrentResponse, TorrentsResponse};
 use crate::models::torrent::{TorrentId, TorrentListing, TorrentRequest};
 use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
+use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::user::UserId;
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::{tracker, AsCSV};
-use crate::models::torrent_tag::{TagId, TorrentTag};
 
 pub struct Index {
     configuration: Arc<Configuration>,
@@ -124,7 +124,9 @@ impl Index {
             return Err(e);
         }
 
-        self.torrent_tag_repository.link_torrent_to_tags(&torrent_id, &torrent_request.fields.tags).await?;
+        self.torrent_tag_repository
+            .link_torrent_to_tags(&torrent_id, &torrent_request.fields.tags)
+            .await?;
 
         Ok(torrent_id)
     }
@@ -476,7 +478,9 @@ impl DbTorrentInfoRepository {
         }
 
         if let Some(tags) = opt_tags {
-            let mut current_tags: Vec<TagId> = self.database.get_tags_for_torrent_id(*torrent_id)
+            let mut current_tags: Vec<TagId> = self
+                .database
+                .get_tags_for_torrent_id(*torrent_id)
                 .await?
                 .iter()
                 .map(|tag| tag.tag_id)

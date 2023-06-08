@@ -5,9 +5,9 @@ pub mod category;
 pub mod proxy;
 pub mod root;
 pub mod settings;
+pub mod tag;
 pub mod torrent;
 pub mod user;
-pub mod tag;
 
 pub const API_VERSION: &str = "v1";
 

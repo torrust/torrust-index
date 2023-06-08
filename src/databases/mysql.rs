@@ -725,7 +725,9 @@ impl Database for Mysql {
     }
 
     async fn add_torrent_tag_links(&self, torrent_id: i64, tag_ids: &Vec<TagId>) -> Result<(), database::Error> {
-        let mut transaction = self.pool.begin()
+        let mut transaction = self
+            .pool
+            .begin()
             .await
             .map_err(|err| database::Error::ErrorWithText(err.to_string()))?;
 
@@ -738,7 +740,8 @@ impl Database for Mysql {
                 .map_err(|err| database::Error::ErrorWithText(err.to_string()))?;
         }
 
-        transaction.commit()
+        transaction
+            .commit()
             .await
             .map_err(|err| database::Error::ErrorWithText(err.to_string()))
     }
@@ -771,9 +774,7 @@ impl Database for Mysql {
     }
 
     async fn get_tags(&self) -> Result<Vec<TorrentTag>, database::Error> {
-        query_as::<_, TorrentTag>(
-            "SELECT tag_id, name FROM torrust_torrent_tags"
-        )
+        query_as::<_, TorrentTag>("SELECT tag_id, name FROM torrust_torrent_tags")
             .fetch_all(&self.pool)
             .await
             .map_err(|_| database::Error::Error)
@@ -784,12 +785,12 @@ impl Database for Mysql {
             "SELECT torrust_torrent_tags.tag_id, torrust_torrent_tags.name
             FROM torrust_torrent_tags
             JOIN torrust_torrent_tag_links ON torrust_torrent_tags.tag_id = torrust_torrent_tag_links.tag_id
-            WHERE torrust_torrent_tag_links.torrent_id = ?"
+            WHERE torrust_torrent_tag_links.torrent_id = ?",
         )
-            .bind(torrent_id)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(|_| database::Error::Error)
+        .bind(torrent_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|_| database::Error::Error)
     }
 
     async fn update_tracker_info(

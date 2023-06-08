@@ -45,7 +45,7 @@ pub struct Create {
     pub title: String,
     pub description: String,
     pub category: String,
-    pub tags: Vec<TagId>
+    pub tags: Vec<TagId>,
 }
 
 impl Create {
@@ -236,7 +236,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
         title,
         description,
         category,
-        tags
+        tags,
     };
 
     fields.verify()?;

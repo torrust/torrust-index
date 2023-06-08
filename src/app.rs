@@ -14,7 +14,10 @@ use crate::config::Configuration;
 use crate::databases::database;
 use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
 use crate::services::category::{self, DbCategoryRepository};
-use crate::services::torrent::{DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator, DbTorrentRepository, DbTorrentTagRepository};
+use crate::services::torrent::{
+    DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator,
+    DbTorrentRepository, DbTorrentTagRepository,
+};
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
