@@ -30,7 +30,9 @@ pub struct Running {
 
 #[allow(clippy::too_many_lines)]
 pub async fn run(configuration: Configuration, api_implementation: &Implementation) -> Running {
-    logging::setup();
+    let log_level = configuration.settings.read().await.log_level.clone();
+
+    logging::setup(&log_level);
 
     let configuration = Arc::new(configuration);
 

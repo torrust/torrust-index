@@ -13,10 +13,8 @@ use log::{info, LevelFilter};
 
 static INIT: Once = Once::new();
 
-pub fn setup() {
-    // todo: load log level from configuration.
-
-    let level = config_level_or_default(&None);
+pub fn setup(log_level: &Option<String>) {
+    let level = config_level_or_default(log_level);
 
     if level == log::LevelFilter::Off {
         return;

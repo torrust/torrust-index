@@ -257,6 +257,9 @@ impl Default for ImageCache {
 /// The whole configuration for the backend.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct TorrustBackend {
+    /// Logging level. Possible values are: `Off`, `Error`, `Warn`, `Info`,
+    /// `Debug` and `Trace`. Default is `Info`.
+    pub log_level: Option<String>,
     /// The website customizable values.
     pub website: Website,
     /// The tracker configuration.
