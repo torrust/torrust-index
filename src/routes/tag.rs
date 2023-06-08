@@ -11,25 +11,39 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope(&format!("/{API_VERSION}/tag")).service(
             web::resource("")
-                .route(web::post().to(add_tag))
-                .route(web::delete().to(delete_tag)),
+                .route(web::post().to(create))
+                .route(web::delete().to(delete)),
         ),
     );
-    cfg.service(web::scope(&format!("/{API_VERSION}/tags")).service(web::resource("").route(web::get().to(get_tags))));
+    cfg.service(web::scope(&format!("/{API_VERSION}/tags")).service(web::resource("").route(web::get().to(get_all))));
 }
 
-pub async fn get_tags(app_data: WebAppData) -> ServiceResult<impl Responder> {
+/// Get Tags
+///
+/// # Errors
+///
+/// This function will return an error if unable to get tags from database.
+pub async fn get_all(app_data: WebAppData) -> ServiceResult<impl Responder> {
     let tags = app_data.torrent_tag_repository.get_tags().await?;
 
     Ok(HttpResponse::Ok().json(OkResponse { data: tags }))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AddTag {
+pub struct Create {
     pub name: String,
 }
 
-pub async fn add_tag(req: HttpRequest, payload: web::Json<AddTag>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+/// Create Tag
+///
+/// # Errors
+///
+/// This function will return an error if unable to:
+///
+/// * Get the requesting user id from the request.
+/// * Get the compact user from the user id.
+/// * Add the new tag to the database.
+pub async fn create(req: HttpRequest, payload: web::Json<Create>, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let user_id = app_data.auth.get_user_id_from_request(&req).await?;
 
     let user = app_data.user_repository.get_compact(&user_id).await?;
@@ -47,11 +61,20 @@ pub async fn add_tag(req: HttpRequest, payload: web::Json<AddTag>, app_data: Web
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct DeleteTag {
+pub struct Delete {
     pub tag_id: TagId,
 }
 
-pub async fn delete_tag(req: HttpRequest, payload: web::Json<DeleteTag>, app_data: WebAppData) -> ServiceResult<impl Responder> {
+/// Delete Tag
+///
+/// # Errors
+///
+/// This function will return an error if unable to:
+///
+/// * Get the requesting user id from the request.
+/// * Get the compact user from the user id.
+/// * Delete the tag from the database.
+pub async fn delete(req: HttpRequest, payload: web::Json<Delete>, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let user_id = app_data.auth.get_user_id_from_request(&req).await?;
 
     let user = app_data.user_repository.get_compact(&user_id).await?;

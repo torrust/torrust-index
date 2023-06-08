@@ -488,8 +488,8 @@ impl DbTorrentInfoRepository {
 
             let mut new_tags = tags.clone();
 
-            current_tags.sort();
-            new_tags.sort();
+            current_tags.sort_unstable();
+            new_tags.sort_unstable();
 
             if new_tags != current_tags {
                 self.database.delete_all_torrent_tag_links(*torrent_id).await?;
