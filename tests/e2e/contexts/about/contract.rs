@@ -47,4 +47,16 @@ mod with_axum_implementation {
         assert_text_ok(&response);
         assert_response_title(&response, "About");
     }
+
+    #[tokio::test]
+    async fn it_should_load_the_license_page_at_the_api_entrypoint() {
+        let mut env = TestEnv::new();
+        env.start(api::Implementation::Axum).await;
+        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+        let response = client.license().await;
+
+        assert_text_ok(&response);
+        assert_response_title(&response, "Licensing");
+    }
 }
