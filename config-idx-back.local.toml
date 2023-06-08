@@ -1,3 +1,5 @@
+log_level = "info"
+
 [website]
 name = "Torrust"
 
