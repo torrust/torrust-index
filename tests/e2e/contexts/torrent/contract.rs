@@ -16,6 +16,7 @@ Get torrent info:
 
 mod for_guests {
     use torrust_index_backend::utils::parse_torrent::decode_torrent;
+    use torrust_index_backend::web::api;
 
     use crate::common::client::Client;
     use crate::common::contexts::category::fixtures::software_predefined_category_id;
@@ -33,7 +34,7 @@ mod for_guests {
     #[tokio::test]
     async fn it_should_allow_guests_to_get_torrents() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -56,7 +57,7 @@ mod for_guests {
     #[tokio::test]
     async fn it_should_allow_to_get_torrents_with_pagination() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -86,7 +87,7 @@ mod for_guests {
     #[tokio::test]
     async fn it_should_allow_to_limit_the_number_of_torrents_per_request() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -121,7 +122,7 @@ mod for_guests {
     #[tokio::test]
     async fn it_should_return_a_default_amount_of_torrents_per_request_if_no_page_size_is_provided() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -152,7 +153,7 @@ mod for_guests {
     #[tokio::test]
     async fn it_should_allow_guests_to_get_torrent_details_searching_by_info_hash() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -215,7 +216,7 @@ mod for_guests {
     #[tokio::test]
     async fn it_should_allow_guests_to_download_a_torrent_file_searching_by_info_hash() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -240,7 +241,7 @@ mod for_guests {
     #[tokio::test]
     async fn it_should_return_a_not_found_trying_to_download_a_non_existing_torrent() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -260,7 +261,7 @@ mod for_guests {
     #[tokio::test]
     async fn it_should_not_allow_guests_to_delete_torrents() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -281,6 +282,7 @@ mod for_guests {
 mod for_authenticated_users {
 
     use torrust_index_backend::utils::parse_torrent::decode_torrent;
+    use torrust_index_backend::web::api;
 
     use crate::common::client::Client;
     use crate::common::contexts::torrent::fixtures::random_torrent;
@@ -294,7 +296,7 @@ mod for_authenticated_users {
     #[tokio::test]
     async fn it_should_allow_authenticated_users_to_upload_new_torrents() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -323,7 +325,7 @@ mod for_authenticated_users {
     #[tokio::test]
     async fn it_should_not_allow_uploading_a_torrent_with_a_non_existing_category() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         let uploader = new_logged_in_user(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
@@ -342,7 +344,7 @@ mod for_authenticated_users {
     #[tokio::test]
     async fn it_should_not_allow_uploading_a_torrent_with_a_title_that_already_exists() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -371,7 +373,7 @@ mod for_authenticated_users {
     #[tokio::test]
     async fn it_should_not_allow_uploading_a_torrent_with_a_info_hash_that_already_exists() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -401,7 +403,7 @@ mod for_authenticated_users {
     #[tokio::test]
     async fn it_should_allow_authenticated_users_to_download_a_torrent_with_a_personal_announce_url() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -435,6 +437,8 @@ mod for_authenticated_users {
     }
 
     mod and_non_admins {
+        use torrust_index_backend::web::api;
+
         use crate::common::client::Client;
         use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
         use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
@@ -444,7 +448,7 @@ mod for_authenticated_users {
         #[tokio::test]
         async fn it_should_not_allow_non_admins_to_delete_torrents() {
             let mut env = TestEnv::new();
-            env.start().await;
+            env.start(api::Implementation::ActixWeb).await;
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -464,7 +468,7 @@ mod for_authenticated_users {
         #[tokio::test]
         async fn it_should_allow_non_admin_users_to_update_someone_elses_torrents() {
             let mut env = TestEnv::new();
-            env.start().await;
+            env.start(api::Implementation::ActixWeb).await;
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -497,6 +501,8 @@ mod for_authenticated_users {
     }
 
     mod and_torrent_owners {
+        use torrust_index_backend::web::api;
+
         use crate::common::client::Client;
         use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
         use crate::common::contexts::torrent::responses::UpdatedTorrentResponse;
@@ -507,7 +513,7 @@ mod for_authenticated_users {
         #[tokio::test]
         async fn it_should_allow_torrent_owners_to_update_their_torrents() {
             let mut env = TestEnv::new();
-            env.start().await;
+            env.start(api::Implementation::ActixWeb).await;
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -543,6 +549,8 @@ mod for_authenticated_users {
     }
 
     mod and_admins {
+        use torrust_index_backend::web::api;
+
         use crate::common::client::Client;
         use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
         use crate::common::contexts::torrent::responses::{DeletedTorrentResponse, UpdatedTorrentResponse};
@@ -553,7 +561,7 @@ mod for_authenticated_users {
         #[tokio::test]
         async fn it_should_allow_admins_to_delete_torrents_searching_by_info_hash() {
             let mut env = TestEnv::new();
-            env.start().await;
+            env.start(api::Implementation::ActixWeb).await;
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -577,7 +585,7 @@ mod for_authenticated_users {
         #[tokio::test]
         async fn it_should_allow_admins_to_update_someone_elses_torrents() {
             let mut env = TestEnv::new();
-            env.start().await;
+            env.start(api::Implementation::ActixWeb).await;
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");

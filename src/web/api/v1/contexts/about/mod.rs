@@ -84,3 +84,5 @@
 //!     </footer>
 //! </html>
 //! ```
+pub mod handlers;
+pub mod routes;

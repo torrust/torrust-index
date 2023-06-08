@@ -2,7 +2,9 @@ use std::net::SocketAddr;
 
 use log::info;
 use tokio::sync::{oneshot, RwLock};
+use tokio::task::JoinHandle;
 use torrust_index_backend::config::Configuration;
+use torrust_index_backend::web::api::Implementation;
 use torrust_index_backend::{app, config};
 
 /// It launches the app and provides a way to stop it.
@@ -25,40 +27,45 @@ impl AppStarter {
         }
     }
 
+    /// Starts the whole app with all its services.
+    ///
     /// # Panics
     ///
     /// Will panic if the app was dropped after spawning it.
-    pub async fn start(&mut self) {
+    pub async fn start(&mut self, api_implementation: Implementation) {
         let configuration = Configuration {
             settings: RwLock::new(self.configuration.clone()),
             config_path: self.config_path.clone(),
         };
 
         // Open a channel to communicate back with this function
-        let (tx, rx) = oneshot::channel::<AppStarted>();
+        let (tx, rx) = oneshot::channel::<AppStartedMessage>();
 
         // Launch the app in a separate task
         let app_handle = tokio::spawn(async move {
-            let app = app::run(configuration).await;
+            let app = app::run(configuration, &api_implementation).await;
+
+            info!("Application started. API server listening on {}", app.api_socket_addr);
 
             // Send the socket address back to the main thread
-            tx.send(AppStarted {
-                socket_addr: app.socket_address,
+            tx.send(AppStartedMessage {
+                api_socket_addr: app.api_socket_addr,
             })
             .expect("the app starter should not be dropped");
 
-            app.api_server.await
+            match api_implementation {
+                Implementation::ActixWeb => app.actix_web_api_server.unwrap().await,
+                Implementation::Axum => app.axum_api_server.unwrap().await,
+            }
         });
 
         // Wait until the app is started
         let socket_addr = match rx.await {
-            Ok(msg) => msg.socket_addr,
+            Ok(msg) => msg.api_socket_addr,
             Err(e) => panic!("the app was dropped: {e}"),
         };
 
         let running_state = RunningState { app_handle, socket_addr };
-
-        info!("Test environment started. Listening on {}", running_state.socket_addr);
 
         // Update the app state
         self.running_state = Some(running_state);
@@ -91,13 +98,13 @@ impl AppStarter {
 }
 
 #[derive(Debug)]
-pub struct AppStarted {
-    pub socket_addr: SocketAddr,
+pub struct AppStartedMessage {
+    pub api_socket_addr: SocketAddr,
 }
 
 /// Stores the app state when it is running.
 pub struct RunningState {
-    app_handle: tokio::task::JoinHandle<std::result::Result<(), std::io::Error>>,
+    app_handle: JoinHandle<Result<Result<(), std::io::Error>, tokio::task::JoinError>>,
     pub socket_addr: SocketAddr,
 }
 

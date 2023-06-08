@@ -1,7 +1,10 @@
+use std::str::FromStr;
+use std::time::Duration;
+
 use async_trait::async_trait;
 use chrono::NaiveDateTime;
-use sqlx::sqlite::SqlitePoolOptions;
-use sqlx::{query, query_as, Acquire, SqlitePool};
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+use sqlx::{query, query_as, Acquire, ConnectOptions, SqlitePool};
 
 use crate::databases::database;
 use crate::databases::database::{Category, Database, Driver, Sorting, TorrentCompact};
@@ -25,8 +28,13 @@ impl Database for Sqlite {
     }
 
     async fn new(database_url: &str) -> Self {
+        let mut connection_options = SqliteConnectOptions::from_str(database_url).expect("Unable to create connection options.");
+        connection_options
+            .log_statements(log::LevelFilter::Error)
+            .log_slow_statements(log::LevelFilter::Warn, Duration::from_secs(1));
+
         let db = SqlitePoolOptions::new()
-            .connect(database_url)
+            .connect_with(connection_options)
             .await
             .expect("Unable to create database pool.");
 

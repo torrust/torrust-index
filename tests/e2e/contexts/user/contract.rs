@@ -1,4 +1,6 @@
 //! API contract for `user` context.
+use torrust_index_backend::web::api;
+
 use crate::common::client::Client;
 use crate::common::contexts::user::fixtures::random_user_registration;
 use crate::common::contexts::user::forms::{LoginForm, TokenRenewalForm, TokenVerificationForm};
@@ -39,7 +41,7 @@ the mailcatcher API.
 #[tokio::test]
 async fn it_should_allow_a_guest_user_to_register() {
     let mut env = TestEnv::new();
-    env.start().await;
+    env.start(api::Implementation::ActixWeb).await;
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let form = random_user_registration();
@@ -56,7 +58,7 @@ async fn it_should_allow_a_guest_user_to_register() {
 #[tokio::test]
 async fn it_should_allow_a_registered_user_to_login() {
     let mut env = TestEnv::new();
-    env.start().await;
+    env.start(api::Implementation::ActixWeb).await;
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let registered_user = new_registered_user(&env).await;
@@ -81,7 +83,7 @@ async fn it_should_allow_a_registered_user_to_login() {
 #[tokio::test]
 async fn it_should_allow_a_logged_in_user_to_verify_an_authentication_token() {
     let mut env = TestEnv::new();
-    env.start().await;
+    env.start(api::Implementation::ActixWeb).await;
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let logged_in_user = new_logged_in_user(&env).await;
@@ -104,7 +106,7 @@ async fn it_should_allow_a_logged_in_user_to_verify_an_authentication_token() {
 #[tokio::test]
 async fn it_should_not_allow_a_logged_in_user_to_renew_an_authentication_token_which_is_still_valid_for_more_than_one_week() {
     let mut env = TestEnv::new();
-    env.start().await;
+    env.start(api::Implementation::ActixWeb).await;
 
     let logged_in_user = new_logged_in_user(&env).await;
     let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_user.token);
@@ -132,6 +134,8 @@ async fn it_should_not_allow_a_logged_in_user_to_renew_an_authentication_token_w
 }
 
 mod banned_user_list {
+    use torrust_index_backend::web::api;
+
     use crate::common::client::Client;
     use crate::common::contexts::user::forms::Username;
     use crate::common::contexts::user::responses::BannedUserResponse;
@@ -141,7 +145,7 @@ mod banned_user_list {
     #[tokio::test]
     async fn it_should_allow_an_admin_to_ban_a_user() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         let logged_in_admin = new_logged_in_admin(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
@@ -162,7 +166,7 @@ mod banned_user_list {
     #[tokio::test]
     async fn it_should_not_allow_a_non_admin_to_ban_a_user() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
 
         let logged_non_admin = new_logged_in_user(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_non_admin.token);
@@ -177,7 +181,7 @@ mod banned_user_list {
     #[tokio::test]
     async fn it_should_not_allow_a_guest_to_ban_a_user() {
         let mut env = TestEnv::new();
-        env.start().await;
+        env.start(api::Implementation::ActixWeb).await;
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
         let registered_user = new_registered_user(&env).await;
