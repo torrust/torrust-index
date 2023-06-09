@@ -361,7 +361,7 @@ impl Database for Sqlite {
         };
 
         let mut query_string = format!(
-            "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, DATE_FORMAT(tt.date_uploaded, '%Y-%m-%d %H:%i:%s') AS date_uploaded, tt.size AS file_size,
+            "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, tt.date_uploaded, tt.size AS file_size,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
             FROM torrust_torrents tt
