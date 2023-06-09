@@ -555,15 +555,6 @@ impl DbTorrentTagRepository {
         Self { database }
     }
 
-    /// It adds a new tag and returns the newly created tag.
-    ///
-    /// # Errors
-    ///
-    /// It returns an error if there is a database error.
-    pub async fn add_tag(&self, tag_name: &str) -> Result<(), Error> {
-        self.database.add_tag(tag_name).await
-    }
-
     /// It adds a new torrent tag link.
     ///
     /// # Errors
@@ -578,17 +569,8 @@ impl DbTorrentTagRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn link_torrent_to_tags(&self, torrent_id: &TorrentId, tag_ids: &Vec<TagId>) -> Result<(), Error> {
+    pub async fn link_torrent_to_tags(&self, torrent_id: &TorrentId, tag_ids: &[TagId]) -> Result<(), Error> {
         self.database.add_torrent_tag_links(*torrent_id, tag_ids).await
-    }
-
-    /// It returns all the tags.
-    ///
-    /// # Errors
-    ///
-    /// It returns an error if there is a database error.
-    pub async fn get_tags(&self) -> Result<Vec<TorrentTag>, Error> {
-        self.database.get_tags().await
     }
 
     /// It returns all the tags linked to a certain torrent ID.
@@ -598,15 +580,6 @@ impl DbTorrentTagRepository {
     /// It returns an error if there is a database error.
     pub async fn get_tags_for_torrent(&self, torrent_id: &TorrentId) -> Result<Vec<TorrentTag>, Error> {
         self.database.get_tags_for_torrent_id(*torrent_id).await
-    }
-
-    /// It removes a tag and returns it.
-    ///
-    /// # Errors
-    ///
-    /// It returns an error if there is a database error.
-    pub async fn delete_tag(&self, tag_id: &TagId) -> Result<(), Error> {
-        self.database.delete_tag(*tag_id).await
     }
 
     /// It removes a torrent tag link.

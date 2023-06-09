@@ -41,13 +41,13 @@ impl Service {
         match self.category_repository.add(category_name).await {
             Ok(id) => Ok(id),
             Err(e) => match e {
-                DatabaseError::CategoryAlreadyExists => Err(ServiceError::CategoryExists),
+                DatabaseError::CategoryAlreadyExists => Err(ServiceError::CategoryAlreadyExists),
                 _ => Err(ServiceError::DatabaseError),
             },
         }
     }
 
-    /// Deletes a new category.
+    /// Deletes a category.
     ///
     /// # Errors
     ///
