@@ -778,7 +778,7 @@ impl Database for Mysql {
             .bind(name)
             .fetch_one(&self.pool)
             .await
-            .map_err(|err| database::Error::TagNotFound)
+            .map_err(|_| database::Error::TagNotFound)
     }
 
     async fn get_tags(&self) -> Result<Vec<TorrentTag>, database::Error> {
