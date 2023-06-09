@@ -13,6 +13,7 @@ use crate::errors::{ServiceError, ServiceResult};
 use crate::models::info_hash::InfoHash;
 use crate::models::response::{NewTorrentResponse, OkResponse};
 use crate::models::torrent::TorrentRequest;
+use crate::models::torrent_tag::TagId;
 use crate::routes::API_VERSION;
 use crate::services::torrent::ListingRequest;
 use crate::utils::parse_torrent;
@@ -44,6 +45,7 @@ pub struct Create {
     pub title: String,
     pub description: String,
     pub category: String,
+    pub tags: Vec<TagId>,
 }
 
 impl Create {
@@ -65,6 +67,7 @@ impl Create {
 pub struct Update {
     title: Option<String>,
     description: Option<String>,
+    tags: Option<Vec<TagId>>,
 }
 
 /// Upload a Torrent to the Index
@@ -138,7 +141,7 @@ pub async fn update_torrent_info_handler(
 
     let torrent_response = app_data
         .torrent_service
-        .update_torrent_info(&info_hash, &payload.title, &payload.description, &user_id)
+        .update_torrent_info(&info_hash, &payload.title, &payload.description, &payload.tags, &user_id)
         .await?;
 
     Ok(HttpResponse::Ok().json(OkResponse { data: torrent_response }))
@@ -193,21 +196,25 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
     let mut title = String::new();
     let mut description = String::new();
     let mut category = String::new();
+    let mut tags: Vec<TagId> = vec![];
 
     while let Ok(Some(mut field)) = payload.try_next().await {
         match field.content_disposition().get_name().unwrap() {
-            "title" | "description" | "category" => {
+            "title" | "description" | "category" | "tags" => {
                 let data = field.next().await;
+
                 if data.is_none() {
                     continue;
                 }
-                let wrapped_data = &data.unwrap().unwrap();
-                let parsed_data = std::str::from_utf8(wrapped_data).unwrap();
+
+                let wrapped_data = &data.unwrap().map_err(|_| ServiceError::BadRequest)?;
+                let parsed_data = std::str::from_utf8(wrapped_data).map_err(|_| ServiceError::BadRequest)?;
 
                 match field.content_disposition().get_name().unwrap() {
                     "title" => title = parsed_data.to_string(),
                     "description" => description = parsed_data.to_string(),
                     "category" => category = parsed_data.to_string(),
+                    "tags" => tags = serde_json::from_str(parsed_data).map_err(|_| ServiceError::BadRequest)?,
                     _ => {}
                 }
             }
@@ -229,6 +236,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
         title,
         description,
         category,
+        tags,
     };
 
     fields.verify()?;

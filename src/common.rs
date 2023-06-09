@@ -8,7 +8,7 @@ use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebTok
 use crate::services::category::{self, DbCategoryRepository};
 use crate::services::torrent::{
     DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator,
-    DbTorrentRepository,
+    DbTorrentRepository, DbTorrentTagRepository,
 };
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
 use crate::services::{proxy, settings, torrent};
@@ -37,6 +37,7 @@ pub struct AppData {
     pub torrent_info_repository: Arc<DbTorrentInfoRepository>,
     pub torrent_file_repository: Arc<DbTorrentFileRepository>,
     pub torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
+    pub torrent_tag_repository: Arc<DbTorrentTagRepository>,
     pub torrent_listing_generator: Arc<DbTorrentListingGenerator>,
     pub banned_user_list: Arc<DbBannedUserList>,
     // Services
@@ -69,6 +70,7 @@ impl AppData {
         torrent_info_repository: Arc<DbTorrentInfoRepository>,
         torrent_file_repository: Arc<DbTorrentFileRepository>,
         torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
+        torrent_tag_repository: Arc<DbTorrentTagRepository>,
         torrent_listing_generator: Arc<DbTorrentListingGenerator>,
         banned_user_list: Arc<DbBannedUserList>,
         // Services
@@ -98,6 +100,7 @@ impl AppData {
             torrent_info_repository,
             torrent_file_repository,
             torrent_announce_url_repository,
+            torrent_tag_repository,
             torrent_listing_generator,
             banned_user_list,
             // Services

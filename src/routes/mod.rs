@@ -5,6 +5,7 @@ pub mod category;
 pub mod proxy;
 pub mod root;
 pub mod settings;
+pub mod tag;
 pub mod torrent;
 pub mod user;
 
@@ -17,5 +18,6 @@ pub fn init(cfg: &mut web::ServiceConfig) {
     settings::init(cfg);
     about::init(cfg);
     proxy::init(cfg);
+    tag::init(cfg);
     root::init(cfg);
 }

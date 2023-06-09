@@ -13,7 +13,7 @@ use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebTok
 use crate::services::category::{self, DbCategoryRepository};
 use crate::services::torrent::{
     DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator,
-    DbTorrentRepository,
+    DbTorrentRepository, DbTorrentTagRepository,
 };
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
 use crate::services::{proxy, settings, torrent};
@@ -65,6 +65,7 @@ pub async fn run(configuration: Configuration, api_implementation: &Implementati
     let torrent_info_repository = Arc::new(DbTorrentInfoRepository::new(database.clone()));
     let torrent_file_repository = Arc::new(DbTorrentFileRepository::new(database.clone()));
     let torrent_announce_url_repository = Arc::new(DbTorrentAnnounceUrlRepository::new(database.clone()));
+    let torrent_tag_repository = Arc::new(DbTorrentTagRepository::new(database.clone()));
     let torrent_listing_generator = Arc::new(DbTorrentListingGenerator::new(database.clone()));
     let banned_user_list = Arc::new(DbBannedUserList::new(database.clone()));
 
@@ -87,6 +88,7 @@ pub async fn run(configuration: Configuration, api_implementation: &Implementati
         torrent_info_repository.clone(),
         torrent_file_repository.clone(),
         torrent_announce_url_repository.clone(),
+        torrent_tag_repository.clone(),
         torrent_listing_generator.clone(),
     ));
     let registration_service = Arc::new(user::RegistrationService::new(
@@ -128,6 +130,7 @@ pub async fn run(configuration: Configuration, api_implementation: &Implementati
         torrent_info_repository,
         torrent_file_repository,
         torrent_announce_url_repository,
+        torrent_tag_repository,
         torrent_listing_generator,
         banned_user_list,
         category_service,

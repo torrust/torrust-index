@@ -12,6 +12,7 @@ use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::{DbTorrentAnnounceUrl, DbTorrentFile, DbTorrentInfo, Torrent, TorrentFile};
+use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
 use crate::utils::clock;
@@ -300,6 +301,7 @@ impl Database for Mysql {
         &self,
         search: &Option<String>,
         categories: &Option<Vec<String>>,
+        tags: &Option<Vec<String>>,
         sort: &Sorting,
         offset: u64,
         limit: u8,
@@ -345,11 +347,36 @@ impl Database for Mysql {
             String::new()
         };
 
+        let tag_filter_query = if let Some(t) = tags {
+            let mut i = 0;
+            let mut tag_filters = String::new();
+            for tag in t.iter() {
+                // don't take user input in the db query
+                if let Ok(sanitized_tag) = self.get_tag_from_name(tag).await {
+                    let mut str = format!("tl.tag_id = '{}'", sanitized_tag.tag_id);
+                    if i > 0 {
+                        str = format!(" OR {str}");
+                    }
+                    tag_filters.push_str(&str);
+                    i += 1;
+                }
+            }
+            if tag_filters.is_empty() {
+                String::new()
+            } else {
+                format!("INNER JOIN torrust_torrent_tag_links tl ON tt.torrent_id = tl.torrent_id AND ({tag_filters}) ")
+            }
+        } else {
+            String::new()
+        };
+
         let mut query_string = format!(
             "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, DATE_FORMAT(tt.date_uploaded, '%Y-%m-%d %H:%i:%s') AS date_uploaded, tt.size AS file_size,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
-            FROM torrust_torrents tt {category_filter_query}
+            FROM torrust_torrents tt
+            {category_filter_query}
+            {tag_filter_query}
             INNER JOIN torrust_user_profiles tp ON tt.uploader_id = tp.user_id
             INNER JOIN torrust_torrent_info ti ON tt.torrent_id = ti.torrent_id
             LEFT JOIN torrust_torrent_tracker_stats ts ON tt.torrent_id = ts.torrent_id
@@ -675,6 +702,103 @@ impl Database for Mysql {
                     Err(database::Error::TorrentNotFound)
                 }
             })
+    }
+
+    async fn add_tag(&self, name: &str) -> Result<(), database::Error> {
+        query("INSERT INTO torrust_torrent_tags (name) VALUES (?)")
+            .bind(name)
+            .execute(&self.pool)
+            .await
+            .map(|_| ())
+            .map_err(|err| database::Error::ErrorWithText(err.to_string()))
+    }
+
+    async fn delete_tag(&self, tag_id: TagId) -> Result<(), database::Error> {
+        query("DELETE FROM torrust_torrent_tags WHERE tag_id = ?")
+            .bind(tag_id)
+            .execute(&self.pool)
+            .await
+            .map(|_| ())
+            .map_err(|err| database::Error::ErrorWithText(err.to_string()))
+    }
+
+    async fn add_torrent_tag_link(&self, torrent_id: i64, tag_id: TagId) -> Result<(), database::Error> {
+        query("INSERT INTO torrust_torrent_tag_links (torrent_id, tag_id) VALUES (?, ?)")
+            .bind(torrent_id)
+            .bind(tag_id)
+            .execute(&self.pool)
+            .await
+            .map(|_| ())
+            .map_err(|_| database::Error::Error)
+    }
+
+    async fn add_torrent_tag_links(&self, torrent_id: i64, tag_ids: &Vec<TagId>) -> Result<(), database::Error> {
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(|err| database::Error::ErrorWithText(err.to_string()))?;
+
+        for tag_id in tag_ids {
+            query("INSERT INTO torrust_torrent_tag_links (torrent_id, tag_id) VALUES (?, ?)")
+                .bind(torrent_id)
+                .bind(tag_id)
+                .execute(&mut transaction)
+                .await
+                .map_err(|err| database::Error::ErrorWithText(err.to_string()))?;
+        }
+
+        transaction
+            .commit()
+            .await
+            .map_err(|err| database::Error::ErrorWithText(err.to_string()))
+    }
+
+    async fn delete_torrent_tag_link(&self, torrent_id: i64, tag_id: TagId) -> Result<(), database::Error> {
+        query("DELETE FROM torrust_torrent_tag_links WHERE torrent_id = ? AND tag_id = ?")
+            .bind(torrent_id)
+            .bind(tag_id)
+            .execute(&self.pool)
+            .await
+            .map(|_| ())
+            .map_err(|_| database::Error::Error)
+    }
+
+    async fn delete_all_torrent_tag_links(&self, torrent_id: i64) -> Result<(), database::Error> {
+        query("DELETE FROM torrust_torrent_tag_links WHERE torrent_id = ?")
+            .bind(torrent_id)
+            .execute(&self.pool)
+            .await
+            .map(|_| ())
+            .map_err(|err| database::Error::ErrorWithText(err.to_string()))
+    }
+
+    async fn get_tag_from_name(&self, name: &str) -> Result<TorrentTag, database::Error> {
+        query_as::<_, TorrentTag>("SELECT tag_id, name FROM torrust_torrent_tags WHERE name = ?")
+            .bind(name)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|err| database::Error::TagNotFound)
+    }
+
+    async fn get_tags(&self) -> Result<Vec<TorrentTag>, database::Error> {
+        query_as::<_, TorrentTag>("SELECT tag_id, name FROM torrust_torrent_tags")
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|_| database::Error::Error)
+    }
+
+    async fn get_tags_for_torrent_id(&self, torrent_id: i64) -> Result<Vec<TorrentTag>, database::Error> {
+        query_as::<_, TorrentTag>(
+            "SELECT torrust_torrent_tags.tag_id, torrust_torrent_tags.name
+            FROM torrust_torrent_tags
+            JOIN torrust_torrent_tag_links ON torrust_torrent_tags.tag_id = torrust_torrent_tag_links.tag_id
+            WHERE torrust_torrent_tag_links.torrent_id = ?",
+        )
+        .bind(torrent_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|_| database::Error::Error)
     }
 
     async fn update_tracker_info(

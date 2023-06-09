@@ -12,6 +12,7 @@ use crate::models::info_hash::InfoHash;
 use crate::models::response::{DeletedTorrentResponse, TorrentResponse, TorrentsResponse};
 use crate::models::torrent::{TorrentId, TorrentListing, TorrentRequest};
 use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
+use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::user::UserId;
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::{tracker, AsCSV};
@@ -26,6 +27,7 @@ pub struct Index {
     torrent_info_repository: Arc<DbTorrentInfoRepository>,
     torrent_file_repository: Arc<DbTorrentFileRepository>,
     torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
+    torrent_tag_repository: Arc<DbTorrentTagRepository>,
     torrent_listing_generator: Arc<DbTorrentListingGenerator>,
 }
 
@@ -37,6 +39,8 @@ pub struct ListingRequest {
     pub sort: Option<Sorting>,
     /// Expects comma separated string, eg: "?categories=movie,other,app"
     pub categories: Option<String>,
+    /// Expects comma separated string, eg: "?tags=Linux,Ubuntu"
+    pub tags: Option<String>,
     pub search: Option<String>,
 }
 
@@ -45,6 +49,7 @@ pub struct ListingRequest {
 pub struct ListingSpecification {
     pub search: Option<String>,
     pub categories: Option<Vec<String>>,
+    pub tags: Option<Vec<String>>,
     pub sort: Sorting,
     pub offset: u64,
     pub page_size: u8,
@@ -63,6 +68,7 @@ impl Index {
         torrent_info_repository: Arc<DbTorrentInfoRepository>,
         torrent_file_repository: Arc<DbTorrentFileRepository>,
         torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
+        torrent_tag_repository: Arc<DbTorrentTagRepository>,
         torrent_listing_repository: Arc<DbTorrentListingGenerator>,
     ) -> Self {
         Self {
@@ -75,6 +81,7 @@ impl Index {
             torrent_info_repository,
             torrent_file_repository,
             torrent_announce_url_repository,
+            torrent_tag_repository,
             torrent_listing_generator: torrent_listing_repository,
         }
     }
@@ -117,6 +124,10 @@ impl Index {
             let _ = self.torrent_repository.delete(&torrent_id).await;
             return Err(e);
         }
+
+        self.torrent_tag_repository
+            .link_torrent_to_tags(&torrent_id, &torrent_request.fields.tags)
+            .await?;
 
         Ok(torrent_id)
     }
@@ -275,6 +286,8 @@ impl Index {
             torrent_response.leechers = torrent_info.leechers;
         }
 
+        torrent_response.tags = self.torrent_tag_repository.get_tags_for_torrent(&torrent_id).await?;
+
         Ok(torrent_response)
     }
 
@@ -318,9 +331,12 @@ impl Index {
 
         let categories = request.categories.as_csv::<String>().unwrap_or(None);
 
+        let tags = request.tags.as_csv::<String>().unwrap_or(None);
+
         ListingSpecification {
             search: request.search.clone(),
             categories,
+            tags,
             sort,
             offset,
             page_size,
@@ -342,6 +358,7 @@ impl Index {
         info_hash: &InfoHash,
         title: &Option<String>,
         description: &Option<String>,
+        tags: &Option<Vec<TagId>>,
         user_id: &UserId,
     ) -> Result<TorrentResponse, ServiceError> {
         let updater = self.user_repository.get_compact(user_id).await?;
@@ -355,7 +372,7 @@ impl Index {
         }
 
         self.torrent_info_repository
-            .update(&torrent_listing.torrent_id, title, description)
+            .update(&torrent_listing.torrent_id, title, description, tags)
             .await?;
 
         let torrent_listing = self
@@ -451,6 +468,7 @@ impl DbTorrentInfoRepository {
         torrent_id: &TorrentId,
         opt_title: &Option<String>,
         opt_description: &Option<String>,
+        opt_tags: &Option<Vec<TagId>>,
     ) -> Result<(), Error> {
         if let Some(title) = &opt_title {
             self.database.update_torrent_title(*torrent_id, title).await?;
@@ -458,6 +476,26 @@ impl DbTorrentInfoRepository {
 
         if let Some(description) = &opt_description {
             self.database.update_torrent_description(*torrent_id, description).await?;
+        }
+
+        if let Some(tags) = opt_tags {
+            let mut current_tags: Vec<TagId> = self
+                .database
+                .get_tags_for_torrent_id(*torrent_id)
+                .await?
+                .iter()
+                .map(|tag| tag.tag_id)
+                .collect();
+
+            let mut new_tags = tags.clone();
+
+            current_tags.sort_unstable();
+            new_tags.sort_unstable();
+
+            if new_tags != current_tags {
+                self.database.delete_all_torrent_tag_links(*torrent_id).await?;
+                self.database.add_torrent_tag_links(*torrent_id, tags).await?;
+            }
         }
 
         Ok(())
@@ -507,6 +545,89 @@ impl DbTorrentAnnounceUrlRepository {
     }
 }
 
+pub struct DbTorrentTagRepository {
+    database: Arc<Box<dyn Database>>,
+}
+
+impl DbTorrentTagRepository {
+    #[must_use]
+    pub fn new(database: Arc<Box<dyn Database>>) -> Self {
+        Self { database }
+    }
+
+    /// It adds a new tag and returns the newly created tag.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn add_tag(&self, tag_name: &str) -> Result<(), Error> {
+        self.database.add_tag(tag_name).await
+    }
+
+    /// It adds a new torrent tag link.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn link_torrent_to_tag(&self, torrent_id: &TorrentId, tag_id: &TagId) -> Result<(), Error> {
+        self.database.add_torrent_tag_link(*torrent_id, *tag_id).await
+    }
+
+    /// It adds multiple torrent tag links at once.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn link_torrent_to_tags(&self, torrent_id: &TorrentId, tag_ids: &Vec<TagId>) -> Result<(), Error> {
+        self.database.add_torrent_tag_links(*torrent_id, tag_ids).await
+    }
+
+    /// It returns all the tags.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn get_tags(&self) -> Result<Vec<TorrentTag>, Error> {
+        self.database.get_tags().await
+    }
+
+    /// It returns all the tags linked to a certain torrent ID.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn get_tags_for_torrent(&self, torrent_id: &TorrentId) -> Result<Vec<TorrentTag>, Error> {
+        self.database.get_tags_for_torrent_id(*torrent_id).await
+    }
+
+    /// It removes a tag and returns it.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn delete_tag(&self, tag_id: &TagId) -> Result<(), Error> {
+        self.database.delete_tag(*tag_id).await
+    }
+
+    /// It removes a torrent tag link.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn unlink_torrent_from_tag(&self, torrent_id: &TorrentId, tag_id: &TagId) -> Result<(), Error> {
+        self.database.delete_torrent_tag_link(*torrent_id, *tag_id).await
+    }
+
+    /// It removes all tags for a certain torrent.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn unlink_all_tags_for_torrent(&self, torrent_id: &TorrentId) -> Result<(), Error> {
+        self.database.delete_all_torrent_tag_links(*torrent_id).await
+    }
+}
+
 pub struct DbTorrentListingGenerator {
     database: Arc<Box<dyn Database>>,
 }
@@ -545,6 +666,7 @@ impl DbTorrentListingGenerator {
             .get_torrents_search_sorted_paginated(
                 &specification.search,
                 &specification.categories,
+                &specification.tags,
                 &specification.sort,
                 specification.offset,
                 specification.page_size,
