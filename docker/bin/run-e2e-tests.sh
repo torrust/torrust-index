@@ -36,13 +36,13 @@ wait_for_container_to_be_healthy() {
 }
 
 # Install tool to create torrent files
-cargo install imdl
+cargo install imdl || exit 1
 
-cp .env.local .env
-./bin/install.sh
+cp .env.local .env || exit 1
+./bin/install.sh || exit 1
 
 # Start E2E testing environment
-./docker/bin/e2e-env-up.sh
+./docker/bin/e2e-env-up.sh || exit 1
 
 wait_for_container_to_be_healthy torrust-mysql-1 10 3
 # todo: implement healthchecks for tracker and backend and wait until they are healthy
@@ -54,7 +54,7 @@ sleep 20s
 docker ps
 
 # Run E2E tests with shared app instance
-TORRUST_IDX_BACK_E2E_SHARED=true cargo test
+TORRUST_IDX_BACK_E2E_SHARED=true cargo test || exit 1
 
 # Stop E2E testing environment
 ./docker/bin/e2e-env-down.sh
