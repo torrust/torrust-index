@@ -4,6 +4,7 @@ use serde::Serialize;
 use super::connection_info::ConnectionInfo;
 use super::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
 use super::contexts::settings::form::UpdateSettings;
+use super::contexts::tag::forms::{AddTagForm, DeleteTagForm};
 use super::contexts::torrent::forms::UpdateTorrentFrom;
 use super::contexts::torrent::requests::InfoHash;
 use super::contexts::user::forms::{LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username};
@@ -65,6 +66,22 @@ impl Client {
 
     pub async fn delete_category(&self, delete_category_form: DeleteCategoryForm) -> TextResponse {
         self.http_client.delete_with_body("/category", &delete_category_form).await
+    }
+
+    // Context: tag
+
+    pub async fn get_tags(&self) -> TextResponse {
+        // code-review: some endpoint are using plural
+        // (for instance, `get_categories`) and some singular.
+        self.http_client.get("/tags", Query::empty()).await
+    }
+
+    pub async fn add_tag(&self, add_tag_form: AddTagForm) -> TextResponse {
+        self.http_client.post("/tag", &add_tag_form).await
+    }
+
+    pub async fn delete_tag(&self, delete_tag_form: DeleteTagForm) -> TextResponse {
+        self.http_client.delete_with_body("/tag", &delete_tag_form).await
     }
 
     // Context: root

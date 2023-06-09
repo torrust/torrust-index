@@ -124,13 +124,16 @@ pub enum ServiceError {
     FailedToSendVerificationEmail,
 
     #[display(fmt = "Category already exists.")]
-    CategoryExists,
+    CategoryAlreadyExists,
 
     #[display(fmt = "Tag already exists.")]
-    TagExists,
+    TagAlreadyExists,
 
     #[display(fmt = "Category not found.")]
     CategoryNotFound,
+
+    #[display(fmt = "Tag not found.")]
+    TagNotFound,
 
     #[display(fmt = "Database error.")]
     DatabaseError,
@@ -176,14 +179,15 @@ impl ResponseError for ServiceError {
             ServiceError::InfoHashAlreadyExists => StatusCode::BAD_REQUEST,
             ServiceError::TorrentTitleAlreadyExists => StatusCode::BAD_REQUEST,
             ServiceError::TrackerOffline => StatusCode::INTERNAL_SERVER_ERROR,
-            ServiceError::CategoryExists => StatusCode::BAD_REQUEST,
-            ServiceError::TagExists => StatusCode::BAD_REQUEST,
+            ServiceError::CategoryAlreadyExists => StatusCode::BAD_REQUEST,
+            ServiceError::TagAlreadyExists => StatusCode::BAD_REQUEST,
             ServiceError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceError::EmailMissing => StatusCode::NOT_FOUND,
             ServiceError::FailedToSendVerificationEmail => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceError::WhitelistingError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceError::DatabaseError => StatusCode::INTERNAL_SERVER_ERROR,
             ServiceError::CategoryNotFound => StatusCode::NOT_FOUND,
+            ServiceError::TagNotFound => StatusCode::NOT_FOUND,
         }
     }
 
@@ -223,9 +227,9 @@ impl From<database::Error> for ServiceError {
             database::Error::UsernameTaken => ServiceError::UsernameTaken,
             database::Error::EmailTaken => ServiceError::EmailTaken,
             database::Error::UserNotFound => ServiceError::UserNotFound,
-            database::Error::CategoryAlreadyExists => ServiceError::CategoryExists,
+            database::Error::CategoryAlreadyExists => ServiceError::CategoryAlreadyExists,
             database::Error::CategoryNotFound => ServiceError::InvalidCategory,
-            database::Error::TagAlreadyExists => ServiceError::TagExists,
+            database::Error::TagAlreadyExists => ServiceError::TagAlreadyExists,
             database::Error::TagNotFound => ServiceError::InvalidTag,
             database::Error::TorrentNotFound => ServiceError::TorrentNotFound,
             database::Error::TorrentAlreadyExists => ServiceError::InfoHashAlreadyExists,

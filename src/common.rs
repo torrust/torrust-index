@@ -6,6 +6,7 @@ use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
 use crate::services::category::{self, DbCategoryRepository};
+use crate::services::tag::{self, DbTagRepository};
 use crate::services::torrent::{
     DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator,
     DbTorrentRepository, DbTorrentTagRepository,
@@ -30,6 +31,7 @@ pub struct AppData {
     pub image_cache_manager: Arc<ImageCacheService>,
     // Repositories
     pub category_repository: Arc<DbCategoryRepository>,
+    pub tag_repository: Arc<DbTagRepository>,
     pub user_repository: Arc<DbUserRepository>,
     pub user_authentication_repository: Arc<DbUserAuthenticationRepository>,
     pub user_profile_repository: Arc<DbUserProfileRepository>,
@@ -42,6 +44,7 @@ pub struct AppData {
     pub banned_user_list: Arc<DbBannedUserList>,
     // Services
     pub category_service: Arc<category::Service>,
+    pub tag_service: Arc<tag::Service>,
     pub proxy_service: Arc<proxy::Service>,
     pub settings_service: Arc<settings::Service>,
     pub torrent_service: Arc<torrent::Index>,
@@ -63,6 +66,7 @@ impl AppData {
         image_cache_manager: Arc<ImageCacheService>,
         // Repositories
         category_repository: Arc<DbCategoryRepository>,
+        tag_repository: Arc<DbTagRepository>,
         user_repository: Arc<DbUserRepository>,
         user_authentication_repository: Arc<DbUserAuthenticationRepository>,
         user_profile_repository: Arc<DbUserProfileRepository>,
@@ -75,6 +79,7 @@ impl AppData {
         banned_user_list: Arc<DbBannedUserList>,
         // Services
         category_service: Arc<category::Service>,
+        tag_service: Arc<tag::Service>,
         proxy_service: Arc<proxy::Service>,
         settings_service: Arc<settings::Service>,
         torrent_service: Arc<torrent::Index>,
@@ -93,6 +98,7 @@ impl AppData {
             image_cache_manager,
             // Repositories
             category_repository,
+            tag_repository,
             user_repository,
             user_authentication_repository,
             user_profile_repository,
@@ -105,6 +111,7 @@ impl AppData {
             banned_user_list,
             // Services
             category_service,
+            tag_service,
             proxy_service,
             settings_service,
             torrent_service,

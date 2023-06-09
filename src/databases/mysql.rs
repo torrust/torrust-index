@@ -732,7 +732,7 @@ impl Database for Mysql {
             .map_err(|_| database::Error::Error)
     }
 
-    async fn add_torrent_tag_links(&self, torrent_id: i64, tag_ids: &Vec<TagId>) -> Result<(), database::Error> {
+    async fn add_torrent_tag_links(&self, torrent_id: i64, tag_ids: &[TagId]) -> Result<(), database::Error> {
         let mut transaction = self
             .pool
             .begin()
@@ -778,7 +778,7 @@ impl Database for Mysql {
             .bind(name)
             .fetch_one(&self.pool)
             .await
-            .map_err(|err| database::Error::TagNotFound)
+            .map_err(|_| database::Error::TagNotFound)
     }
 
     async fn get_tags(&self) -> Result<Vec<TorrentTag>, database::Error> {

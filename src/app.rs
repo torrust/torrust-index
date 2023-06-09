@@ -11,6 +11,7 @@ use crate::config::Configuration;
 use crate::databases::database;
 use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
 use crate::services::category::{self, DbCategoryRepository};
+use crate::services::tag::{self, DbTagRepository};
 use crate::services::torrent::{
     DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository, DbTorrentListingGenerator,
     DbTorrentRepository, DbTorrentTagRepository,
@@ -58,6 +59,7 @@ pub async fn run(configuration: Configuration, api_implementation: &Implementati
 
     // Repositories
     let category_repository = Arc::new(DbCategoryRepository::new(database.clone()));
+    let tag_repository = Arc::new(DbTagRepository::new(database.clone()));
     let user_repository = Arc::new(DbUserRepository::new(database.clone()));
     let user_authentication_repository = Arc::new(DbUserAuthenticationRepository::new(database.clone()));
     let user_profile_repository = Arc::new(DbUserProfileRepository::new(database.clone()));
@@ -76,6 +78,7 @@ pub async fn run(configuration: Configuration, api_implementation: &Implementati
     let mailer_service = Arc::new(mailer::Service::new(configuration.clone()).await);
     let image_cache_service: Arc<ImageCacheService> = Arc::new(ImageCacheService::new(configuration.clone()).await);
     let category_service = Arc::new(category::Service::new(category_repository.clone(), user_repository.clone()));
+    let tag_service = Arc::new(tag::Service::new(tag_repository.clone(), user_repository.clone()));
     let proxy_service = Arc::new(proxy::Service::new(image_cache_service.clone(), user_repository.clone()));
     let settings_service = Arc::new(settings::Service::new(configuration.clone(), user_repository.clone()));
     let torrent_index = Arc::new(torrent::Index::new(
@@ -123,6 +126,7 @@ pub async fn run(configuration: Configuration, api_implementation: &Implementati
         mailer_service,
         image_cache_service,
         category_repository,
+        tag_repository,
         user_repository,
         user_authentication_repository,
         user_profile_repository,
@@ -134,6 +138,7 @@ pub async fn run(configuration: Configuration, api_implementation: &Implementati
         torrent_listing_generator,
         banned_user_list,
         category_service,
+        tag_service,
         proxy_service,
         settings_service,
         torrent_index,

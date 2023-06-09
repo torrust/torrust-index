@@ -243,7 +243,7 @@ pub trait Database: Sync + Send {
     async fn add_torrent_tag_link(&self, torrent_id: i64, tag_id: TagId) -> Result<(), Error>;
 
     /// Add multiple tags to a torrent at once.
-    async fn add_torrent_tag_links(&self, torrent_id: i64, tag_ids: &Vec<TagId>) -> Result<(), Error>;
+    async fn add_torrent_tag_links(&self, torrent_id: i64, tag_ids: &[TagId]) -> Result<(), Error>;
 
     /// Remove a tag from torrent.
     async fn delete_torrent_tag_link(&self, torrent_id: i64, tag_id: TagId) -> Result<(), Error>;
