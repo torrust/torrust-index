@@ -138,3 +138,5 @@
 //! Refer to [`OkResponse`](crate::models::response::OkResponse<T>) for more
 //! information about the response attributes. The response contains only the
 //! name of the deleted category.
+pub mod handlers;
+pub mod routes;

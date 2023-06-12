@@ -207,3 +207,23 @@ async fn it_should_not_allow_guests_to_delete_categories() {
 
     assert_eq!(response.status, 401);
 }
+
+mod with_axum_implementation {
+    use torrust_index_backend::web::api;
+
+    use crate::common::asserts::assert_json_ok;
+    use crate::common::client::Client;
+    use crate::e2e::environment::TestEnv;
+
+    #[tokio::test]
+    async fn it_should_return_an_empty_category_list_when_there_are_no_categories() {
+        let mut env = TestEnv::new();
+        env.start(api::Implementation::Axum).await;
+
+        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+        let response = client.get_categories().await;
+
+        assert_json_ok(&response);
+    }
+}
