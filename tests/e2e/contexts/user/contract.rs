@@ -2,7 +2,7 @@
 use torrust_index_backend::web::api;
 
 use crate::common::client::Client;
-use crate::common::contexts::user::fixtures::random_user_registration;
+use crate::common::contexts::user::fixtures::random_user_registration_form;
 use crate::common::contexts::user::forms::{LoginForm, TokenRenewalForm, TokenVerificationForm};
 use crate::common::contexts::user::responses::{
     SuccessfulLoginResponse, TokenRenewalData, TokenRenewalResponse, TokenVerifiedResponse,
@@ -44,7 +44,7 @@ async fn it_should_allow_a_guest_user_to_register() {
     env.start(api::Implementation::ActixWeb).await;
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
-    let form = random_user_registration();
+    let form = random_user_registration_form();
 
     let response = client.register_user(form).await;
 
@@ -189,5 +189,35 @@ mod banned_user_list {
         let response = client.ban_user(Username::new(registered_user.username.clone())).await;
 
         assert_eq!(response.status, 401);
+    }
+}
+
+mod with_axum_implementation {
+    use std::env;
+
+    use torrust_index_backend::web::api;
+
+    use crate::common::client::Client;
+    use crate::common::contexts::user::asserts::assert_added_user_response;
+    use crate::common::contexts::user::fixtures::random_user_registration_form;
+    use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
+    use crate::e2e::environment::TestEnv;
+
+    #[tokio::test]
+    async fn it_should_allow_a_guest_user_to_register() {
+        let mut env = TestEnv::new();
+        env.start(api::Implementation::Axum).await;
+
+        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
+            return;
+        }
+
+        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+        let form = random_user_registration_form();
+
+        let response = client.register_user(form).await;
+
+        assert_added_user_response(&response);
     }
 }

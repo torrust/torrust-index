@@ -3,7 +3,7 @@ use std::sync::Arc;
 use torrust_index_backend::databases::database;
 
 use crate::common::client::Client;
-use crate::common::contexts::user::fixtures::random_user_registration;
+use crate::common::contexts::user::fixtures::random_user_registration_form;
 use crate::common::contexts::user::forms::{LoginForm, RegisteredUser};
 use crate::common::contexts::user::responses::{LoggedInUserData, SuccessfulLoginResponse};
 use crate::e2e::environment::TestEnv;
@@ -64,7 +64,7 @@ pub async fn new_logged_in_user(env: &TestEnv) -> LoggedInUserData {
 pub async fn new_registered_user(env: &TestEnv) -> RegisteredUser {
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
-    let form = random_user_registration();
+    let form = random_user_registration_form();
 
     let registered_user = form.clone();
 

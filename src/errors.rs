@@ -146,49 +146,7 @@ pub struct ErrorToResponse {
 
 impl ResponseError for ServiceError {
     fn status_code(&self) -> StatusCode {
-        #[allow(clippy::match_same_arms)]
-        match self {
-            ServiceError::ClosedForRegistration => StatusCode::FORBIDDEN,
-            ServiceError::EmailInvalid => StatusCode::BAD_REQUEST,
-            ServiceError::NotAUrl => StatusCode::BAD_REQUEST,
-            ServiceError::WrongPasswordOrUsername => StatusCode::FORBIDDEN,
-            ServiceError::UsernameNotFound => StatusCode::NOT_FOUND,
-            ServiceError::UserNotFound => StatusCode::NOT_FOUND,
-            ServiceError::AccountNotFound => StatusCode::NOT_FOUND,
-            ServiceError::ProfanityError => StatusCode::BAD_REQUEST,
-            ServiceError::BlacklistError => StatusCode::BAD_REQUEST,
-            ServiceError::UsernameCaseMappedError => StatusCode::BAD_REQUEST,
-            ServiceError::PasswordTooShort => StatusCode::BAD_REQUEST,
-            ServiceError::PasswordTooLong => StatusCode::BAD_REQUEST,
-            ServiceError::PasswordsDontMatch => StatusCode::BAD_REQUEST,
-            ServiceError::UsernameTaken => StatusCode::BAD_REQUEST,
-            ServiceError::UsernameInvalid => StatusCode::BAD_REQUEST,
-            ServiceError::EmailTaken => StatusCode::BAD_REQUEST,
-            ServiceError::EmailNotVerified => StatusCode::FORBIDDEN,
-            ServiceError::TokenNotFound => StatusCode::UNAUTHORIZED,
-            ServiceError::TokenExpired => StatusCode::UNAUTHORIZED,
-            ServiceError::TokenInvalid => StatusCode::UNAUTHORIZED,
-            ServiceError::TorrentNotFound => StatusCode::BAD_REQUEST,
-            ServiceError::InvalidTorrentFile => StatusCode::BAD_REQUEST,
-            ServiceError::InvalidTorrentPiecesLength => StatusCode::BAD_REQUEST,
-            ServiceError::InvalidFileType => StatusCode::BAD_REQUEST,
-            ServiceError::BadRequest => StatusCode::BAD_REQUEST,
-            ServiceError::InvalidCategory => StatusCode::BAD_REQUEST,
-            ServiceError::InvalidTag => StatusCode::BAD_REQUEST,
-            ServiceError::Unauthorized => StatusCode::FORBIDDEN,
-            ServiceError::InfoHashAlreadyExists => StatusCode::BAD_REQUEST,
-            ServiceError::TorrentTitleAlreadyExists => StatusCode::BAD_REQUEST,
-            ServiceError::TrackerOffline => StatusCode::INTERNAL_SERVER_ERROR,
-            ServiceError::CategoryAlreadyExists => StatusCode::BAD_REQUEST,
-            ServiceError::TagAlreadyExists => StatusCode::BAD_REQUEST,
-            ServiceError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
-            ServiceError::EmailMissing => StatusCode::NOT_FOUND,
-            ServiceError::FailedToSendVerificationEmail => StatusCode::INTERNAL_SERVER_ERROR,
-            ServiceError::WhitelistingError => StatusCode::INTERNAL_SERVER_ERROR,
-            ServiceError::DatabaseError => StatusCode::INTERNAL_SERVER_ERROR,
-            ServiceError::CategoryNotFound => StatusCode::NOT_FOUND,
-            ServiceError::TagNotFound => StatusCode::NOT_FOUND,
-        }
+        http_status_code_for_service_error(self)
     }
 
     fn error_response(&self) -> HttpResponse {
@@ -220,22 +178,7 @@ impl From<sqlx::Error> for ServiceError {
 
 impl From<database::Error> for ServiceError {
     fn from(e: database::Error) -> Self {
-        #[allow(clippy::match_same_arms)]
-        match e {
-            database::Error::Error => ServiceError::InternalServerError,
-            database::Error::ErrorWithText(_) => ServiceError::InternalServerError,
-            database::Error::UsernameTaken => ServiceError::UsernameTaken,
-            database::Error::EmailTaken => ServiceError::EmailTaken,
-            database::Error::UserNotFound => ServiceError::UserNotFound,
-            database::Error::CategoryAlreadyExists => ServiceError::CategoryAlreadyExists,
-            database::Error::CategoryNotFound => ServiceError::InvalidCategory,
-            database::Error::TagAlreadyExists => ServiceError::TagAlreadyExists,
-            database::Error::TagNotFound => ServiceError::InvalidTag,
-            database::Error::TorrentNotFound => ServiceError::TorrentNotFound,
-            database::Error::TorrentAlreadyExists => ServiceError::InfoHashAlreadyExists,
-            database::Error::TorrentTitleAlreadyExists => ServiceError::TorrentTitleAlreadyExists,
-            database::Error::UnrecognizedDatabaseDriver => ServiceError::InternalServerError,
-        }
+        map_database_error_to_service_error(&e)
     }
 }
 
@@ -264,5 +207,72 @@ impl From<serde_json::Error> for ServiceError {
     fn from(e: serde_json::Error) -> Self {
         eprintln!("{e}");
         ServiceError::InternalServerError
+    }
+}
+
+#[must_use]
+pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
+    #[allow(clippy::match_same_arms)]
+    match error {
+        ServiceError::ClosedForRegistration => StatusCode::FORBIDDEN,
+        ServiceError::EmailInvalid => StatusCode::BAD_REQUEST,
+        ServiceError::NotAUrl => StatusCode::BAD_REQUEST,
+        ServiceError::WrongPasswordOrUsername => StatusCode::FORBIDDEN,
+        ServiceError::UsernameNotFound => StatusCode::NOT_FOUND,
+        ServiceError::UserNotFound => StatusCode::NOT_FOUND,
+        ServiceError::AccountNotFound => StatusCode::NOT_FOUND,
+        ServiceError::ProfanityError => StatusCode::BAD_REQUEST,
+        ServiceError::BlacklistError => StatusCode::BAD_REQUEST,
+        ServiceError::UsernameCaseMappedError => StatusCode::BAD_REQUEST,
+        ServiceError::PasswordTooShort => StatusCode::BAD_REQUEST,
+        ServiceError::PasswordTooLong => StatusCode::BAD_REQUEST,
+        ServiceError::PasswordsDontMatch => StatusCode::BAD_REQUEST,
+        ServiceError::UsernameTaken => StatusCode::BAD_REQUEST,
+        ServiceError::UsernameInvalid => StatusCode::BAD_REQUEST,
+        ServiceError::EmailTaken => StatusCode::BAD_REQUEST,
+        ServiceError::EmailNotVerified => StatusCode::FORBIDDEN,
+        ServiceError::TokenNotFound => StatusCode::UNAUTHORIZED,
+        ServiceError::TokenExpired => StatusCode::UNAUTHORIZED,
+        ServiceError::TokenInvalid => StatusCode::UNAUTHORIZED,
+        ServiceError::TorrentNotFound => StatusCode::BAD_REQUEST,
+        ServiceError::InvalidTorrentFile => StatusCode::BAD_REQUEST,
+        ServiceError::InvalidTorrentPiecesLength => StatusCode::BAD_REQUEST,
+        ServiceError::InvalidFileType => StatusCode::BAD_REQUEST,
+        ServiceError::BadRequest => StatusCode::BAD_REQUEST,
+        ServiceError::InvalidCategory => StatusCode::BAD_REQUEST,
+        ServiceError::InvalidTag => StatusCode::BAD_REQUEST,
+        ServiceError::Unauthorized => StatusCode::FORBIDDEN,
+        ServiceError::InfoHashAlreadyExists => StatusCode::BAD_REQUEST,
+        ServiceError::TorrentTitleAlreadyExists => StatusCode::BAD_REQUEST,
+        ServiceError::TrackerOffline => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::CategoryAlreadyExists => StatusCode::BAD_REQUEST,
+        ServiceError::TagAlreadyExists => StatusCode::BAD_REQUEST,
+        ServiceError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::EmailMissing => StatusCode::NOT_FOUND,
+        ServiceError::FailedToSendVerificationEmail => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::WhitelistingError => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::DatabaseError => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::CategoryNotFound => StatusCode::NOT_FOUND,
+        ServiceError::TagNotFound => StatusCode::NOT_FOUND,
+    }
+}
+
+#[must_use]
+pub fn map_database_error_to_service_error(error: &database::Error) -> ServiceError {
+    #[allow(clippy::match_same_arms)]
+    match error {
+        database::Error::Error => ServiceError::InternalServerError,
+        database::Error::ErrorWithText(_) => ServiceError::InternalServerError,
+        database::Error::UsernameTaken => ServiceError::UsernameTaken,
+        database::Error::EmailTaken => ServiceError::EmailTaken,
+        database::Error::UserNotFound => ServiceError::UserNotFound,
+        database::Error::CategoryAlreadyExists => ServiceError::CategoryAlreadyExists,
+        database::Error::CategoryNotFound => ServiceError::InvalidCategory,
+        database::Error::TagAlreadyExists => ServiceError::TagAlreadyExists,
+        database::Error::TagNotFound => ServiceError::InvalidTag,
+        database::Error::TorrentNotFound => ServiceError::TorrentNotFound,
+        database::Error::TorrentAlreadyExists => ServiceError::InfoHashAlreadyExists,
+        database::Error::TorrentTitleAlreadyExists => ServiceError::TorrentTitleAlreadyExists,
+        database::Error::UnrecognizedDatabaseDriver => ServiceError::InternalServerError,
     }
 }

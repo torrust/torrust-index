@@ -6,4 +6,5 @@
 //! information.
 pub mod auth;
 pub mod contexts;
+pub mod responses;
 pub mod routes;
