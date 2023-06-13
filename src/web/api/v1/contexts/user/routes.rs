@@ -6,12 +6,22 @@ use std::sync::Arc;
 use axum::routing::{get, post};
 use axum::Router;
 
-use super::handlers::{email_verification_handler, registration_handler};
+use super::handlers::{email_verification_handler, login_handler, registration_handler};
 use crate::common::AppData;
 
 /// Routes for the [`user`](crate::web::api::v1::contexts::user) API context.
 pub fn router(app_data: Arc<AppData>) -> Router {
     Router::new()
+        // Registration
         .route("/register", post(registration_handler).with_state(app_data.clone()))
-        .route("/email/verify/:token", get(email_verification_handler).with_state(app_data))
+        // code-review: should this be part of the REST API?
+        // - This endpoint should only verify the email.
+        // - There should be an independent service (web app) serving the email verification page.
+        //   The wep app can user this endpoint to verify the email and render the page accordingly.
+        .route(
+            "/email/verify/:token",
+            get(email_verification_handler).with_state(app_data.clone()),
+        )
+        // Authentication
+        .route("/login", post(login_handler).with_state(app_data))
 }

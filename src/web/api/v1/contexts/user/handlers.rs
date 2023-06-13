@@ -6,11 +6,13 @@ use axum::extract::{self, Host, Path, State};
 use axum::Json;
 use serde::Deserialize;
 
-use super::forms::RegistrationForm;
-use super::responses::{self, NewUser};
+use super::forms::{LoginForm, RegistrationForm};
+use super::responses::{self, NewUser, TokenResponse};
 use crate::common::AppData;
 use crate::errors::ServiceError;
 use crate::web::api::v1::responses::OkResponse;
+
+// Registration
 
 /// It handles the registration of a new user.
 ///
@@ -48,6 +50,28 @@ pub async fn email_verification_handler(State(app_data): State<Arc<AppData>>, Pa
     match app_data.registration_service.verify_email(&token.0).await {
         Ok(_) => String::from("Email verified, you can close this page."),
         Err(error) => error.to_string(),
+    }
+}
+
+// Authentication
+
+/// It handles the user login.
+///
+/// # Errors
+///
+/// It returns an error if the user could not be registered.
+#[allow(clippy::unused_async)]
+pub async fn login_handler(
+    State(app_data): State<Arc<AppData>>,
+    extract::Json(login_form): extract::Json<LoginForm>,
+) -> Result<Json<OkResponse<TokenResponse>>, ServiceError> {
+    match app_data
+        .authentication_service
+        .login(&login_form.login, &login_form.password)
+        .await
+    {
+        Ok((token, user_compact)) => Ok(responses::logged_in_user(token, user_compact)),
+        Err(error) => Err(error),
     }
 }
 

@@ -50,7 +50,7 @@ pub async fn registration_handler(
 ) -> ServiceResult<impl Responder> {
     let conn_info = req.connection_info().clone();
     // todo: check if `base_url` option was define in settings `net->base_url`.
-    // It should have priority over request headers.
+    // It should have priority over request he
     let api_base_url = format!("{}://{}", conn_info.scheme(), conn_info.host());
 
     let _user_id = app_data

@@ -193,32 +193,79 @@ mod banned_user_list {
 }
 
 mod with_axum_implementation {
-    use std::env;
 
-    use torrust_index_backend::web::api;
+    mod registration {
+        use std::env;
 
-    use crate::common::client::Client;
-    use crate::common::contexts::user::asserts::assert_added_user_response;
-    use crate::common::contexts::user::fixtures::random_user_registration_form;
-    use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
-    use crate::e2e::environment::TestEnv;
+        use torrust_index_backend::web::api;
 
-    #[tokio::test]
-    async fn it_should_allow_a_guest_user_to_register() {
-        let mut env = TestEnv::new();
-        env.start(api::Implementation::Axum).await;
+        use crate::common::client::Client;
+        use crate::common::contexts::user::asserts::assert_added_user_response;
+        use crate::common::contexts::user::fixtures::random_user_registration_form;
+        use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
+        use crate::e2e::environment::TestEnv;
 
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
+        #[tokio::test]
+        async fn it_should_allow_a_guest_user_to_register() {
+            let mut env = TestEnv::new();
+            env.start(api::Implementation::Axum).await;
+
+            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
+                println!("Skipped");
+                return;
+            }
+
+            let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+            let form = random_user_registration_form();
+
+            let response = client.register_user(form).await;
+
+            assert_added_user_response(&response);
         }
+    }
 
-        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+    mod authentication {
+        use std::env;
 
-        let form = random_user_registration_form();
+        use torrust_index_backend::web::api;
 
-        let response = client.register_user(form).await;
+        use crate::common::client::Client;
+        use crate::common::contexts::user::forms::LoginForm;
+        use crate::common::contexts::user::responses::SuccessfulLoginResponse;
+        use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
+        use crate::e2e::contexts::user::steps::new_registered_user;
+        use crate::e2e::environment::TestEnv;
 
-        assert_added_user_response(&response);
+        #[tokio::test]
+        async fn it_should_allow_a_registered_user_to_login() {
+            let mut env = TestEnv::new();
+            env.start(api::Implementation::Axum).await;
+
+            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
+                println!("Skipped");
+                return;
+            }
+
+            let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+            let registered_user = new_registered_user(&env).await;
+
+            let response = client
+                .login_user(LoginForm {
+                    login: registered_user.username.clone(),
+                    password: registered_user.password.clone(),
+                })
+                .await;
+
+            let res: SuccessfulLoginResponse = serde_json::from_str(&response.body).unwrap();
+            let logged_in_user = res.data;
+
+            assert_eq!(logged_in_user.username, registered_user.username);
+            if let Some(content_type) = &response.content_type {
+                assert_eq!(content_type, "application/json");
+            }
+            assert_eq!(response.status, 200);
+        }
     }
 }
