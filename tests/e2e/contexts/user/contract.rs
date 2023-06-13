@@ -209,6 +209,7 @@ mod with_axum_implementation {
         env.start(api::Implementation::Axum).await;
 
         if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
+            println!("Skipped");
             return;
         }
 

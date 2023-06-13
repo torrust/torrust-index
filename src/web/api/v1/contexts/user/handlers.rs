@@ -2,8 +2,9 @@
 //! context.
 use std::sync::Arc;
 
-use axum::extract::{self, Host, State};
+use axum::extract::{self, Host, Path, State};
 use axum::Json;
+use serde::Deserialize;
 
 use super::forms::RegistrationForm;
 use super::responses::{self, NewUser};
@@ -35,6 +36,18 @@ pub async fn registration_handler(
     {
         Ok(user_id) => Ok(responses::added_user(user_id)),
         Err(error) => Err(error),
+    }
+}
+
+#[derive(Deserialize)]
+pub struct TokenParam(String);
+
+/// It handles the verification of the email verification token.
+#[allow(clippy::unused_async)]
+pub async fn email_verification_handler(State(app_data): State<Arc<AppData>>, Path(token): Path<TokenParam>) -> String {
+    match app_data.registration_service.verify_email(&token.0).await {
+        Ok(_) => String::from("Email verified, you can close this page."),
+        Err(error) => error.to_string(),
     }
 }
 
