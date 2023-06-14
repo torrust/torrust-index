@@ -2,7 +2,7 @@ use rand::Rng;
 
 use crate::common::contexts::user::forms::RegistrationForm;
 
-pub fn random_user_registration() -> RegistrationForm {
+pub fn random_user_registration_form() -> RegistrationForm {
     let user_id = random_user_id();
     RegistrationForm {
         username: format!("username_{user_id}"),

@@ -422,6 +422,12 @@ impl Configuration {
 
         settings_lock.website.name.clone()
     }
+
+    pub async fn get_api_base_url(&self) -> Option<String> {
+        let settings_lock = self.settings.read().await;
+
+        settings_lock.net.base_url.clone()
+    }
 }
 
 /// The public backend configuration.

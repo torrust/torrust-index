@@ -41,7 +41,7 @@ pub struct Category {
 /// This function will return an error if unable to get user.
 /// This function will return an error if unable to insert into the database the new category.
 pub async fn add(req: HttpRequest, payload: web::Json<Category>, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await?;
 
     let _category_id = app_data.category_service.add_category(&payload.name, &user_id).await?;
 
@@ -61,7 +61,7 @@ pub async fn delete(req: HttpRequest, payload: web::Json<Category>, app_data: We
     // And we should use the ID instead of the name, because the name could change
     // or we could add support for multiple languages.
 
-    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await?;
 
     app_data.category_service.delete_category(&payload.name, &user_id).await?;
 

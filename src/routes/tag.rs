@@ -44,7 +44,7 @@ pub struct Create {
 /// * Get the compact user from the user id.
 /// * Add the new tag to the database.
 pub async fn create(req: HttpRequest, payload: web::Json<Create>, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await?;
 
     app_data.tag_service.add_tag(&payload.name, &user_id).await?;
 
@@ -68,7 +68,7 @@ pub struct Delete {
 /// * Get the compact user from the user id.
 /// * Delete the tag from the database.
 pub async fn delete(req: HttpRequest, payload: web::Json<Delete>, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await?;
 
     app_data.tag_service.delete_tag(&payload.tag_id, &user_id).await?;
 

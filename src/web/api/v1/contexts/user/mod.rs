@@ -243,3 +243,7 @@
 //! **WARNING**: The admin can ban themselves. If they do, they will not be able
 //! to unban themselves. The only way to unban themselves is to manually remove
 //! the user from the banned user list in the database.
+pub mod forms;
+pub mod handlers;
+pub mod responses;
+pub mod routes;

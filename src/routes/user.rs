@@ -5,6 +5,7 @@ use crate::common::WebAppData;
 use crate::errors::{ServiceError, ServiceResult};
 use crate::models::response::{OkResponse, TokenResponse};
 use crate::routes::API_VERSION;
+use crate::web::api::v1::contexts::user::forms::RegistrationForm;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -24,14 +25,6 @@ pub fn init(cfg: &mut web::ServiceConfig) {
             // code-review: should not this be a POST method? We add the user to the blacklist. We do not delete the user.
             .service(web::resource("/ban/{user}").route(web::delete().to(ban_handler))),
     );
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RegistrationForm {
-    pub username: String,
-    pub email: Option<String>,
-    pub password: String,
-    pub confirm_password: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -56,8 +49,8 @@ pub async fn registration_handler(
     app_data: WebAppData,
 ) -> ServiceResult<impl Responder> {
     let conn_info = req.connection_info().clone();
-    // todo: we should add this in the configuration. It does not work is the
-    // server is behind a reverse proxy.
+    // todo: check if `base_url` option was define in settings `net->base_url`.
+    // It should have priority over request he
     let api_base_url = format!("{}://{}", conn_info.scheme(), conn_info.host());
 
     let _user_id = app_data
@@ -141,7 +134,7 @@ pub async fn email_verification_handler(req: HttpRequest, app_data: WebAppData) 
 ///
 /// This function will return if the user could not be banned.
 pub async fn ban_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await?;
     let to_be_banned_username = req.match_info().get("user").ok_or(ServiceError::InternalServerError)?;
 
     app_data.ban_service.ban_user(to_be_banned_username, &user_id).await?;

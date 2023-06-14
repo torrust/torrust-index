@@ -21,7 +21,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 ///
 /// This function will return `Ok` only for now.
 pub async fn get_proxy_image(req: HttpRequest, app_data: WebAppData, path: web::Path<String>) -> ServiceResult<impl Responder> {
-    let user_id = app_data.auth.get_user_id_from_request(&req).await.ok();
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await.ok();
 
     match user_id {
         Some(user_id) => {

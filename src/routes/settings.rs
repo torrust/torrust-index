@@ -25,7 +25,7 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 ///
 /// This function will return an error if unable to get user from database.
 pub async fn get_all_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await?;
 
     let all_settings = app_data.settings_service.get_all(&user_id).await?;
 
@@ -46,7 +46,7 @@ pub async fn update_handler(
     payload: web::Json<config::TorrustBackend>,
     app_data: WebAppData,
 ) -> ServiceResult<impl Responder> {
-    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await?;
 
     let new_settings = app_data.settings_service.update_all(payload.into_inner(), &user_id).await?;
 

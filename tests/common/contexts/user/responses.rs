@@ -1,6 +1,16 @@
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
+pub struct AddedUserResponse {
+    pub data: NewUserData,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct NewUserData {
+    pub user_id: i64,
+}
+
+#[derive(Deserialize, Debug)]
 pub struct SuccessfulLoginResponse {
     pub data: LoggedInUserData,
 }

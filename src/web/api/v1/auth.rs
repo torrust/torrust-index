@@ -78,3 +78,16 @@
 //!   "data": "new category"
 //! }
 //! ```
+
+use hyper::http::HeaderValue;
+
+/// Parses the token from the `Authorization` header.
+pub fn parse_token(authorization: &HeaderValue) -> String {
+    let split: Vec<&str> = authorization
+        .to_str()
+        .expect("variable `auth` contains data that is not visible ASCII chars.")
+        .split("Bearer")
+        .collect();
+    let token = split[1].trim();
+    token.to_string()
+}
