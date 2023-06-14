@@ -134,7 +134,7 @@ pub async fn email_verification_handler(req: HttpRequest, app_data: WebAppData) 
 ///
 /// This function will return if the user could not be banned.
 pub async fn ban_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await?;
     let to_be_banned_username = req.match_info().get("user").ok_or(ServiceError::InternalServerError)?;
 
     app_data.ban_service.ban_user(to_be_banned_username, &user_id).await?;

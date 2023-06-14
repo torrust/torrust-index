@@ -77,7 +77,7 @@ pub struct Update {
 /// This function will return an error if there was a problem uploading the
 /// torrent.
 pub async fn upload_torrent_handler(req: HttpRequest, payload: Multipart, app_data: WebAppData) -> ServiceResult<impl Responder> {
-    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await?;
 
     let torrent_request = get_torrent_request_from_payload(payload).await?;
 
@@ -99,7 +99,7 @@ pub async fn upload_torrent_handler(req: HttpRequest, payload: Multipart, app_da
 /// Returns `ServiceError::BadRequest` if the torrent info-hash is invalid.
 pub async fn download_torrent_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let info_hash = get_torrent_info_hash_from_request(&req)?;
-    let user_id = app_data.auth.get_user_id_from_request(&req).await.ok();
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await.ok();
 
     let torrent = app_data.torrent_service.get_torrent(&info_hash, user_id).await?;
 
@@ -115,7 +115,7 @@ pub async fn download_torrent_handler(req: HttpRequest, app_data: WebAppData) ->
 /// This function will return an error if unable to get torrent info.
 pub async fn get_torrent_info_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let info_hash = get_torrent_info_hash_from_request(&req)?;
-    let user_id = app_data.auth.get_user_id_from_request(&req).await.ok();
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await.ok();
 
     let torrent_response = app_data.torrent_service.get_torrent_info(&info_hash, user_id).await?;
 
@@ -137,7 +137,7 @@ pub async fn update_torrent_info_handler(
     app_data: WebAppData,
 ) -> ServiceResult<impl Responder> {
     let info_hash = get_torrent_info_hash_from_request(&req)?;
-    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await?;
 
     let torrent_response = app_data
         .torrent_service
@@ -158,7 +158,7 @@ pub async fn update_torrent_info_handler(
 /// * Delete the torrent.
 pub async fn delete_torrent_handler(req: HttpRequest, app_data: WebAppData) -> ServiceResult<impl Responder> {
     let info_hash = get_torrent_info_hash_from_request(&req)?;
-    let user_id = app_data.auth.get_user_id_from_request(&req).await?;
+    let user_id = app_data.auth.get_user_id_from_actix_web_request(&req).await?;
 
     let deleted_torrent_response = app_data.torrent_service.delete_torrent(&info_hash, &user_id).await?;
 

@@ -2,7 +2,7 @@ use super::forms::RegistrationForm;
 use super::responses::LoggedInUserData;
 use crate::common::asserts::assert_json_ok;
 use crate::common::contexts::user::responses::{
-    AddedUserResponse, SuccessfulLoginResponse, TokenRenewalData, TokenRenewalResponse, TokenVerifiedResponse,
+    AddedUserResponse, BannedUserResponse, SuccessfulLoginResponse, TokenRenewalData, TokenRenewalResponse, TokenVerifiedResponse,
 };
 use crate::common::responses::TextResponse;
 
@@ -43,6 +43,18 @@ pub fn assert_token_renewal_response(response: &TextResponse, logged_in_user: &L
             username: logged_in_user.username.clone(),
             admin: logged_in_user.admin,
         }
+    );
+
+    assert_json_ok(response);
+}
+
+pub fn assert_banned_user_response(response: &TextResponse, registered_user: &RegistrationForm) {
+    let banned_user_response: BannedUserResponse = serde_json::from_str(&response.body)
+        .unwrap_or_else(|_| panic!("response {:#?} should be a BannedUserResponse", response.body));
+
+    assert_eq!(
+        banned_user_response.data,
+        format!("Banned user: {}", registered_user.username)
     );
 
     assert_json_ok(response);

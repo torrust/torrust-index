@@ -10,6 +10,7 @@ use super::forms::{JsonWebToken, LoginForm, RegistrationForm};
 use super::responses::{self, NewUser, TokenResponse};
 use crate::common::AppData;
 use crate::errors::ServiceError;
+use crate::web::api::v1::extractors::bearer_token::Extract;
 use crate::web::api::v1::responses::OkResponse;
 
 // Registration
@@ -99,6 +100,9 @@ pub async fn verify_token_handler(
     }
 }
 
+#[derive(Deserialize)]
+pub struct UsernameParam(pub String);
+
 /// It renews the JWT.
 ///
 /// # Errors
@@ -114,6 +118,32 @@ pub async fn renew_token_handler(
 ) -> Result<Json<OkResponse<TokenResponse>>, ServiceError> {
     match app_data.authentication_service.renew_token(&token.token).await {
         Ok((token, user_compact)) => Ok(responses::renewed_token(token, user_compact)),
+        Err(error) => Err(error),
+    }
+}
+
+/// It bans a user from the index.
+///
+/// # Errors
+///
+/// This function will return if:
+///
+/// - The JWT provided by the banning authority was not valid.
+/// - The user could not be banned: it does not exist, etcetera.
+#[allow(clippy::unused_async)]
+pub async fn ban_handler(
+    State(app_data): State<Arc<AppData>>,
+    Path(to_be_banned_username): Path<UsernameParam>,
+    Extract(maybe_bearer_token): Extract,
+) -> Result<Json<OkResponse<String>>, ServiceError> {
+    // todo: add reason and `date_expiry` parameters to request
+
+    let user_id = app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await?;
+
+    match app_data.ban_service.ban_user(&to_be_banned_username.0, &user_id).await {
+        Ok(_) => Ok(axum::Json(OkResponse {
+            data: format!("Banned user: {}", to_be_banned_username.0),
+        })),
         Err(error) => Err(error),
     }
 }

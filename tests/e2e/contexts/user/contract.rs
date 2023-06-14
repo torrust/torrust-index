@@ -310,4 +310,78 @@ mod with_axum_implementation {
             assert_token_renewal_response(&response, &logged_in_user);
         }
     }
+
+    mod banned_user_list {
+        use std::env;
+
+        use torrust_index_backend::web::api;
+
+        use crate::common::client::Client;
+        use crate::common::contexts::user::asserts::assert_banned_user_response;
+        use crate::common::contexts::user::forms::Username;
+        use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
+        use crate::e2e::contexts::user::steps::{new_logged_in_admin, new_logged_in_user, new_registered_user};
+        use crate::e2e::environment::TestEnv;
+
+        #[tokio::test]
+        async fn it_should_allow_an_admin_to_ban_a_user() {
+            let mut env = TestEnv::new();
+            env.start(api::Implementation::Axum).await;
+
+            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
+                println!("Skipped");
+                return;
+            }
+
+            let logged_in_admin = new_logged_in_admin(&env).await;
+
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+            let registered_user = new_registered_user(&env).await;
+
+            let response = client.ban_user(Username::new(registered_user.username.clone())).await;
+
+            assert_banned_user_response(&response, &registered_user);
+        }
+
+        #[tokio::test]
+        async fn it_should_not_allow_a_non_admin_to_ban_a_user() {
+            let mut env = TestEnv::new();
+            env.start(api::Implementation::Axum).await;
+
+            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
+                println!("Skipped");
+                return;
+            }
+
+            let logged_non_admin = new_logged_in_user(&env).await;
+
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_non_admin.token);
+
+            let registered_user = new_registered_user(&env).await;
+
+            let response = client.ban_user(Username::new(registered_user.username.clone())).await;
+
+            assert_eq!(response.status, 403);
+        }
+
+        #[tokio::test]
+        async fn it_should_not_allow_a_guest_to_ban_a_user() {
+            let mut env = TestEnv::new();
+            env.start(api::Implementation::Axum).await;
+
+            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
+                println!("Skipped");
+                return;
+            }
+
+            let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+            let registered_user = new_registered_user(&env).await;
+
+            let response = client.ban_user(Username::new(registered_user.username.clone())).await;
+
+            assert_eq!(response.status, 401);
+        }
+    }
 }
