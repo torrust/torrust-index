@@ -231,10 +231,10 @@ mod with_axum_implementation {
         use torrust_index_backend::web::api;
 
         use crate::common::client::Client;
-        use crate::common::contexts::user::forms::LoginForm;
-        use crate::common::contexts::user::responses::SuccessfulLoginResponse;
+        use crate::common::contexts::user::asserts::{assert_successful_login_response, assert_token_verified_response};
+        use crate::common::contexts::user::forms::{LoginForm, TokenVerificationForm};
         use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
-        use crate::e2e::contexts::user::steps::new_registered_user;
+        use crate::e2e::contexts::user::steps::{new_logged_in_user, new_registered_user};
         use crate::e2e::environment::TestEnv;
 
         #[tokio::test]
@@ -258,14 +258,24 @@ mod with_axum_implementation {
                 })
                 .await;
 
-            let res: SuccessfulLoginResponse = serde_json::from_str(&response.body).unwrap();
-            let logged_in_user = res.data;
+            assert_successful_login_response(&response, &registered_user);
+        }
 
-            assert_eq!(logged_in_user.username, registered_user.username);
-            if let Some(content_type) = &response.content_type {
-                assert_eq!(content_type, "application/json");
-            }
-            assert_eq!(response.status, 200);
+        #[tokio::test]
+        async fn it_should_allow_a_logged_in_user_to_verify_an_authentication_token() {
+            let mut env = TestEnv::new();
+            env.start(api::Implementation::Axum).await;
+            let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+            let logged_in_user = new_logged_in_user(&env).await;
+
+            let response = client
+                .verify_token(TokenVerificationForm {
+                    token: logged_in_user.token.clone(),
+                })
+                .await;
+
+            assert_token_verified_response(&response);
         }
     }
 }

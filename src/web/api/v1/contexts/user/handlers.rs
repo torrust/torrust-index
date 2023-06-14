@@ -6,7 +6,7 @@ use axum::extract::{self, Host, Path, State};
 use axum::Json;
 use serde::Deserialize;
 
-use super::forms::{LoginForm, RegistrationForm};
+use super::forms::{JsonWebToken, LoginForm, RegistrationForm};
 use super::responses::{self, NewUser, TokenResponse};
 use crate::common::AppData;
 use crate::errors::ServiceError;
@@ -71,6 +71,27 @@ pub async fn login_handler(
         .await
     {
         Ok((token, user_compact)) => Ok(responses::logged_in_user(token, user_compact)),
+        Err(error) => Err(error),
+    }
+}
+
+/// It verifies a supplied JWT.
+///
+/// # Errors
+///
+/// It returns an error if:
+///
+/// - Unable to verify the supplied payload as a valid JWT.
+/// - The JWT is not invalid or expired.
+#[allow(clippy::unused_async)]
+pub async fn verify_token_handler(
+    State(app_data): State<Arc<AppData>>,
+    extract::Json(token): extract::Json<JsonWebToken>,
+) -> Result<Json<OkResponse<String>>, ServiceError> {
+    match app_data.json_web_token.verify(&token.token).await {
+        Ok(_) => Ok(axum::Json(OkResponse {
+            data: "Token is valid.".to_string(),
+        })),
         Err(error) => Err(error),
     }
 }

@@ -14,6 +14,11 @@ pub struct RegistrationForm {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LoginForm {
-    pub login: String, // todo: rename to `username` after finishing Axum API migration.
+    pub login: String, // todo: rename to `username`
     pub password: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct JsonWebToken {
+    pub token: String, // // todo: rename to `encoded` or `value`
 }
