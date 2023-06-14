@@ -231,8 +231,10 @@ mod with_axum_implementation {
         use torrust_index_backend::web::api;
 
         use crate::common::client::Client;
-        use crate::common::contexts::user::asserts::{assert_successful_login_response, assert_token_verified_response};
-        use crate::common::contexts::user::forms::{LoginForm, TokenVerificationForm};
+        use crate::common::contexts::user::asserts::{
+            assert_successful_login_response, assert_token_renewal_response, assert_token_verified_response,
+        };
+        use crate::common::contexts::user::forms::{LoginForm, TokenRenewalForm, TokenVerificationForm};
         use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
         use crate::e2e::contexts::user::steps::{new_logged_in_user, new_registered_user};
         use crate::e2e::environment::TestEnv;
@@ -265,6 +267,12 @@ mod with_axum_implementation {
         async fn it_should_allow_a_logged_in_user_to_verify_an_authentication_token() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
+
+            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
+                println!("Skipped");
+                return;
+            }
+
             let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
             let logged_in_user = new_logged_in_user(&env).await;
@@ -276,6 +284,30 @@ mod with_axum_implementation {
                 .await;
 
             assert_token_verified_response(&response);
+        }
+
+        #[tokio::test]
+        async fn it_should_not_allow_a_logged_in_user_to_renew_an_authentication_token_which_is_still_valid_for_more_than_one_week(
+        ) {
+            let mut env = TestEnv::new();
+            env.start(api::Implementation::Axum).await;
+
+            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
+                println!("Skipped");
+                return;
+            }
+
+            let logged_in_user = new_logged_in_user(&env).await;
+
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_user.token);
+
+            let response = client
+                .renew_token(TokenRenewalForm {
+                    token: logged_in_user.token.clone(),
+                })
+                .await;
+
+            assert_token_renewal_response(&response, &logged_in_user);
         }
     }
 }

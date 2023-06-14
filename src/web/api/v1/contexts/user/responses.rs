@@ -27,8 +27,19 @@ pub struct TokenResponse {
     pub admin: bool,
 }
 
-/// Response after successfully log in a user.
+/// Response after successfully logging in a user.
 pub fn logged_in_user(token: String, user_compact: UserCompact) -> Json<OkResponse<TokenResponse>> {
+    Json(OkResponse {
+        data: TokenResponse {
+            token,
+            username: user_compact.username,
+            admin: user_compact.administrator,
+        },
+    })
+}
+
+/// Response after successfully renewing a JWT.
+pub fn renewed_token(token: String, user_compact: UserCompact) -> Json<OkResponse<TokenResponse>> {
     Json(OkResponse {
         data: TokenResponse {
             token,
