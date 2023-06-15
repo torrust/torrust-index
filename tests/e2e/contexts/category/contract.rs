@@ -215,9 +215,9 @@ mod with_axum_implementation {
 
     use crate::common::asserts::assert_json_ok;
     use crate::common::client::Client;
-    use crate::common::contexts::category::asserts::assert_added_category_response;
+    use crate::common::contexts::category::asserts::{assert_added_category_response, assert_deleted_category_response};
     use crate::common::contexts::category::fixtures::random_category_name;
-    use crate::common::contexts::category::forms::AddCategoryForm;
+    use crate::common::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
     use crate::common::contexts::category::responses::ListResponse;
     use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
     use crate::e2e::contexts::category::steps::{add_category, add_random_category};
@@ -378,5 +378,79 @@ mod with_axum_implementation {
         let response = add_category(&added_category_name, &env).await;
 
         assert_eq!(response.status, 400);
+    }
+
+    #[tokio::test]
+    async fn it_should_allow_admins_to_delete_categories() {
+        let mut env = TestEnv::new();
+        env.start(api::Implementation::Axum).await;
+
+        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
+
+        let logged_in_admin = new_logged_in_admin(&env).await;
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+        let added_category_name = add_random_category(&env).await;
+
+        let response = client
+            .delete_category(DeleteCategoryForm {
+                name: added_category_name.to_string(),
+                icon: None,
+            })
+            .await;
+
+        assert_deleted_category_response(&response, &added_category_name);
+    }
+
+    #[tokio::test]
+    async fn it_should_not_allow_non_admins_to_delete_categories() {
+        let mut env = TestEnv::new();
+        env.start(api::Implementation::Axum).await;
+
+        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
+
+        let added_category_name = add_random_category(&env).await;
+
+        let logged_in_non_admin = new_logged_in_user(&env).await;
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_non_admin.token);
+
+        let response = client
+            .delete_category(DeleteCategoryForm {
+                name: added_category_name.to_string(),
+                icon: None,
+            })
+            .await;
+
+        assert_eq!(response.status, 403);
+    }
+
+    #[tokio::test]
+    async fn it_should_not_allow_guests_to_delete_categories() {
+        let mut env = TestEnv::new();
+        env.start(api::Implementation::Axum).await;
+
+        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
+
+        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+        let added_category_name = add_random_category(&env).await;
+
+        let response = client
+            .delete_category(DeleteCategoryForm {
+                name: added_category_name.to_string(),
+                icon: None,
+            })
+            .await;
+
+        assert_eq!(response.status, 401);
     }
 }

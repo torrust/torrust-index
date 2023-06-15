@@ -10,3 +10,10 @@ pub fn added_category(category_name: &str) -> Json<OkResponse<String>> {
         data: category_name.to_string(),
     })
 }
+
+/// Response after successfully deleting a new category.
+pub fn deleted_category(category_name: &str) -> Json<OkResponse<String>> {
+    Json(OkResponse {
+        data: category_name.to_string(),
+    })
+}

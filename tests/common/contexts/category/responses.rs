@@ -5,6 +5,11 @@ pub struct AddedCategoryResponse {
     pub data: String,
 }
 
+#[derive(Deserialize)]
+pub struct DeletedCategoryResponse {
+    pub data: String,
+}
+
 #[derive(Deserialize, Debug)]
 pub struct ListResponse {
     pub data: Vec<ListItem>,
