@@ -17,7 +17,10 @@ pub async fn new_logged_in_admin(env: &TestEnv) -> LoggedInUserData {
             .expect("Database error."),
     );
 
-    let user_profile = database.get_user_profile_from_username(&user.username).await.unwrap();
+    let user_profile = database
+        .get_user_profile_from_username(&user.username)
+        .await
+        .unwrap_or_else(|_| panic!("user {user:#?} should  have a profile."));
 
     database.grant_admin_role(user_profile.user_id).await.unwrap();
 
