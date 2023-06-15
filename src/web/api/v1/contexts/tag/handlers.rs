@@ -12,7 +12,7 @@ use crate::databases::database;
 use crate::errors::ServiceError;
 use crate::models::torrent_tag::TorrentTag;
 use crate::web::api::v1::extractors::bearer_token::Extract;
-use crate::web::api::v1::responses::{self, OkResponse};
+use crate::web::api::v1::responses::{self, OkResponseData};
 
 /// It handles the request to get all the tags.
 ///
@@ -30,9 +30,9 @@ use crate::web::api::v1::responses::{self, OkResponse};
 #[allow(clippy::unused_async)]
 pub async fn get_all_handler(
     State(app_data): State<Arc<AppData>>,
-) -> Result<Json<responses::OkResponse<Vec<TorrentTag>>>, database::Error> {
+) -> Result<Json<responses::OkResponseData<Vec<TorrentTag>>>, database::Error> {
     match app_data.tag_repository.get_all().await {
-        Ok(tags) => Ok(Json(responses::OkResponse { data: tags })),
+        Ok(tags) => Ok(Json(responses::OkResponseData { data: tags })),
         Err(error) => Err(error),
     }
 }
@@ -50,7 +50,7 @@ pub async fn add_handler(
     State(app_data): State<Arc<AppData>>,
     Extract(maybe_bearer_token): Extract,
     extract::Json(add_tag_form): extract::Json<AddTagForm>,
-) -> Result<Json<OkResponse<String>>, ServiceError> {
+) -> Result<Json<OkResponseData<String>>, ServiceError> {
     let user_id = app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await?;
 
     match app_data.tag_service.add_tag(&add_tag_form.name, &user_id).await {
@@ -72,7 +72,7 @@ pub async fn delete_handler(
     State(app_data): State<Arc<AppData>>,
     Extract(maybe_bearer_token): Extract,
     extract::Json(delete_tag_form): extract::Json<DeleteTagForm>,
-) -> Result<Json<OkResponse<String>>, ServiceError> {
+) -> Result<Json<OkResponseData<String>>, ServiceError> {
     let user_id = app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await?;
 
     match app_data.tag_service.delete_tag(&delete_tag_form.tag_id, &user_id).await {

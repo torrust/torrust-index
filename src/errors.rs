@@ -139,6 +139,9 @@ pub enum ServiceError {
     DatabaseError,
 }
 
+// Begin ActixWeb error handling
+// todo: remove after migration to Axum
+
 #[derive(Serialize, Deserialize)]
 pub struct ErrorToResponse {
     pub error: String,
@@ -155,6 +158,8 @@ impl ResponseError for ServiceError {
             .body(serde_json::to_string(&ErrorToResponse { error: self.to_string() }).unwrap())
     }
 }
+
+// End ActixWeb error handling
 
 impl From<sqlx::Error> for ServiceError {
     fn from(e: sqlx::Error) -> Self {

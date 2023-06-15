@@ -1,7 +1,7 @@
 //! API contract for `tag` context.
 use torrust_index_backend::web::api;
 
-use crate::common::asserts::assert_json_ok;
+use crate::common::asserts::assert_json_ok_response;
 use crate::common::client::Client;
 use crate::common::contexts::tag::fixtures::random_tag_name;
 use crate::common::contexts::tag::forms::{AddTagForm, DeleteTagForm};
@@ -18,7 +18,7 @@ async fn it_should_return_an_empty_tag_list_when_there_are_no_tags() {
 
     let response = client.get_tags().await;
 
-    assert_json_ok(&response);
+    assert_json_ok_response(&response);
 }
 
 #[tokio::test]
@@ -187,7 +187,7 @@ mod with_axum_implementation {
 
     use torrust_index_backend::web::api;
 
-    use crate::common::asserts::assert_json_ok;
+    use crate::common::asserts::assert_json_ok_response;
     use crate::common::client::Client;
     use crate::common::contexts::tag::asserts::{assert_added_tag_response, assert_deleted_tag_response};
     use crate::common::contexts::tag::fixtures::random_tag_name;
@@ -212,7 +212,7 @@ mod with_axum_implementation {
 
         let response = client.get_tags().await;
 
-        assert_json_ok(&response);
+        assert_json_ok_response(&response);
     }
 
     #[tokio::test]

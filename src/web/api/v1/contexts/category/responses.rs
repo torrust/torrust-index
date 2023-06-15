@@ -2,18 +2,18 @@
 //! context.
 use axum::Json;
 
-use crate::web::api::v1::responses::OkResponse;
+use crate::web::api::v1::responses::OkResponseData;
 
 /// Response after successfully creating a new category.
-pub fn added_category(category_name: &str) -> Json<OkResponse<String>> {
-    Json(OkResponse {
+pub fn added_category(category_name: &str) -> Json<OkResponseData<String>> {
+    Json(OkResponseData {
         data: category_name.to_string(),
     })
 }
 
 /// Response after successfully deleting a new category.
-pub fn deleted_category(category_name: &str) -> Json<OkResponse<String>> {
-    Json(OkResponse {
+pub fn deleted_category(category_name: &str) -> Json<OkResponseData<String>> {
+    Json(OkResponseData {
         data: category_name.to_string(),
     })
 }

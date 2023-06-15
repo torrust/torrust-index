@@ -11,7 +11,7 @@ use super::responses::{self, NewUser, TokenResponse};
 use crate::common::AppData;
 use crate::errors::ServiceError;
 use crate::web::api::v1::extractors::bearer_token::Extract;
-use crate::web::api::v1::responses::OkResponse;
+use crate::web::api::v1::responses::OkResponseData;
 
 // Registration
 
@@ -25,7 +25,7 @@ pub async fn registration_handler(
     State(app_data): State<Arc<AppData>>,
     Host(host_from_header): Host,
     extract::Json(registration_form): extract::Json<RegistrationForm>,
-) -> Result<Json<OkResponse<NewUser>>, ServiceError> {
+) -> Result<Json<OkResponseData<NewUser>>, ServiceError> {
     let api_base_url = app_data
         .cfg
         .get_api_base_url()
@@ -68,7 +68,7 @@ pub async fn email_verification_handler(State(app_data): State<Arc<AppData>>, Pa
 pub async fn login_handler(
     State(app_data): State<Arc<AppData>>,
     extract::Json(login_form): extract::Json<LoginForm>,
-) -> Result<Json<OkResponse<TokenResponse>>, ServiceError> {
+) -> Result<Json<OkResponseData<TokenResponse>>, ServiceError> {
     match app_data
         .authentication_service
         .login(&login_form.login, &login_form.password)
@@ -91,9 +91,9 @@ pub async fn login_handler(
 pub async fn verify_token_handler(
     State(app_data): State<Arc<AppData>>,
     extract::Json(token): extract::Json<JsonWebToken>,
-) -> Result<Json<OkResponse<String>>, ServiceError> {
+) -> Result<Json<OkResponseData<String>>, ServiceError> {
     match app_data.json_web_token.verify(&token.token).await {
-        Ok(_) => Ok(axum::Json(OkResponse {
+        Ok(_) => Ok(axum::Json(OkResponseData {
             data: "Token is valid.".to_string(),
         })),
         Err(error) => Err(error),
@@ -115,7 +115,7 @@ pub struct UsernameParam(pub String);
 pub async fn renew_token_handler(
     State(app_data): State<Arc<AppData>>,
     extract::Json(token): extract::Json<JsonWebToken>,
-) -> Result<Json<OkResponse<TokenResponse>>, ServiceError> {
+) -> Result<Json<OkResponseData<TokenResponse>>, ServiceError> {
     match app_data.authentication_service.renew_token(&token.token).await {
         Ok((token, user_compact)) => Ok(responses::renewed_token(token, user_compact)),
         Err(error) => Err(error),
@@ -135,13 +135,13 @@ pub async fn ban_handler(
     State(app_data): State<Arc<AppData>>,
     Path(to_be_banned_username): Path<UsernameParam>,
     Extract(maybe_bearer_token): Extract,
-) -> Result<Json<OkResponse<String>>, ServiceError> {
+) -> Result<Json<OkResponseData<String>>, ServiceError> {
     // todo: add reason and `date_expiry` parameters to request
 
     let user_id = app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await?;
 
     match app_data.ban_service.ban_user(&to_be_banned_username.0, &user_id).await {
-        Ok(_) => Ok(axum::Json(OkResponse {
+        Ok(_) => Ok(axum::Json(OkResponseData {
             data: format!("Banned user: {}", to_be_banned_username.0),
         })),
         Err(error) => Err(error),

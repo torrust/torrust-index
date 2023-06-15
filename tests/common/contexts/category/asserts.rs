@@ -1,4 +1,4 @@
-use crate::common::asserts::assert_json_ok;
+use crate::common::asserts::assert_json_ok_response;
 use crate::common::contexts::category::responses::{AddedCategoryResponse, DeletedCategoryResponse};
 use crate::common::responses::TextResponse;
 
@@ -8,7 +8,7 @@ pub fn assert_added_category_response(response: &TextResponse, category_name: &s
 
     assert_eq!(added_category_response.data, category_name);
 
-    assert_json_ok(response);
+    assert_json_ok_response(response);
 }
 
 pub fn assert_deleted_category_response(response: &TextResponse, category_name: &str) {
@@ -17,5 +17,5 @@ pub fn assert_deleted_category_response(response: &TextResponse, category_name: 
 
     assert_eq!(deleted_category_response.data, category_name);
 
-    assert_json_ok(response);
+    assert_json_ok_response(response);
 }

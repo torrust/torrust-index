@@ -1,7 +1,7 @@
 //! API contract for `category` context.
 use torrust_index_backend::web::api;
 
-use crate::common::asserts::assert_json_ok;
+use crate::common::asserts::assert_json_ok_response;
 use crate::common::client::Client;
 use crate::common::contexts::category::fixtures::random_category_name;
 use crate::common::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
@@ -18,7 +18,7 @@ async fn it_should_return_an_empty_category_list_when_there_are_no_categories() 
 
     let response = client.get_categories().await;
 
-    assert_json_ok(&response);
+    assert_json_ok_response(&response);
 }
 
 #[tokio::test]
@@ -213,7 +213,7 @@ mod with_axum_implementation {
 
     use torrust_index_backend::web::api;
 
-    use crate::common::asserts::assert_json_ok;
+    use crate::common::asserts::assert_json_ok_response;
     use crate::common::client::Client;
     use crate::common::contexts::category::asserts::{assert_added_category_response, assert_deleted_category_response};
     use crate::common::contexts::category::fixtures::random_category_name;
@@ -233,7 +233,7 @@ mod with_axum_implementation {
 
         let response = client.get_categories().await;
 
-        assert_json_ok(&response);
+        assert_json_ok_response(&response);
     }
 
     #[tokio::test]
