@@ -167,3 +167,5 @@
 //!
 //! Refer to the [`ConfigurationPublic`](crate::config::ConfigurationPublic)
 //! struct for more information about the response attributes.
+pub mod handlers;
+pub mod routes;
