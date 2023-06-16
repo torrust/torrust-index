@@ -1,19 +1,23 @@
 //! API handlers for the [`torrent`](crate::web::api::v1::contexts::torrent) API
 //! context.
 use std::io::{Cursor, Write};
+use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::extract::{Multipart, State};
+use axum::extract::{Multipart, Path, State};
 use axum::response::{IntoResponse, Response};
+use serde::Deserialize;
 
-use super::responses::new_torrent_response;
+use super::responses::{new_torrent_response, torrent_file_response};
 use crate::common::AppData;
 use crate::errors::ServiceError;
+use crate::models::info_hash::InfoHash;
 use crate::models::torrent::TorrentRequest;
 use crate::models::torrent_tag::TagId;
+use crate::models::user::UserId;
 use crate::routes::torrent::Create;
 use crate::utils::parse_torrent;
-use crate::web::api::v1::extractors::bearer_token::Extract;
+use crate::web::api::v1::extractors::bearer_token::{BearerToken, Extract};
 
 /// Upload a new torrent file to the Index
 ///
@@ -47,7 +51,62 @@ pub async fn upload_torrent_handler(
     }
 }
 
+#[derive(Deserialize)]
+pub struct InfoHashParam(pub String);
+
+#[allow(clippy::unused_async)]
+pub async fn download_torrent_handler(
+    State(app_data): State<Arc<AppData>>,
+    Extract(maybe_bearer_token): Extract,
+    Path(info_hash): Path<InfoHashParam>,
+) -> Response {
+    let Ok(info_hash) = InfoHash::from_str(&info_hash.0) else { return ServiceError::BadRequest.into_response() };
+
+    let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
+        Ok(opt_user_id) => opt_user_id,
+        Err(err) => return err.into_response(),
+    };
+
+    let torrent = match app_data.torrent_service.get_torrent(&info_hash, opt_user_id).await {
+        Ok(torrent) => torrent,
+        Err(err) => return err.into_response(),
+    };
+
+    let Ok(bytes) = parse_torrent::encode_torrent(&torrent) else { return ServiceError::InternalServerError.into_response() };
+
+    torrent_file_response(bytes)
+}
+
+/// If the user is logged in, returns the user's ID. Otherwise, returns `None`.
+///
+/// # Errors
+///
+/// It returns an error if we cannot get the user from the bearer token.
+async fn get_optional_logged_in_user(
+    maybe_bearer_token: Option<BearerToken>,
+    app_data: Arc<AppData>,
+) -> Result<Option<UserId>, ServiceError> {
+    match maybe_bearer_token {
+        Some(bearer_token) => match app_data.auth.get_user_id_from_bearer_token(&Some(bearer_token)).await {
+            Ok(user_id) => Ok(Some(user_id)),
+            Err(err) => Err(err),
+        },
+        None => Ok(None),
+    }
+}
+
 /// Extracts the [`TorrentRequest`] from the multipart form payload.
+///
+/// # Errors
+///
+/// It will return an error if:
+///
+/// - The text fields do not contain a valid UTF8 string.
+/// - The torrent file data is not valid because:
+///    - The content type is not `application/x-bittorrent`.
+///    - The multipart content is invalid.
+///    - The torrent file pieces key has a length that is not a multiple of 20.
+///    - The binary data cannot be decoded as a torrent file.
 async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<TorrentRequest, ServiceError> {
     let torrent_buffer = vec![0u8];
     let mut torrent_cursor = Cursor::new(torrent_buffer);

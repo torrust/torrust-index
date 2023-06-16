@@ -625,7 +625,6 @@ mod for_authenticated_users {
 mod with_axum_implementation {
 
     mod for_guests {
-        /*
 
         use std::env;
 
@@ -633,18 +632,20 @@ mod with_axum_implementation {
         use torrust_index_backend::web::api;
 
         use crate::common::client::Client;
-        use crate::common::contexts::category::fixtures::software_predefined_category_id;
-        use crate::common::contexts::torrent::asserts::assert_expected_torrent_details;
+        //use crate::common::contexts::category::fixtures::software_predefined_category_id;
+        //use crate::common::contexts::torrent::asserts::assert_expected_torrent_details;
         use crate::common::contexts::torrent::requests::InfoHash;
-        use crate::common::contexts::torrent::responses::{
-            Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
-        };
-        use crate::common::http::{Query, QueryParam};
+        //use crate::common::contexts::torrent::responses::{
+        //    Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
+        //};
+        //use crate::common::http::{Query, QueryParam};
         use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
         use crate::e2e::contexts::torrent::asserts::expected_torrent;
         use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
         use crate::e2e::contexts::user::steps::new_logged_in_user;
         use crate::e2e::environment::TestEnv;
+
+        /*
 
         #[tokio::test]
         async fn it_should_allow_guests_to_get_torrents() {
@@ -853,6 +854,8 @@ mod with_axum_implementation {
             assert!(response.is_json_and_ok());
         }
 
+        */
+
         #[tokio::test]
         async fn it_should_allow_guests_to_download_a_torrent_file_searching_by_info_hash() {
             let mut env = TestEnv::new();
@@ -908,6 +911,8 @@ mod with_axum_implementation {
             assert_eq!(response.status, 400);
         }
 
+        /*
+
         #[tokio::test]
         async fn it_should_not_allow_guests_to_delete_torrents() {
             let mut env = TestEnv::new();
@@ -940,17 +945,17 @@ mod with_axum_implementation {
 
         use std::env;
 
-        //use torrust_index_backend::utils::parse_torrent::decode_torrent;
+        use torrust_index_backend::utils::parse_torrent::decode_torrent;
         use torrust_index_backend::web::api;
 
-        //use crate::e2e::contexts::torrent::asserts::{build_announce_url, get_user_tracker_key};
         use crate::common::asserts::assert_json_error_response;
         use crate::common::client::Client;
         use crate::common::contexts::torrent::fixtures::random_torrent;
         use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
         use crate::common::contexts::torrent::responses::UploadedTorrentResponse;
         use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
-        //use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
+        use crate::e2e::contexts::torrent::asserts::{build_announce_url, get_user_tracker_key};
+        use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
         use crate::e2e::contexts::user::steps::new_logged_in_user;
         use crate::e2e::environment::TestEnv;
 
@@ -1080,8 +1085,6 @@ mod with_axum_implementation {
             assert_eq!(response.status, 400);
         }
 
-        /*
-
         #[tokio::test]
         async fn it_should_allow_authenticated_users_to_download_a_torrent_with_a_personal_announce_url() {
             let mut env = TestEnv::new();
@@ -1122,8 +1125,6 @@ mod with_axum_implementation {
                 build_announce_url(&tracker_url, &Some(tracker_key))
             );
         }
-
-        */
 
         mod and_non_admins {
             /*

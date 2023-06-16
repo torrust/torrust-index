@@ -77,7 +77,7 @@ impl Authentication {
 
     // Begin Axum
 
-    /// Get User id from bearer token
+    /// Get logged-in user ID from bearer token
     ///
     /// # Errors
     ///

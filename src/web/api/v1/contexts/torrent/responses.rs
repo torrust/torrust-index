@@ -1,4 +1,6 @@
+use axum::response::{IntoResponse, Response};
 use axum::Json;
+use hyper::{header, StatusCode};
 use serde::{Deserialize, Serialize};
 
 use crate::models::torrent::TorrentId;
@@ -19,4 +21,9 @@ pub fn new_torrent_response(torrent_id: TorrentId, info_hash: &str) -> Json<OkRe
             info_hash: info_hash.to_owned(),
         },
     })
+}
+
+#[must_use]
+pub fn torrent_file_response(bytes: Vec<u8>) -> Response {
+    (StatusCode::OK, [(header::CONTENT_TYPE, "application/x-bittorrent")], bytes).into_response()
 }
