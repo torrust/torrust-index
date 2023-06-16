@@ -88,6 +88,25 @@ pub async fn get_torrents_handler(State(app_data): State<Arc<AppData>>, Query(cr
     }
 }
 
+#[allow(clippy::unused_async)]
+pub async fn get_torrent_info_handler(
+    State(app_data): State<Arc<AppData>>,
+    Extract(maybe_bearer_token): Extract,
+    Path(info_hash): Path<InfoHashParam>,
+) -> Response {
+    let Ok(info_hash) = InfoHash::from_str(&info_hash.0) else { return ServiceError::BadRequest.into_response() };
+
+    let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
+        Ok(opt_user_id) => opt_user_id,
+        Err(err) => return err.into_response(),
+    };
+
+    match app_data.torrent_service.get_torrent_info(&info_hash, opt_user_id).await {
+        Ok(torrent_response) => Json(OkResponseData { data: torrent_response }).into_response(),
+        Err(err) => err.into_response(),
+    }
+}
+
 /// If the user is logged in, returns the user's ID. Otherwise, returns `None`.
 ///
 /// # Errors

@@ -632,13 +632,12 @@ mod with_axum_implementation {
         use torrust_index_backend::web::api;
 
         use crate::common::client::Client;
-        //use crate::common::contexts::category::fixtures::software_predefined_category_id;
-        //use crate::common::contexts::torrent::asserts::assert_expected_torrent_details;
+        use crate::common::contexts::category::fixtures::software_predefined_category_id;
+        use crate::common::contexts::torrent::asserts::assert_expected_torrent_details;
         use crate::common::contexts::torrent::requests::InfoHash;
-        use crate::common::contexts::torrent::responses::TorrentListResponse;
-        //use crate::common::contexts::torrent::responses::{
-        //    Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
-        //};
+        use crate::common::contexts::torrent::responses::{
+            Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
+        };
         use crate::common::http::{Query, QueryParam};
         use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
         use crate::e2e::contexts::torrent::asserts::expected_torrent;
@@ -785,8 +784,6 @@ mod with_axum_implementation {
             assert!(response.is_json_and_ok());
         }
 
-        /*
-
         #[tokio::test]
         async fn it_should_allow_guests_to_get_torrent_details_searching_by_info_hash() {
             let mut env = TestEnv::new();
@@ -854,8 +851,6 @@ mod with_axum_implementation {
             assert_expected_torrent_details(&torrent_details_response.data, &expected_torrent);
             assert!(response.is_json_and_ok());
         }
-
-        */
 
         #[tokio::test]
         async fn it_should_allow_guests_to_download_a_torrent_file_searching_by_info_hash() {
