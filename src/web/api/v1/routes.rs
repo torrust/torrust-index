@@ -6,7 +6,7 @@ use axum::Router;
 
 use super::contexts::about::handlers::about_page_handler;
 //use tower_http::cors::CorsLayer;
-use super::contexts::{about, settings, tag, torrent};
+use super::contexts::{about, proxy, settings, tag, torrent};
 use super::contexts::{category, user};
 use crate::common::AppData;
 
@@ -25,7 +25,8 @@ pub fn router(app_data: Arc<AppData>) -> Router {
         .nest("/tags", tag::routes::router_for_multiple_resources(app_data.clone()))
         .nest("/settings", settings::routes::router(app_data.clone()))
         .nest("/torrent", torrent::routes::router_for_single_resources(app_data.clone()))
-        .nest("/torrents", torrent::routes::router_for_multiple_resources(app_data.clone()));
+        .nest("/torrents", torrent::routes::router_for_multiple_resources(app_data.clone()))
+        .nest("/proxy", proxy::routes::router(app_data.clone()));
 
     Router::new()
         .route("/", get(about_page_handler).with_state(app_data))
