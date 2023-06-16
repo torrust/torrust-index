@@ -907,8 +907,6 @@ mod with_axum_implementation {
             assert_eq!(response.status, 400);
         }
 
-        /*
-
         #[tokio::test]
         async fn it_should_not_allow_guests_to_delete_torrents() {
             let mut env = TestEnv::new();
@@ -933,8 +931,6 @@ mod with_axum_implementation {
 
             assert_eq!(response.status, 401);
         }
-
-        */
     }
 
     mod for_authenticated_users {
@@ -1135,8 +1131,6 @@ mod with_axum_implementation {
             use crate::e2e::contexts::user::steps::new_logged_in_user;
             use crate::e2e::environment::TestEnv;
 
-            /*
-
             #[tokio::test]
             async fn it_should_not_allow_non_admins_to_delete_torrents() {
                 let mut env = TestEnv::new();
@@ -1161,8 +1155,6 @@ mod with_axum_implementation {
 
                 assert_eq!(response.status, 403);
             }
-
-            */
 
             #[tokio::test]
             async fn it_should_allow_non_admin_users_to_update_someone_elses_torrents() {
@@ -1269,14 +1261,11 @@ mod with_axum_implementation {
 
             use crate::common::client::Client;
             use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
-            //use crate::common::contexts::torrent::responses::{DeletedTorrentResponse, UpdatedTorrentResponse};
-            use crate::common::contexts::torrent::responses::UpdatedTorrentResponse;
+            use crate::common::contexts::torrent::responses::{DeletedTorrentResponse, UpdatedTorrentResponse};
             use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
             use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
             use crate::e2e::contexts::user::steps::{new_logged_in_admin, new_logged_in_user};
             use crate::e2e::environment::TestEnv;
-
-            /*
 
             #[tokio::test]
             async fn it_should_allow_admins_to_delete_torrents_searching_by_info_hash() {
@@ -1306,8 +1295,6 @@ mod with_axum_implementation {
                 assert_eq!(deleted_torrent_response.data.torrent_id, uploaded_torrent.torrent_id);
                 assert!(response.is_json_and_ok());
             }
-
-            */
 
             #[tokio::test]
             async fn it_should_allow_admins_to_update_someone_elses_torrents() {

@@ -167,6 +167,37 @@ pub async fn update_torrent_info_handler(
     }
 }
 
+/// Delete a torrent.
+///
+/// # Errors
+///
+/// This function will return an error if unable to:
+///
+/// * Get the user ID from the request.
+/// * Get the torrent info-hash from the request.
+/// * Delete the torrent.
+#[allow(clippy::unused_async)]
+pub async fn delete_torrent_handler(
+    State(app_data): State<Arc<AppData>>,
+    Extract(maybe_bearer_token): Extract,
+    Path(info_hash): Path<InfoHashParam>,
+) -> Response {
+    let Ok(info_hash) = InfoHash::from_str(&info_hash.0) else { return ServiceError::BadRequest.into_response() };
+
+    let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
+        Ok(user_id) => user_id,
+        Err(err) => return err.into_response(),
+    };
+
+    match app_data.torrent_service.delete_torrent(&info_hash, &user_id).await {
+        Ok(deleted_torrent_response) => Json(OkResponseData {
+            data: deleted_torrent_response,
+        })
+        .into_response(),
+        Err(err) => err.into_response(),
+    }
+}
+
 /// If the user is logged in, returns the user's ID. Otherwise, returns `None`.
 ///
 /// # Errors
