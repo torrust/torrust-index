@@ -6,7 +6,7 @@ use axum::Router;
 
 use super::contexts::about::handlers::about_page_handler;
 //use tower_http::cors::CorsLayer;
-use super::contexts::{about, settings, tag};
+use super::contexts::{about, settings, tag, torrent};
 use super::contexts::{category, user};
 use crate::common::AppData;
 
@@ -23,15 +23,18 @@ pub fn router(app_data: Arc<AppData>) -> Router {
         .nest("/category", category::routes::router(app_data.clone()))
         .nest("/tag", tag::routes::router_for_single_resources(app_data.clone()))
         .nest("/tags", tag::routes::router_for_multiple_resources(app_data.clone()))
-        .nest("/settings", settings::routes::router(app_data.clone()));
+        .nest("/settings", settings::routes::router(app_data.clone()))
+        .nest("/torrent", torrent::routes::router_for_single_resources(app_data.clone()))
+        .nest("/torrents", torrent::routes::router_for_multiple_resources(app_data.clone()));
 
     Router::new()
         .route("/", get(about_page_handler).with_state(app_data))
         .nest("/v1", v1_api_routes)
-
     // For development purposes only.
+    //
+    //.layer(CorsLayer::permissive()) // Uncomment this line and the `use` import.
+    //
     // It allows calling the API on a different port. For example
     // API: http://localhost:3000/v1
     // Webapp: http://localhost:8080
-    //Router::new().nest("/v1", api_routes).layer(CorsLayer::permissive())
 }

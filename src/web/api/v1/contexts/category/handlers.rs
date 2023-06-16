@@ -11,7 +11,7 @@ use crate::common::AppData;
 use crate::databases::database::{self, Category};
 use crate::errors::ServiceError;
 use crate::web::api::v1::extractors::bearer_token::Extract;
-use crate::web::api::v1::responses::{self, OkResponse};
+use crate::web::api::v1::responses::{self, OkResponseData};
 
 /// It handles the request to get all the categories.
 ///
@@ -29,9 +29,9 @@ use crate::web::api::v1::responses::{self, OkResponse};
 #[allow(clippy::unused_async)]
 pub async fn get_all_handler(
     State(app_data): State<Arc<AppData>>,
-) -> Result<Json<responses::OkResponse<Vec<Category>>>, database::Error> {
+) -> Result<Json<responses::OkResponseData<Vec<Category>>>, database::Error> {
     match app_data.category_repository.get_all().await {
-        Ok(categories) => Ok(Json(responses::OkResponse { data: categories })),
+        Ok(categories) => Ok(Json(responses::OkResponseData { data: categories })),
         Err(error) => Err(error),
     }
 }
@@ -49,7 +49,7 @@ pub async fn add_handler(
     State(app_data): State<Arc<AppData>>,
     Extract(maybe_bearer_token): Extract,
     extract::Json(category_form): extract::Json<AddCategoryForm>,
-) -> Result<Json<OkResponse<String>>, ServiceError> {
+) -> Result<Json<OkResponseData<String>>, ServiceError> {
     let user_id = app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await?;
 
     match app_data.category_service.add_category(&category_form.name, &user_id).await {
@@ -71,7 +71,7 @@ pub async fn delete_handler(
     State(app_data): State<Arc<AppData>>,
     Extract(maybe_bearer_token): Extract,
     extract::Json(category_form): extract::Json<DeleteCategoryForm>,
-) -> Result<Json<OkResponse<String>>, ServiceError> {
+) -> Result<Json<OkResponseData<String>>, ServiceError> {
     // code-review: why do we need to send the whole category object to delete it?
     // And we should use the ID instead of the name, because the name could change
     // or we could add support for multiple languages.
