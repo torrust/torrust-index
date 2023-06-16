@@ -635,17 +635,16 @@ mod with_axum_implementation {
         //use crate::common::contexts::category::fixtures::software_predefined_category_id;
         //use crate::common::contexts::torrent::asserts::assert_expected_torrent_details;
         use crate::common::contexts::torrent::requests::InfoHash;
+        use crate::common::contexts::torrent::responses::TorrentListResponse;
         //use crate::common::contexts::torrent::responses::{
         //    Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
         //};
-        //use crate::common::http::{Query, QueryParam};
+        use crate::common::http::{Query, QueryParam};
         use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
         use crate::e2e::contexts::torrent::asserts::expected_torrent;
         use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
         use crate::e2e::contexts::user::steps::new_logged_in_user;
         use crate::e2e::environment::TestEnv;
-
-        /*
 
         #[tokio::test]
         async fn it_should_allow_guests_to_get_torrents() {
@@ -785,6 +784,8 @@ mod with_axum_implementation {
             assert_eq!(torrent_list_response.data.results.len(), default_torrent_page_size);
             assert!(response.is_json_and_ok());
         }
+
+        /*
 
         #[tokio::test]
         async fn it_should_allow_guests_to_get_torrent_details_searching_by_info_hash() {

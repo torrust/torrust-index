@@ -4,8 +4,9 @@ use std::io::{Cursor, Write};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::extract::{Multipart, Path, State};
+use axum::extract::{Multipart, Path, Query, State};
 use axum::response::{IntoResponse, Response};
+use axum::Json;
 use serde::Deserialize;
 
 use super::responses::{new_torrent_response, torrent_file_response};
@@ -16,8 +17,10 @@ use crate::models::torrent::TorrentRequest;
 use crate::models::torrent_tag::TagId;
 use crate::models::user::UserId;
 use crate::routes::torrent::Create;
+use crate::services::torrent::ListingRequest;
 use crate::utils::parse_torrent;
 use crate::web::api::v1::extractors::bearer_token::{BearerToken, Extract};
+use crate::web::api::v1::responses::OkResponseData;
 
 /// Upload a new torrent file to the Index
 ///
@@ -75,6 +78,14 @@ pub async fn download_torrent_handler(
     let Ok(bytes) = parse_torrent::encode_torrent(&torrent) else { return ServiceError::InternalServerError.into_response() };
 
     torrent_file_response(bytes)
+}
+
+#[allow(clippy::unused_async)]
+pub async fn get_torrents_handler(State(app_data): State<Arc<AppData>>, Query(criteria): Query<ListingRequest>) -> Response {
+    match app_data.torrent_service.generate_torrent_info_listing(&criteria).await {
+        Ok(torrents_response) => Json(OkResponseData { data: torrents_response }).into_response(),
+        Err(err) => err.into_response(),
+    }
 }
 
 /// If the user is logged in, returns the user's ID. Otherwise, returns `None`.
