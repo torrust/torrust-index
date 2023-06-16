@@ -4,11 +4,12 @@ use std::io::{Cursor, Write};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::extract::{Multipart, Path, Query, State};
+use axum::extract::{self, Multipart, Path, Query, State};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 
+use super::forms::UpdateTorrentInfoForm;
 use super::responses::{new_torrent_response, torrent_file_response};
 use crate::common::AppData;
 use crate::errors::ServiceError;
@@ -57,6 +58,11 @@ pub async fn upload_torrent_handler(
 #[derive(Deserialize)]
 pub struct InfoHashParam(pub String);
 
+/// Returns the torrent as a byte stream `application/x-bittorrent`.
+///
+/// # Errors
+///
+/// Returns `ServiceError::BadRequest` if the torrent info-hash is invalid.
 #[allow(clippy::unused_async)]
 pub async fn download_torrent_handler(
     State(app_data): State<Arc<AppData>>,
@@ -80,6 +86,13 @@ pub async fn download_torrent_handler(
     torrent_file_response(bytes)
 }
 
+/// It returns a list of torrents matching the search criteria.
+///
+/// Eg: `/torrents?categories=music,other,movie&search=bunny&sort=size_DESC`
+///
+/// # Errors
+///
+/// It returns an error if the database query fails.
 #[allow(clippy::unused_async)]
 pub async fn get_torrents_handler(State(app_data): State<Arc<AppData>>, Query(criteria): Query<ListingRequest>) -> Response {
     match app_data.torrent_service.generate_torrent_info_listing(&criteria).await {
@@ -88,6 +101,14 @@ pub async fn get_torrents_handler(State(app_data): State<Arc<AppData>>, Query(cr
     }
 }
 
+/// Get Torrent from the Index
+///
+/// # Errors
+///
+/// This function returns an error if:
+///
+/// - The info-hash is not valid.
+/// - Ot there was a problem getting the torrent info from the database.
 #[allow(clippy::unused_async)]
 pub async fn get_torrent_info_handler(
     State(app_data): State<Arc<AppData>>,
@@ -102,6 +123,45 @@ pub async fn get_torrent_info_handler(
     };
 
     match app_data.torrent_service.get_torrent_info(&info_hash, opt_user_id).await {
+        Ok(torrent_response) => Json(OkResponseData { data: torrent_response }).into_response(),
+        Err(err) => err.into_response(),
+    }
+}
+
+/// Update a the torrent info
+///
+/// # Errors
+///
+/// This function will return an error if unable to:
+///
+/// * Get the user id from the request.
+/// * Get the torrent info-hash from the request.
+/// * Update the torrent info.
+#[allow(clippy::unused_async)]
+pub async fn update_torrent_info_handler(
+    State(app_data): State<Arc<AppData>>,
+    Extract(maybe_bearer_token): Extract,
+    Path(info_hash): Path<InfoHashParam>,
+    extract::Json(update_torrent_info_form): extract::Json<UpdateTorrentInfoForm>,
+) -> Response {
+    let Ok(info_hash) = InfoHash::from_str(&info_hash.0) else { return ServiceError::BadRequest.into_response() };
+
+    let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
+        Ok(user_id) => user_id,
+        Err(err) => return err.into_response(),
+    };
+
+    match app_data
+        .torrent_service
+        .update_torrent_info(
+            &info_hash,
+            &update_torrent_info_form.title,
+            &update_torrent_info_form.description,
+            &update_torrent_info_form.tags,
+            &user_id,
+        )
+        .await
+    {
         Ok(torrent_response) => Json(OkResponseData { data: torrent_response }).into_response(),
         Err(err) => err.into_response(),
     }
