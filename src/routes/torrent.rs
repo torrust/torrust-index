@@ -12,7 +12,7 @@ use crate::common::WebAppData;
 use crate::errors::{ServiceError, ServiceResult};
 use crate::models::info_hash::InfoHash;
 use crate::models::response::{NewTorrentResponse, OkResponse};
-use crate::models::torrent::TorrentRequest;
+use crate::models::torrent::{Create, TorrentRequest};
 use crate::models::torrent_tag::TagId;
 use crate::services::torrent::ListingRequest;
 use crate::utils::parse_torrent;
@@ -38,29 +38,6 @@ pub fn init(cfg: &mut web::ServiceConfig) {
 #[derive(FromRow)]
 pub struct Count {
     pub count: i32,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Create {
-    pub title: String,
-    pub description: String,
-    pub category: String,
-    pub tags: Vec<TagId>,
-}
-
-impl Create {
-    /// Returns the verify of this [`Create`].
-    ///
-    /// # Errors
-    ///
-    /// This function will return an `BadRequest` error if the `title` or the `category` is empty.
-    pub fn verify(&self) -> Result<(), ServiceError> {
-        if self.title.is_empty() || self.category.is_empty() {
-            Err(ServiceError::BadRequest)
-        } else {
-            Ok(())
-        }
-    }
 }
 
 #[derive(Debug, Deserialize)]
