@@ -78,8 +78,14 @@
 //!   "data": "new category"
 //! }
 //! ```
+use std::sync::Arc;
 
 use hyper::http::HeaderValue;
+
+use crate::common::AppData;
+use crate::errors::ServiceError;
+use crate::models::user::UserId;
+use crate::web::api::v1::extractors::bearer_token::BearerToken;
 
 /// Parses the token from the `Authorization` header.
 pub fn parse_token(authorization: &HeaderValue) -> String {
@@ -90,4 +96,22 @@ pub fn parse_token(authorization: &HeaderValue) -> String {
         .collect();
     let token = split[1].trim();
     token.to_string()
+}
+
+/// If the user is logged in, returns the user's ID. Otherwise, returns `None`.
+///
+/// # Errors
+///
+/// It returns an error if we cannot get the user from the bearer token.
+pub async fn get_optional_logged_in_user(
+    maybe_bearer_token: Option<BearerToken>,
+    app_data: Arc<AppData>,
+) -> Result<Option<UserId>, ServiceError> {
+    match maybe_bearer_token {
+        Some(bearer_token) => match app_data.auth.get_user_id_from_bearer_token(&Some(bearer_token)).await {
+            Ok(user_id) => Ok(Some(user_id)),
+            Err(error) => Err(error),
+        },
+        None => Ok(None),
+    }
 }

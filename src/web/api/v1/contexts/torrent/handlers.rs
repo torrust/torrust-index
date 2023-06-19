@@ -16,11 +16,11 @@ use crate::errors::ServiceError;
 use crate::models::info_hash::InfoHash;
 use crate::models::torrent::TorrentRequest;
 use crate::models::torrent_tag::TagId;
-use crate::models::user::UserId;
 use crate::routes::torrent::Create;
 use crate::services::torrent::ListingRequest;
 use crate::utils::parse_torrent;
-use crate::web::api::v1::extractors::bearer_token::{BearerToken, Extract};
+use crate::web::api::v1::auth::get_optional_logged_in_user;
+use crate::web::api::v1::extractors::bearer_token::Extract;
 use crate::web::api::v1::responses::OkResponseData;
 
 /// Upload a new torrent file to the Index
@@ -195,24 +195,6 @@ pub async fn delete_torrent_handler(
         })
         .into_response(),
         Err(error) => error.into_response(),
-    }
-}
-
-/// If the user is logged in, returns the user's ID. Otherwise, returns `None`.
-///
-/// # Errors
-///
-/// It returns an error if we cannot get the user from the bearer token.
-async fn get_optional_logged_in_user(
-    maybe_bearer_token: Option<BearerToken>,
-    app_data: Arc<AppData>,
-) -> Result<Option<UserId>, ServiceError> {
-    match maybe_bearer_token {
-        Some(bearer_token) => match app_data.auth.get_user_id_from_bearer_token(&Some(bearer_token)).await {
-            Ok(user_id) => Ok(Some(user_id)),
-            Err(error) => Err(error),
-        },
-        None => Ok(None),
     }
 }
 
