@@ -14,7 +14,7 @@ use super::responses::{new_torrent_response, torrent_file_response};
 use crate::common::AppData;
 use crate::errors::ServiceError;
 use crate::models::info_hash::InfoHash;
-use crate::models::torrent::{Create, TorrentRequest};
+use crate::models::torrent::{AddTorrentRequest, Metadata};
 use crate::models::torrent_tag::TagId;
 use crate::services::torrent::ListingRequest;
 use crate::utils::parse_torrent;
@@ -209,7 +209,7 @@ pub async fn delete_torrent_handler(
 ///    - The multipart content is invalid.
 ///    - The torrent file pieces key has a length that is not a multiple of 20.
 ///    - The binary data cannot be decoded as a torrent file.
-async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<TorrentRequest, ServiceError> {
+async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<AddTorrentRequest, ServiceError> {
     let torrent_buffer = vec![0u8];
     let mut torrent_cursor = Cursor::new(torrent_buffer);
 
@@ -266,7 +266,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
         }
     }
 
-    let fields = Create {
+    let fields = Metadata {
         title,
         description,
         category,
@@ -288,5 +288,8 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
         }
     }
 
-    Ok(TorrentRequest { fields, torrent })
+    Ok(AddTorrentRequest {
+        metadata: fields,
+        torrent,
+    })
 }

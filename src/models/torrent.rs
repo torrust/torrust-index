@@ -25,20 +25,20 @@ pub struct TorrentListing {
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
-pub struct TorrentRequest {
-    pub fields: Create,
+pub struct AddTorrentRequest {
+    pub metadata: Metadata,
     pub torrent: Torrent,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Create {
+pub struct Metadata {
     pub title: String,
     pub description: String,
     pub category: String,
     pub tags: Vec<TagId>,
 }
 
-impl Create {
+impl Metadata {
     /// Returns the verify of this [`Create`].
     ///
     /// # Errors

@@ -12,7 +12,7 @@ use crate::common::WebAppData;
 use crate::errors::{ServiceError, ServiceResult};
 use crate::models::info_hash::InfoHash;
 use crate::models::response::{NewTorrentResponse, OkResponse};
-use crate::models::torrent::{Create, TorrentRequest};
+use crate::models::torrent::{AddTorrentRequest, Metadata};
 use crate::models::torrent_tag::TagId;
 use crate::services::torrent::ListingRequest;
 use crate::utils::parse_torrent;
@@ -166,7 +166,7 @@ fn get_torrent_info_hash_from_request(req: &HttpRequest) -> Result<InfoHash, Ser
     }
 }
 
-async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<TorrentRequest, ServiceError> {
+async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<AddTorrentRequest, ServiceError> {
     let torrent_buffer = vec![0u8];
     let mut torrent_cursor = Cursor::new(torrent_buffer);
 
@@ -209,7 +209,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
         }
     }
 
-    let fields = Create {
+    let fields = Metadata {
         title,
         description,
         category,
@@ -230,5 +230,8 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
         }
     }
 
-    Ok(TorrentRequest { fields, torrent })
+    Ok(AddTorrentRequest {
+        metadata: fields,
+        torrent,
+    })
 }
