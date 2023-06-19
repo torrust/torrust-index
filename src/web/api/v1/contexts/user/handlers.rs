@@ -3,13 +3,13 @@
 use std::sync::Arc;
 
 use axum::extract::{self, Host, Path, State};
+use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 
 use super::forms::{JsonWebToken, LoginForm, RegistrationForm};
-use super::responses::{self, NewUser, TokenResponse};
+use super::responses::{self};
 use crate::common::AppData;
-use crate::errors::ServiceError;
 use crate::web::api::v1::extractors::bearer_token::Extract;
 use crate::web::api::v1::responses::OkResponseData;
 
@@ -25,7 +25,7 @@ pub async fn registration_handler(
     State(app_data): State<Arc<AppData>>,
     Host(host_from_header): Host,
     extract::Json(registration_form): extract::Json<RegistrationForm>,
-) -> Result<Json<OkResponseData<NewUser>>, ServiceError> {
+) -> Response {
     let api_base_url = app_data
         .cfg
         .get_api_base_url()
@@ -37,8 +37,8 @@ pub async fn registration_handler(
         .register_user(&registration_form, &api_base_url)
         .await
     {
-        Ok(user_id) => Ok(responses::added_user(user_id)),
-        Err(error) => Err(error),
+        Ok(user_id) => responses::added_user(user_id).into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -68,14 +68,14 @@ pub async fn email_verification_handler(State(app_data): State<Arc<AppData>>, Pa
 pub async fn login_handler(
     State(app_data): State<Arc<AppData>>,
     extract::Json(login_form): extract::Json<LoginForm>,
-) -> Result<Json<OkResponseData<TokenResponse>>, ServiceError> {
+) -> Response {
     match app_data
         .authentication_service
         .login(&login_form.login, &login_form.password)
         .await
     {
-        Ok((token, user_compact)) => Ok(responses::logged_in_user(token, user_compact)),
-        Err(error) => Err(error),
+        Ok((token, user_compact)) => responses::logged_in_user(token, user_compact).into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -91,12 +91,13 @@ pub async fn login_handler(
 pub async fn verify_token_handler(
     State(app_data): State<Arc<AppData>>,
     extract::Json(token): extract::Json<JsonWebToken>,
-) -> Result<Json<OkResponseData<String>>, ServiceError> {
+) -> Response {
     match app_data.json_web_token.verify(&token.token).await {
-        Ok(_) => Ok(axum::Json(OkResponseData {
+        Ok(_) => axum::Json(OkResponseData {
             data: "Token is valid.".to_string(),
-        })),
-        Err(error) => Err(error),
+        })
+        .into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -115,10 +116,10 @@ pub struct UsernameParam(pub String);
 pub async fn renew_token_handler(
     State(app_data): State<Arc<AppData>>,
     extract::Json(token): extract::Json<JsonWebToken>,
-) -> Result<Json<OkResponseData<TokenResponse>>, ServiceError> {
+) -> Response {
     match app_data.authentication_service.renew_token(&token.token).await {
-        Ok((token, user_compact)) => Ok(responses::renewed_token(token, user_compact)),
-        Err(error) => Err(error),
+        Ok((token, user_compact)) => responses::renewed_token(token, user_compact).into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -135,16 +136,20 @@ pub async fn ban_handler(
     State(app_data): State<Arc<AppData>>,
     Path(to_be_banned_username): Path<UsernameParam>,
     Extract(maybe_bearer_token): Extract,
-) -> Result<Json<OkResponseData<String>>, ServiceError> {
+) -> Response {
     // todo: add reason and `date_expiry` parameters to request
 
-    let user_id = app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await?;
+    let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
+        Ok(user_id) => user_id,
+        Err(error) => return error.into_response(),
+    };
 
     match app_data.ban_service.ban_user(&to_be_banned_username.0, &user_id).await {
-        Ok(_) => Ok(axum::Json(OkResponseData {
+        Ok(_) => Json(OkResponseData {
             data: format!("Banned user: {}", to_be_banned_username.0),
-        })),
-        Err(error) => Err(error),
+        })
+        .into_response(),
+        Err(error) => error.into_response(),
     }
 }
 

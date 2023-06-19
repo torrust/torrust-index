@@ -39,12 +39,12 @@ pub async fn upload_torrent_handler(
 ) -> Response {
     let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
         Ok(user_id) => user_id,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     let torrent_request = match get_torrent_request_from_payload(multipart).await {
         Ok(torrent_request) => torrent_request,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     let info_hash = torrent_request.torrent.info_hash().clone();
@@ -73,12 +73,12 @@ pub async fn download_torrent_handler(
 
     let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
         Ok(opt_user_id) => opt_user_id,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     let torrent = match app_data.torrent_service.get_torrent(&info_hash, opt_user_id).await {
         Ok(torrent) => torrent,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     let Ok(bytes) = parse_torrent::encode_torrent(&torrent) else { return ServiceError::InternalServerError.into_response() };
@@ -97,7 +97,7 @@ pub async fn download_torrent_handler(
 pub async fn get_torrents_handler(State(app_data): State<Arc<AppData>>, Query(criteria): Query<ListingRequest>) -> Response {
     match app_data.torrent_service.generate_torrent_info_listing(&criteria).await {
         Ok(torrents_response) => Json(OkResponseData { data: torrents_response }).into_response(),
-        Err(err) => err.into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -119,12 +119,12 @@ pub async fn get_torrent_info_handler(
 
     let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
         Ok(opt_user_id) => opt_user_id,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     match app_data.torrent_service.get_torrent_info(&info_hash, opt_user_id).await {
         Ok(torrent_response) => Json(OkResponseData { data: torrent_response }).into_response(),
-        Err(err) => err.into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -148,7 +148,7 @@ pub async fn update_torrent_info_handler(
 
     let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
         Ok(user_id) => user_id,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     match app_data
@@ -163,7 +163,7 @@ pub async fn update_torrent_info_handler(
         .await
     {
         Ok(torrent_response) => Json(OkResponseData { data: torrent_response }).into_response(),
-        Err(err) => err.into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -186,7 +186,7 @@ pub async fn delete_torrent_handler(
 
     let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
         Ok(user_id) => user_id,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     match app_data.torrent_service.delete_torrent(&info_hash, &user_id).await {
@@ -194,7 +194,7 @@ pub async fn delete_torrent_handler(
             data: deleted_torrent_response,
         })
         .into_response(),
-        Err(err) => err.into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -210,7 +210,7 @@ async fn get_optional_logged_in_user(
     match maybe_bearer_token {
         Some(bearer_token) => match app_data.auth.get_user_id_from_bearer_token(&Some(bearer_token)).await {
             Ok(user_id) => Ok(Some(user_id)),
-            Err(err) => Err(err),
+            Err(error) => Err(error),
         },
         None => Ok(None),
     }
