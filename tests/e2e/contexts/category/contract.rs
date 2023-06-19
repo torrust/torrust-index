@@ -111,6 +111,13 @@ async fn it_should_allow_adding_empty_categories() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
 
+    if env.is_shared() {
+        // This test cannot be run in a shared test env because it will fail
+        // when the empty category already exits
+        println!("Skipped");
+        return;
+    }
+
     let logged_in_admin = new_logged_in_admin(&env).await;
     let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
 
@@ -341,6 +348,13 @@ mod with_axum_implementation {
 
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
+
+        if env.is_shared() {
+            // This test cannot be run in a shared test env because it will fail
+            // when the empty category already exits
+            println!("Skipped");
+            return;
+        }
 
         if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
             println!("Skipped");
