@@ -1,5 +1,5 @@
 //! Templates for "about" static pages.
-use crate::routes::API_VERSION;
+use crate::web::api::API_VERSION;
 
 #[must_use]
 pub fn index_page() -> String {

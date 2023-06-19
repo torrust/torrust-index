@@ -14,9 +14,9 @@ use crate::models::info_hash::InfoHash;
 use crate::models::response::{NewTorrentResponse, OkResponse};
 use crate::models::torrent::TorrentRequest;
 use crate::models::torrent_tag::TagId;
-use crate::routes::API_VERSION;
 use crate::services::torrent::ListingRequest;
 use crate::utils::parse_torrent;
+use crate::web::api::API_VERSION;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(

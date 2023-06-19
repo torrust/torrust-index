@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use crate::common::WebAppData;
 use crate::errors::{ServiceError, ServiceResult};
 use crate::models::response::{OkResponse, TokenResponse};
-use crate::routes::API_VERSION;
 use crate::web::api::v1::contexts::user::forms::RegistrationForm;
+use crate::web::api::API_VERSION;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(

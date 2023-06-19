@@ -15,6 +15,8 @@ use tokio::task::JoinHandle;
 use crate::common::AppData;
 use crate::web::api;
 
+pub const API_VERSION: &str = "v1";
+
 /// API implementations.
 pub enum Implementation {
     /// API implementation with Actix Web.

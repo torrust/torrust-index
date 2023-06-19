@@ -1,6 +1,7 @@
 use actix_web::web;
 
-use crate::routes::{about, API_VERSION};
+use crate::routes::about;
+use crate::web::api::API_VERSION;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(web::scope("/").service(web::resource("").route(web::get().to(about::get))));
