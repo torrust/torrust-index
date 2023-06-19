@@ -10,7 +10,7 @@ use crate::databases::database::{Category, Database, Error, Sorting};
 use crate::errors::ServiceError;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::{DeletedTorrentResponse, TorrentResponse, TorrentsResponse};
-use crate::models::torrent::{TorrentId, TorrentListing, TorrentRequest};
+use crate::models::torrent::{AddTorrentRequest, TorrentId, TorrentListing};
 use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::user::UserId;
@@ -97,12 +97,12 @@ impl Index {
     /// * Unable to get the category from the database.
     /// * Unable to insert the torrent into the database.
     /// * Unable to add the torrent to the whitelist.
-    pub async fn add_torrent(&self, mut torrent_request: TorrentRequest, user_id: UserId) -> Result<TorrentId, ServiceError> {
+    pub async fn add_torrent(&self, mut torrent_request: AddTorrentRequest, user_id: UserId) -> Result<TorrentId, ServiceError> {
         torrent_request.torrent.set_announce_urls(&self.configuration).await;
 
         let category = self
             .category_repository
-            .get_by_name(&torrent_request.fields.category)
+            .get_by_name(&torrent_request.metadata.category)
             .await
             .map_err(|_| ServiceError::InvalidCategory)?;
 
@@ -126,7 +126,7 @@ impl Index {
         }
 
         self.torrent_tag_repository
-            .link_torrent_to_tags(&torrent_id, &torrent_request.fields.tags)
+            .link_torrent_to_tags(&torrent_id, &torrent_request.metadata.tags)
             .await?;
 
         Ok(torrent_id)
@@ -417,14 +417,19 @@ impl DbTorrentRepository {
     /// # Errors
     ///
     /// This function will return an error there is a database error.
-    pub async fn add(&self, torrent_request: &TorrentRequest, user_id: UserId, category: Category) -> Result<TorrentId, Error> {
+    pub async fn add(
+        &self,
+        torrent_request: &AddTorrentRequest,
+        user_id: UserId,
+        category: Category,
+    ) -> Result<TorrentId, Error> {
         self.database
             .insert_torrent_and_get_id(
                 &torrent_request.torrent,
                 user_id,
                 category.category_id,
-                &torrent_request.fields.title,
-                &torrent_request.fields.description,
+                &torrent_request.metadata.title,
+                &torrent_request.metadata.description,
             )
             .await
     }

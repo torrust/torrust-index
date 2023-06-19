@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Configuration;
 use crate::errors::ServiceError;
-use crate::routes::API_VERSION;
 use crate::utils::clock;
+use crate::web::api::API_VERSION;
 
 pub struct Service {
     cfg: Arc<Configuration>,

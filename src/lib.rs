@@ -257,7 +257,6 @@
 //! In addition to the production code documentation you can find a lot of
 //! examples in the [tests](https://github.com/torrust/torrust-index-backend/tree/develop/tests/e2e/contexts) directory.
 pub mod app;
-pub mod auth;
 pub mod bootstrap;
 pub mod cache;
 pub mod common;

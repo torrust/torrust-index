@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use crate::auth::Authentication;
 use crate::cache::image::manager::ImageCacheService;
 use crate::config::Configuration;
 use crate::databases::database::Database;
@@ -14,6 +13,7 @@ use crate::services::torrent::{
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
+use crate::web::api::v1::auth::Authentication;
 use crate::{mailer, tracker};
 pub type Username = String;
 

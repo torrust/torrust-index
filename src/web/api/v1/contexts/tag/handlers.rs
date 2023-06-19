@@ -3,16 +3,13 @@
 use std::sync::Arc;
 
 use axum::extract::{self, State};
-use axum::response::Json;
+use axum::response::{IntoResponse, Json, Response};
 
 use super::forms::{AddTagForm, DeleteTagForm};
 use super::responses::{added_tag, deleted_tag};
 use crate::common::AppData;
-use crate::databases::database;
-use crate::errors::ServiceError;
-use crate::models::torrent_tag::TorrentTag;
 use crate::web::api::v1::extractors::bearer_token::Extract;
-use crate::web::api::v1::responses::{self, OkResponseData};
+use crate::web::api::v1::responses::{self};
 
 /// It handles the request to get all the tags.
 ///
@@ -28,12 +25,10 @@ use crate::web::api::v1::responses::{self, OkResponseData};
 ///
 /// It returns an error if there is a database error.
 #[allow(clippy::unused_async)]
-pub async fn get_all_handler(
-    State(app_data): State<Arc<AppData>>,
-) -> Result<Json<responses::OkResponseData<Vec<TorrentTag>>>, database::Error> {
+pub async fn get_all_handler(State(app_data): State<Arc<AppData>>) -> Response {
     match app_data.tag_repository.get_all().await {
-        Ok(tags) => Ok(Json(responses::OkResponseData { data: tags })),
-        Err(error) => Err(error),
+        Ok(tags) => Json(responses::OkResponseData { data: tags }).into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -50,12 +45,15 @@ pub async fn add_handler(
     State(app_data): State<Arc<AppData>>,
     Extract(maybe_bearer_token): Extract,
     extract::Json(add_tag_form): extract::Json<AddTagForm>,
-) -> Result<Json<OkResponseData<String>>, ServiceError> {
-    let user_id = app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await?;
+) -> Response {
+    let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
+        Ok(user_id) => user_id,
+        Err(error) => return error.into_response(),
+    };
 
     match app_data.tag_service.add_tag(&add_tag_form.name, &user_id).await {
-        Ok(_) => Ok(added_tag(&add_tag_form.name)),
-        Err(error) => Err(error),
+        Ok(_) => added_tag(&add_tag_form.name).into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -72,11 +70,14 @@ pub async fn delete_handler(
     State(app_data): State<Arc<AppData>>,
     Extract(maybe_bearer_token): Extract,
     extract::Json(delete_tag_form): extract::Json<DeleteTagForm>,
-) -> Result<Json<OkResponseData<String>>, ServiceError> {
-    let user_id = app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await?;
+) -> Response {
+    let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
+        Ok(user_id) => user_id,
+        Err(error) => return error.into_response(),
+    };
 
     match app_data.tag_service.delete_tag(&delete_tag_form.tag_id, &user_id).await {
-        Ok(_) => Ok(deleted_tag(delete_tag_form.tag_id)),
-        Err(error) => Err(error),
+        Ok(_) => deleted_tag(delete_tag_form.tag_id).into_response(),
+        Err(error) => error.into_response(),
     }
 }

@@ -14,13 +14,12 @@ use super::responses::{new_torrent_response, torrent_file_response};
 use crate::common::AppData;
 use crate::errors::ServiceError;
 use crate::models::info_hash::InfoHash;
-use crate::models::torrent::TorrentRequest;
+use crate::models::torrent::{AddTorrentRequest, Metadata};
 use crate::models::torrent_tag::TagId;
-use crate::models::user::UserId;
-use crate::routes::torrent::Create;
 use crate::services::torrent::ListingRequest;
 use crate::utils::parse_torrent;
-use crate::web::api::v1::extractors::bearer_token::{BearerToken, Extract};
+use crate::web::api::v1::auth::get_optional_logged_in_user;
+use crate::web::api::v1::extractors::bearer_token::Extract;
 use crate::web::api::v1::responses::OkResponseData;
 
 /// Upload a new torrent file to the Index
@@ -39,12 +38,12 @@ pub async fn upload_torrent_handler(
 ) -> Response {
     let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
         Ok(user_id) => user_id,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     let torrent_request = match get_torrent_request_from_payload(multipart).await {
         Ok(torrent_request) => torrent_request,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     let info_hash = torrent_request.torrent.info_hash().clone();
@@ -73,12 +72,12 @@ pub async fn download_torrent_handler(
 
     let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
         Ok(opt_user_id) => opt_user_id,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     let torrent = match app_data.torrent_service.get_torrent(&info_hash, opt_user_id).await {
         Ok(torrent) => torrent,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     let Ok(bytes) = parse_torrent::encode_torrent(&torrent) else { return ServiceError::InternalServerError.into_response() };
@@ -97,7 +96,7 @@ pub async fn download_torrent_handler(
 pub async fn get_torrents_handler(State(app_data): State<Arc<AppData>>, Query(criteria): Query<ListingRequest>) -> Response {
     match app_data.torrent_service.generate_torrent_info_listing(&criteria).await {
         Ok(torrents_response) => Json(OkResponseData { data: torrents_response }).into_response(),
-        Err(err) => err.into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -119,12 +118,12 @@ pub async fn get_torrent_info_handler(
 
     let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
         Ok(opt_user_id) => opt_user_id,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     match app_data.torrent_service.get_torrent_info(&info_hash, opt_user_id).await {
         Ok(torrent_response) => Json(OkResponseData { data: torrent_response }).into_response(),
-        Err(err) => err.into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -148,7 +147,7 @@ pub async fn update_torrent_info_handler(
 
     let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
         Ok(user_id) => user_id,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     match app_data
@@ -163,7 +162,7 @@ pub async fn update_torrent_info_handler(
         .await
     {
         Ok(torrent_response) => Json(OkResponseData { data: torrent_response }).into_response(),
-        Err(err) => err.into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -186,7 +185,7 @@ pub async fn delete_torrent_handler(
 
     let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
         Ok(user_id) => user_id,
-        Err(err) => return err.into_response(),
+        Err(error) => return error.into_response(),
     };
 
     match app_data.torrent_service.delete_torrent(&info_hash, &user_id).await {
@@ -194,25 +193,7 @@ pub async fn delete_torrent_handler(
             data: deleted_torrent_response,
         })
         .into_response(),
-        Err(err) => err.into_response(),
-    }
-}
-
-/// If the user is logged in, returns the user's ID. Otherwise, returns `None`.
-///
-/// # Errors
-///
-/// It returns an error if we cannot get the user from the bearer token.
-async fn get_optional_logged_in_user(
-    maybe_bearer_token: Option<BearerToken>,
-    app_data: Arc<AppData>,
-) -> Result<Option<UserId>, ServiceError> {
-    match maybe_bearer_token {
-        Some(bearer_token) => match app_data.auth.get_user_id_from_bearer_token(&Some(bearer_token)).await {
-            Ok(user_id) => Ok(Some(user_id)),
-            Err(err) => Err(err),
-        },
-        None => Ok(None),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -228,7 +209,7 @@ async fn get_optional_logged_in_user(
 ///    - The multipart content is invalid.
 ///    - The torrent file pieces key has a length that is not a multiple of 20.
 ///    - The binary data cannot be decoded as a torrent file.
-async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<TorrentRequest, ServiceError> {
+async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<AddTorrentRequest, ServiceError> {
     let torrent_buffer = vec![0u8];
     let mut torrent_cursor = Cursor::new(torrent_buffer);
 
@@ -285,7 +266,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
         }
     }
 
-    let fields = Create {
+    let fields = Metadata {
         title,
         description,
         category,
@@ -307,5 +288,8 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<Torr
         }
     }
 
-    Ok(TorrentRequest { fields, torrent })
+    Ok(AddTorrentRequest {
+        metadata: fields,
+        torrent,
+    })
 }

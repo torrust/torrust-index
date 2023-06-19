@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+use super::torrent_tag::TagId;
+use crate::errors::ServiceError;
 use crate::models::torrent_file::Torrent;
-use crate::routes::torrent::Create;
 
 #[allow(clippy::module_name_repetitions)]
 pub type TorrentId = i64;
@@ -24,7 +25,30 @@ pub struct TorrentListing {
 
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
-pub struct TorrentRequest {
-    pub fields: Create,
+pub struct AddTorrentRequest {
+    pub metadata: Metadata,
     pub torrent: Torrent,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Metadata {
+    pub title: String,
+    pub description: String,
+    pub category: String,
+    pub tags: Vec<TagId>,
+}
+
+impl Metadata {
+    /// Returns the verify of this [`Create`].
+    ///
+    /// # Errors
+    ///
+    /// This function will return an `BadRequest` error if the `title` or the `category` is empty.
+    pub fn verify(&self) -> Result<(), ServiceError> {
+        if self.title.is_empty() || self.category.is_empty() {
+            Err(ServiceError::BadRequest)
+        } else {
+            Ok(())
+        }
+    }
 }

@@ -4,8 +4,8 @@ use actix_web::{web, HttpRequest, HttpResponse, Responder};
 use crate::cache::image::manager::Error;
 use crate::common::WebAppData;
 use crate::errors::ServiceResult;
-use crate::routes::API_VERSION;
 use crate::ui::proxy::{load_error_images, map_error_to_image};
+use crate::web::api::API_VERSION;
 
 pub fn init(cfg: &mut web::ServiceConfig) {
     cfg.service(
