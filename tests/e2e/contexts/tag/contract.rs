@@ -356,7 +356,7 @@ mod with_axum_implementation {
     #[tokio::test]
     async fn it_should_allow_admins_to_delete_tags() {
         let mut env = TestEnv::new();
-        env.start(api::Implementation::ActixWeb).await;
+        env.start(api::Implementation::Axum).await;
 
         if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
             println!("Skipped");

@@ -10,7 +10,7 @@ use super::responses::{added_tag, deleted_tag};
 use crate::common::AppData;
 use crate::databases::database;
 use crate::errors::ServiceError;
-use crate::models::torrent_tag::TorrentTag;
+use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::web::api::v1::extractors::bearer_token::Extract;
 use crate::web::api::v1::responses::{self, OkResponseData};
 
@@ -72,7 +72,7 @@ pub async fn delete_handler(
     State(app_data): State<Arc<AppData>>,
     Extract(maybe_bearer_token): Extract,
     extract::Json(delete_tag_form): extract::Json<DeleteTagForm>,
-) -> Result<Json<OkResponseData<String>>, ServiceError> {
+) -> Result<Json<OkResponseData<TagId>>, ServiceError> {
     let user_id = app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await?;
 
     match app_data.tag_service.delete_tag(&delete_tag_form.tag_id, &user_id).await {
