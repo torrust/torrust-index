@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use tokio::task::JoinHandle;
 
-use crate::auth::Authentication;
 use crate::bootstrap::logging;
 use crate::cache::image::manager::ImageCacheService;
 use crate::common::AppData;
@@ -19,6 +18,7 @@ use crate::services::torrent::{
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
+use crate::web::api::v1::auth::Authentication;
 use crate::web::api::{start, Implementation};
 use crate::{mailer, tracker};
 
