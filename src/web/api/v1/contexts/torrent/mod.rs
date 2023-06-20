@@ -243,7 +243,7 @@
 //! `description` | `Option<String>` | The torrent description  | No | `MandelbrotSet image`
 //!
 //!
-//! Refer to the [`Update`](crate::routes::torrent::Update)
+//! Refer to the [`UpdateTorrentInfoForm`](crate::web::api::v1::contexts::torrent::forms::UpdateTorrentInfoForm)
 //! struct for more information about the request attributes.
 //!
 //! **Example request**

@@ -39,7 +39,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    /// Returns the verify of this [`Create`].
+    /// Returns the verify of this [`Metadata`].
     ///
     /// # Errors
     ///

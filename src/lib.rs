@@ -2,7 +2,7 @@
 //!
 //! This is the backend API for [Torrust Tracker Index](https://github.com/torrust/torrust-index).
 //!
-//! It is written in Rust and uses the [actix-web](https://actix.rs/) framework. It is designed to be
+//! It is written in Rust and uses the [Axum](https://github.com/tokio-rs/axum) framework. It is designed to be
 //! used with by the [Torrust Tracker Index Frontend](https://github.com/torrust/torrust-index-frontend).
 //!
 //! If you are looking for information on how to use the API, please see the
@@ -266,7 +266,6 @@ pub mod databases;
 pub mod errors;
 pub mod mailer;
 pub mod models;
-pub mod routes;
 pub mod services;
 pub mod tracker;
 pub mod ui;

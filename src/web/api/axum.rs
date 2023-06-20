@@ -42,7 +42,6 @@ pub async fn start(app_data: Arc<AppData>, net_ip: &str, net_port: u16) -> Runni
 
     Running {
         socket_addr: bound_addr,
-        actix_web_api_server: None,
         axum_api_server: Some(join_handle),
     }
 }

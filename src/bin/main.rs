@@ -11,7 +11,6 @@ async fn main() -> Result<(), std::io::Error> {
     let app = app::run(configuration, &api_implementation).await;
 
     match api_implementation {
-        Implementation::ActixWeb => app.actix_web_api_server.unwrap().await.expect("the API server was dropped"),
         Implementation::Axum => app.axum_api_server.unwrap().await.expect("the Axum API server was dropped"),
     }
 }

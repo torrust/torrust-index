@@ -24,7 +24,6 @@ use crate::{mailer, tracker};
 
 pub struct Running {
     pub api_socket_addr: SocketAddr,
-    pub actix_web_api_server: Option<JoinHandle<std::result::Result<(), std::io::Error>>>,
     pub axum_api_server: Option<JoinHandle<std::result::Result<(), std::io::Error>>>,
     pub tracker_data_importer_handle: tokio::task::JoinHandle<()>,
 }
@@ -171,7 +170,6 @@ pub async fn run(configuration: Configuration, api_implementation: &Implementati
 
     Running {
         api_socket_addr: running_api.socket_addr,
-        actix_web_api_server: running_api.actix_web_api_server,
         axum_api_server: running_api.axum_api_server,
         tracker_data_importer_handle: tracker_statistics_importer_handle,
     }

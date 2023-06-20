@@ -54,7 +54,6 @@ impl AppStarter {
             .expect("the app starter should not be dropped");
 
             match api_implementation {
-                Implementation::ActixWeb => app.actix_web_api_server.unwrap().await,
                 Implementation::Axum => app.axum_api_server.unwrap().await,
             }
         });

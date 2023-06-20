@@ -5,7 +5,7 @@
 //! You can execute it with: `cargo run --bin import_tracker_statistics`
 use torrust_index_backend::console::commands::import_tracker_statistics::run_importer;
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() {
     run_importer().await;
 }

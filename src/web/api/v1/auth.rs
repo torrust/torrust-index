@@ -80,7 +80,6 @@
 //! ```
 use std::sync::Arc;
 
-use actix_web::HttpRequest;
 use hyper::http::HeaderValue;
 
 use crate::common::AppData;
@@ -113,47 +112,6 @@ impl Authentication {
         self.json_web_token.verify(token).await
     }
 
-    // Begin ActixWeb
-
-    /// Get User id from `ActixWeb` Request
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if it can get claims from the request
-    pub async fn get_user_id_from_actix_web_request(&self, req: &HttpRequest) -> Result<UserId, ServiceError> {
-        let claims = self.get_claims_from_actix_web_request(req).await?;
-        Ok(claims.user.user_id)
-    }
-
-    /// Get Claims from `ActixWeb` Request
-    ///
-    /// # Errors
-    ///
-    /// - Return an `ServiceError::TokenNotFound` if `HeaderValue` is `None`.
-    /// - Pass through the `ServiceError::TokenInvalid` if unable to verify the JWT.
-    async fn get_claims_from_actix_web_request(&self, req: &HttpRequest) -> Result<UserClaims, ServiceError> {
-        match req.headers().get("Authorization") {
-            Some(auth) => {
-                let split: Vec<&str> = auth
-                    .to_str()
-                    .expect("variable `auth` contains data that is not visible ASCII chars.")
-                    .split("Bearer")
-                    .collect();
-                let token = split[1].trim();
-
-                match self.verify_jwt(token).await {
-                    Ok(claims) => Ok(claims),
-                    Err(e) => Err(e),
-                }
-            }
-            None => Err(ServiceError::TokenNotFound),
-        }
-    }
-
-    // End ActixWeb
-
-    // Begin Axum
-
     /// Get logged-in user ID from bearer token
     ///
     /// # Errors
@@ -181,8 +139,6 @@ impl Authentication {
             None => Err(ServiceError::TokenNotFound),
         }
     }
-
-    // End Axum
 }
 
 /// Parses the token from the `Authorization` header.

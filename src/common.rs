@@ -17,8 +17,6 @@ use crate::web::api::v1::auth::Authentication;
 use crate::{mailer, tracker};
 pub type Username = String;
 
-pub type WebAppData = actix_web::web::Data<Arc<AppData>>;
-
 pub struct AppData {
     pub cfg: Arc<Configuration>,
     pub database: Arc<Box<dyn Database>>,
