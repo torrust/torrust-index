@@ -3,6 +3,3 @@ cov = "llvm-cov"
 cov-html = "llvm-cov --html"
 cov-lcov = "llvm-cov --lcov --output-path=./.coverage/lcov.info"
 time = "build --timings --all-targets"
-
-
-
