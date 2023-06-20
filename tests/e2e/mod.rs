@@ -37,5 +37,5 @@
 //! documentation. See <https://superuser.com/a/1200818/277693> for more
 //! information.
 pub mod config;
-pub mod contexts;
 pub mod environment;
+pub mod web;

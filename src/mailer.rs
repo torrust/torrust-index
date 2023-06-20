@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Configuration;
 use crate::errors::ServiceError;
 use crate::utils::clock;
-use crate::web::api::API_VERSION;
+use crate::web::api::v1::routes::API_VERSION_URL_PREFIX;
 
 pub struct Service {
     cfg: Arc<Configuration>,
@@ -147,7 +147,7 @@ impl Service {
             base_url = cfg_base_url;
         }
 
-        format!("{base_url}/{API_VERSION}/user/email/verify/{token}")
+        format!("{base_url}/{API_VERSION_URL_PREFIX}/user/email/verify/{token}")
     }
 }
 

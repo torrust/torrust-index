@@ -9,7 +9,7 @@ use super::v1::routes::router;
 use super::{Running, ServerStartedMessage};
 use crate::common::AppData;
 
-/// Starts the API server with `Axum`.
+/// Starts the API server.
 ///
 /// # Panics
 ///
@@ -42,7 +42,7 @@ pub async fn start(app_data: Arc<AppData>, net_ip: &str, net_port: u16) -> Runni
 
     Running {
         socket_addr: bound_addr,
-        axum_api_server: Some(join_handle),
+        api_server: Some(join_handle),
     }
 }
 

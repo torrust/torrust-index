@@ -3,8 +3,8 @@ use crate::common::contexts::tag::fixtures::random_tag_name;
 use crate::common::contexts::tag::forms::AddTagForm;
 use crate::common::contexts::tag::responses::ListResponse;
 use crate::common::responses::TextResponse;
-use crate::e2e::contexts::user::steps::new_logged_in_admin;
 use crate::e2e::environment::TestEnv;
+use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_admin;
 
 pub async fn add_random_tag(env: &TestEnv) -> (i64, String) {
     let tag_name = random_tag_name();

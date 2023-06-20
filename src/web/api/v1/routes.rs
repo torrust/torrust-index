@@ -10,6 +10,8 @@ use super::contexts::{about, proxy, settings, tag, torrent};
 use super::contexts::{category, user};
 use crate::common::AppData;
 
+pub const API_VERSION_URL_PREFIX: &str = "v1";
+
 /// Add all API routes to the router.
 #[allow(clippy::needless_pass_by_value)]
 pub fn router(app_data: Arc<AppData>) -> Router {
@@ -30,7 +32,7 @@ pub fn router(app_data: Arc<AppData>) -> Router {
 
     Router::new()
         .route("/", get(about_page_handler).with_state(app_data))
-        .nest("/v1", v1_api_routes)
+        .nest(&format!("/{API_VERSION_URL_PREFIX}"), v1_api_routes)
     // For development purposes only.
     //
     //.layer(CorsLayer::permissive()) // Uncomment this line and the `use` import.

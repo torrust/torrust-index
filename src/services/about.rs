@@ -1,5 +1,5 @@
 //! Templates for "about" static pages.
-use crate::web::api::API_VERSION;
+use crate::web::api::v1::routes::API_VERSION_URL_PREFIX;
 
 #[must_use]
 pub fn index_page() -> String {
@@ -22,7 +22,7 @@ pub fn page() -> String {
             <p>Hi! This is a running <a href="https://github.com/torrust/torrust-index-backend">torrust-index-backend</a>.</p>
         </body>
         <footer style="padding: 1.25em 0;border-top: dotted 1px;">
-            <a href="/{API_VERSION}/about/license">license</a>
+            <a href="/{API_VERSION_URL_PREFIX}/about/license">license</a>
         </footer>
     </html>
 "#
@@ -55,7 +55,7 @@ pub fn license_page() -> String {
             <p>If you want to read more about all the licenses and how they apply please refer to the <a href="https://github.com/torrust/torrust-index-backend/blob/develop/licensing/contributor_agreement_v01.md">contributor agreement</a>.</p>
         </body>
         <footer style="padding: 1.25em 0;border-top: dotted 1px;">
-            <a href="/{API_VERSION}/about">about</a>
+            <a href="/{API_VERSION_URL_PREFIX}/about">about</a>
         </footer>
     </html>
 "#

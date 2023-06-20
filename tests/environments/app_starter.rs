@@ -4,7 +4,7 @@ use log::info;
 use tokio::sync::{oneshot, RwLock};
 use tokio::task::JoinHandle;
 use torrust_index_backend::config::Configuration;
-use torrust_index_backend::web::api::Implementation;
+use torrust_index_backend::web::api::Version;
 use torrust_index_backend::{app, config};
 
 /// It launches the app and provides a way to stop it.
@@ -32,7 +32,7 @@ impl AppStarter {
     /// # Panics
     ///
     /// Will panic if the app was dropped after spawning it.
-    pub async fn start(&mut self, api_implementation: Implementation) {
+    pub async fn start(&mut self, api_version: Version) {
         let configuration = Configuration {
             settings: RwLock::new(self.configuration.clone()),
             config_path: self.config_path.clone(),
@@ -43,7 +43,7 @@ impl AppStarter {
 
         // Launch the app in a separate task
         let app_handle = tokio::spawn(async move {
-            let app = app::run(configuration, &api_implementation).await;
+            let app = app::run(configuration, &api_version).await;
 
             info!("Application started. API server listening on {}", app.api_socket_addr);
 
@@ -53,8 +53,8 @@ impl AppStarter {
             })
             .expect("the app starter should not be dropped");
 
-            match api_implementation {
-                Implementation::Axum => app.axum_api_server.unwrap().await,
+            match api_version {
+                Version::V1 => app.api_server.unwrap().await,
             }
         });
 
