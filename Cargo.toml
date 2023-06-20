@@ -2,7 +2,7 @@
 name = "torrust-index-backend"
 description = "The backend (API) for the Torrust Index project."
 license-file = "COPYRIGHT"
-version = "2.0.0-alpha.1"
+version = "2.0.0-alpha.2"
 authors = ["Mick van Dijke <mick@dutchbits.nl>", "Wesley Bijleveld <wesley@dutchbits.nl>"]
 repository = "https://github.com/torrust/torrust-index-backend"
 edition = "2021"
