@@ -1,4 +1,6 @@
 //! API contract for `category` context.
+use std::env;
+
 use torrust_index_backend::web::api;
 
 use crate::common::asserts::assert_json_ok_response;
@@ -6,6 +8,7 @@ use crate::common::client::Client;
 use crate::common::contexts::category::fixtures::random_category_name;
 use crate::common::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
 use crate::common::contexts::category::responses::{AddedCategoryResponse, ListResponse};
+use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL;
 use crate::e2e::contexts::category::steps::{add_category, add_random_category};
 use crate::e2e::contexts::user::steps::{new_logged_in_admin, new_logged_in_user};
 use crate::e2e::environment::TestEnv;
@@ -14,6 +17,12 @@ use crate::e2e::environment::TestEnv;
 async fn it_should_return_an_empty_category_list_when_there_are_no_categories() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let response = client.get_categories().await;
@@ -25,6 +34,12 @@ async fn it_should_return_an_empty_category_list_when_there_are_no_categories() 
 async fn it_should_return_a_category_list() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     add_random_category(&env).await;
@@ -47,6 +62,12 @@ async fn it_should_return_a_category_list() {
 async fn it_should_not_allow_adding_a_new_category_to_unauthenticated_users() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let response = client
@@ -63,6 +84,11 @@ async fn it_should_not_allow_adding_a_new_category_to_unauthenticated_users() {
 async fn it_should_not_allow_adding_a_new_category_to_non_admins() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
 
     let logged_non_admin = new_logged_in_user(&env).await;
 
@@ -82,6 +108,11 @@ async fn it_should_not_allow_adding_a_new_category_to_non_admins() {
 async fn it_should_allow_admins_to_add_new_categories() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
 
     let logged_in_admin = new_logged_in_admin(&env).await;
     let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
@@ -110,6 +141,11 @@ async fn it_should_allow_adding_empty_categories() {
 
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
 
     if env.is_shared() {
         // This test cannot be run in a shared test env because it will fail
@@ -144,6 +180,11 @@ async fn it_should_not_allow_adding_duplicated_categories() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
 
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let added_category_name = add_random_category(&env).await;
 
     // Try to add the same category again
@@ -155,6 +196,11 @@ async fn it_should_not_allow_adding_duplicated_categories() {
 async fn it_should_allow_admins_to_delete_categories() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
 
     let logged_in_admin = new_logged_in_admin(&env).await;
     let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
@@ -182,6 +228,11 @@ async fn it_should_not_allow_non_admins_to_delete_categories() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
 
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let added_category_name = add_random_category(&env).await;
 
     let logged_in_non_admin = new_logged_in_user(&env).await;
@@ -201,6 +252,12 @@ async fn it_should_not_allow_non_admins_to_delete_categories() {
 async fn it_should_not_allow_guests_to_delete_categories() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let added_category_name = add_random_category(&env).await;
@@ -216,7 +273,6 @@ async fn it_should_not_allow_guests_to_delete_categories() {
 }
 
 mod with_axum_implementation {
-    use std::env;
 
     use torrust_index_backend::web::api;
 
@@ -226,7 +282,6 @@ mod with_axum_implementation {
     use crate::common::contexts::category::fixtures::random_category_name;
     use crate::common::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
     use crate::common::contexts::category::responses::ListResponse;
-    use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
     use crate::e2e::contexts::category::steps::{add_category, add_random_category};
     use crate::e2e::contexts::user::steps::{new_logged_in_admin, new_logged_in_user};
     use crate::e2e::environment::TestEnv;
@@ -247,11 +302,6 @@ mod with_axum_implementation {
     async fn it_should_return_a_category_list() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
@@ -276,11 +326,6 @@ mod with_axum_implementation {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
 
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
-
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
         let response = client
@@ -297,11 +342,6 @@ mod with_axum_implementation {
     async fn it_should_not_allow_adding_a_new_category_to_non_admins() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         let logged_non_admin = new_logged_in_user(&env).await;
 
@@ -321,11 +361,6 @@ mod with_axum_implementation {
     async fn it_should_allow_admins_to_add_new_categories() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         let logged_in_admin = new_logged_in_admin(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
@@ -356,11 +391,6 @@ mod with_axum_implementation {
             return;
         }
 
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
-
         let logged_in_admin = new_logged_in_admin(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
 
@@ -381,11 +411,6 @@ mod with_axum_implementation {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
 
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
-
         let added_category_name = add_random_category(&env).await;
 
         // Try to add the same category again
@@ -398,11 +423,6 @@ mod with_axum_implementation {
     async fn it_should_allow_admins_to_delete_categories() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         let logged_in_admin = new_logged_in_admin(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
@@ -424,11 +444,6 @@ mod with_axum_implementation {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
 
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
-
         let added_category_name = add_random_category(&env).await;
 
         let logged_in_non_admin = new_logged_in_user(&env).await;
@@ -448,11 +463,6 @@ mod with_axum_implementation {
     async fn it_should_not_allow_guests_to_delete_categories() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 

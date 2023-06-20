@@ -32,4 +32,4 @@ jobs:
       - name: E2E Tests
         run: ./docker/bin/run-e2e-tests.sh
         env:
-          TORRUST_IDX_BACK_E2E_EXCLUDE_AXUM_IMPL: "true"
+          TORRUST_IDX_BACK_E2E_EXCLUDE_ACTIX_WEB_IMPL: "true"

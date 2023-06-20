@@ -1,7 +1,10 @@
+use std::env;
+
 use torrust_index_backend::web::api;
 
 use crate::common::client::Client;
 use crate::common::contexts::settings::responses::{AllSettingsResponse, Public, PublicSettingsResponse, SiteNameResponse};
+use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL;
 use crate::e2e::contexts::user::steps::new_logged_in_admin;
 use crate::e2e::environment::TestEnv;
 
@@ -9,6 +12,12 @@ use crate::e2e::environment::TestEnv;
 async fn it_should_allow_guests_to_get_the_public_settings() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let response = client.get_public_settings().await;
@@ -34,6 +43,12 @@ async fn it_should_allow_guests_to_get_the_public_settings() {
 async fn it_should_allow_guests_to_get_the_site_name() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let response = client.get_site_name().await;
@@ -51,6 +66,11 @@ async fn it_should_allow_guests_to_get_the_site_name() {
 async fn it_should_allow_admins_to_get_all_the_settings() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
 
     let logged_in_admin = new_logged_in_admin(&env).await;
     let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
@@ -70,6 +90,11 @@ async fn it_should_allow_admins_to_get_all_the_settings() {
 async fn it_should_allow_admins_to_update_all_the_settings() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
 
     if !env.is_isolated() {
         // This test can't be executed in a non-isolated environment because
@@ -96,14 +121,12 @@ async fn it_should_allow_admins_to_update_all_the_settings() {
 }
 
 mod with_axum_implementation {
-    use std::env;
 
     use torrust_index_backend::web::api;
 
     use crate::common::asserts::assert_json_ok_response;
     use crate::common::client::Client;
     use crate::common::contexts::settings::responses::{AllSettingsResponse, Public, PublicSettingsResponse, SiteNameResponse};
-    use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
     use crate::e2e::contexts::user::steps::new_logged_in_admin;
     use crate::e2e::environment::TestEnv;
 
@@ -111,11 +134,6 @@ mod with_axum_implementation {
     async fn it_should_allow_guests_to_get_the_public_settings() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
@@ -142,11 +160,6 @@ mod with_axum_implementation {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
 
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
-
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
         let response = client.get_site_name().await;
@@ -162,11 +175,6 @@ mod with_axum_implementation {
     async fn it_should_allow_admins_to_get_all_the_settings() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         let logged_in_admin = new_logged_in_admin(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
@@ -184,11 +192,6 @@ mod with_axum_implementation {
     async fn it_should_allow_admins_to_update_all_the_settings() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         if !env.is_isolated() {
             // This test can't be executed in a non-isolated environment because

@@ -15,6 +15,8 @@ Get torrent info:
 */
 
 mod for_guests {
+    use std::env;
+
     use torrust_index_backend::utils::parse_torrent::decode_torrent;
     use torrust_index_backend::web::api;
 
@@ -26,6 +28,7 @@ mod for_guests {
         Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
     };
     use crate::common::http::{Query, QueryParam};
+    use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL;
     use crate::e2e::contexts::torrent::asserts::expected_torrent;
     use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
     use crate::e2e::contexts::user::steps::new_logged_in_user;
@@ -35,6 +38,11 @@ mod for_guests {
     async fn it_should_allow_guests_to_get_torrents() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::ActixWeb).await;
+
+        if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -58,6 +66,11 @@ mod for_guests {
     async fn it_should_allow_to_get_torrents_with_pagination() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::ActixWeb).await;
+
+        if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -88,6 +101,11 @@ mod for_guests {
     async fn it_should_allow_to_limit_the_number_of_torrents_per_request() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::ActixWeb).await;
+
+        if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -124,6 +142,11 @@ mod for_guests {
         let mut env = TestEnv::new();
         env.start(api::Implementation::ActixWeb).await;
 
+        if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
+
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
             return;
@@ -154,6 +177,11 @@ mod for_guests {
     async fn it_should_allow_guests_to_get_torrent_details_searching_by_info_hash() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::ActixWeb).await;
+
+        if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -218,6 +246,11 @@ mod for_guests {
         let mut env = TestEnv::new();
         env.start(api::Implementation::ActixWeb).await;
 
+        if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
+
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
             return;
@@ -243,6 +276,11 @@ mod for_guests {
         let mut env = TestEnv::new();
         env.start(api::Implementation::ActixWeb).await;
 
+        if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
+
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
             return;
@@ -263,6 +301,11 @@ mod for_guests {
         let mut env = TestEnv::new();
         env.start(api::Implementation::ActixWeb).await;
 
+        if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
+
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
             return;
@@ -281,6 +324,8 @@ mod for_guests {
 
 mod for_authenticated_users {
 
+    use std::env;
+
     use torrust_index_backend::utils::parse_torrent::decode_torrent;
     use torrust_index_backend::web::api;
 
@@ -288,6 +333,7 @@ mod for_authenticated_users {
     use crate::common::contexts::torrent::fixtures::random_torrent;
     use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
     use crate::common::contexts::torrent::responses::UploadedTorrentResponse;
+    use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL;
     use crate::e2e::contexts::torrent::asserts::{build_announce_url, get_user_tracker_key};
     use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
     use crate::e2e::contexts::user::steps::new_logged_in_user;
@@ -297,6 +343,11 @@ mod for_authenticated_users {
     async fn it_should_allow_authenticated_users_to_upload_new_torrents() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::ActixWeb).await;
+
+        if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -327,6 +378,11 @@ mod for_authenticated_users {
         let mut env = TestEnv::new();
         env.start(api::Implementation::ActixWeb).await;
 
+        if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
+
         let uploader = new_logged_in_user(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
 
@@ -345,6 +401,11 @@ mod for_authenticated_users {
     async fn it_should_not_allow_uploading_a_torrent_with_a_title_that_already_exists() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::ActixWeb).await;
+
+        if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -375,6 +436,11 @@ mod for_authenticated_users {
         let mut env = TestEnv::new();
         env.start(api::Implementation::ActixWeb).await;
 
+        if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
+
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
             return;
@@ -404,6 +470,11 @@ mod for_authenticated_users {
     async fn it_should_allow_authenticated_users_to_download_a_torrent_with_a_personal_announce_url() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::ActixWeb).await;
+
+        if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+            println!("Skipped");
+            return;
+        }
 
         if !env.provides_a_tracker() {
             println!("test skipped. It requires a tracker to be running.");
@@ -437,10 +508,13 @@ mod for_authenticated_users {
     }
 
     mod and_non_admins {
+        use std::env;
+
         use torrust_index_backend::web::api;
 
         use crate::common::client::Client;
         use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
+        use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL;
         use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
         use crate::e2e::contexts::user::steps::new_logged_in_user;
         use crate::e2e::environment::TestEnv;
@@ -449,6 +523,11 @@ mod for_authenticated_users {
         async fn it_should_not_allow_non_admins_to_delete_torrents() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::ActixWeb).await;
+
+            if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+                println!("Skipped");
+                return;
+            }
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -469,6 +548,11 @@ mod for_authenticated_users {
         async fn it_should_allow_non_admin_users_to_update_someone_elses_torrents() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::ActixWeb).await;
+
+            if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+                println!("Skipped");
+                return;
+            }
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -501,11 +585,14 @@ mod for_authenticated_users {
     }
 
     mod and_torrent_owners {
+        use std::env;
+
         use torrust_index_backend::web::api;
 
         use crate::common::client::Client;
         use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
         use crate::common::contexts::torrent::responses::UpdatedTorrentResponse;
+        use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL;
         use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
         use crate::e2e::contexts::user::steps::new_logged_in_user;
         use crate::e2e::environment::TestEnv;
@@ -514,6 +601,11 @@ mod for_authenticated_users {
         async fn it_should_allow_torrent_owners_to_update_their_torrents() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::ActixWeb).await;
+
+            if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+                println!("Skipped");
+                return;
+            }
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -549,11 +641,14 @@ mod for_authenticated_users {
     }
 
     mod and_admins {
+        use std::env;
+
         use torrust_index_backend::web::api;
 
         use crate::common::client::Client;
         use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
         use crate::common::contexts::torrent::responses::{DeletedTorrentResponse, UpdatedTorrentResponse};
+        use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL;
         use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
         use crate::e2e::contexts::user::steps::{new_logged_in_admin, new_logged_in_user};
         use crate::e2e::environment::TestEnv;
@@ -562,6 +657,11 @@ mod for_authenticated_users {
         async fn it_should_allow_admins_to_delete_torrents_searching_by_info_hash() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::ActixWeb).await;
+
+            if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+                println!("Skipped");
+                return;
+            }
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -586,6 +686,11 @@ mod for_authenticated_users {
         async fn it_should_allow_admins_to_update_someone_elses_torrents() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::ActixWeb).await;
+
+            if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+                println!("Skipped");
+                return;
+            }
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -626,8 +731,6 @@ mod with_axum_implementation {
 
     mod for_guests {
 
-        use std::env;
-
         use torrust_index_backend::utils::parse_torrent::decode_torrent;
         use torrust_index_backend::web::api;
 
@@ -639,7 +742,6 @@ mod with_axum_implementation {
             Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
         };
         use crate::common::http::{Query, QueryParam};
-        use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
         use crate::e2e::contexts::torrent::asserts::expected_torrent;
         use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
         use crate::e2e::contexts::user::steps::new_logged_in_user;
@@ -649,11 +751,6 @@ mod with_axum_implementation {
         async fn it_should_allow_guests_to_get_torrents() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
-
-            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                println!("Skipped");
-                return;
-            }
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -677,11 +774,6 @@ mod with_axum_implementation {
         async fn it_should_allow_to_get_torrents_with_pagination() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
-
-            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                println!("Skipped");
-                return;
-            }
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -712,11 +804,6 @@ mod with_axum_implementation {
         async fn it_should_allow_to_limit_the_number_of_torrents_per_request() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
-
-            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                println!("Skipped");
-                return;
-            }
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -753,11 +840,6 @@ mod with_axum_implementation {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
 
-            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                println!("Skipped");
-                return;
-            }
-
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
                 return;
@@ -788,11 +870,6 @@ mod with_axum_implementation {
         async fn it_should_allow_guests_to_get_torrent_details_searching_by_info_hash() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
-
-            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                println!("Skipped");
-                return;
-            }
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -857,11 +934,6 @@ mod with_axum_implementation {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
 
-            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                println!("Skipped");
-                return;
-            }
-
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
                 return;
@@ -887,11 +959,6 @@ mod with_axum_implementation {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
 
-            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                println!("Skipped");
-                return;
-            }
-
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
                 return;
@@ -912,11 +979,6 @@ mod with_axum_implementation {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
 
-            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                println!("Skipped");
-                return;
-            }
-
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
                 return;
@@ -935,8 +997,6 @@ mod with_axum_implementation {
 
     mod for_authenticated_users {
 
-        use std::env;
-
         use torrust_index_backend::utils::parse_torrent::decode_torrent;
         use torrust_index_backend::web::api;
 
@@ -945,7 +1005,6 @@ mod with_axum_implementation {
         use crate::common::contexts::torrent::fixtures::random_torrent;
         use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
         use crate::common::contexts::torrent::responses::UploadedTorrentResponse;
-        use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
         use crate::e2e::contexts::torrent::asserts::{build_announce_url, get_user_tracker_key};
         use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
         use crate::e2e::contexts::user::steps::new_logged_in_user;
@@ -955,11 +1014,6 @@ mod with_axum_implementation {
         async fn it_should_allow_authenticated_users_to_upload_new_torrents() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
-
-            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                println!("Skipped");
-                return;
-            }
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -990,11 +1044,6 @@ mod with_axum_implementation {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
 
-            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                println!("Skipped");
-                return;
-            }
-
             let uploader = new_logged_in_user(&env).await;
             let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
 
@@ -1013,11 +1062,6 @@ mod with_axum_implementation {
         async fn it_should_not_allow_uploading_a_torrent_with_a_title_that_already_exists() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
-
-            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                println!("Skipped");
-                return;
-            }
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -1046,11 +1090,6 @@ mod with_axum_implementation {
         async fn it_should_not_allow_uploading_a_torrent_with_a_info_hash_that_already_exists() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
-
-            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                println!("Skipped");
-                return;
-            }
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -1081,11 +1120,6 @@ mod with_axum_implementation {
         async fn it_should_allow_authenticated_users_to_download_a_torrent_with_a_personal_announce_url() {
             let mut env = TestEnv::new();
             env.start(api::Implementation::Axum).await;
-
-            if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                println!("Skipped");
-                return;
-            }
 
             if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
@@ -1120,13 +1154,10 @@ mod with_axum_implementation {
 
         mod and_non_admins {
 
-            use std::env;
-
             use torrust_index_backend::web::api;
 
             use crate::common::client::Client;
             use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
-            use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
             use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
             use crate::e2e::contexts::user::steps::new_logged_in_user;
             use crate::e2e::environment::TestEnv;
@@ -1135,11 +1166,6 @@ mod with_axum_implementation {
             async fn it_should_not_allow_non_admins_to_delete_torrents() {
                 let mut env = TestEnv::new();
                 env.start(api::Implementation::Axum).await;
-
-                if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                    println!("Skipped");
-                    return;
-                }
 
                 if !env.provides_a_tracker() {
                     println!("test skipped. It requires a tracker to be running.");
@@ -1160,11 +1186,6 @@ mod with_axum_implementation {
             async fn it_should_allow_non_admin_users_to_update_someone_elses_torrents() {
                 let mut env = TestEnv::new();
                 env.start(api::Implementation::Axum).await;
-
-                if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                    println!("Skipped");
-                    return;
-                }
 
                 if !env.provides_a_tracker() {
                     println!("test skipped. It requires a tracker to be running.");
@@ -1198,14 +1219,11 @@ mod with_axum_implementation {
 
         mod and_torrent_owners {
 
-            use std::env;
-
             use torrust_index_backend::web::api;
 
             use crate::common::client::Client;
             use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
             use crate::common::contexts::torrent::responses::UpdatedTorrentResponse;
-            use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
             use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
             use crate::e2e::contexts::user::steps::new_logged_in_user;
             use crate::e2e::environment::TestEnv;
@@ -1214,11 +1232,6 @@ mod with_axum_implementation {
             async fn it_should_allow_torrent_owners_to_update_their_torrents() {
                 let mut env = TestEnv::new();
                 env.start(api::Implementation::Axum).await;
-
-                if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                    println!("Skipped");
-                    return;
-                }
 
                 if !env.provides_a_tracker() {
                     println!("test skipped. It requires a tracker to be running.");
@@ -1255,14 +1268,11 @@ mod with_axum_implementation {
 
         mod and_admins {
 
-            use std::env;
-
             use torrust_index_backend::web::api;
 
             use crate::common::client::Client;
             use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
             use crate::common::contexts::torrent::responses::{DeletedTorrentResponse, UpdatedTorrentResponse};
-            use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
             use crate::e2e::contexts::torrent::steps::upload_random_torrent_to_index;
             use crate::e2e::contexts::user::steps::{new_logged_in_admin, new_logged_in_user};
             use crate::e2e::environment::TestEnv;
@@ -1271,11 +1281,6 @@ mod with_axum_implementation {
             async fn it_should_allow_admins_to_delete_torrents_searching_by_info_hash() {
                 let mut env = TestEnv::new();
                 env.start(api::Implementation::Axum).await;
-
-                if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                    println!("Skipped");
-                    return;
-                }
 
                 if !env.provides_a_tracker() {
                     println!("test skipped. It requires a tracker to be running.");
@@ -1300,11 +1305,6 @@ mod with_axum_implementation {
             async fn it_should_allow_admins_to_update_someone_elses_torrents() {
                 let mut env = TestEnv::new();
                 env.start(api::Implementation::Axum).await;
-
-                if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-                    println!("Skipped");
-                    return;
-                }
 
                 if !env.provides_a_tracker() {
                     println!("test skipped. It requires a tracker to be running.");

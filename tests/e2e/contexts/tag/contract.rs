@@ -1,4 +1,6 @@
 //! API contract for `tag` context.
+use std::env;
+
 use torrust_index_backend::web::api;
 
 use crate::common::asserts::assert_json_ok_response;
@@ -6,6 +8,7 @@ use crate::common::client::Client;
 use crate::common::contexts::tag::fixtures::random_tag_name;
 use crate::common::contexts::tag::forms::{AddTagForm, DeleteTagForm};
 use crate::common::contexts::tag::responses::{AddedTagResponse, DeletedTagResponse, ListResponse};
+use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL;
 use crate::e2e::contexts::tag::steps::{add_random_tag, add_tag};
 use crate::e2e::contexts::user::steps::{new_logged_in_admin, new_logged_in_user};
 use crate::e2e::environment::TestEnv;
@@ -14,6 +17,12 @@ use crate::e2e::environment::TestEnv;
 async fn it_should_return_an_empty_tag_list_when_there_are_no_tags() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let response = client.get_tags().await;
@@ -25,6 +34,12 @@ async fn it_should_return_an_empty_tag_list_when_there_are_no_tags() {
 async fn it_should_return_a_tag_list() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     // Add a tag
@@ -50,6 +65,12 @@ async fn it_should_return_a_tag_list() {
 async fn it_should_not_allow_adding_a_new_tag_to_unauthenticated_users() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let response = client
@@ -65,6 +86,11 @@ async fn it_should_not_allow_adding_a_new_tag_to_unauthenticated_users() {
 async fn it_should_not_allow_adding_a_new_tag_to_non_admins() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
 
     let logged_non_admin = new_logged_in_user(&env).await;
 
@@ -83,6 +109,11 @@ async fn it_should_not_allow_adding_a_new_tag_to_non_admins() {
 async fn it_should_allow_admins_to_add_new_tags() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
 
     let logged_in_admin = new_logged_in_admin(&env).await;
     let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
@@ -111,6 +142,11 @@ async fn it_should_allow_adding_duplicated_tags() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
 
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     // Add a tag
     let random_tag_name = random_tag_name();
     let response = add_tag(&random_tag_name, &env).await;
@@ -128,6 +164,11 @@ async fn it_should_allow_adding_a_tag_with_an_empty_name() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
 
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let empty_tag_name = String::new();
     let response = add_tag(&empty_tag_name, &env).await;
     assert_eq!(response.status, 200);
@@ -137,6 +178,11 @@ async fn it_should_allow_adding_a_tag_with_an_empty_name() {
 async fn it_should_allow_admins_to_delete_tags() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
 
     let logged_in_admin = new_logged_in_admin(&env).await;
     let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
@@ -159,6 +205,11 @@ async fn it_should_not_allow_non_admins_to_delete_tags() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
 
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let logged_in_non_admin = new_logged_in_user(&env).await;
     let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_non_admin.token);
 
@@ -173,6 +224,12 @@ async fn it_should_not_allow_non_admins_to_delete_tags() {
 async fn it_should_not_allow_guests_to_delete_tags() {
     let mut env = TestEnv::new();
     env.start(api::Implementation::ActixWeb).await;
+
+    if env::var(ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL).is_ok() {
+        println!("Skipped");
+        return;
+    }
+
     let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
     let (tag_id, _tag_name) = add_random_tag(&env).await;
@@ -183,7 +240,6 @@ async fn it_should_not_allow_guests_to_delete_tags() {
 }
 
 mod with_axum_implementation {
-    use std::env;
 
     use torrust_index_backend::web::api;
 
@@ -193,7 +249,6 @@ mod with_axum_implementation {
     use crate::common::contexts::tag::fixtures::random_tag_name;
     use crate::common::contexts::tag::forms::{AddTagForm, DeleteTagForm};
     use crate::common::contexts::tag::responses::ListResponse;
-    use crate::e2e::config::ENV_VAR_E2E_EXCLUDE_AXUM_IMPL;
     use crate::e2e::contexts::tag::steps::{add_random_tag, add_tag};
     use crate::e2e::contexts::user::steps::{new_logged_in_admin, new_logged_in_user};
     use crate::e2e::environment::TestEnv;
@@ -202,11 +257,6 @@ mod with_axum_implementation {
     async fn it_should_return_an_empty_tag_list_when_there_are_no_tags() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
@@ -219,11 +269,6 @@ mod with_axum_implementation {
     async fn it_should_return_a_tag_list() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
@@ -251,11 +296,6 @@ mod with_axum_implementation {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
 
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
-
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
         let response = client
@@ -271,11 +311,6 @@ mod with_axum_implementation {
     async fn it_should_not_allow_adding_a_new_tag_to_non_admins() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         let logged_non_admin = new_logged_in_user(&env).await;
 
@@ -294,11 +329,6 @@ mod with_axum_implementation {
     async fn it_should_allow_admins_to_add_new_tags() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         let logged_in_admin = new_logged_in_admin(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
@@ -321,11 +351,6 @@ mod with_axum_implementation {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
 
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
-
         // Add a tag
         let random_tag_name = random_tag_name();
         let response = add_tag(&random_tag_name, &env).await;
@@ -343,11 +368,6 @@ mod with_axum_implementation {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
 
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
-
         let empty_tag_name = String::new();
         let response = add_tag(&empty_tag_name, &env).await;
         assert_eq!(response.status, 200);
@@ -357,11 +377,6 @@ mod with_axum_implementation {
     async fn it_should_allow_admins_to_delete_tags() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         let logged_in_admin = new_logged_in_admin(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
@@ -378,11 +393,6 @@ mod with_axum_implementation {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
 
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
-
         let logged_in_non_admin = new_logged_in_user(&env).await;
         let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_non_admin.token);
 
@@ -397,11 +407,6 @@ mod with_axum_implementation {
     async fn it_should_not_allow_guests_to_delete_tags() {
         let mut env = TestEnv::new();
         env.start(api::Implementation::Axum).await;
-
-        if env::var(ENV_VAR_E2E_EXCLUDE_AXUM_IMPL).is_ok() {
-            println!("Skipped");
-            return;
-        }
 
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
