@@ -1,7 +1,7 @@
 use tempfile::TempDir;
 use torrust_index_backend::config;
 use torrust_index_backend::config::FREE_PORT;
-use torrust_index_backend::web::api::Implementation;
+use torrust_index_backend::web::api::Version;
 
 use super::app_starter::AppStarter;
 use crate::common::random;
@@ -16,9 +16,9 @@ pub struct TestEnv {
 
 impl TestEnv {
     /// Provides a running app instance for integration tests.
-    pub async fn running(api_implementation: Implementation) -> Self {
+    pub async fn running(api_version: Version) -> Self {
         let mut env = Self::default();
-        env.start(api_implementation).await;
+        env.start(api_version).await;
         env
     }
 
@@ -40,8 +40,8 @@ impl TestEnv {
     }
 
     /// Starts the app.
-    pub async fn start(&mut self, api_implementation: Implementation) {
-        self.app_starter.start(api_implementation).await;
+    pub async fn start(&mut self, api_version: Version) {
+        self.app_starter.start(api_version).await;
     }
 
     /// Provides the whole server configuration.

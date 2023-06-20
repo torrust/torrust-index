@@ -4,7 +4,7 @@
 
 use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::upgrader::run;
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() {
     run().await;
 }

@@ -1,10 +1,8 @@
 use std::borrow::Cow;
 use std::error;
 
-use actix_web::http::{header, StatusCode};
-use actix_web::{HttpResponse, HttpResponseBuilder, ResponseError};
 use derive_more::{Display, Error};
-use serde::{Deserialize, Serialize};
+use hyper::StatusCode;
 
 use crate::databases::database;
 
@@ -138,28 +136,6 @@ pub enum ServiceError {
     #[display(fmt = "Database error.")]
     DatabaseError,
 }
-
-// Begin ActixWeb error handling
-// todo: remove after migration to Axum
-
-#[derive(Serialize, Deserialize)]
-pub struct ErrorToResponse {
-    pub error: String,
-}
-
-impl ResponseError for ServiceError {
-    fn status_code(&self) -> StatusCode {
-        http_status_code_for_service_error(self)
-    }
-
-    fn error_response(&self) -> HttpResponse {
-        HttpResponseBuilder::new(self.status_code())
-            .append_header((header::CONTENT_TYPE, "application/json; charset=UTF-8"))
-            .body(serde_json::to_string(&ErrorToResponse { error: self.to_string() }).unwrap())
-    }
-}
-
-// End ActixWeb error handling
 
 impl From<sqlx::Error> for ServiceError {
     fn from(e: sqlx::Error) -> Self {

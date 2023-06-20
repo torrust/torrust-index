@@ -1,17 +1,15 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use actix_cors::Cors;
-use actix_web::{middleware, web, App, HttpServer};
+use futures::Future;
 use log::info;
 use tokio::sync::oneshot::{self, Sender};
 
-use super::Running;
+use super::v1::routes::router;
+use super::{Running, ServerStartedMessage};
 use crate::common::AppData;
-use crate::routes;
-use crate::web::api::ServerStartedMessage;
 
-/// Starts the API server with `ActixWeb`.
+/// Starts the API server.
 ///
 /// # Panics
 ///
@@ -27,9 +25,11 @@ pub async fn start(app_data: Arc<AppData>, net_ip: &str, net_port: u16) -> Runni
     let join_handle = tokio::spawn(async move {
         info!("Starting API server with net config: {} ...", config_socket_addr);
 
-        let server_future = start_server(config_socket_addr, app_data.clone(), tx);
+        let handle = start_server(config_socket_addr, app_data.clone(), tx);
 
-        let _ = server_future.await;
+        if let Ok(()) = handle.await {
+            info!("API server stopped");
+        }
 
         Ok(())
     });
@@ -40,12 +40,9 @@ pub async fn start(app_data: Arc<AppData>, net_ip: &str, net_port: u16) -> Runni
         Err(e) => panic!("API server start. The API server was dropped: {e}"),
     };
 
-    info!("API server started");
-
     Running {
         socket_addr: bound_addr,
-        actix_web_api_server: Some(join_handle),
-        axum_api_server: None,
+        api_server: Some(join_handle),
     }
 }
 
@@ -53,23 +50,26 @@ fn start_server(
     config_socket_addr: SocketAddr,
     app_data: Arc<AppData>,
     tx: Sender<ServerStartedMessage>,
-) -> actix_web::dev::Server {
-    let server = HttpServer::new(move || {
-        App::new()
-            .wrap(Cors::permissive())
-            .app_data(web::Data::new(app_data.clone()))
-            .wrap(middleware::Logger::default())
-            .configure(routes::init)
-    })
-    .bind(config_socket_addr)
-    .expect("can't bind server to socket address");
+) -> impl Future<Output = hyper::Result<()>> {
+    let tcp_listener = std::net::TcpListener::bind(config_socket_addr).expect("tcp listener to bind to a socket address");
 
-    let bound_addr = server.addrs()[0];
+    let bound_addr = tcp_listener
+        .local_addr()
+        .expect("tcp listener to be bound to a socket address.");
 
     info!("API server listening on http://{}", bound_addr);
+
+    let app = router(app_data);
+
+    let server = axum::Server::from_tcp(tcp_listener)
+        .expect("a new server from the previously created tcp listener.")
+        .serve(app.into_make_service_with_connect_info::<SocketAddr>());
 
     tx.send(ServerStartedMessage { socket_addr: bound_addr })
         .expect("the API server should not be dropped");
 
-    server.run()
+    server.with_graceful_shutdown(async move {
+        tokio::signal::ctrl_c().await.expect("Failed to listen to shutdown signal.");
+        info!("Stopping API server on http://{} ...", bound_addr);
+    })
 }

@@ -50,7 +50,7 @@
 //! max_password_length = 64
 //! ```
 //!
-//! Refer to the [`RegistrationForm`](crate::routes::user::RegistrationForm)
+//! Refer to the [`RegistrationForm`](crate::web::api::v1::contexts::user::forms::RegistrationForm)
 //! struct for more information about the registration form.
 //!
 //! **Example request**
@@ -97,8 +97,8 @@
 //! `login` | `String` | The password  | Yes | `indexadmin`
 //! `password` | `String` | The password  | Yes | `BenoitMandelbrot1924`
 //!
-//! Refer to the [`RegistrationForm`](crate::routes::user::Login)
-//! struct for more information about the registration form.
+//! Refer to the [`LoginForm`](crate::web::api::v1::contexts::user::forms::LoginForm)
+//! struct for more information about the login form.
 //!
 //! **Example request**
 //!
@@ -125,8 +125,8 @@
 //! ---|---|---|---|---
 //! `token` | `String` | The token you want to verify  | Yes | `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI`
 //!
-//! Refer to the [`Token`](crate::routes::user::Token)
-//! struct for more information about the registration form.
+//! Refer to the [`JsonWebToken`](crate::web::api::v1::contexts::user::forms::JsonWebToken)
+//! struct for more information about the token.
 //!
 //! **Example request**
 //!
@@ -171,8 +171,8 @@
 //! ---|---|---|---|---
 //! `token` | `String` | The current valid token | Yes | `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI`
 //!
-//! Refer to the [`Token`](crate::routes::user::Token)
-//! struct for more information about the registration form.
+//! Refer to the [`JsonWebToken`](crate::web::api::v1::contexts::user::forms::JsonWebToken)
+//! struct for more information about the token.
 //!
 //! **Example request**
 //!

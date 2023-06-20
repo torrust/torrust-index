@@ -19,18 +19,17 @@ use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbU
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::web::api::v1::auth::Authentication;
-use crate::web::api::{start, Implementation};
+use crate::web::api::{start, Version};
 use crate::{mailer, tracker};
 
 pub struct Running {
     pub api_socket_addr: SocketAddr,
-    pub actix_web_api_server: Option<JoinHandle<std::result::Result<(), std::io::Error>>>,
-    pub axum_api_server: Option<JoinHandle<std::result::Result<(), std::io::Error>>>,
+    pub api_server: Option<JoinHandle<std::result::Result<(), std::io::Error>>>,
     pub tracker_data_importer_handle: tokio::task::JoinHandle<()>,
 }
 
 #[allow(clippy::too_many_lines)]
-pub async fn run(configuration: Configuration, api_implementation: &Implementation) -> Running {
+pub async fn run(configuration: Configuration, api_version: &Version) -> Running {
     let log_level = configuration.settings.read().await.log_level.clone();
 
     logging::setup(&log_level);
@@ -167,12 +166,11 @@ pub async fn run(configuration: Configuration, api_implementation: &Implementati
 
     // Start API server
 
-    let running_api = start(app_data, &net_ip, net_port, api_implementation).await;
+    let running_api = start(app_data, &net_ip, net_port, api_version).await;
 
     Running {
         api_socket_addr: running_api.socket_addr,
-        actix_web_api_server: running_api.actix_web_api_server,
-        axum_api_server: running_api.axum_api_server,
+        api_server: running_api.api_server,
         tracker_data_importer_handle: tracker_statistics_importer_handle,
     }
 }

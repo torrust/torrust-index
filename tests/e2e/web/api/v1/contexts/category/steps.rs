@@ -3,8 +3,8 @@ use crate::common::contexts::category::fixtures::random_category_name;
 use crate::common::contexts::category::forms::AddCategoryForm;
 use crate::common::contexts::category::responses::AddedCategoryResponse;
 use crate::common::responses::TextResponse;
-use crate::e2e::contexts::user::steps::new_logged_in_admin;
 use crate::e2e::environment::TestEnv;
+use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_admin;
 
 /// Add a random category and return its name.
 pub async fn add_random_category(env: &TestEnv) -> String {

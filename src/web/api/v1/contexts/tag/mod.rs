@@ -41,7 +41,7 @@
 //! ```
 //! **Resource**
 //!
-//! Refer to the [`Tag`](crate::databases::database::Tag)
+//! Refer to the [`Tag`](crate::models::torrent_tag::TorrentTag)
 //! struct for more information about the response attributes.
 //!
 //! # Add a tag
