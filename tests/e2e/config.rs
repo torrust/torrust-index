@@ -14,8 +14,8 @@ pub const ENV_VAR_E2E_SHARED: &str = "TORRUST_IDX_BACK_E2E_SHARED";
 /// The whole `config.toml` file content. It has priority over the config file.
 pub const ENV_VAR_E2E_CONFIG: &str = "TORRUST_IDX_BACK_E2E_CONFIG";
 
-/// If present, E2E tests for new Axum implementation will not be executed
-pub const ENV_VAR_E2E_EXCLUDE_AXUM_IMPL: &str = "TORRUST_IDX_BACK_E2E_EXCLUDE_AXUM_IMPL";
+/// If present, E2E tests for new `ActixWeb` implementation will not be executed
+pub const ENV_VAR_E2E_EXCLUDE_ACTIX_WEB_IMPL: &str = "TORRUST_IDX_BACK_E2E_EXCLUDE_ACTIX_WEB_IMPL";
 
 // Default values
 

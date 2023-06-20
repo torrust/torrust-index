@@ -6,11 +6,7 @@ use torrust_index_backend::web::api::Implementation;
 async fn main() -> Result<(), std::io::Error> {
     let configuration = init_configuration().await;
 
-    // todo: we are migrating from actix-web to axum, so we need to keep both
-    // implementations for a while. For production we only use ActixWeb.
-    // Once the Axum implementation is finished and stable, we can switch to it
-    // and remove the ActixWeb implementation.
-    let api_implementation = Implementation::ActixWeb;
+    let api_implementation = Implementation::Axum;
 
     let app = app::run(configuration, &api_implementation).await;
 
