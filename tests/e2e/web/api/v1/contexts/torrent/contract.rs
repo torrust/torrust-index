@@ -468,7 +468,7 @@ mod for_authenticated_users {
         }
 
         #[tokio::test]
-        async fn it_should_allow_non_admin_users_to_update_someone_elses_torrents() {
+        async fn it_should_not_allow_non_admin_users_to_update_someone_elses_torrents() {
             let mut env = TestEnv::new();
             env.start(api::Version::V1).await;
 
@@ -494,6 +494,8 @@ mod for_authenticated_users {
                     UpdateTorrentFrom {
                         title: Some(new_title.clone()),
                         description: Some(new_description.clone()),
+                        category: None,
+                        tags: None,
                     },
                 )
                 .await;
@@ -537,6 +539,8 @@ mod for_authenticated_users {
                     UpdateTorrentFrom {
                         title: Some(new_title.clone()),
                         description: Some(new_description.clone()),
+                        category: None,
+                        tags: None,
                     },
                 )
                 .await;
@@ -611,6 +615,8 @@ mod for_authenticated_users {
                     UpdateTorrentFrom {
                         title: Some(new_title.clone()),
                         description: Some(new_description.clone()),
+                        category: None,
+                        tags: None,
                     },
                 )
                 .await;

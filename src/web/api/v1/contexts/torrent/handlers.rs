@@ -156,6 +156,7 @@ pub async fn update_torrent_info_handler(
             &info_hash,
             &update_torrent_info_form.title,
             &update_torrent_info_form.description,
+            &update_torrent_info_form.category,
             &update_torrent_info_form.tags,
             &user_id,
         )

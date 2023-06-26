@@ -241,6 +241,8 @@
 //! ---|---|---|---|---
 //! `title` | `Option<String>` | The torrent title | No | `MandelbrotSet`
 //! `description` | `Option<String>` | The torrent description  | No | `MandelbrotSet image`
+//! `category` | `Option<CategoryId>` | The torrent category ID  | No | `1`
+//! `tags` | `Option<Vec<TagId>>` | The tag Id list  | No | `[1,2,3]`
 //!
 //!
 //! Refer to the [`UpdateTorrentInfoForm`](crate::web::api::v1::contexts::torrent::forms::UpdateTorrentInfoForm)

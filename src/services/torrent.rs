@@ -8,6 +8,7 @@ use super::user::DbUserRepository;
 use crate::config::Configuration;
 use crate::databases::database::{Category, Database, Error, Sorting};
 use crate::errors::ServiceError;
+use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::{DeletedTorrentResponse, TorrentResponse, TorrentsResponse};
 use crate::models::torrent::{AddTorrentRequest, TorrentId, TorrentListing};
@@ -358,6 +359,7 @@ impl Index {
         info_hash: &InfoHash,
         title: &Option<String>,
         description: &Option<String>,
+        category_id: &Option<CategoryId>,
         tags: &Option<Vec<TagId>>,
         user_id: &UserId,
     ) -> Result<TorrentResponse, ServiceError> {
@@ -372,7 +374,7 @@ impl Index {
         }
 
         self.torrent_info_repository
-            .update(&torrent_listing.torrent_id, title, description, tags)
+            .update(&torrent_listing.torrent_id, title, description, category_id, tags)
             .await?;
 
         let torrent_listing = self
@@ -473,6 +475,7 @@ impl DbTorrentInfoRepository {
         torrent_id: &TorrentId,
         opt_title: &Option<String>,
         opt_description: &Option<String>,
+        opt_category_id: &Option<CategoryId>,
         opt_tags: &Option<Vec<TagId>>,
     ) -> Result<(), Error> {
         if let Some(title) = &opt_title {
@@ -481,6 +484,10 @@ impl DbTorrentInfoRepository {
 
         if let Some(description) = &opt_description {
             self.database.update_torrent_description(*torrent_id, description).await?;
+        }
+
+        if let Some(category_id) = &opt_category_id {
+            self.database.update_torrent_category(*torrent_id, *category_id).await?;
         }
 
         if let Some(tags) = opt_tags {

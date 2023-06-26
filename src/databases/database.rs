@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::databases::mysql::Mysql;
 use crate::databases::sqlite::Sqlite;
+use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
@@ -232,6 +233,9 @@ pub trait Database: Sync + Send {
 
     /// Update a torrent's description with `torrent_id` and `description`.
     async fn update_torrent_description(&self, torrent_id: i64, description: &str) -> Result<(), Error>;
+
+    /// Update a torrent's category with `torrent_id` and `category_id`.
+    async fn update_torrent_category(&self, torrent_id: i64, category_id: CategoryId) -> Result<(), Error>;
 
     /// Add a new tag.
     async fn add_tag(&self, name: &str) -> Result<(), Error>;

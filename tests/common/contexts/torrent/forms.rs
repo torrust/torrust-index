@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 pub struct UpdateTorrentFrom {
     pub title: Option<String>,
     pub description: Option<String>,
+    pub category: Option<i64>,
+    pub tags: Option<Vec<i64>>,
 }
 
 use reqwest::multipart::Form;
