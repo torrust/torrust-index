@@ -21,7 +21,7 @@ pub async fn migrate_target_database(target_database: Arc<SqliteDatabaseV2_0_0>)
     target_database.migrate().await;
 }
 
-pub async fn reset_target_database(target_database: Arc<SqliteDatabaseV2_0_0>) {
+pub async fn truncate_target_database(target_database: Arc<SqliteDatabaseV2_0_0>) {
     println!("Truncating all tables in target database ...");
     target_database
         .delete_all_database_rows()

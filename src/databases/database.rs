@@ -13,6 +13,27 @@ use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
 
+/// Database tables to be truncated when upgrading from v1.0.0 to v2.0.0.
+/// They must be in the correct order to avoid foreign key errors.
+pub const TABLES_TO_TRUNCATE: &[&str] = &[
+    "torrust_torrent_announce_urls",
+    "torrust_torrent_files",
+    "torrust_torrent_info",
+    "torrust_torrent_tag_links",
+    "torrust_torrent_tracker_stats",
+    "torrust_torrents",
+    "torrust_tracker_keys",
+    "torrust_user_authentication",
+    "torrust_user_bans",
+    "torrust_user_invitation_uses",
+    "torrust_user_invitations",
+    "torrust_user_profiles",
+    "torrust_user_public_keys",
+    "torrust_users",
+    "torrust_categories",
+    "torrust_torrent_tags",
+];
+
 /// Database drivers.
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub enum Driver {
