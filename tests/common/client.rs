@@ -3,7 +3,6 @@ use serde::Serialize;
 
 use super::connection_info::ConnectionInfo;
 use super::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
-use super::contexts::settings::form::UpdateSettings;
 use super::contexts::tag::forms::{AddTagForm, DeleteTagForm};
 use super::contexts::torrent::forms::UpdateTorrentFrom;
 use super::contexts::torrent::requests::InfoHash;
@@ -17,8 +16,7 @@ pub struct Client {
 }
 
 impl Client {
-    // todo: forms in POST requests can be passed by reference. It's already
-    // changed for the `update_settings` method.
+    // todo: forms in POST requests can be passed by reference.
 
     fn base_path() -> String {
         "/v1".to_string()
@@ -102,10 +100,6 @@ impl Client {
 
     pub async fn get_settings(&self) -> TextResponse {
         self.http_client.get("/settings", Query::empty()).await
-    }
-
-    pub async fn update_settings(&self, update_settings_form: &UpdateSettings) -> TextResponse {
-        self.http_client.post("/settings", &update_settings_form).await
     }
 
     // Context: torrent

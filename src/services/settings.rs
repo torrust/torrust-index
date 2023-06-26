@@ -37,25 +37,6 @@ impl Service {
         Ok(self.configuration.get_all().await)
     }
 
-    /// It updates all the settings.
-    ///
-    /// # Errors
-    ///
-    /// It returns an error if the user does not have the required permissions.
-    pub async fn update_all(&self, torrust_backend: TorrustBackend, user_id: &UserId) -> Result<TorrustBackend, ServiceError> {
-        let user = self.user_repository.get_compact(user_id).await?;
-
-        // Check if user is administrator
-        // todo: extract authorization service
-        if !user.administrator {
-            return Err(ServiceError::Unauthorized);
-        }
-
-        let _ = self.configuration.update_settings(torrust_backend).await;
-
-        Ok(self.configuration.get_all().await)
-    }
-
     /// It gets only the public settings.
     ///
     /// # Errors
