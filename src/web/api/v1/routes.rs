@@ -1,13 +1,14 @@
 //! Route initialization for the v1 API.
+use std::env;
 use std::sync::Arc;
 
 use axum::routing::get;
 use axum::Router;
+use tower_http::cors::CorsLayer;
 
 use super::contexts::about::handlers::about_page_handler;
-//use tower_http::cors::CorsLayer;
-use super::contexts::{about, proxy, settings, tag, torrent};
-use super::contexts::{category, user};
+use super::contexts::{about, category, proxy, settings, tag, torrent, user};
+use crate::bootstrap::config::ENV_VAR_CORS_PERMISSIVE;
 use crate::common::AppData;
 
 pub const API_VERSION_URL_PREFIX: &str = "v1";
@@ -30,14 +31,13 @@ pub fn router(app_data: Arc<AppData>) -> Router {
         .nest("/torrents", torrent::routes::router_for_multiple_resources(app_data.clone()))
         .nest("/proxy", proxy::routes::router(app_data.clone()));
 
-    Router::new()
+    let router = Router::new()
         .route("/", get(about_page_handler).with_state(app_data))
-        .nest(&format!("/{API_VERSION_URL_PREFIX}"), v1_api_routes)
-    // For development purposes only.
-    //
-    //.layer(CorsLayer::permissive()) // Uncomment this line and the `use` import.
-    //
-    // It allows calling the API on a different port. For example
-    // API: http://localhost:3000/v1
-    // Webapp: http://localhost:8080
+        .nest(&format!("/{API_VERSION_URL_PREFIX}"), v1_api_routes);
+
+    if env::var(ENV_VAR_CORS_PERMISSIVE).is_ok() {
+        router.layer(CorsLayer::permissive())
+    } else {
+        router
+    }
 }
