@@ -8,6 +8,7 @@ use sqlx::{query, query_as, Acquire, ConnectOptions, MySqlPool};
 
 use crate::databases::database;
 use crate::databases::database::{Category, Database, Driver, Sorting, TorrentCompact};
+use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
@@ -691,6 +692,22 @@ impl Database for Mysql {
     async fn update_torrent_description(&self, torrent_id: i64, description: &str) -> Result<(), database::Error> {
         query("UPDATE torrust_torrent_info SET description = ? WHERE torrent_id = ?")
             .bind(description)
+            .bind(torrent_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|_| database::Error::Error)
+            .and_then(|v| {
+                if v.rows_affected() > 0 {
+                    Ok(())
+                } else {
+                    Err(database::Error::TorrentNotFound)
+                }
+            })
+    }
+
+    async fn update_torrent_category(&self, torrent_id: i64, category_id: CategoryId) -> Result<(), database::Error> {
+        query("UPDATE torrust_torrents SET category_id = ? WHERE torrent_id = ?")
+            .bind(category_id)
             .bind(torrent_id)
             .execute(&self.pool)
             .await

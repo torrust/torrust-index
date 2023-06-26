@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use hyper::StatusCode;
 use log::error;
 use serde::{Deserialize, Serialize};
 
@@ -139,10 +140,23 @@ impl Service {
             .await
             .map_err(|_| ServiceError::InternalServerError)?;
 
-        if let Ok(torrent_info) = response.json::<TorrentInfo>().await {
-            Ok(torrent_info)
+        if response.status() == StatusCode::NOT_FOUND {
+            return Err(ServiceError::TorrentNotFound);
+        }
+
+        let body = response.text().await;
+
+        if let Ok(body) = body {
+            let torrent_info = serde_json::from_str(&body);
+
+            if let Ok(torrent_info) = torrent_info {
+                Ok(torrent_info)
+            } else {
+                error!("Failed to parse torrent info from tracker response");
+                Err(ServiceError::InternalServerError)
+            }
         } else {
-            error!("Failed to parse torrent info from tracker response");
+            error!("Tracker API response without body");
             Err(ServiceError::InternalServerError)
         }
     }
