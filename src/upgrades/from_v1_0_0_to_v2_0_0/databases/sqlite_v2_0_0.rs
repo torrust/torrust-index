@@ -6,7 +6,7 @@ use sqlx::sqlite::{SqlitePoolOptions, SqliteQueryResult};
 use sqlx::{query, query_as, SqlitePool};
 
 use super::sqlite_v1_0_0::{TorrentRecordV1, UserRecordV1};
-use crate::databases::database;
+use crate::databases::database::{self, TABLES_TO_TRUNCATE};
 use crate::models::torrent_file::{TorrentFile, TorrentInfo};
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -261,34 +261,12 @@ impl SqliteDatabaseV2_0_0 {
 
     #[allow(clippy::missing_panics_doc)]
     pub async fn delete_all_database_rows(&self) -> Result<(), database::Error> {
-        query("DELETE FROM torrust_categories").execute(&self.pool).await.unwrap();
-
-        query("DELETE FROM torrust_torrents").execute(&self.pool).await.unwrap();
-
-        query("DELETE FROM torrust_tracker_keys").execute(&self.pool).await.unwrap();
-
-        query("DELETE FROM torrust_users").execute(&self.pool).await.unwrap();
-
-        query("DELETE FROM torrust_user_authentication")
-            .execute(&self.pool)
-            .await
-            .unwrap();
-
-        query("DELETE FROM torrust_user_bans").execute(&self.pool).await.unwrap();
-
-        query("DELETE FROM torrust_user_invitations")
-            .execute(&self.pool)
-            .await
-            .unwrap();
-
-        query("DELETE FROM torrust_user_profiles").execute(&self.pool).await.unwrap();
-
-        query("DELETE FROM torrust_torrents").execute(&self.pool).await.unwrap();
-
-        query("DELETE FROM torrust_user_public_keys")
-            .execute(&self.pool)
-            .await
-            .unwrap();
+        for table in TABLES_TO_TRUNCATE {
+            query(&format!("DELETE FROM {table};"))
+                .execute(&self.pool)
+                .await
+                .expect("table {table} should be deleted");
+        }
 
         Ok(())
     }

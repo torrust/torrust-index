@@ -52,7 +52,7 @@ use std::time::SystemTime;
 use chrono::prelude::{DateTime, Utc};
 use text_colorizer::Colorize;
 
-use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::{current_db, migrate_target_database, new_db, reset_target_database};
+use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::{current_db, migrate_target_database, new_db, truncate_target_database};
 use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrers::category_transferrer::transfer_categories;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrers::torrent_transferrer::transfer_torrents;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::transferrers::tracker_key_transferrer::transfer_tracker_keys;
@@ -120,7 +120,7 @@ pub async fn upgrade(args: &Arguments, date_imported: &str) {
     println!("Upgrading data from version v1.0.0 to v2.0.0 ...");
 
     migrate_target_database(target_database.clone()).await;
-    reset_target_database(target_database.clone()).await;
+    truncate_target_database(target_database.clone()).await;
 
     transfer_categories(source_database.clone(), target_database.clone()).await;
     transfer_users(source_database.clone(), target_database.clone(), date_imported).await;

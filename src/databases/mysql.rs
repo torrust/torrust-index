@@ -6,6 +6,7 @@ use chrono::NaiveDateTime;
 use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions};
 use sqlx::{query, query_as, Acquire, ConnectOptions, MySqlPool};
 
+use super::database::TABLES_TO_TRUNCATE;
 use crate::databases::database;
 use crate::databases::database::{Category, Database, Driver, Sorting, TorrentCompact};
 use crate::models::category::CategoryId;
@@ -852,55 +853,12 @@ impl Database for Mysql {
     }
 
     async fn delete_all_database_rows(&self) -> Result<(), database::Error> {
-        query("DELETE FROM torrust_categories;")
-            .execute(&self.pool)
-            .await
-            .map_err(|_| database::Error::Error)?;
-
-        query("DELETE FROM torrust_torrents;")
-            .execute(&self.pool)
-            .await
-            .map_err(|_| database::Error::Error)?;
-
-        query("DELETE FROM torrust_tracker_keys;")
-            .execute(&self.pool)
-            .await
-            .map_err(|_| database::Error::Error)?;
-
-        query("DELETE FROM torrust_users;")
-            .execute(&self.pool)
-            .await
-            .map_err(|_| database::Error::Error)?;
-
-        query("DELETE FROM torrust_user_authentication;")
-            .execute(&self.pool)
-            .await
-            .map_err(|_| database::Error::Error)?;
-
-        query("DELETE FROM torrust_user_bans;")
-            .execute(&self.pool)
-            .await
-            .map_err(|_| database::Error::Error)?;
-
-        query("DELETE FROM torrust_user_invitations;")
-            .execute(&self.pool)
-            .await
-            .map_err(|_| database::Error::Error)?;
-
-        query("DELETE FROM torrust_user_profiles;")
-            .execute(&self.pool)
-            .await
-            .map_err(|_| database::Error::Error)?;
-
-        query("DELETE FROM torrust_torrents;")
-            .execute(&self.pool)
-            .await
-            .map_err(|_| database::Error::Error)?;
-
-        query("DELETE FROM torrust_user_public_keys;")
-            .execute(&self.pool)
-            .await
-            .map_err(|_| database::Error::Error)?;
+        for table in TABLES_TO_TRUNCATE {
+            query(&format!("DELETE FROM {table};"))
+                .execute(&self.pool)
+                .await
+                .map_err(|_| database::Error::Error)?;
+        }
 
         Ok(())
     }
