@@ -372,34 +372,6 @@ impl Configuration {
         fs::write(config_path, toml_string).expect("Could not write to file!");
     }
 
-    /// Update the settings file based upon a supplied `new_settings`.
-    ///
-    /// # Errors
-    ///
-    /// Todo: Make an error if the save fails.
-    ///
-    /// # Panics
-    ///
-    /// Will panic if the configuration file path is not defined. That happens
-    /// when the configuration was loaded from the environment variable.
-    pub async fn update_settings(&self, new_settings: TorrustBackend) -> Result<(), ()> {
-        match &self.config_path {
-            Some(config_path) => {
-                let mut settings = self.settings.write().await;
-                *settings = new_settings;
-
-                drop(settings);
-
-                let _ = self.save_to_file(config_path).await;
-
-                Ok(())
-            }
-            None => panic!(
-                "Cannot update settings when the config file path is not defined. For example: when it's loaded from env var."
-            ),
-        }
-    }
-
     pub async fn get_all(&self) -> TorrustBackend {
         let settings_lock = self.settings.read().await;
 

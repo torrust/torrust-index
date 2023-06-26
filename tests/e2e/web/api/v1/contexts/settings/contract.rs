@@ -65,30 +65,3 @@ async fn it_should_allow_admins_to_get_all_the_settings() {
 
     assert_json_ok_response(&response);
 }
-
-#[tokio::test]
-async fn it_should_allow_admins_to_update_all_the_settings() {
-    let mut env = TestEnv::new();
-    env.start(api::Version::V1).await;
-
-    if !env.is_isolated() {
-        // This test can't be executed in a non-isolated environment because
-        // it will change the settings for all the other tests.
-        return;
-    }
-
-    let logged_in_admin = new_logged_in_admin(&env).await;
-    let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
-
-    let mut new_settings = env.server_settings().unwrap();
-
-    new_settings.website.name = "UPDATED NAME".to_string();
-
-    let response = client.update_settings(&new_settings).await;
-
-    let res: AllSettingsResponse = serde_json::from_str(&response.body).unwrap();
-
-    assert_eq!(res.data, new_settings);
-
-    assert_json_ok_response(&response);
-}
