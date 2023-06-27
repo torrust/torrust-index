@@ -221,7 +221,10 @@ impl Index {
 
         let torrent_id = torrent_listing.torrent_id;
 
-        let category = self.category_repository.get_by_id(&torrent_listing.category_id).await?;
+        let category = match torrent_listing.category_id {
+            Some(category_id) => Some(self.category_repository.get_by_id(&category_id).await?),
+            None => None,
+        };
 
         let mut torrent_response = TorrentResponse::from_listing(torrent_listing, category);
 
@@ -382,7 +385,10 @@ impl Index {
             .one_torrent_by_torrent_id(&torrent_listing.torrent_id)
             .await?;
 
-        let category = self.category_repository.get_by_id(&torrent_listing.category_id).await?;
+        let category = match torrent_listing.category_id {
+            Some(category_id) => Some(self.category_repository.get_by_id(&category_id).await?),
+            None => None,
+        };
 
         let torrent_response = TorrentResponse::from_listing(torrent_listing, category);
 

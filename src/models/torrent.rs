@@ -16,7 +16,7 @@ pub struct TorrentListing {
     pub info_hash: String,
     pub title: String,
     pub description: Option<String>,
-    pub category_id: i64,
+    pub category_id: Option<i64>,
     pub date_uploaded: String,
     pub file_size: i64,
     pub seeders: i64,
