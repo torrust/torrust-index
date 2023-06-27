@@ -9,6 +9,8 @@
 //! - Avoid storing images on the server.
 //!
 //! The proxy service is a simple cache that stores the images in memory.
+//! 
+//! **NOTICE:** For now, it only supports PNG images.
 //!
 //! **NOTICE:** The proxy service is not intended to be used as a general
 //! purpose proxy. It is only intended to be used for the images in the
@@ -18,6 +20,16 @@
 //! with the text "Sign in to see image" instead.
 //!
 //! # Example
+//! 
+//! The PNG image:
+//! 
+//! <https://raw.githubusercontent.com/torrust/torrust-index-backend/develop/docs/media/torrust_logo.png>
+//! 
+//! The percent encoded image URL:
+//! 
+//! ```text
+//! https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index-backend%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
+//! ```
 //!
 //! For unauthenticated clients:
 //!
@@ -26,7 +38,7 @@
 //!   --header "cache-control: no-cache" \
 //!   --header "pragma: no-cache" \
 //!   --output mandelbrotset.jpg \
-//!   http://0.0.0.0:3000/v1/proxy/image/https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2Fthumb%2F2%2F21%2FMandel_zoom_00_mandelbrot_set.jpg%2F1280px-Mandel_zoom_00_mandelbrot_set.jpg
+//!   http://0.0.0.0:3000/v1/proxy/image/https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index-backend%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
 //! ```
 //!
 //! You will receive an image with the text "Sign in to see image" instead.
@@ -39,7 +51,7 @@
 //!   --header "cache-control: no-cache" \
 //!   --header "pragma: no-cache" \
 //!   --output mandelbrotset.jpg \
-//!   http://0.0.0.0:3000/v1/proxy/image/https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2Fthumb%2F2%2F21%2FMandel_zoom_00_mandelbrot_set.jpg%2F1280px-Mandel_zoom_00_mandelbrot_set.jpg
+//!   http://0.0.0.0:3000/v1/proxy/image/https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index-backend%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
 //! ```
 pub mod handlers;
 pub mod responses;
