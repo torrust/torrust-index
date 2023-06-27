@@ -7,11 +7,11 @@ use crate::cache::image::manager::Error;
 
 pub static ERROR_IMAGE_LOADER: Once = Once::new();
 
-pub static mut ERROR_IMAGE_URL_IS_UNREACHABLE: Bytes = Bytes::new();
-pub static mut ERROR_IMAGE_URL_IS_NOT_AN_IMAGE: Bytes = Bytes::new();
-pub static mut ERROR_IMAGE_TOO_BIG: Bytes = Bytes::new();
-pub static mut ERROR_IMAGE_USER_QUOTA_MET: Bytes = Bytes::new();
-pub static mut ERROR_IMAGE_UNAUTHENTICATED: Bytes = Bytes::new();
+static mut ERROR_IMAGE_URL_IS_UNREACHABLE: Bytes = Bytes::new();
+static mut ERROR_IMAGE_URL_IS_NOT_AN_IMAGE: Bytes = Bytes::new();
+static mut ERROR_IMAGE_TOO_BIG: Bytes = Bytes::new();
+static mut ERROR_IMAGE_USER_QUOTA_MET: Bytes = Bytes::new();
+static mut ERROR_IMAGE_UNAUTHENTICATED: Bytes = Bytes::new();
 
 const ERROR_IMG_FONT_SIZE: u8 = 16;
 const ERROR_IMG_COLOR: &str = "Red";
@@ -33,6 +33,7 @@ pub fn load_error_images() {
 }
 
 pub fn map_error_to_image(error: &Error) -> Bytes {
+    load_error_images();
     unsafe {
         match error {
             Error::UrlIsUnreachable => ERROR_IMAGE_URL_IS_UNREACHABLE.clone(),

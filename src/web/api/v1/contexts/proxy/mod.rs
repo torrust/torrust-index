@@ -9,7 +9,7 @@
 //! - Avoid storing images on the server.
 //!
 //! The proxy service is a simple cache that stores the images in memory.
-//! 
+//!
 //! **NOTICE:** For now, it only supports PNG images.
 //!
 //! **NOTICE:** The proxy service is not intended to be used as a general
@@ -20,13 +20,13 @@
 //! with the text "Sign in to see image" instead.
 //!
 //! # Example
-//! 
+//!
 //! The PNG image:
-//! 
+//!
 //! <https://raw.githubusercontent.com/torrust/torrust-index-backend/develop/docs/media/torrust_logo.png>
-//! 
+//!
 //! The percent encoded image URL:
-//! 
+//!
 //! ```text
 //! https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index-backend%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
 //! ```
