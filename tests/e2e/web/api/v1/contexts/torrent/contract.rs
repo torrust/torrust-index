@@ -176,7 +176,7 @@ mod for_guests {
         let expected_torrent = TorrentDetails {
             torrent_id: uploaded_torrent.torrent_id,
             uploader: uploader.username,
-            info_hash: test_torrent.file_info.info_hash.to_uppercase(),
+            info_hash: test_torrent.file_info.info_hash.to_lowercase(),
             title: test_torrent.index_info.title.clone(),
             description: test_torrent.index_info.description,
             category: Category {
@@ -203,7 +203,7 @@ mod for_guests {
             magnet_link: format!(
                 // cspell:disable-next-line
                 "magnet:?xt=urn:btih:{}&dn={}&tr={}&tr={}",
-                test_torrent.file_info.info_hash.to_uppercase(),
+                test_torrent.file_info.info_hash.to_lowercase(),
                 urlencoding::encode(&test_torrent.index_info.title),
                 encoded_tracker_url,
                 encoded_tracker_url
