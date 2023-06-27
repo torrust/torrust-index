@@ -52,7 +52,7 @@ pub struct TorrentResponse {
     pub info_hash: String,
     pub title: String,
     pub description: Option<String>,
-    pub category: Category,
+    pub category: Option<Category>,
     pub upload_date: String,
     pub file_size: i64,
     pub seeders: i64,
@@ -65,7 +65,7 @@ pub struct TorrentResponse {
 
 impl TorrentResponse {
     #[must_use]
-    pub fn from_listing(torrent_listing: TorrentListing, category: Category) -> TorrentResponse {
+    pub fn from_listing(torrent_listing: TorrentListing, category: Option<Category>) -> TorrentResponse {
         TorrentResponse {
             torrent_id: torrent_listing.torrent_id,
             uploader: torrent_listing.uploader,
