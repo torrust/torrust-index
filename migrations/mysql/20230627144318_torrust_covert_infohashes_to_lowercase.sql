@@ -1,0 +1,1 @@
+UPDATE torrust_torrents SET info_hash = LOWER(info_hash);

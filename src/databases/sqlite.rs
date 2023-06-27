@@ -434,7 +434,7 @@ impl Database for Sqlite {
         let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, name, pieces, piece_length, private, root_hash, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
             .bind(uploader_id)
             .bind(category_id)
-            .bind(info_hash.to_uppercase())
+            .bind(info_hash.to_lowercase())
             .bind(torrent.file_size())
             .bind(torrent.info.name.to_string())
             .bind(pieces)
@@ -572,7 +572,7 @@ impl Database for Sqlite {
         query_as::<_, DbTorrentInfo>(
             "SELECT torrent_id, info_hash, name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE info_hash = ?",
         )
-        .bind(info_hash.to_hex_string().to_uppercase()) // `info_hash` is stored as uppercase hex string
+        .bind(info_hash.to_hex_string().to_lowercase())
         .fetch_one(&self.pool)
         .await
         .map_err(|_| database::Error::TorrentNotFound)
@@ -642,7 +642,7 @@ impl Database for Sqlite {
             WHERE tt.info_hash = ?
             GROUP BY ts.torrent_id"
         )
-            .bind(info_hash.to_string().to_uppercase()) // `info_hash` is stored as uppercase
+            .bind(info_hash.to_string().to_lowercase())
             .fetch_one(&self.pool)
             .await
             .map_err(|_| database::Error::TorrentNotFound)
