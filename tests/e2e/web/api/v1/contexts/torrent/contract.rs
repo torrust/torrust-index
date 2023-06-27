@@ -240,14 +240,23 @@ mod for_guests {
     }
 
     #[tokio::test]
-    async fn it_should_return_a_not_found_trying_to_download_a_non_existing_torrent() {
+    async fn it_should_return_a_not_found_response_trying_to_get_the_torrent_info_for_a_non_existing_torrent() {
         let mut env = TestEnv::new();
         env.start(api::Version::V1).await;
 
-        if !env.provides_a_tracker() {
-            println!("test skipped. It requires a tracker to be running.");
-            return;
-        }
+        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+        let non_existing_info_hash: InfoHash = "443c7602b4fde83d1154d6d9da48808418b181b6".to_string();
+
+        let response = client.get_torrent(&non_existing_info_hash).await;
+
+        assert_eq!(response.status, 404);
+    }
+
+    #[tokio::test]
+    async fn it_should_return_a_not_found_trying_to_download_a_non_existing_torrent() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
 
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
 
@@ -255,8 +264,7 @@ mod for_guests {
 
         let response = client.download_torrent(&non_existing_info_hash).await;
 
-        // code-review: should this be 404?
-        assert_eq!(response.status, 400);
+        assert_eq!(response.status, 404);
     }
 
     #[tokio::test]
