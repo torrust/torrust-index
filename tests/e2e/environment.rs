@@ -86,7 +86,7 @@ impl TestEnv {
     }
 
     /// Provides the API server socket address.
-    /// For example: `localhost:3000`.
+    /// For example: `localhost:3001`.
     pub fn server_socket_addr(&self) -> Option<String> {
         match self.state() {
             State::RunningShared => self.shared.as_ref().unwrap().server_socket_addr(),

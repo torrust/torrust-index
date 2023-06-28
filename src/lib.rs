@@ -113,7 +113,7 @@
 //!   && export TORRUST_IDX_BACK_USER_UID=1000 \
 //!   && docker run -it \
 //!     --user="$TORRUST_IDX_BACK_USER_UID" \
-//!     --publish 3000:3000/tcp \
+//!     --publish 3001:3001/tcp \
 //!     --volume "$(pwd)/storage":"/app/storage" \
 //!     torrust/index-backend
 //! ```
@@ -167,7 +167,7 @@
 //! token_valid_seconds = 7257600
 //!
 //! [net]
-//! port = 3000
+//! port = 3001
 //!
 //! [auth]
 //! email_on_signup = "Optional"
@@ -223,7 +223,7 @@
 //!
 //! ## API
 //!
-//! Running the tracker with the default configuration will expose the REST API on port 3000: <http://localhost:3000>
+//! Running the backend with the default configuration will expose the REST API on port 3001: <http://localhost:3001>
 //!
 //! ## Tracker Statistics Importer
 //!

@@ -30,7 +30,7 @@ git clone https://github.com/torrust/torrust-index-backend.git \
 
 And then run `cargo run` twice. The first time to generate the `config.toml` file and the second time to run the backend with the default configuration.
 
-After running the tracker the API will be available at <http://localhost:3000>.
+After running the tracker the API will be available at <http://localhost:3001>.
 
 ## Documentation
 

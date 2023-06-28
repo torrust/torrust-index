@@ -28,7 +28,7 @@
 //!   --form "description=MandelbrotSet image" \
 //!   --form "category=software" \
 //!   --form "torrent=@docs/media/mandelbrot_2048x2048_infohash_v1.png.torrent;type=application/x-bittorrent" \
-//!   "http://127.0.0.1:3000/v1/torrent/upload"
+//!   "http://127.0.0.1:3001/v1/torrent/upload"
 //! ```
 //!
 //! **Example response** `200`
@@ -63,7 +63,7 @@
 //!   --header "Content-Type: application/x-bittorrent" \
 //!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
 //!   --output mandelbrot_2048x2048_infohash_v1.png.torrent \
-//!   "http://127.0.0.1:3000/v1/torrent/download/5452869BE36F9F3350CCEE6B4544E7E76CAAADAB"
+//!   "http://127.0.0.1:3001/v1/torrent/download/5452869BE36F9F3350CCEE6B4544E7E76CAAADAB"
 //! ```
 //!
 //! **Example response** `200`
@@ -105,7 +105,7 @@
 //!   --header "Content-Type: application/json" \
 //!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
 //!   --request GET \
-//!   "http://127.0.0.1:3000/v1/torrent/5452869BE36F9F3350CCEE6B4544E7E76CAAADAB"
+//!   "http://127.0.0.1:3001/v1/torrent/5452869BE36F9F3350CCEE6B4544E7E76CAAADAB"
 //! ```
 //!
 //! **Example response** `200`
@@ -191,7 +191,7 @@
 //!   --header "Content-Type: application/json" \
 //!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
 //!   --request GET \
-//!   "http://127.0.0.1:3000/v1/torrents"
+//!   "http://127.0.0.1:3001/v1/torrents"
 //! ```
 //!
 //! **Example response** `200`
@@ -256,7 +256,7 @@
 //!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
 //!   --request PUT \
 //!   --data '{"title":"MandelbrotSet", "description":"MandelbrotSet image"}' \
-//!   "http://127.0.0.1:3000/v1/torrent/5452869BE36F9F3350CCEE6B4544E7E76CAAADAB"
+//!   "http://127.0.0.1:3001/v1/torrent/5452869BE36F9F3350CCEE6B4544E7E76CAAADAB"
 //! ```
 //!
 //! **Example response** `200`
@@ -312,7 +312,7 @@
 //!   --header "Content-Type: application/json" \
 //!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
 //!   --request DELETE \
-//!   "http://127.0.0.1:3000/v1/torrent/5452869BE36F9F3350CCEE6B4544E7E76CAAADAB"
+//!   "http://127.0.0.1:3001/v1/torrent/5452869BE36F9F3350CCEE6B4544E7E76CAAADAB"
 //! ```
 //!
 //! **Example response** `200`

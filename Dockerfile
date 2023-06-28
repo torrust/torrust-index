@@ -13,7 +13,7 @@ FROM chef as development
 WORKDIR /app
 ARG UID=1000
 ARG RUN_AS_USER=appuser
-ARG IDX_BACK_API_PORT=3000
+ARG IDX_BACK_API_PORT=3001
 # Add the app user for development
 ENV USER=appuser
 ENV UID=$UID
@@ -57,7 +57,7 @@ RUN strip /app/target/x86_64-unknown-linux-musl/release/main
 FROM alpine:latest
 WORKDIR /app
 ARG RUN_AS_USER=appuser
-ARG IDX_BACK_API_PORT=3000
+ARG IDX_BACK_API_PORT=3001
 RUN apk --no-cache add ca-certificates
 ENV TZ=Etc/UTC
 ENV RUN_AS_USER=$RUN_AS_USER

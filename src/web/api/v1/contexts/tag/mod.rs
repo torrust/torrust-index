@@ -20,7 +20,7 @@
 //! **Example request**
 //!
 //! ```bash
-//! curl "http://127.0.0.1:3000/v1/tags"
+//! curl "http://127.0.0.1:3001/v1/tags"
 //! ```
 //!
 //! **Example response** `200`
@@ -64,7 +64,7 @@
 //!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
 //!   --request POST \
 //!   --data '{"name":"new tag"}' \
-//!   http://127.0.0.1:3000/v1/tag
+//!   http://127.0.0.1:3001/v1/tag
 //! ```
 //!
 //! **Example response** `200`
@@ -101,7 +101,7 @@
 //!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
 //!   --request DELETE \
 //!   --data '{"tag_id":1}' \
-//!   http://127.0.0.1:3000/v1/tag
+//!   http://127.0.0.1:3001/v1/tag
 //! ```
 //!
 //! **Example response** `200`

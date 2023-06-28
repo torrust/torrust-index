@@ -38,7 +38,7 @@
 //!   --header "cache-control: no-cache" \
 //!   --header "pragma: no-cache" \
 //!   --output mandelbrotset.jpg \
-//!   http://0.0.0.0:3000/v1/proxy/image/https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index-backend%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
+//!   http://0.0.0.0:3001/v1/proxy/image/https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index-backend%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
 //! ```
 //!
 //! You will receive an image with the text "Sign in to see image" instead.
@@ -51,7 +51,7 @@
 //!   --header "cache-control: no-cache" \
 //!   --header "pragma: no-cache" \
 //!   --output mandelbrotset.jpg \
-//!   http://0.0.0.0:3000/v1/proxy/image/https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index-backend%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
+//!   http://0.0.0.0:3001/v1/proxy/image/https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index-backend%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
 //! ```
 pub mod handlers;
 pub mod responses;

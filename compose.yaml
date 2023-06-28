@@ -16,7 +16,7 @@ services:
     networks:
       - server_side
     ports:
-      - 3000:3000
+      - 3001:3001
     # todo: implement healthcheck
     #healthcheck:
     #  test:
