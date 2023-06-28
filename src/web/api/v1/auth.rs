@@ -17,7 +17,7 @@
 //!   --header "Content-Type: application/json" \
 //!   --request POST \
 //!   --data '{"username":"indexadmin","email":"indexadmin@torrust.com","password":"BenoitMandelbrot1924","confirm_password":"BenoitMandelbrot1924"}' \
-//!   http://127.0.0.1:3000/v1/user/register
+//!   http://127.0.0.1:3001/v1/user/register
 //! ```
 //!
 //! **NOTICE**: The first user is automatically an administrator. Currently,
@@ -34,7 +34,7 @@
 //!   --header "Content-Type: application/json" \
 //!   --request POST \
 //!   --data '{"login":"indexadmin","password":"BenoitMandelbrot1924"}' \
-//!   http://127.0.0.1:3000/v1/user/login
+//!   http://127.0.0.1:3001/v1/user/login
 //! ```
 //!
 //! **Response**
@@ -68,7 +68,7 @@
 //!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
 //!   --request POST \
 //!   --data '{"name":"new category","icon":null}' \
-//!   http://127.0.0.1:3000/v1/category
+//!   http://127.0.0.1:3001/v1/category
 //! ```
 //!
 //! **Response**

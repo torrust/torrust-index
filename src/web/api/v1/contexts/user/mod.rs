@@ -60,7 +60,7 @@
 //!   --header "Content-Type: application/json" \
 //!   --request POST \
 //!   --data '{"username":"indexadmin","email":"indexadmin@torrust.com","password":"BenoitMandelbrot1924","confirm_password":"BenoitMandelbrot1924"}' \
-//!   http://127.0.0.1:3000/v1/user/register
+//!   http://127.0.0.1:3001/v1/user/register
 //! ```
 //!
 //! For more information about the registration process, refer to the [`auth`](crate::web::api::v1::auth)
@@ -107,7 +107,7 @@
 //!   --header "Content-Type: application/json" \
 //!   --request POST \
 //!   --data '{"login":"indexadmin","password":"BenoitMandelbrot1924"}' \
-//!   http://127.0.0.1:3000/v1/user/login
+//!   http://127.0.0.1:3001/v1/user/login
 //! ```
 //!
 //! For more information about the login process, refer to the [`auth`](crate::web::api::v1::auth)
@@ -135,7 +135,7 @@
 //!   --header "Content-Type: application/json" \
 //!   --request POST \
 //!   --data '{"token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI"}' \
-//!   http://127.0.0.1:3000/v1/user/token/verify
+//!   http://127.0.0.1:3001/v1/user/token/verify
 //! ```
 //!
 //! **Example response** `200`
@@ -181,7 +181,7 @@
 //!   --header "Content-Type: application/json" \
 //!   --request POST \
 //!   --data '{"token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI"}' \
-//!   http://127.0.0.1:3000/v1/user/token/renew
+//!   http://127.0.0.1:3001/v1/user/token/renew
 //! ```
 //!
 //! **Example response** `200`
@@ -227,7 +227,7 @@
 //!   --header "Content-Type: application/json" \
 //!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
 //!   --request DELETE \
-//!   http://127.0.0.1:3000/v1/user/ban/indexadmin
+//!   http://127.0.0.1:3001/v1/user/ban/indexadmin
 //! ```
 //!
 //! **Example response** `200`

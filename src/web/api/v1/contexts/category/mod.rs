@@ -20,7 +20,7 @@
 //! **Example request**
 //!
 //! ```bash
-//! curl "http://127.0.0.1:3000/v1/category"
+//! curl "http://127.0.0.1:3001/v1/category"
 //! ```
 //!
 //! **Example response** `200`
@@ -84,7 +84,7 @@
 //!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
 //!   --request POST \
 //!   --data '{"name":"new category","icon":null}' \
-//!   http://127.0.0.1:3000/v1/category
+//!   http://127.0.0.1:3001/v1/category
 //! ```
 //!
 //! **Example response** `200`
@@ -122,7 +122,7 @@
 //!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
 //!   --request DELETE \
 //!   --data '{"name":"new category","icon":null}' \
-//!   http://127.0.0.1:3000/v1/category
+//!   http://127.0.0.1:3001/v1/category
 //! ```
 //!
 //! **Example response** `200`

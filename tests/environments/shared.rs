@@ -25,7 +25,7 @@ impl TestEnv {
     #[must_use]
     pub fn server_socket_addr(&self) -> Option<String> {
         // If the E2E configuration uses port 0 in the future instead of a
-        // predefined port (right now we are using port 3000) we will
+        // predefined port (right now we are using port 3001) we will
         // need to pass an env var with the port used by the server.
         Some(self.authority.clone())
     }
@@ -34,7 +34,7 @@ impl TestEnv {
 impl Default for TestEnv {
     fn default() -> Self {
         Self {
-            authority: "localhost:3000".to_string(),
+            authority: "localhost:3001".to_string(),
         }
     }
 }

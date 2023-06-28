@@ -5,7 +5,7 @@
 //!
 //! Sample URL:
 //!
-//! <http://0.0.0.0:3000/v1/proxy/image/https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2Fthumb%2F2%2F21%2FMandel_zoom_00_mandelbrot_set.jpg%2F1280px-Mandel_zoom_00_mandelbrot_set.jpg>
+//! <http://0.0.0.0:3001/v1/proxy/image/https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2Fthumb%2F2%2F21%2FMandel_zoom_00_mandelbrot_set.jpg%2F1280px-Mandel_zoom_00_mandelbrot_set.jpg>
 use std::sync::Arc;
 
 use bytes::Bytes;

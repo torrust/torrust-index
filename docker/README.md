@@ -33,7 +33,7 @@ Run using the pre-built public docker image:
 export TORRUST_IDX_BACK_USER_UID=$(id -u)
 docker run -it \
     --user="$TORRUST_IDX_BACK_USER_UID" \
-    --publish 3000:3000/tcp \
+    --publish 3001:3001/tcp \
     --volume "$(pwd)/storage":"/app/storage" \
     torrust/index-backend
 ```
@@ -75,7 +75,7 @@ After running the "up" command you will have three running containers:
 ```s
 $ docker ps
 CONTAINER ID   IMAGE                     COMMAND                  CREATED          STATUS                    PORTS                                                                                            NAMES
-e35b14edaceb   torrust-idx-back          "cargo run"              19 seconds ago   Up 17 seconds             0.0.0.0:3000->3000/tcp, :::3000->3000/tcp                                                        torrust-idx-back-1
+e35b14edaceb   torrust-idx-back          "cargo run"              19 seconds ago   Up 17 seconds             0.0.0.0:3001->3001/tcp, :::3001->3001/tcp                                                        torrust-idx-back-1
 ddbad9fb496a   torrust/tracker:develop   "/app/torrust-tracker"   19 seconds ago   Up 18 seconds             0.0.0.0:1212->1212/tcp, :::1212->1212/tcp, 0.0.0.0:6969->6969/udp, :::6969->6969/udp, 7070/tcp   torrust-tracker-1
 f1d991d62170   mysql:8.0                 "docker-entrypoint.s…"   3 hours ago      Up 18 seconds (healthy)   0.0.0.0:3306->3306/tcp, :::3306->3306/tcp, 33060/tcp                                             torrust-mysql-1
                                                                              torrust-mysql-1

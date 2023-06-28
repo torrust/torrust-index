@@ -7,7 +7,7 @@
 //! set the environment variable `TORRUST_IDX_BACK_E2E_SHARED` to `true`.
 //!
 //! > **NOTICE**: The server must be running before running the tests. The
-//! server url is hardcoded to `http://localhost:3000` for now. We are planning
+//! server url is hardcoded to `http://localhost:3001` for now. We are planning
 //! to make it configurable in the future via a environment variable.
 //!
 //! ```text
