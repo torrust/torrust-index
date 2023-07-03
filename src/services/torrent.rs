@@ -99,6 +99,8 @@ impl Index {
     /// * Unable to insert the torrent into the database.
     /// * Unable to add the torrent to the whitelist.
     pub async fn add_torrent(&self, mut torrent_request: AddTorrentRequest, user_id: UserId) -> Result<TorrentId, ServiceError> {
+        let _user = self.user_repository.get_compact(&user_id).await?;
+
         torrent_request.torrent.set_announce_urls(&self.configuration).await;
 
         let category = self

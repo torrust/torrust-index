@@ -362,6 +362,10 @@ impl Configuration {
     }
 
     /// Returns the save to file of this [`Configuration`].
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if it can't write to the file.
     pub async fn save_to_file(&self, config_path: &str) {
         let settings = self.settings.read().await;
 

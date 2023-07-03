@@ -98,7 +98,7 @@ impl BytesCache {
     pub fn total_size(&self) -> usize {
         let mut size: usize = 0;
 
-        for (_, entry) in self.bytes_table.iter() {
+        for (_, entry) in &self.bytes_table {
             size += entry.bytes.len();
         }
 

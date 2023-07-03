@@ -167,7 +167,7 @@ impl TorrentTester {
             let files = torrent_file.info.files.as_ref().unwrap();
 
             // Files in torrent file
-            for file in files.iter() {
+            for file in files {
                 let file_path = file.path.join("/");
 
                 // Find file in database

@@ -28,6 +28,11 @@ pub struct Running {
     pub tracker_data_importer_handle: tokio::task::JoinHandle<()>,
 }
 
+/// Runs the application.
+///
+/// # Panics
+///
+/// It panics if there is an error connecting to the database.
 #[allow(clippy::too_many_lines)]
 pub async fn run(configuration: Configuration, api_version: &Version) -> Running {
     let log_level = configuration.settings.read().await.log_level.clone();

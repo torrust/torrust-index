@@ -70,6 +70,11 @@ fn print_usage() {
     );
 }
 
+/// Import Tracker Statistics Command
+///
+/// # Panics
+///
+/// Panics if arguments cannot be parsed.
 pub async fn run_importer() {
     parse_args().expect("unable to parse command arguments");
     import().await;

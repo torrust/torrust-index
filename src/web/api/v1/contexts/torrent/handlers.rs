@@ -74,7 +74,9 @@ pub async fn download_torrent_handler(
     Extract(maybe_bearer_token): Extract,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
-    let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else { return ServiceError::BadRequest.into_response() };
+    let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
+        return ServiceError::BadRequest.into_response();
+    };
 
     let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
         Ok(opt_user_id) => opt_user_id,
@@ -86,7 +88,9 @@ pub async fn download_torrent_handler(
         Err(error) => return error.into_response(),
     };
 
-    let Ok(bytes) = parse_torrent::encode_torrent(&torrent) else { return ServiceError::InternalServerError.into_response() };
+    let Ok(bytes) = parse_torrent::encode_torrent(&torrent) else {
+        return ServiceError::InternalServerError.into_response();
+    };
 
     torrent_file_response(bytes)
 }
@@ -120,7 +124,9 @@ pub async fn get_torrent_info_handler(
     Extract(maybe_bearer_token): Extract,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
-    let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else { return ServiceError::BadRequest.into_response() };
+    let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
+        return ServiceError::BadRequest.into_response();
+    };
 
     let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
         Ok(opt_user_id) => opt_user_id,
@@ -149,7 +155,9 @@ pub async fn update_torrent_info_handler(
     Path(info_hash): Path<InfoHashParam>,
     extract::Json(update_torrent_info_form): extract::Json<UpdateTorrentInfoForm>,
 ) -> Response {
-    let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else { return ServiceError::BadRequest.into_response() };
+    let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
+        return ServiceError::BadRequest.into_response();
+    };
 
     let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
         Ok(user_id) => user_id,
@@ -188,7 +196,9 @@ pub async fn delete_torrent_handler(
     Extract(maybe_bearer_token): Extract,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
-    let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else { return ServiceError::BadRequest.into_response() };
+    let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
+        return ServiceError::BadRequest.into_response();
+    };
 
     let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
         Ok(user_id) => user_id,

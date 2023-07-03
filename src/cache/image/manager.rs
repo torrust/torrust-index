@@ -19,6 +19,11 @@ pub enum Error {
 
 type UserQuotas = HashMap<i64, ImageCacheQuota>;
 
+/// Returns the current time in seconds.
+///
+/// # Panics
+///
+/// This function will panic if the current time is before the UNIX EPOCH.
 #[must_use]
 pub fn now_in_secs() -> u64 {
     SystemTime::now()
@@ -87,6 +92,11 @@ pub struct ImageCacheService {
 }
 
 impl ImageCacheService {
+    /// Create a new image cache service.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the image cache could not be created.
     pub async fn new(cfg: Arc<Configuration>) -> Self {
         let settings = cfg.settings.read().await;
 

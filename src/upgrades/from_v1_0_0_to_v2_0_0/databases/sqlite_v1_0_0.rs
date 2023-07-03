@@ -58,6 +58,11 @@ pub struct SqliteDatabaseV1_0_0 {
 }
 
 impl SqliteDatabaseV1_0_0 {
+    /// It creates a new instance of the `SqliteDatabaseV1_0_0`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if it is unable to create the database pool.
     pub async fn new(database_url: &str) -> Self {
         let db = SqlitePoolOptions::new()
             .connect(database_url)

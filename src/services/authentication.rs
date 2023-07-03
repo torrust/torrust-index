@@ -120,6 +120,11 @@ impl JsonWebToken {
     }
 
     /// Create Json Web Token.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the default encoding algorithm does not ç
+    /// match the encoding key.
     pub async fn sign(&self, user: UserCompact) -> String {
         let settings = self.cfg.settings.read().await;
 

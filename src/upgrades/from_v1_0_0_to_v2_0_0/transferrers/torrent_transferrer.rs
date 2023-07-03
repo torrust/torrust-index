@@ -96,7 +96,7 @@ pub async fn transfer_torrents(
             // Multiple files are being shared
             let files = torrent_from_file.info.files.as_ref().unwrap();
 
-            for file in files.iter() {
+            for file in files {
                 println!(
                     "[v2][torrust_torrent_files][multiple-file-torrent] adding torrent file: {:?} ...",
                     &file
