@@ -58,11 +58,15 @@ impl Service {
         }
     }
 
-    /// Send Verification Email
+    /// Send Verification Email.
     ///
     /// # Errors
     ///
     /// This function will return an error if unable to send an email.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the multipart builder had an error.
     pub async fn send_verification_mail(
         &self,
         to: &str,

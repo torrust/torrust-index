@@ -329,7 +329,7 @@ impl Database for Mysql {
         let category_filter_query = if let Some(c) = categories {
             let mut i = 0;
             let mut category_filters = String::new();
-            for category in c.iter() {
+            for category in c {
                 // don't take user input in the db query
                 if let Ok(sanitized_category) = self.get_category_from_name(category).await {
                     let mut str = format!("tc.name = '{}'", sanitized_category.name);
@@ -352,7 +352,7 @@ impl Database for Mysql {
         let tag_filter_query = if let Some(t) = tags {
             let mut i = 0;
             let mut tag_filters = String::new();
-            for tag in t.iter() {
+            for tag in t {
                 // don't take user input in the db query
                 if let Ok(sanitized_tag) = self.get_tag_from_name(tag).await {
                     let mut str = format!("tl.tag_id = '{}'", sanitized_tag.tag_id);
@@ -479,7 +479,7 @@ impl Database for Mysql {
         } else {
             let files = torrent.info.files.as_ref().unwrap();
 
-            for file in files.iter() {
+            for file in files {
                 let path = file.path.join("/");
 
                 let _ = query("INSERT INTO torrust_torrent_files (md5sum, torrent_id, length, path) VALUES (?, ?, ?, ?)")

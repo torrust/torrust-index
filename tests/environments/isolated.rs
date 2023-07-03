@@ -24,6 +24,10 @@ impl TestEnv {
 
     /// Provides a test environment with a default configuration for testing
     /// application.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the temporary directory cannot be created.
     #[must_use]
     pub fn with_test_configuration() -> Self {
         let temp_dir = TempDir::new().expect("failed to create a temporary directory");

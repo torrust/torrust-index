@@ -50,6 +50,12 @@ impl TorrentInfo {
         }
     }
 
+    /// It returns the root hash as a `i64` value.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the root hash cannot be converted into a
+    /// `i64` value.
     #[must_use]
     pub fn get_root_hash_as_i64(&self) -> i64 {
         match &self.root_hash {
@@ -96,6 +102,11 @@ pub struct Torrent {
 }
 
 impl Torrent {
+    /// It hydrates a `Torrent` struct from the database data.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the `torrent_info.pieces` is not a valid hex string.
     #[must_use]
     pub fn from_db_info_files_and_announce_urls(
         torrent_info: DbTorrentInfo,
@@ -180,6 +191,11 @@ impl Torrent {
         }
     }
 
+    /// It calculates the info hash of the torrent file.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the `info` part of the torrent file cannot be serialized.
     #[must_use]
     pub fn calculate_info_hash_as_bytes(&self) -> [u8; 20] {
         let info_bencoded = ser::to_bytes(&self.info).expect("variable `info` was not able to be serialized.");
@@ -204,7 +220,7 @@ impl Torrent {
                 None => 0,
                 Some(files) => {
                     let mut file_size = 0;
-                    for file in files.iter() {
+                    for file in files {
                         file_size += file.length;
                     }
                     file_size
@@ -213,6 +229,11 @@ impl Torrent {
         }
     }
 
+    /// It returns the announce urls of the torrent file.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if both the `announce_list` and the `announce` are `None`.
     #[must_use]
     pub fn announce_urls(&self) -> Vec<String> {
         match &self.announce_list {

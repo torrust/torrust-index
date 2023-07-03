@@ -142,6 +142,10 @@ impl Authentication {
 }
 
 /// Parses the token from the `Authorization` header.
+///
+/// # Panics
+///
+/// This function will panic if the `Authorization` header is not a valid `String`.
 pub fn parse_token(authorization: &HeaderValue) -> String {
     let split: Vec<&str> = authorization
         .to_str()

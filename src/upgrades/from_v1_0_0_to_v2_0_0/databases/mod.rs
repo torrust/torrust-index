@@ -21,6 +21,11 @@ pub async fn migrate_target_database(target_database: Arc<SqliteDatabaseV2_0_0>)
     target_database.migrate().await;
 }
 
+/// It truncates all tables in the target database.
+///
+/// # Panics
+///
+/// It panics if it cannot truncate the tables.
 pub async fn truncate_target_database(target_database: Arc<SqliteDatabaseV2_0_0>) {
     println!("Truncating all tables in target database ...");
     target_database

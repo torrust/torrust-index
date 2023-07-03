@@ -22,7 +22,9 @@ pub async fn get_proxy_image_handler(
         return png_image(map_error_to_image(&Error::Unauthenticated));
     }
 
-    let Ok(user_id) = app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await else { return png_image(map_error_to_image(&Error::Unauthenticated)) };
+    let Ok(user_id) = app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await else {
+        return png_image(map_error_to_image(&Error::Unauthenticated));
+    };
 
     // code-review: Handling status codes in the frontend other tan OK is quite a pain.
     // Return OK for now.

@@ -49,6 +49,11 @@ impl TorrentRecordV2 {
     }
 }
 
+/// It converts a timestamp in seconds to a datetime string.
+///
+/// # Panics
+///
+/// It panics if the timestamp is too big and it overflows i64. Very future!
 #[must_use]
 pub fn convert_timestamp_to_datetime(timestamp: i64) -> String {
     // The expected format in database is: 2022-11-04 09:53:57
@@ -66,6 +71,11 @@ pub struct SqliteDatabaseV2_0_0 {
 }
 
 impl SqliteDatabaseV2_0_0 {
+    /// Creates a new instance of the database.
+    ///
+    /// # Panics
+    ///
+    /// It panics if it cannot create the database pool.
     pub async fn new(database_url: &str) -> Self {
         let db = SqlitePoolOptions::new()
             .connect(database_url)
@@ -74,6 +84,11 @@ impl SqliteDatabaseV2_0_0 {
         Self { pool: db }
     }
 
+    /// It migrates the database to the latest version.
+    ///
+    /// # Panics
+    ///
+    /// It panics if it cannot run the migrations.
     pub async fn migrate(&self) {
         sqlx::migrate!("migrations/sqlite3")
             .run(&self.pool)

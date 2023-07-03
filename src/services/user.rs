@@ -61,6 +61,10 @@ impl RegistrationService {
     /// * `ServiceError::FailedToSendVerificationEmail` if unable to send the required verification email.
     /// * An error if unable to successfully hash the password.
     /// * An error if unable to insert user into the database.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the email is required, but missing.
     pub async fn register_user(&self, registration_form: &RegistrationForm, api_base_url: &str) -> Result<UserId, ServiceError> {
         info!("registering user: {}", registration_form.username);
 
@@ -328,6 +332,11 @@ impl DbBannedUserList {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
+    ///
+    /// # Panics
+    ///
+    /// It panics if the expiration date cannot be parsed. It should never
+    /// happen as the date is hardcoded for now.
     pub async fn add(&self, user_id: &UserId) -> Result<(), Error> {
         // todo: add reason and `date_expiry` parameters to request.
 
