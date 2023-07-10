@@ -49,11 +49,6 @@ jobs:
           toolchain: stable
 
       - name: Publish workspace packages
-        run: |
-          cargo publish -p torrust-tracker-located-error
-          cargo publish -p torrust-tracker-primitives
-          cargo publish -p torrust-tracker-configuration
-          cargo publish -p torrust-tracker-test-helpers
-          cargo publish -p torrust-tracker
+        run: cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_TOKEN }}
