@@ -3145,6 +3145,7 @@ dependencies = [
  "email_address",
  "fern",
  "futures",
+ "hex",
  "hyper",
  "indexmap 1.9.3",
  "jsonwebtoken",
