@@ -8,6 +8,8 @@ use axum::extract::{self, Multipart, Path, Query, State};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
+use sha1::{Digest, Sha1};
+use uuid::Uuid;
 
 use super::forms::UpdateTorrentInfoForm;
 use super::responses::{new_torrent_response, torrent_file_response};
@@ -15,6 +17,7 @@ use crate::common::AppData;
 use crate::errors::ServiceError;
 use crate::models::info_hash::InfoHash;
 use crate::models::torrent::{AddTorrentRequest, Metadata};
+use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
 use crate::models::torrent_tag::TagId;
 use crate::services::torrent::ListingRequest;
 use crate::utils::parse_torrent;
@@ -92,7 +95,7 @@ pub async fn download_torrent_handler(
         return ServiceError::InternalServerError.into_response();
     };
 
-    torrent_file_response(bytes)
+    torrent_file_response(bytes, &format!("{}.torrent", torrent.info.name))
 }
 
 /// It returns a list of torrents matching the search criteria.
@@ -212,6 +215,65 @@ pub async fn delete_torrent_handler(
         .into_response(),
         Err(error) => error.into_response(),
     }
+}
+
+/// Returns a random torrent as a byte stream `application/x-bittorrent`.
+///
+/// This is useful for testing purposes.
+///
+/// # Errors
+///
+/// Returns `ServiceError::BadRequest` if the torrent info-hash is invalid.
+#[allow(clippy::unused_async)]
+pub async fn create_random_torrent_handler(State(_app_data): State<Arc<AppData>>) -> Response {
+    let torrent = generate_random_torrent();
+
+    let Ok(bytes) = parse_torrent::encode_torrent(&torrent) else {
+        return ServiceError::InternalServerError.into_response();
+    };
+
+    torrent_file_response(bytes, &format!("{}.torrent", torrent.info.name))
+}
+
+/// It generates a random single-file torrent for testing purposes.
+fn generate_random_torrent() -> Torrent {
+    let id = Uuid::new_v4();
+
+    let file_contents = format!("{id}\n");
+
+    let torrent_info = DbTorrentInfo {
+        torrent_id: 1,
+        info_hash: String::new(),
+        name: format!("file-{id}.txt"),
+        pieces: sha1(&file_contents),
+        piece_length: 16384,
+        private: None,
+        root_hash: 0,
+    };
+
+    let torrent_files: Vec<TorrentFile> = vec![TorrentFile {
+        path: vec![String::new()],
+        length: 37, // Number of bytes for the UUID plus one char for line break (`0a`).
+        md5sum: None,
+    }];
+
+    let torrent_announce_urls: Vec<Vec<String>> = vec![];
+
+    Torrent::from_db_info_files_and_announce_urls(torrent_info, torrent_files, torrent_announce_urls)
+}
+
+fn sha1(data: &str) -> String {
+    // Create a Sha1 object
+    let mut hasher = Sha1::new();
+
+    // Write input message
+    hasher.update(data.as_bytes());
+
+    // Read hash digest and consume hasher
+    let result = hasher.finalize();
+
+    // Convert the hash (a byte array) to a string of hex characters
+    hex::encode(result)
 }
 
 /// Extracts the [`TorrentRequest`] from the multipart form payload.
