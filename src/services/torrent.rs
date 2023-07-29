@@ -98,10 +98,15 @@ impl Index {
     /// * Unable to get the category from the database.
     /// * Unable to insert the torrent into the database.
     /// * Unable to add the torrent to the whitelist.
+    /// * Torrent title is too short.
     pub async fn add_torrent(&self, mut torrent_request: AddTorrentRequest, user_id: UserId) -> Result<TorrentId, ServiceError> {
         let _user = self.user_repository.get_compact(&user_id).await?;
 
         torrent_request.torrent.set_announce_urls(&self.configuration).await;
+
+        if torrent_request.metadata.title.len() < 3 {
+            return Err(ServiceError::BadRequest);
+        }
 
         let category = self
             .category_repository
