@@ -217,6 +217,15 @@ pub async fn delete_torrent_handler(
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UuidParam(pub String);
+
+impl UuidParam {
+    fn value(&self) -> String {
+        self.0.to_lowercase()
+    }
+}
+
 /// Returns a random torrent as a byte stream `application/x-bittorrent`.
 ///
 /// This is useful for testing purposes.
@@ -225,8 +234,12 @@ pub async fn delete_torrent_handler(
 ///
 /// Returns `ServiceError::BadRequest` if the torrent info-hash is invalid.
 #[allow(clippy::unused_async)]
-pub async fn create_random_torrent_handler(State(_app_data): State<Arc<AppData>>) -> Response {
-    let torrent = generate_random_torrent();
+pub async fn create_random_torrent_handler(State(_app_data): State<Arc<AppData>>, Path(uuid): Path<UuidParam>) -> Response {
+    let Ok(uuid) = Uuid::parse_str(&uuid.value()) else {
+        return ServiceError::BadRequest.into_response();
+    };
+
+    let torrent = generate_random_torrent(uuid);
 
     let Ok(bytes) = parse_torrent::encode_torrent(&torrent) else {
         return ServiceError::InternalServerError.into_response();
@@ -236,9 +249,7 @@ pub async fn create_random_torrent_handler(State(_app_data): State<Arc<AppData>>
 }
 
 /// It generates a random single-file torrent for testing purposes.
-fn generate_random_torrent() -> Torrent {
-    let id = Uuid::new_v4();
-
+fn generate_random_torrent(id: Uuid) -> Torrent {
     let file_contents = format!("{id}\n");
 
     let torrent_info = DbTorrentInfo {
