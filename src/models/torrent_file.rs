@@ -4,6 +4,7 @@ use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
 
 use crate::config::Configuration;
+use crate::services::torrent_file::NewTorrentInfoRequest;
 use crate::utils::hex::{from_bytes, into_bytes};
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
@@ -102,6 +103,20 @@ pub struct Torrent {
 }
 
 impl Torrent {
+    #[must_use]
+    pub fn from_new_torrent_info_request(new_torrent_info: NewTorrentInfoRequest) -> Self {
+        let torrent_info = DbTorrentInfo {
+            torrent_id: 1,
+            info_hash: String::new(),
+            name: new_torrent_info.name,
+            pieces: new_torrent_info.pieces,
+            piece_length: 16384,
+            private: None,
+            root_hash: 0,
+        };
+        Torrent::from_db_info_files_and_announce_urls(torrent_info, new_torrent_info.files, new_torrent_info.announce_urls)
+    }
+
     /// It hydrates a `Torrent` struct from the database data.
     ///
     /// # Panics
