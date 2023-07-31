@@ -18,6 +18,8 @@ use crate::models::user::UserId;
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::{tracker, AsCSV};
 
+const MIN_TORRENT_TITLE_LENGTH: u32 = 3;
+
 pub struct Index {
     configuration: Arc<Configuration>,
     tracker_statistics_importer: Arc<StatisticsImporter>,
@@ -104,7 +106,7 @@ impl Index {
 
         torrent_request.torrent.set_announce_urls(&self.configuration).await;
 
-        if torrent_request.metadata.title.len() < 3 {
+        if torrent_request.metadata.title.len() < MIN_TORRENT_TITLE_LENGTH {
             return Err(ServiceError::InvalidTorrentTitleLength);
         }
 
