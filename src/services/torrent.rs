@@ -105,7 +105,7 @@ impl Index {
         torrent_request.torrent.set_announce_urls(&self.configuration).await;
 
         if torrent_request.metadata.title.len() < 3 {
-            return Err(ServiceError::BadRequest);
+            return Err(ServiceError::InvalidTorrentTitleLength);
         }
 
         let category = self
