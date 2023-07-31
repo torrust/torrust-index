@@ -18,6 +18,8 @@ use crate::models::user::UserId;
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::{tracker, AsCSV};
 
+const MIN_TORRENT_TITLE_LENGTH: usize = 3;
+
 pub struct Index {
     configuration: Arc<Configuration>,
     tracker_statistics_importer: Arc<StatisticsImporter>,
@@ -98,10 +100,15 @@ impl Index {
     /// * Unable to get the category from the database.
     /// * Unable to insert the torrent into the database.
     /// * Unable to add the torrent to the whitelist.
+    /// * Torrent title is too short.
     pub async fn add_torrent(&self, mut torrent_request: AddTorrentRequest, user_id: UserId) -> Result<TorrentId, ServiceError> {
         let _user = self.user_repository.get_compact(&user_id).await?;
 
         torrent_request.torrent.set_announce_urls(&self.configuration).await;
+
+        if torrent_request.metadata.title.len() < MIN_TORRENT_TITLE_LENGTH {
+            return Err(ServiceError::InvalidTorrentTitleLength);
+        }
 
         let category = self
             .category_repository
