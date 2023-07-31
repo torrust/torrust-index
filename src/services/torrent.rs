@@ -18,7 +18,7 @@ use crate::models::user::UserId;
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::{tracker, AsCSV};
 
-const MIN_TORRENT_TITLE_LENGTH: u32 = 3;
+const MIN_TORRENT_TITLE_LENGTH: usize = 3;
 
 pub struct Index {
     configuration: Arc<Configuration>,
