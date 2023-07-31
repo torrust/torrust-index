@@ -309,7 +309,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<AddT
     let mut tags: Vec<TagId> = vec![];
 
     while let Some(mut field) = payload.next_field().await.unwrap() {
-        let name = field.name().unwrap().clone();
+        let name = field.name().unwrap();
 
         match name {
             "title" => {
@@ -342,7 +342,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<AddT
                 tags = serde_json::from_str(&string_data).map_err(|_| ServiceError::BadRequest)?;
             }
             "torrent" => {
-                let content_type = field.content_type().unwrap().clone();
+                let content_type = field.content_type().unwrap();
 
                 if content_type != "application/x-bittorrent" {
                     return Err(ServiceError::InvalidFileType);
