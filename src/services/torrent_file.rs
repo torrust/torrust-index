@@ -4,6 +4,10 @@ use uuid::Uuid;
 use crate::models::torrent_file::{Torrent, TorrentFile};
 use crate::services::hasher::sha1;
 
+/// It contains the information required to create a new torrent file.
+///
+/// It's not the full in-memory representation of a torrent file. The full
+/// in-memory representation is the `Torrent` struct.
 pub struct NewTorrentInfoRequest {
     pub name: String,
     pub pieces: String,
