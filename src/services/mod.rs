@@ -2,6 +2,7 @@
 pub mod about;
 pub mod authentication;
 pub mod category;
+pub mod hasher;
 pub mod proxy;
 pub mod settings;
 pub mod tag;

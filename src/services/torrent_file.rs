@@ -1,8 +1,8 @@
 //! This module contains the services related to torrent file management.
-use sha1::{Digest, Sha1};
 use uuid::Uuid;
 
 use crate::models::torrent_file::{Torrent, TorrentFile};
+use crate::services::hasher::sha1;
 
 pub struct NewTorrentInfoRequest {
     pub name: String,
@@ -47,18 +47,4 @@ pub fn generate_random_torrent(id: Uuid) -> Torrent {
     };
 
     Torrent::from_new_torrent_info_request(torrent_info_request)
-}
-
-fn sha1(data: &str) -> String {
-    // Create a Sha1 object
-    let mut hasher = Sha1::new();
-
-    // Write input message
-    hasher.update(data.as_bytes());
-
-    // Read hash digest and consume hasher
-    let result = hasher.finalize();
-
-    // Convert the hash (a byte array) to a string of hex characters
-    hex::encode(result)
 }
