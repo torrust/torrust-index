@@ -222,7 +222,7 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::InvalidTorrentFile => StatusCode::BAD_REQUEST,
         ServiceError::InvalidTorrentPiecesLength => StatusCode::BAD_REQUEST,
         ServiceError::InvalidFileType => StatusCode::BAD_REQUEST,
-        &ServiceError::InvalidTorrentTitleLength => StatusCode::BAD_REQUEST,
+        ServiceError::InvalidTorrentTitleLength => StatusCode::BAD_REQUEST,
         ServiceError::BadRequest => StatusCode::BAD_REQUEST,
         ServiceError::InvalidCategory => StatusCode::BAD_REQUEST,
         ServiceError::InvalidTag => StatusCode::BAD_REQUEST,
