@@ -24,6 +24,14 @@ pub fn new_torrent_response(torrent_id: TorrentId, info_hash: &str) -> Json<OkRe
 }
 
 #[must_use]
-pub fn torrent_file_response(bytes: Vec<u8>) -> Response {
-    (StatusCode::OK, [(header::CONTENT_TYPE, "application/x-bittorrent")], bytes).into_response()
+pub fn torrent_file_response(bytes: Vec<u8>, filename: &str) -> Response {
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "application/x-bittorrent"),
+            (header::CONTENT_DISPOSITION, &format!("attachment; filename={filename}")),
+        ],
+        bytes,
+    )
+        .into_response()
 }

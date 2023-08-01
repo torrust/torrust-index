@@ -8,6 +8,7 @@ use axum::extract::{self, Multipart, Path, Query, State};
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
+use uuid::Uuid;
 
 use super::forms::UpdateTorrentInfoForm;
 use super::responses::{new_torrent_response, torrent_file_response};
@@ -17,6 +18,7 @@ use crate::models::info_hash::InfoHash;
 use crate::models::torrent::{AddTorrentRequest, Metadata};
 use crate::models::torrent_tag::TagId;
 use crate::services::torrent::ListingRequest;
+use crate::services::torrent_file::generate_random_torrent;
 use crate::utils::parse_torrent;
 use crate::web::api::v1::auth::get_optional_logged_in_user;
 use crate::web::api::v1::extractors::bearer_token::Extract;
@@ -92,7 +94,7 @@ pub async fn download_torrent_handler(
         return ServiceError::InternalServerError.into_response();
     };
 
-    torrent_file_response(bytes)
+    torrent_file_response(bytes, &format!("{}.torrent", torrent.info.name))
 }
 
 /// It returns a list of torrents matching the search criteria.
@@ -214,6 +216,37 @@ pub async fn delete_torrent_handler(
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UuidParam(pub String);
+
+impl UuidParam {
+    fn value(&self) -> String {
+        self.0.to_lowercase()
+    }
+}
+
+/// Returns a random torrent file as a byte stream `application/x-bittorrent`.
+///
+/// This is useful for testing purposes.
+///
+/// # Errors
+///
+/// Returns `ServiceError::BadRequest` if the torrent info-hash is invalid.
+#[allow(clippy::unused_async)]
+pub async fn create_random_torrent_handler(State(_app_data): State<Arc<AppData>>, Path(uuid): Path<UuidParam>) -> Response {
+    let Ok(uuid) = Uuid::parse_str(&uuid.value()) else {
+        return ServiceError::BadRequest.into_response();
+    };
+
+    let torrent = generate_random_torrent(uuid);
+
+    let Ok(bytes) = parse_torrent::encode_torrent(&torrent) else {
+        return ServiceError::InternalServerError.into_response();
+    };
+
+    torrent_file_response(bytes, &format!("{}.torrent", torrent.info.name))
+}
+
 /// Extracts the [`TorrentRequest`] from the multipart form payload.
 ///
 /// # Errors
@@ -236,7 +269,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<AddT
     let mut tags: Vec<TagId> = vec![];
 
     while let Some(mut field) = payload.next_field().await.unwrap() {
-        let name = field.name().unwrap().clone();
+        let name = field.name().unwrap();
 
         match name {
             "title" => {
@@ -269,7 +302,7 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<AddT
                 tags = serde_json::from_str(&string_data).map_err(|_| ServiceError::BadRequest)?;
             }
             "torrent" => {
-                let content_type = field.content_type().unwrap().clone();
+                let content_type = field.content_type().unwrap();
 
                 if content_type != "application/x-bittorrent" {
                     return Err(ServiceError::InvalidFileType);

@@ -7,8 +7,8 @@ use axum::routing::{delete, get, post, put};
 use axum::Router;
 
 use super::handlers::{
-    delete_torrent_handler, download_torrent_handler, get_torrent_info_handler, get_torrents_handler,
-    update_torrent_info_handler, upload_torrent_handler,
+    create_random_torrent_handler, delete_torrent_handler, download_torrent_handler, get_torrent_info_handler,
+    get_torrents_handler, update_torrent_info_handler, upload_torrent_handler,
 };
 use crate::common::AppData;
 
@@ -21,7 +21,14 @@ pub fn router_for_single_resources(app_data: Arc<AppData>) -> Router {
 
     Router::new()
         .route("/upload", post(upload_torrent_handler).with_state(app_data.clone()))
-        .route("/download/:info_hash", get(download_torrent_handler).with_state(app_data))
+        .route(
+            "/download/:info_hash",
+            get(download_torrent_handler).with_state(app_data.clone()),
+        )
+        .route(
+            "/meta-info/random/:uuid",
+            get(create_random_torrent_handler).with_state(app_data),
+        )
         .nest("/:info_hash", torrent_info_routes)
 }
 

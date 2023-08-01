@@ -4,6 +4,7 @@ use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
 
 use crate::config::Configuration;
+use crate::services::torrent_file::NewTorrentInfoRequest;
 use crate::utils::hex::{from_bytes, into_bytes};
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
@@ -102,17 +103,13 @@ pub struct Torrent {
 }
 
 impl Torrent {
-    /// It hydrates a `Torrent` struct from the database data.
+    /// It builds a `Torrent` from a `NewTorrentInfoRequest`.
     ///
     /// # Panics
     ///
     /// This function will panic if the `torrent_info.pieces` is not a valid hex string.
     #[must_use]
-    pub fn from_db_info_files_and_announce_urls(
-        torrent_info: DbTorrentInfo,
-        torrent_files: Vec<TorrentFile>,
-        torrent_announce_urls: Vec<Vec<String>>,
-    ) -> Self {
+    pub fn from_new_torrent_info_request(torrent_info: NewTorrentInfoRequest) -> Self {
         let private = u8::try_from(torrent_info.private.unwrap_or(0)).ok();
 
         // the info part of the torrent file
@@ -137,8 +134,9 @@ impl Torrent {
         }
 
         // either set the single file or the multiple files information
-        if torrent_files.len() == 1 {
-            let torrent_file = torrent_files
+        if torrent_info.files.len() == 1 {
+            let torrent_file = torrent_info
+                .files
                 .first()
                 .expect("vector `torrent_files` should have at least one element");
 
@@ -160,7 +158,7 @@ impl Torrent {
 
             info.path = path;
         } else {
-            info.files = Some(torrent_files);
+            info.files = Some(torrent_info.files);
         }
 
         Self {
@@ -169,11 +167,30 @@ impl Torrent {
             nodes: None,
             encoding: None,
             httpseeds: None,
-            announce_list: Some(torrent_announce_urls),
+            announce_list: Some(torrent_info.announce_urls),
             creation_date: None,
             comment: None,
             created_by: None,
         }
+    }
+
+    /// It hydrates a `Torrent` struct from the database data.
+    #[must_use]
+    pub fn from_db_info_files_and_announce_urls(
+        torrent_info: DbTorrentInfo,
+        torrent_files: Vec<TorrentFile>,
+        torrent_announce_urls: Vec<Vec<String>>,
+    ) -> Self {
+        let torrent_info_request = NewTorrentInfoRequest {
+            name: torrent_info.name,
+            pieces: torrent_info.pieces,
+            piece_length: torrent_info.piece_length,
+            private: torrent_info.private,
+            root_hash: torrent_info.root_hash,
+            files: torrent_files,
+            announce_urls: torrent_announce_urls,
+        };
+        Torrent::from_new_torrent_info_request(torrent_info_request)
     }
 
     /// Sets the announce url to the tracker url and removes all other trackers
