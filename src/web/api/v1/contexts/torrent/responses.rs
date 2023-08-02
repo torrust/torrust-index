@@ -1,6 +1,6 @@
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use hyper::{header, StatusCode};
+use hyper::{header, HeaderMap, StatusCode};
 use serde::{Deserialize, Serialize};
 
 use crate::models::torrent::TorrentId;
@@ -23,15 +23,33 @@ pub fn new_torrent_response(torrent_id: TorrentId, info_hash: &str) -> Json<OkRe
     })
 }
 
+/// Builds the binary response for a torrent file.
+///
+/// # Panics
+///
+/// Panics if the filename is not a valid header value for the `content-disposition`
+/// header.
 #[must_use]
-pub fn torrent_file_response(bytes: Vec<u8>, filename: &str) -> Response {
-    (
-        StatusCode::OK,
-        [
-            (header::CONTENT_TYPE, "application/x-bittorrent"),
-            (header::CONTENT_DISPOSITION, &format!("attachment; filename={filename}")),
-        ],
-        bytes,
-    )
-        .into_response()
+pub fn torrent_file_response(bytes: Vec<u8>, filename: &str, info_hash: &str) -> Response {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        "application/x-bittorrent"
+            .parse()
+            .expect("HTTP content type header should be valid"),
+    );
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        format!("attachment; filename={filename}")
+            .parse()
+            .expect("Torrent filename should be a valid header value for the content disposition header"),
+    );
+    headers.insert(
+        "x-torrust-torrent-infohash",
+        info_hash
+            .parse()
+            .expect("Torrent infohash should be a valid header value for the content disposition header"),
+    );
+
+    (StatusCode::OK, headers, bytes).into_response()
 }
