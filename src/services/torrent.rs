@@ -118,10 +118,11 @@ impl Index {
 
         let torrent_id = self.torrent_repository.add(&torrent_request, user_id, category).await?;
 
-        let _ = self
-            .tracker_statistics_importer
-            .import_torrent_statistics(torrent_id, &torrent_request.torrent.info_hash())
-            .await;
+        drop(
+            self.tracker_statistics_importer
+                .import_torrent_statistics(torrent_id, &torrent_request.torrent.info_hash())
+                .await,
+        );
 
         // We always whitelist the torrent on the tracker because even if the tracker mode is `public`
         // it could be changed to `private` later on.
@@ -131,7 +132,7 @@ impl Index {
             .await
         {
             // If the torrent can't be whitelisted somehow, remove the torrent from database
-            let _ = self.torrent_repository.delete(&torrent_id).await;
+            drop(self.torrent_repository.delete(&torrent_id).await);
             return Err(e);
         }
 

@@ -126,7 +126,7 @@ impl RegistrationService {
 
         // If this is the first created account, give administrator rights
         if user_id == 1 {
-            let _ = self.user_repository.grant_admin_role(&user_id).await;
+            drop(self.user_repository.grant_admin_role(&user_id).await);
         }
 
         if settings.mail.email_verification_enabled && opt_email.is_some() {
@@ -141,7 +141,7 @@ impl RegistrationService {
                 .await;
 
             if mail_res.is_err() {
-                let _ = self.user_repository.delete(&user_id).await;
+                drop(self.user_repository.delete(&user_id).await);
                 return Err(ServiceError::FailedToSendVerificationEmail);
             }
         }
