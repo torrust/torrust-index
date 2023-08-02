@@ -333,7 +333,6 @@ impl Index {
         let page_size = request.page_size.unwrap_or(default_torrent_page_size);
 
         // Guard that page size does not exceed the maximum
-        let max_torrent_page_size = max_torrent_page_size;
         let page_size = if page_size > max_torrent_page_size {
             max_torrent_page_size
         } else {
