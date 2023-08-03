@@ -80,6 +80,7 @@ mod tests {
                 private: Some(0),
                 path: None,
                 root_hash: None,
+                source: None,
             },
             announce: None,
             announce_list: Some(vec![]),

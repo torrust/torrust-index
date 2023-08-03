@@ -38,6 +38,8 @@ pub struct TorrentInfo {
     #[serde(default)]
     #[serde(rename = "root hash")]
     pub root_hash: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 impl TorrentInfo {
@@ -123,6 +125,7 @@ impl Torrent {
             private,
             path: None,
             root_hash: None,
+            source: None,
         };
 
         // a torrent file has a root hash or a pieces key, but not both.
