@@ -121,7 +121,7 @@ impl BytesCache {
         }
 
         // Remove the old entry so that a new entry will be added as last in the queue.
-        let _ = self.bytes_table.shift_remove(&key);
+        drop(self.bytes_table.shift_remove(&key));
 
         let bytes_cache_entry = BytesCacheEntry::new(bytes);
 

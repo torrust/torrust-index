@@ -69,13 +69,14 @@ impl StatisticsImporter {
     /// found.
     pub async fn import_torrent_statistics(&self, torrent_id: i64, info_hash: &str) -> Result<TorrentInfo, ServiceError> {
         if let Ok(torrent_info) = self.tracker_service.get_torrent_info(info_hash).await {
-            let _ = self
-                .database
-                .update_tracker_info(torrent_id, &self.tracker_url, torrent_info.seeders, torrent_info.leechers)
-                .await;
+            drop(
+                self.database
+                    .update_tracker_info(torrent_id, &self.tracker_url, torrent_info.seeders, torrent_info.leechers)
+                    .await,
+            );
             Ok(torrent_info)
         } else {
-            let _ = self.database.update_tracker_info(torrent_id, &self.tracker_url, 0, 0).await;
+            drop(self.database.update_tracker_info(torrent_id, &self.tracker_url, 0, 0).await);
             Err(ServiceError::TorrentNotFound)
         }
     }

@@ -74,7 +74,7 @@ impl Database for Sqlite {
 
         // rollback transaction on error
         if let Err(e) = insert_user_auth_result {
-            let _ = tx.rollback().await;
+            drop(tx.rollback().await);
             return Err(e);
         }
 
@@ -101,11 +101,11 @@ impl Database for Sqlite {
         // commit or rollback transaction and return user_id on success
         match insert_user_profile_result {
             Ok(_) => {
-                let _ = tx.commit().await;
+                drop(tx.commit().await);
                 Ok(user_id)
             }
             Err(e) => {
-                let _ = tx.rollback().await;
+                drop(tx.rollback().await);
                 Err(e)
             }
         }
@@ -487,7 +487,7 @@ impl Database for Sqlite {
 
         // rollback transaction on error
         if let Err(e) = insert_torrent_files_result {
-            let _ = tx.rollback().await;
+            drop(tx.rollback().await);
             return Err(e);
         }
 
@@ -521,7 +521,7 @@ impl Database for Sqlite {
 
         // rollback transaction on error
         if let Err(e) = insert_torrent_announce_urls_result {
-            let _ = tx.rollback().await;
+            drop(tx.rollback().await);
             return Err(e);
         }
 
@@ -548,11 +548,11 @@ impl Database for Sqlite {
         // commit or rollback transaction and return user_id on success
         match insert_torrent_info_result {
             Ok(_) => {
-                let _ = tx.commit().await;
+                drop(tx.commit().await);
                 Ok(torrent_id)
             }
             Err(e) => {
-                let _ = tx.rollback().await;
+                drop(tx.rollback().await);
                 Err(e)
             }
         }

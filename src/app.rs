@@ -162,7 +162,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         loop {
             interval.tick().await;
             if let Some(tracker) = weak_tracker_statistics_importer.upgrade() {
-                let _ = tracker.import_all_torrents_statistics().await;
+                drop(tracker.import_all_torrents_statistics().await);
             } else {
                 break;
             }
