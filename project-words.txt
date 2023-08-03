@@ -1,5 +1,6 @@
 actix
 addrs
+alekitto
 AUTOINCREMENT
 bencode
 bencoded
@@ -7,6 +8,8 @@ Benoit
 binascii
 btih
 chrono
+codecov
+codegen
 compatiblelicenses
 creativecommons
 creds
@@ -16,6 +19,8 @@ datetime
 DATETIME
 Dont
 dotless
+dtolnay
+grcov
 Grünwald
 hasher
 Hasher
@@ -27,6 +32,7 @@ imdl
 indexadmin
 indexmap
 infohash
+Intermodal
 jsonwebtoken
 leechers
 Leechers
@@ -49,6 +55,8 @@ reqwest
 Roadmap
 ROADMAP
 rowid
+RUSTDOCFLAGS
+RUSTFLAGS
 sgxj
 singlepart
 sqlx
@@ -56,6 +64,8 @@ strftime
 sublicensable
 sublist
 subpoints
+Swatinem
+taiki
 tempdir
 tempfile
 thiserror
