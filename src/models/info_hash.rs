@@ -128,7 +128,75 @@
 //!
 //! You can hash that byte string with <https://www.pelock.com/products/hash-calculator>
 //!
+//! > NOTICE: you need to remove the line breaks from the byte string before hashing.
+//!
+//! ```text
+//! 64363a6c656e6774686931373232303465343a6e616d6532343a6d616e64656c62726f745f3230343878323034382e706e6731323a7069656365206c656e67746869313633383465363a7069656365733232303a7d91710d9d4dba889b542054d526728d5a863fe121df77c7f7bb6c779621662538c5d9cdab8b08ef8c249bb2f5c4cd2adf0bc00cf0addf7290e5b6414c236c479b8e9f46aa0c0d8ed197ffee688b5f34a387d771c5a6f98e2ea6317cbdf0f9e223f9cc80af540004f985691c7789c1764ed6aabf61a6c28099abb65f602f40a825be32a33d9d070c796898d49d6349af205866266f986b6d3234cd7d08155e1ad0000957ab303b2060c1dc1287d6f3e7454f706709363155f220f66ca5156f2c8995691653817d31f1b6bd3742cc110bb2fc2b49a585b6fc7674449365
+//! ```
+//!
 //! The result is a 20-char string: `5452869BE36F9F3350CCEE6B4544E7E76CAAADAB`
+//!
+//! The `info` dictionary can contain more fields, like the following example:
+//!
+//! ```json
+//! {
+//!     "length": 172204,
+//!     "name": "mandelbrot_2048x2048.png",
+//!     "piece length": 16384,
+//!     "pieces": "<hex>7D 91 71 0D 9D 4D BA 88 9B 54 20 54 D5 26 72 8D 5A 86 3F E1 21 DF 77 C7 F7 BB 6C 77 96 21 66 25 38 C5 D9 CD AB 8B 08 EF 8C 24 9B B2 F5 C4 CD 2A DF 0B C0 0C F0 AD DF 72 90 E5 B6 41 4C 23 6C 47 9B 8E 9F 46 AA 0C 0D 8E D1 97 FF EE 68 8B 5F 34 A3 87 D7 71 C5 A6 F9 8E 2E A6 31 7C BD F0 F9 E2 23 F9 CC 80 AF 54 00 04 F9 85 69 1C 77 89 C1 76 4E D6 AA BF 61 A6 C2 80 99 AB B6 5F 60 2F 40 A8 25 BE 32 A3 3D 9D 07 0C 79 68 98 D4 9D 63 49 AF 20 58 66 26 6F 98 6B 6D 32 34 CD 7D 08 15 5E 1A D0 00 09 57 AB 30 3B 20 60 C1 DC 12 87 D6 F3 E7 45 4F 70 67 09 36 31 55 F2 20 F6 6C A5 15 6F 2C 89 95 69 16 53 81 7D 31 F1 B6 BD 37 42 CC 11 0B B2 FC 2B 49 A5 85 B6 FC 76 74 44 93</hex>"
+//!     "private": 1,
+//!     "md5sum": "e2ea6317cbdf0f9e223f9cc80af54000
+//!     "source": "GGn",
+//!  }
+//! ```
+//!
+//! Refer to the struct [`TorrentInfo`](crate::models::torrent_file::TorrentInfo) for more info.
+//!
+//! Regarding the `source` field, it is not clear was was the initial intention
+//! for that field. It could be an string to identify the source of the torrent.
+//! But it has been used by private trackers to identify the tracker that
+//! created the torrent and it's usually a three-char string. Refer to
+//! <https://github.com/qbittorrent/qBittorrent/discussions/19406> for more info.
+//!
+//! The `md5sum` field is a string with the MD5 hash of the file. It seems is
+//! not used by the protocol.
+//!
+//! Some fields are exclusive to `BitTorrent` v2.
+//!
+//! For the [`]BitTorrent` Version 1 specification](https://www.bittorrent.org/beps/bep_0003.html) there are two types of torrent
+//! files: single file and multiple files. Some fields are only valid for one
+//! type of torrent file.
+//!
+//! An example for a single-file torrent info dictionary:
+//!
+//! ```json
+//! {
+//!     "length": 11,
+//!     "name": "sample.txt",
+//!     "piece length": 16384,
+//!     "pieces": "<hex>D4 91 58 7F 1C 42 DF F0 CB 0F F5 C2 B8 CE FE 22 B3 AD 31 0A</hex>"
+//! }
+//! ```
+//!
+//! An example for a multi-file torrent info dictionary:
+//!
+//! ```json
+//! {
+//!     "files": [
+//!        {
+//!           "length": 11,
+//!           "path": [
+//!              "sample.txt"
+//!           ]
+//!        }
+//!     ],
+//!     "name": "sample",
+//!     "piece length": 16384,
+//!     "pieces": "<hex>D4 91 58 7F 1C 42 DF F0 CB 0F F5 C2 B8 CE FE 22 B3 AD 31 0A</hex>"
+//! }
+//! ```
+//!
+//! An example torrent creator implementation can be found [here](https://www.bittorrent.org/beps/bep_0052_torrent_creator.py).
 use std::panic::Location;
 
 use thiserror::Error;
