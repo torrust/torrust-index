@@ -1,0 +1,1 @@
+ALTER TABLE torrust_torrents ADD COLUMN source TEXT DEFAULT NULL

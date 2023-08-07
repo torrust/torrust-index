@@ -441,7 +441,7 @@ impl Database for Mysql {
         let private = torrent.info.private.unwrap_or(0);
 
         // add torrent
-        let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, name, pieces, piece_length, private, root_hash, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())")
+        let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, name, pieces, piece_length, private, root_hash, `source`, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())")
             .bind(uploader_id)
             .bind(category_id)
             .bind(info_hash.to_lowercase())
@@ -451,6 +451,7 @@ impl Database for Mysql {
             .bind(torrent.info.piece_length)
             .bind(private)
             .bind(root_hash)
+            .bind(torrent.info.source.clone())
             .execute(&self.pool)
             .await
             .map(|v| i64::try_from(v.last_insert_id()).expect("last ID is larger than i64"))
