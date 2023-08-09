@@ -87,7 +87,7 @@ services:
     environment:
       - MYSQL_ROOT_HOST=%
       - MYSQL_ROOT_PASSWORD=root_secret_password
-      - MYSQL_DATABASE=torrust_index_backend
+      - MYSQL_DATABASE=${TORRUST_IDX_BACK_MYSQL_DATABASE:-torrust_index_backend_e2e_testing}
       - MYSQL_USER=db_user
       - MYSQL_PASSWORD=db_user_secret_password
     networks:

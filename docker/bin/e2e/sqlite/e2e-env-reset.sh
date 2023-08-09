@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Delete the SQLite databases and recreate them.
+# Delete the databases and recreate them.
 
-./docker/bin/e2e-env-down.sh
+docker compose down
 
 rm -f ./storage/database/torrust_index_backend_e2e_testing.db
 rm -f ./storage/database/torrust_tracker_e2e_testing.db
@@ -23,4 +23,4 @@ if ! [ -f "./storage/database/torrust_tracker_e2e_testing.db" ]; then
     echo ";" | sqlite3 ./storage/database/torrust_tracker_e2e_testing.db
 fi
 
-./docker/bin/e2e-env-up.sh
+./docker/bin/e2e/sqlite/e2e-env-up.sh

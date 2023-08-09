@@ -250,7 +250,9 @@ impl Database for Mysql {
             .map(|v| i64::try_from(v.last_insert_id()).expect("last ID is larger than i64"))
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
-                    if err.message().contains("UNIQUE") {
+                    if err.message().contains("Duplicate entry") {
+                        // Example error message when you try to insert a duplicate category:
+                        // Error: Duplicate entry 'category name SAMPLE_NAME' for key 'torrust_categories.name'
                         database::Error::CategoryAlreadyExists
                     } else {
                         database::Error::Error
