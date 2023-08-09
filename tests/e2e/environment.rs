@@ -1,5 +1,6 @@
 use std::env;
 
+use torrust_index_backend::databases::database;
 use torrust_index_backend::web::api::Version;
 
 use super::config::{init_shared_env_configuration, ENV_VAR_E2E_SHARED};
@@ -95,12 +96,53 @@ impl TestEnv {
         }
     }
 
-    /// Provides the database connect URL.
-    /// For example: `sqlite://storage/database/torrust_index_backend_e2e_testing.db?mode=rwc`.
+    /// Provides a database connect URL to connect to the database. For example:
+    ///
+    /// `sqlite://storage/database/torrust_index_backend_e2e_testing.db?mode=rwc`.
+    ///
+    /// It's used to run SQL queries against the database needed for some tests.
     pub fn database_connect_url(&self) -> Option<String> {
-        self.starting_settings
+        let internal_connect_url = self
+            .starting_settings
             .as_ref()
-            .map(|settings| settings.database.connect_url.clone())
+            .map(|settings| settings.database.connect_url.clone());
+
+        match self.state() {
+            State::RunningShared => {
+                if let Some(db_path) = internal_connect_url {
+                    let maybe_db_driver = database::get_driver(&db_path);
+
+                    return match maybe_db_driver {
+                        Ok(db_driver) => match db_driver {
+                            database::Driver::Sqlite3 => Some(db_path),
+                            database::Driver::Mysql => Some(Self::overwrite_mysql_host(&db_path, "localhost")),
+                        },
+                        Err(_) => None,
+                    };
+                }
+                None
+            }
+            State::RunningIsolated => internal_connect_url,
+            State::Stopped => None,
+        }
+    }
+
+    /// It overrides the "Host" in a `SQLx` database connection URL. For example:
+    ///
+    /// For:
+    ///
+    /// `mysql://root:root_secret_password@mysql:3306/torrust_index_backend_e2e_testing`.
+    ///
+    /// It changes the `mysql` host name to `localhost`:
+    ///
+    /// `mysql://root:root_secret_password@localhost:3306/torrust_index_backend_e2e_testing`.
+    ///
+    /// For E2E tests, we use docker compose, internally the backend connects to
+    /// the database using the "mysql" host, which is the docker compose service
+    /// name, but tests connects directly to the localhost since the `MySQL`
+    /// is exposed to the host.
+    fn overwrite_mysql_host(db_path: &str, new_host: &str) -> String {
+        db_path.replace("@mysql:", &format!("@{new_host}:"))
     }
 
     fn state(&self) -> State {

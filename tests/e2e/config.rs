@@ -1,7 +1,7 @@
 //! Initialize configuration for the shared E2E tests environment from a
 //! config file `config.toml` or env var.
 //!
-//! All environment variables are prefixed with `TORRUST_IDX_BACK_`.
+//! All environment variables are prefixed with `TORRUST_IDX_BACK_E2E`.
 use std::env;
 
 use torrust_index_backend::config::Configuration;
@@ -13,6 +13,9 @@ pub const ENV_VAR_E2E_SHARED: &str = "TORRUST_IDX_BACK_E2E_SHARED";
 
 /// The whole `config.toml` file content. It has priority over the config file.
 pub const ENV_VAR_E2E_CONFIG: &str = "TORRUST_IDX_BACK_E2E_CONFIG";
+
+/// The `config.toml` file location.
+pub const ENV_VAR_E2E_CONFIG_PATH: &str = "TORRUST_IDX_BACK_E2E_CONFIG_PATH";
 
 // Default values
 
@@ -29,9 +32,11 @@ pub async fn init_shared_env_configuration() -> Configuration {
 
         Configuration::load_from_env_var(ENV_VAR_E2E_CONFIG).unwrap()
     } else {
-        println!("Loading configuration for E2E env from config file `{ENV_VAR_E2E_DEFAULT_CONFIG_PATH}`");
+        let config_path = env::var(ENV_VAR_E2E_CONFIG_PATH).unwrap_or_else(|_| ENV_VAR_E2E_DEFAULT_CONFIG_PATH.to_string());
 
-        match Configuration::load_from_file(ENV_VAR_E2E_DEFAULT_CONFIG_PATH).await {
+        println!("Loading configuration from config file `{config_path}`");
+
+        match Configuration::load_from_file(&config_path).await {
             Ok(config) => config,
             Err(error) => {
                 panic!("{}", error)
