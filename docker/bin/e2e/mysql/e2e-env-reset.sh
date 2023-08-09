@@ -1,8 +1,8 @@
 #!/bin/bash
 
-./docker/bin/e2e/mysql/e2e-env-down.sh
-
 # Delete the databases and recreate them.
+
+docker compose down
 
 # Index Backend
 
