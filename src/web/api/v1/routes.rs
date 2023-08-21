@@ -2,6 +2,7 @@
 use std::env;
 use std::sync::Arc;
 
+use axum::extract::DefaultBodyLimit;
 use axum::routing::get;
 use axum::Router;
 use tower_http::cors::CorsLayer;
@@ -35,9 +36,11 @@ pub fn router(app_data: Arc<AppData>) -> Router {
         .route("/", get(about_page_handler).with_state(app_data))
         .nest(&format!("/{API_VERSION_URL_PREFIX}"), v1_api_routes);
 
-    if env::var(ENV_VAR_CORS_PERMISSIVE).is_ok() {
+    let router = if env::var(ENV_VAR_CORS_PERMISSIVE).is_ok() {
         router.layer(CorsLayer::permissive())
     } else {
         router
-    }
+    };
+
+    router.layer(DefaultBodyLimit::max(10_485_760))
 }
