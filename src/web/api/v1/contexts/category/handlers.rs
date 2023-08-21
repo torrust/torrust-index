@@ -81,7 +81,7 @@ pub async fn delete_handler(
     };
 
     match app_data.category_service.delete_category(&category_form.name, &user_id).await {
-        Ok(_) => deleted_category(&category_form.name).into_response(),
+        Ok(()) => deleted_category(&category_form.name).into_response(),
         Err(error) => error.into_response(),
     }
 }

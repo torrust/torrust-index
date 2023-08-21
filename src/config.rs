@@ -318,7 +318,7 @@ impl Configuration {
             warn!("No config file found. Creating default config file ...");
 
             let config = Configuration::default();
-            let _ = config.save_to_file(config_path).await;
+            let () = config.save_to_file(config_path).await;
 
             return Err(ConfigError::Message(format!(
                 "No config file found. Created default config file in {config_path}. Edit the file and start the application."
