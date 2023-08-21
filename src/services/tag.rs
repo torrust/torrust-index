@@ -39,7 +39,7 @@ impl Service {
         }
 
         match self.tag_repository.add(tag_name).await {
-            Ok(_) => Ok(()),
+            Ok(()) => Ok(()),
             Err(e) => match e {
                 DatabaseError::TagAlreadyExists => Err(ServiceError::TagAlreadyExists),
                 _ => Err(ServiceError::DatabaseError),
@@ -65,7 +65,7 @@ impl Service {
         }
 
         match self.tag_repository.delete(tag_id).await {
-            Ok(_) => Ok(()),
+            Ok(()) => Ok(()),
             Err(e) => match e {
                 DatabaseError::TagNotFound => Err(ServiceError::TagNotFound),
                 _ => Err(ServiceError::DatabaseError),

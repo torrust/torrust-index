@@ -65,7 +65,7 @@ impl Service {
         }
 
         match self.category_repository.delete(category_name).await {
-            Ok(_) => Ok(()),
+            Ok(()) => Ok(()),
             Err(e) => match e {
                 DatabaseError::CategoryNotFound => Err(ServiceError::CategoryNotFound),
                 _ => Err(ServiceError::DatabaseError),

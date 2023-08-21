@@ -52,7 +52,7 @@ pub async fn add_handler(
     };
 
     match app_data.tag_service.add_tag(&add_tag_form.name, &user_id).await {
-        Ok(_) => added_tag(&add_tag_form.name).into_response(),
+        Ok(()) => added_tag(&add_tag_form.name).into_response(),
         Err(error) => error.into_response(),
     }
 }
@@ -77,7 +77,7 @@ pub async fn delete_handler(
     };
 
     match app_data.tag_service.delete_tag(&delete_tag_form.tag_id, &user_id).await {
-        Ok(_) => deleted_tag(delete_tag_form.tag_id).into_response(),
+        Ok(()) => deleted_tag(delete_tag_form.tag_id).into_response(),
         Err(error) => error.into_response(),
     }
 }

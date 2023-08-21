@@ -498,7 +498,7 @@ impl Database for Sqlite {
             let announce_urls = announce_urls.iter().flatten().collect::<Vec<&String>>();
 
             for tracker_url in &announce_urls {
-                let _ = query("INSERT INTO torrust_torrent_announce_urls (torrent_id, tracker_url) VALUES (?, ?)")
+                let () = query("INSERT INTO torrust_torrent_announce_urls (torrent_id, tracker_url) VALUES (?, ?)")
                     .bind(torrent_id)
                     .bind(tracker_url)
                     .execute(&mut tx)

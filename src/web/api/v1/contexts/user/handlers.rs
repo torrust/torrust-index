@@ -145,7 +145,7 @@ pub async fn ban_handler(
     };
 
     match app_data.ban_service.ban_user(&to_be_banned_username.0, &user_id).await {
-        Ok(_) => Json(OkResponseData {
+        Ok(()) => Json(OkResponseData {
             data: format!("Banned user: {}", to_be_banned_username.0),
         })
         .into_response(),
