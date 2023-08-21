@@ -97,8 +97,8 @@ pub enum ServiceError {
     #[display(fmt = "Torrent title is too short.")]
     InvalidTorrentTitleLength,
 
-    #[display(fmt = "Bad request.")]
-    BadRequest,
+    #[display(fmt = "Some mandatory metadata fields are missing.")]
+    MissingMandatoryMetadataFields,
 
     #[display(fmt = "Selected category does not exist.")]
     InvalidCategory,
@@ -223,7 +223,7 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::InvalidTorrentPiecesLength => StatusCode::BAD_REQUEST,
         ServiceError::InvalidFileType => StatusCode::BAD_REQUEST,
         ServiceError::InvalidTorrentTitleLength => StatusCode::BAD_REQUEST,
-        ServiceError::BadRequest => StatusCode::BAD_REQUEST,
+        ServiceError::MissingMandatoryMetadataFields => StatusCode::BAD_REQUEST,
         ServiceError::InvalidCategory => StatusCode::BAD_REQUEST,
         ServiceError::InvalidTag => StatusCode::BAD_REQUEST,
         ServiceError::Unauthorized => StatusCode::FORBIDDEN,

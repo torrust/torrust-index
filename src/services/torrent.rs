@@ -11,11 +11,12 @@ use crate::errors::ServiceError;
 use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::{DeletedTorrentResponse, TorrentResponse, TorrentsResponse};
-use crate::models::torrent::{AddTorrentRequest, TorrentId, TorrentListing};
+use crate::models::torrent::{Metadata, TorrentId, TorrentListing};
 use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::user::UserId;
 use crate::tracker::statistics_importer::StatisticsImporter;
+use crate::utils::parse_torrent;
 use crate::{tracker, AsCSV};
 
 const MIN_TORRENT_TITLE_LENGTH: usize = 3;
@@ -32,6 +33,14 @@ pub struct Index {
     torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
     torrent_tag_repository: Arc<DbTorrentTagRepository>,
     torrent_listing_generator: Arc<DbTorrentListingGenerator>,
+}
+
+pub struct AddTorrentRequest {
+    pub title: String,
+    pub description: String,
+    pub category: String,
+    pub tags: Vec<TagId>,
+    pub torrent_buffer: Vec<u8>,
 }
 
 /// User request to generate a torrent listing.
@@ -101,46 +110,75 @@ impl Index {
     /// * Unable to insert the torrent into the database.
     /// * Unable to add the torrent to the whitelist.
     /// * Torrent title is too short.
-    pub async fn add_torrent(&self, mut torrent_request: AddTorrentRequest, user_id: UserId) -> Result<TorrentId, ServiceError> {
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if:
+    ///
+    /// * Unable to parse the torrent info-hash.
+    pub async fn add_torrent(
+        &self,
+        add_torrent_form: AddTorrentRequest,
+        user_id: UserId,
+    ) -> Result<(TorrentId, InfoHash), ServiceError> {
+        let metadata = Metadata {
+            title: add_torrent_form.title,
+            description: add_torrent_form.description,
+            category: add_torrent_form.category,
+            tags: add_torrent_form.tags,
+        };
+
+        metadata.verify()?;
+
+        let mut torrent =
+            parse_torrent::decode_torrent(&add_torrent_form.torrent_buffer).map_err(|_| ServiceError::InvalidTorrentFile)?;
+
+        // Make sure that the pieces key has a length that is a multiple of 20
+        if let Some(pieces) = torrent.info.pieces.as_ref() {
+            if pieces.as_ref().len() % 20 != 0 {
+                return Err(ServiceError::InvalidTorrentPiecesLength);
+            }
+        }
+
         let _user = self.user_repository.get_compact(&user_id).await?;
 
-        torrent_request.torrent.set_announce_urls(&self.configuration).await;
+        torrent.set_announce_urls(&self.configuration).await;
 
-        if torrent_request.metadata.title.len() < MIN_TORRENT_TITLE_LENGTH {
+        if metadata.title.len() < MIN_TORRENT_TITLE_LENGTH {
             return Err(ServiceError::InvalidTorrentTitleLength);
         }
 
         let category = self
             .category_repository
-            .get_by_name(&torrent_request.metadata.category)
+            .get_by_name(&metadata.category)
             .await
             .map_err(|_| ServiceError::InvalidCategory)?;
 
-        let torrent_id = self.torrent_repository.add(&torrent_request, user_id, category).await?;
+        let torrent_id = self.torrent_repository.add(&torrent, &metadata, user_id, category).await?;
+        let info_hash: InfoHash = torrent
+            .info_hash()
+            .parse()
+            .expect("the parsed torrent should have a valid info hash");
 
         drop(
             self.tracker_statistics_importer
-                .import_torrent_statistics(torrent_id, &torrent_request.torrent.info_hash())
+                .import_torrent_statistics(torrent_id, &torrent.info_hash())
                 .await,
         );
 
         // We always whitelist the torrent on the tracker because even if the tracker mode is `public`
         // it could be changed to `private` later on.
-        if let Err(e) = self
-            .tracker_service
-            .whitelist_info_hash(torrent_request.torrent.info_hash())
-            .await
-        {
+        if let Err(e) = self.tracker_service.whitelist_info_hash(torrent.info_hash()).await {
             // If the torrent can't be whitelisted somehow, remove the torrent from database
             drop(self.torrent_repository.delete(&torrent_id).await);
             return Err(e);
         }
 
         self.torrent_tag_repository
-            .link_torrent_to_tags(&torrent_id, &torrent_request.metadata.tags)
+            .link_torrent_to_tags(&torrent_id, &metadata.tags)
             .await?;
 
-        Ok(torrent_id)
+        Ok((torrent_id, info_hash))
     }
 
     /// Gets a torrent from the Index.
@@ -436,18 +474,13 @@ impl DbTorrentRepository {
     /// This function will return an error there is a database error.
     pub async fn add(
         &self,
-        torrent_request: &AddTorrentRequest,
+        torrent: &Torrent,
+        metadata: &Metadata,
         user_id: UserId,
         category: Category,
     ) -> Result<TorrentId, Error> {
         self.database
-            .insert_torrent_and_get_id(
-                &torrent_request.torrent,
-                user_id,
-                category.category_id,
-                &torrent_request.metadata.title,
-                &torrent_request.metadata.description,
-            )
+            .insert_torrent_and_get_id(torrent, user_id, category.category_id, &metadata.title, &metadata.description)
             .await
     }
 
