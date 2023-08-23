@@ -39,7 +39,8 @@ impl IntoResponse for database::Error {
     }
 }
 
-fn json_error_response(status_code: StatusCode, error_response_data: &ErrorResponseData) -> Response {
+#[must_use]
+pub fn json_error_response(status_code: StatusCode, error_response_data: &ErrorResponseData) -> Response {
     (
         status_code,
         [(header::CONTENT_TYPE, "application/json")],

@@ -330,6 +330,7 @@
 //!
 //! Refer to the [`DeletedTorrentResponse`](crate::models::response::DeletedTorrentResponse)
 //! struct for more information about the response attributes.
+pub mod errors;
 pub mod forms;
 pub mod handlers;
 pub mod responses;

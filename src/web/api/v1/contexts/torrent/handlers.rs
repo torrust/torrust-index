@@ -10,14 +10,14 @@ use axum::Json;
 use serde::Deserialize;
 use uuid::Uuid;
 
+use super::errors;
 use super::forms::UpdateTorrentInfoForm;
 use super::responses::{new_torrent_response, torrent_file_response};
 use crate::common::AppData;
 use crate::errors::ServiceError;
 use crate::models::info_hash::InfoHash;
-use crate::models::torrent::{AddTorrentRequest, Metadata};
 use crate::models::torrent_tag::TagId;
-use crate::services::torrent::ListingRequest;
+use crate::services::torrent::{AddTorrentRequest, ListingRequest};
 use crate::services::torrent_file::generate_random_torrent;
 use crate::utils::parse_torrent;
 use crate::web::api::v1::auth::get_optional_logged_in_user;
@@ -43,15 +43,13 @@ pub async fn upload_torrent_handler(
         Err(error) => return error.into_response(),
     };
 
-    let torrent_request = match get_torrent_request_from_payload(multipart).await {
+    let add_torrent_form = match build_add_torrent_request_from_payload(multipart).await {
         Ok(torrent_request) => torrent_request,
         Err(error) => return error.into_response(),
     };
 
-    let info_hash = torrent_request.torrent.info_hash().clone();
-
-    match app_data.torrent_service.add_torrent(torrent_request, user_id).await {
-        Ok(torrent_id) => new_torrent_response(torrent_id, &info_hash).into_response(),
+    match app_data.torrent_service.add_torrent(add_torrent_form, user_id).await {
+        Ok(torrent_ids) => new_torrent_response(torrent_ids.0, &torrent_ids.1.to_hex_string()).into_response(),
         Err(error) => error.into_response(),
     }
 }
@@ -69,7 +67,7 @@ impl InfoHashParam {
 ///
 /// # Errors
 ///
-/// Returns `ServiceError::BadRequest` if the torrent info-hash is invalid.
+/// Returns an error if the torrent info-hash is invalid.
 #[allow(clippy::unused_async)]
 pub async fn download_torrent_handler(
     State(app_data): State<Arc<AppData>>,
@@ -77,7 +75,7 @@ pub async fn download_torrent_handler(
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
-        return ServiceError::BadRequest.into_response();
+        return errors::Request::InvalidInfoHashParam.into_response();
     };
 
     let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
@@ -127,7 +125,7 @@ pub async fn get_torrent_info_handler(
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
-        return ServiceError::BadRequest.into_response();
+        return errors::Request::InvalidInfoHashParam.into_response();
     };
 
     let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
@@ -158,7 +156,7 @@ pub async fn update_torrent_info_handler(
     extract::Json(update_torrent_info_form): extract::Json<UpdateTorrentInfoForm>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
-        return ServiceError::BadRequest.into_response();
+        return errors::Request::InvalidInfoHashParam.into_response();
     };
 
     let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
@@ -199,7 +197,7 @@ pub async fn delete_torrent_handler(
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
-        return ServiceError::BadRequest.into_response();
+        return errors::Request::InvalidInfoHashParam.into_response();
     };
 
     let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
@@ -231,11 +229,11 @@ impl UuidParam {
 ///
 /// # Errors
 ///
-/// Returns `ServiceError::BadRequest` if the torrent info-hash is invalid.
+/// Returns an error if the torrent info-hash is invalid.
 #[allow(clippy::unused_async)]
 pub async fn create_random_torrent_handler(State(_app_data): State<Arc<AppData>>, Path(uuid): Path<UuidParam>) -> Response {
     let Ok(uuid) = Uuid::parse_str(&uuid.value()) else {
-        return ServiceError::BadRequest.into_response();
+        return errors::Request::InvalidInfoHashParam.into_response();
     };
 
     let torrent = generate_random_torrent(uuid);
@@ -259,7 +257,7 @@ pub async fn create_random_torrent_handler(State(_app_data): State<Arc<AppData>>
 ///    - The multipart content is invalid.
 ///    - The torrent file pieces key has a length that is not a multiple of 20.
 ///    - The binary data cannot be decoded as a torrent file.
-async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<AddTorrentRequest, ServiceError> {
+async fn build_add_torrent_request_from_payload(mut payload: Multipart) -> Result<AddTorrentRequest, errors::Request> {
     let torrent_buffer = vec![0u8];
     let mut torrent_cursor = Cursor::new(torrent_buffer);
 
@@ -277,69 +275,56 @@ async fn get_torrent_request_from_payload(mut payload: Multipart) -> Result<AddT
                 if data.is_empty() {
                     continue;
                 };
-                title = String::from_utf8(data.to_vec()).map_err(|_| ServiceError::BadRequest)?;
+                title = String::from_utf8(data.to_vec()).map_err(|_| errors::Request::TitleIsNotValidUtf8)?;
             }
             "description" => {
                 let data = field.bytes().await.unwrap();
                 if data.is_empty() {
                     continue;
                 };
-                description = String::from_utf8(data.to_vec()).map_err(|_| ServiceError::BadRequest)?;
+                description = String::from_utf8(data.to_vec()).map_err(|_| errors::Request::DescriptionIsNotValidUtf8)?;
             }
             "category" => {
                 let data = field.bytes().await.unwrap();
                 if data.is_empty() {
                     continue;
                 };
-                category = String::from_utf8(data.to_vec()).map_err(|_| ServiceError::BadRequest)?;
+                category = String::from_utf8(data.to_vec()).map_err(|_| errors::Request::CategoryIsNotValidUtf8)?;
             }
             "tags" => {
                 let data = field.bytes().await.unwrap();
                 if data.is_empty() {
                     continue;
                 };
-                let string_data = String::from_utf8(data.to_vec()).map_err(|_| ServiceError::BadRequest)?;
-                tags = serde_json::from_str(&string_data).map_err(|_| ServiceError::BadRequest)?;
+                let string_data = String::from_utf8(data.to_vec()).map_err(|_| errors::Request::TagsArrayIsNotValidUtf8)?;
+                tags = serde_json::from_str(&string_data).map_err(|_| errors::Request::TagsArrayIsNotValidJson)?;
             }
             "torrent" => {
                 let content_type = field.content_type().unwrap();
 
                 if content_type != "application/x-bittorrent" {
-                    return Err(ServiceError::InvalidFileType);
+                    return Err(errors::Request::InvalidFileType);
                 }
 
-                while let Some(chunk) = field.chunk().await.map_err(|_| (ServiceError::BadRequest))? {
-                    torrent_cursor.write_all(&chunk)?;
+                while let Some(chunk) = field
+                    .chunk()
+                    .await
+                    .map_err(|_| (errors::Request::CannotReadChunkFromUploadedBinary))?
+                {
+                    torrent_cursor
+                        .write_all(&chunk)
+                        .map_err(|_| (errors::Request::CannotWriteChunkFromUploadedBinary))?;
                 }
             }
             _ => {}
         }
     }
 
-    let fields = Metadata {
+    Ok(AddTorrentRequest {
         title,
         description,
         category,
         tags,
-    };
-
-    fields.verify()?;
-
-    let position = usize::try_from(torrent_cursor.position()).map_err(|_| ServiceError::InvalidTorrentFile)?;
-    let inner = torrent_cursor.get_ref();
-
-    let torrent = parse_torrent::decode_torrent(&inner[..position]).map_err(|_| ServiceError::InvalidTorrentFile)?;
-
-    // Make sure that the pieces key has a length that is a multiple of 20
-    // code-review: I think we could put this inside the service.
-    if let Some(pieces) = torrent.info.pieces.as_ref() {
-        if pieces.as_ref().len() % 20 != 0 {
-            return Err(ServiceError::InvalidTorrentPiecesLength);
-        }
-    }
-
-    Ok(AddTorrentRequest {
-        metadata: fields,
-        torrent,
+        torrent_buffer: torrent_cursor.into_inner(),
     })
 }

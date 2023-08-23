@@ -229,6 +229,7 @@ impl Torrent {
 
     #[must_use]
     pub fn info_hash(&self) -> String {
+        // todo: return an InfoHash struct
         from_bytes(&self.calculate_info_hash_as_bytes()).to_lowercase()
     }
 

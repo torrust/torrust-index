@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use super::torrent_tag::TagId;
 use crate::errors::ServiceError;
-use crate::models::torrent_file::Torrent;
 
 #[allow(clippy::module_name_repetitions)]
 pub type TorrentId = i64;
@@ -23,13 +22,6 @@ pub struct TorrentListing {
     pub leechers: i64,
 }
 
-#[allow(clippy::module_name_repetitions)]
-#[derive(Debug)]
-pub struct AddTorrentRequest {
-    pub metadata: Metadata,
-    pub torrent: Torrent,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct Metadata {
     pub title: String,
@@ -43,10 +35,10 @@ impl Metadata {
     ///
     /// # Errors
     ///
-    /// This function will return an `BadRequest` error if the `title` or the `category` is empty.
+    /// This function will return an error if the any of the mandatory metadata fields are missing.
     pub fn verify(&self) -> Result<(), ServiceError> {
         if self.title.is_empty() || self.category.is_empty() {
-            Err(ServiceError::BadRequest)
+            Err(ServiceError::MissingMandatoryMetadataFields)
         } else {
             Ok(())
         }
