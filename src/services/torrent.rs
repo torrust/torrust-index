@@ -43,6 +43,12 @@ pub struct AddTorrentRequest {
     pub torrent_buffer: Vec<u8>,
 }
 
+pub struct AddTorrentResponse {
+    pub torrent_id: TorrentId,
+    pub info_hash: String,
+    pub original_info_hash: String,
+}
+
 /// User request to generate a torrent listing.
 #[derive(Debug, Deserialize)]
 pub struct ListingRequest {
@@ -120,7 +126,7 @@ impl Index {
         &self,
         add_torrent_form: AddTorrentRequest,
         user_id: UserId,
-    ) -> Result<(TorrentId, InfoHash), ServiceError> {
+    ) -> Result<AddTorrentResponse, ServiceError> {
         let metadata = Metadata {
             title: add_torrent_form.title,
             description: add_torrent_form.description,
@@ -184,7 +190,11 @@ impl Index {
             .link_torrent_to_tags(&torrent_id, &metadata.tags)
             .await?;
 
-        Ok((torrent_id, info_hash))
+        Ok(AddTorrentResponse {
+            torrent_id,
+            info_hash: info_hash.to_string(),
+            original_info_hash: original_info_hash.to_string(),
+        })
     }
 
     /// Gets a torrent from the Index.

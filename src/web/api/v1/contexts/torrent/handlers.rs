@@ -49,7 +49,7 @@ pub async fn upload_torrent_handler(
     };
 
     match app_data.torrent_service.add_torrent(add_torrent_form, user_id).await {
-        Ok(torrent_ids) => new_torrent_response(torrent_ids.0, &torrent_ids.1.to_hex_string()).into_response(),
+        Ok(response) => new_torrent_response(response.torrent_id, &response.info_hash).into_response(),
         Err(error) => error.into_response(),
     }
 }
