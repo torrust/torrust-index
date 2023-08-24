@@ -44,6 +44,7 @@ luckythelab
 mailcatcher
 mandelbrotset
 metainfo
+migth
 nanos
 NCCA
 nextest
@@ -51,8 +52,11 @@ nilm
 nocapture
 Oberhachingerstr
 oneshot
+openbittorrent
+opentrackr
 ppassword
 proxied
+rapppid
 reqwest
 Roadmap
 ROADMAP
@@ -60,10 +64,12 @@ rowid
 RUSTDOCFLAGS
 RUSTFLAGS
 rustfmt
+serde
 sgxj
 singlepart
 sqlx
 strftime
+struct
 sublicensable
 sublist
 subpoints
@@ -82,4 +88,5 @@ urlencoding
 uroot
 Verstappen
 waivable
+webseeding
 Xoauth
