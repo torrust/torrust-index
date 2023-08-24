@@ -33,3 +33,22 @@ pub fn encode_torrent(torrent: &Torrent) -> Result<Vec<u8>, Error> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    #[test]
+    fn it_should_ignore_non_standard_fields_in_info_dictionary() {
+        let torrent_path = Path::new(
+            // cspell:disable-next-line
+            "tests/fixtures/torrents/6c690018c5786dbbb00161f62b0712d69296df97_with_custom_info_dict_key.torrent",
+        );
+
+        let torrent = super::decode_torrent(&std::fs::read(torrent_path).unwrap()).unwrap();
+
+        // The infohash is not the original infohash of the torrent file, but the infohash of the
+        // info dictionary without the custom keys.
+        assert_eq!(torrent.info_hash(), "8aa01a4c816332045ffec83247ccbc654547fedf".to_string());
+    }
+}
