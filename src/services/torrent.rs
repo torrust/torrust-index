@@ -130,6 +130,8 @@ impl Index {
 
         metadata.verify()?;
 
+        let original_info_hash = parse_torrent::calculate_info_hash(&add_torrent_form.torrent_buffer);
+
         let mut torrent =
             parse_torrent::decode_torrent(&add_torrent_form.torrent_buffer).map_err(|_| ServiceError::InvalidTorrentFile)?;
 
@@ -154,7 +156,11 @@ impl Index {
             .await
             .map_err(|_| ServiceError::InvalidCategory)?;
 
-        let torrent_id = self.torrent_repository.add(&torrent, &metadata, user_id, category).await?;
+        let torrent_id = self
+            .torrent_repository
+            .add(&original_info_hash, &torrent, &metadata, user_id, category)
+            .await?;
+
         let info_hash: InfoHash = torrent
             .info_hash()
             .parse()
@@ -474,13 +480,21 @@ impl DbTorrentRepository {
     /// This function will return an error there is a database error.
     pub async fn add(
         &self,
+        original_info_hash: &InfoHash,
         torrent: &Torrent,
         metadata: &Metadata,
         user_id: UserId,
         category: Category,
     ) -> Result<TorrentId, Error> {
         self.database
-            .insert_torrent_and_get_id(torrent, user_id, category.category_id, &metadata.title, &metadata.description)
+            .insert_torrent_and_get_id(
+                original_info_hash,
+                torrent,
+                user_id,
+                category.category_id,
+                &metadata.title,
+                &metadata.description,
+            )
             .await
     }
 

@@ -406,6 +406,7 @@ impl Database for Sqlite {
     #[allow(clippy::too_many_lines)]
     async fn insert_torrent_and_get_id(
         &self,
+        original_info_hash: &InfoHash,
         torrent: &Torrent,
         uploader_id: UserId,
         category_id: i64,
@@ -431,7 +432,7 @@ impl Database for Sqlite {
         let private = torrent.info.private.unwrap_or(0);
 
         // add torrent
-        let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, name, pieces, piece_length, private, root_hash, `source`, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
+        let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, name, pieces, piece_length, private, root_hash, `source`, original_info_hash, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
             .bind(uploader_id)
             .bind(category_id)
             .bind(info_hash.to_lowercase())
@@ -442,6 +443,7 @@ impl Database for Sqlite {
             .bind(private)
             .bind(root_hash)
             .bind(torrent.info.source.clone())
+            .bind(original_info_hash.to_hex_string())
             .execute(&self.pool)
             .await
             .map(|v| v.last_insert_rowid())
