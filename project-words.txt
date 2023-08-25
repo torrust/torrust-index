@@ -8,6 +8,7 @@ Benoit
 binascii
 btih
 chrono
+clippy
 codecov
 codegen
 compatiblelicenses
@@ -45,6 +46,7 @@ mandelbrotset
 metainfo
 nanos
 NCCA
+nextest
 nilm
 nocapture
 Oberhachingerstr
@@ -57,6 +59,7 @@ ROADMAP
 rowid
 RUSTDOCFLAGS
 RUSTFLAGS
+rustfmt
 sgxj
 singlepart
 sqlx
