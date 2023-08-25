@@ -35,15 +35,8 @@ jobs:
 
     steps:
       - id: checkout_index
-        name: Checkout Repository (Index)
+        name: Checkout Repository (index)
         uses: actions/checkout@v3
-
-      - id: checkout_tracker
-        name: Checkout Repository (Tracker)
-        uses: actions/checkout@v3
-        with:
-          repository: torrust/torrust-tracker
-          path: tracker
 
       - id: setup
         name: Setup Toolchain
@@ -65,7 +58,7 @@ jobs:
         name: Build (tracker)
         uses: docker/build-push-action@v4
         with:
-          context: tracker
+          context: https://github.com/torrust/torrust-tracker.git#pull/363/head
           push: false
           load: true
           target: debug
@@ -89,8 +82,8 @@ jobs:
         name: Run Applications
         
         run: |
-          export TORRUST_INDEX_CONFIG=$(cat index/config-index.mysql.local.toml)
-          export TORRUST_TRACKER_CONFIG=$(cat index/config-tracker.local.toml)
+          export TORRUST_INDEX_CONFIG=$(cat config-index.mysql.local.toml)
+          export TORRUST_TRACKER_CONFIG=$(cat config-tracker.local.toml)
 
           docker compose up --detach
 

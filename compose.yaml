@@ -8,13 +8,12 @@ services:
     environment:
       - TORRUST_INDEX_CONFIG=${TORRUST_INDEX_CONFIG}
       - TORRUST_INDEX_CORS_PERMISSIVE=true
-      - CARGO_HOME=/home/appuser/.cargo
     networks:
       - server_side
     ports:
       - 3001:3001
     volumes:
-      - ./lib/torrust:/var/lib/torrust
+      - ./storage:/var/lib/torrust/index
     depends_on:
       - tracker
       - mailcatcher
@@ -33,7 +32,7 @@ services:
       - 6969:6969/udp
       - 1212:1212/tcp
     volumes:
-      - ./lib/torrust:/var/lib/torrust
+      - ./storage:/var/lib/torrust/tracker
     depends_on:
       - mysql
 
