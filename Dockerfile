@@ -1,72 +1,141 @@
-FROM clux/muslrust:stable AS chef
-WORKDIR /app
-RUN cargo install cargo-chef
+# syntax=docker/dockerfile:latest
+
+# Torrust Index Backend
+
+## Builder Image
+FROM rust:latest as chef
+WORKDIR /tmp
+RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+RUN cargo binstall --no-confirm cargo-chef cargo-nextest
 
 
-FROM chef AS planner
-WORKDIR /app
-COPY . .
-RUN cargo chef prepare --recipe-path recipe.json
+## Tester Image
+FROM rust:slim as tester
+WORKDIR /tmp
+### (fixme) https://github.com/cargo-bins/cargo-binstall/issues/1252
+RUN apt-get update; apt-get install -y curl; apt-get autoclean
+RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+RUN cargo binstall --no-confirm cargo-nextest imdl
 
 
-FROM chef as development
-WORKDIR /app
-ARG UID=1000
-ARG RUN_AS_USER=appuser
-ARG IDX_BACK_API_PORT=3001
-# Add the app user for development
-ENV USER=appuser
-ENV UID=$UID
-RUN adduser --uid "${UID}" "${USER}"
-# Build dependencies
-COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --recipe-path recipe.json
-# Build the application
-COPY . .
-RUN cargo build --bin main
-USER $RUN_AS_USER:$RUN_AS_USER
-EXPOSE $IDX_BACK_API_PORT/tcp  
-CMD ["cargo", "run"]
+## Chef Prepare (look at project and see wat we need)
+FROM chef AS recipe
+WORKDIR /build/src
+COPY . /build/src
+RUN cargo chef prepare --recipe-path /build/recipe.json
 
 
-FROM chef AS builder
-WORKDIR /app
-ARG UID=1000
-# Add the app user for production
-ENV USER=appuser
-ENV UID=$UID
-RUN adduser \
-  --disabled-password \
-  --gecos "" \
-  --home "/nonexistent" \
-  --shell "/sbin/nologin" \
-  --no-create-home \
-  --uid "${UID}" \
-  "${USER}"  
-# Build dependencies
-COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --target x86_64-unknown-linux-musl --recipe-path recipe.json
-# Build the application
-COPY . .
-RUN cargo build --release --target x86_64-unknown-linux-musl --bin main
-# Strip the binary
-# More info: https://github.com/LukeMathWalker/cargo-chef/issues/149
-RUN strip /app/target/x86_64-unknown-linux-musl/release/main
+## Cook (debug)
+FROM chef AS dependencies_debug
+WORKDIR /build/src
+COPY --from=recipe /build/recipe.json /build/recipe.json
+RUN cargo chef cook --tests --benches --examples --workspace --all-targets --all-features --recipe-path /build/recipe.json
+RUN cargo nextest archive --tests --benches --examples --workspace --all-targets --all-features --archive-file /build/temp.tar.zst ; rm /build/temp.tar.zst
+
+## Cook (release)
+FROM chef AS dependencies
+WORKDIR /build/src
+COPY --from=recipe /build/recipe.json /build/recipe.json
+RUN cargo chef cook --tests --benches --examples --workspace --all-targets --all-features --recipe-path /build/recipe.json --release
+RUN cargo nextest archive --tests --benches --examples --workspace --all-targets --all-features --archive-file /build/temp.tar.zst --release  ; rm /build/temp.tar.zst
 
 
-FROM alpine:latest
-WORKDIR /app
-ARG RUN_AS_USER=appuser
-ARG IDX_BACK_API_PORT=3001
-RUN apk --no-cache add ca-certificates
+## Build Archive (debug)
+FROM dependencies_debug AS build_debug
+WORKDIR /build/src
+COPY . /build/src
+RUN cargo nextest archive --tests --benches --examples --workspace --all-targets --all-features --archive-file /build/torrust-index-backend-debug.tar.zst
+
+## Build Archive (release)
+FROM dependencies AS build
+WORKDIR /build/src
+COPY . /build/src
+RUN cargo nextest archive --tests --benches --examples --workspace --all-targets --all-features --archive-file /build/torrust-index-backend.tar.zst --release
+
+
+# Extract and Test (debug)
+FROM tester as test_debug
+WORKDIR /test
+COPY . /test/src
+COPY --from=build_debug \
+  /build/torrust-index-backend-debug.tar.zst \
+  /test/torrust-index-backend-debug.tar.zst
+RUN mkdir -p /test/test
+RUN cargo nextest run --workspace-remap /test/src/ --extract-to /test/src/ --no-run --archive-file /test/torrust-index-backend-debug.tar.zst
+RUN cargo nextest run --workspace-remap /test/src/ --target-dir-remap /test/src/target/ --cargo-metadata /test/src/target/nextest/cargo-metadata.json --binaries-metadata /test/src/target/nextest/binaries-metadata.json
+
+RUN mkdir -p /app/bin/; cp -l /test/src/target/debug/main     /app/bin/torrust-index-backend
+RUN mkdir -p /app/bin/; cp -l /test/src/target/debug/upgrader /app/bin/torrust-index-backend-upgrader
+RUN mkdir -p /app/bin/; cp -l /test/src/target/debug/importer /app/bin/torrust-index-backend-importer
+
+# RUN mkdir /app/lib/; cp -l $(realpath $(ldd /app/bin/torrust-index-backend | grep "libz\.so\.1" | awk '{print $3}')) /app/lib/libz.so.1
+
+RUN chown -R root:root /app
+RUN chmod -R u=rw,go=r,a+X /app
+RUN chmod -R a+x /app/bin
+
+# Extract and Test (release)
+FROM tester as test
+WORKDIR /test
+COPY . /test/src
+COPY --from=build \
+  /build/torrust-index-backend.tar.zst \
+  /test/torrust-index-backend.tar.zst
+RUN cargo nextest run --workspace-remap /test/src/ --extract-to /test/src/ --no-run --archive-file /test/torrust-index-backend.tar.zst
+RUN cargo nextest run --workspace-remap /test/src/ --target-dir-remap /test/src/target/ --cargo-metadata /test/src/target/nextest/cargo-metadata.json --binaries-metadata /test/src/target/nextest/binaries-metadata.json
+
+RUN mkdir -p /app/bin/; cp -l /test/src/target/release/main     /app/bin/torrust-index-backend
+RUN mkdir -p /app/bin/; cp -l /test/src/target/release/upgrader /app/bin/torrust-index-backend-upgrader
+RUN mkdir -p /app/bin/; cp -l /test/src/target/release/importer /app/bin/torrust-index-backend-importer
+
+# RUN mkdir -p /app/lib/; cp -l $(realpath $(ldd /app/bin/torrust-index-backend | grep "libz\.so\.1" | awk '{print $3}')) /app/lib/libz.so.1
+
+RUN chown -R root:root /app
+RUN chmod -R u=rw,go=r,a+X /app
+RUN chmod -R a+x /app/bin
+
+
+## Torrust-Index-Backend (debug)
+FROM gcr.io/distroless/cc:debug as index_backend_debug
+
+RUN ["/busybox/cp", "-sp", "/busybox/sh", "/bin/sh"]
+ENV ENV=/etc/profile
+
+ARG USER_ID=1000
+ARG USER_NAME=appuser
+ARG API_PORT=3001
+
+ENV USER_ID=${USER_ID}
+ENV USER_NAME=${USER_NAME}
+ENV API_PORT=${API_PORT}
 ENV TZ=Etc/UTC
-ENV RUN_AS_USER=$RUN_AS_USER
-COPY --from=builder /etc/passwd /etc/passwd
-COPY --from=builder /etc/group /etc/group
-COPY --from=builder --chown=$RUN_AS_USER \
-  /app/target/x86_64-unknown-linux-musl/release/main \
-  /app/main
-RUN chown -R $RUN_AS_USER:$RUN_AS_USER /app
-USER $RUN_AS_USER:$RUN_AS_USER
-EXPOSE $IDX_BACK_API_PORT/tcp
-ENTRYPOINT ["/app/main"]
+
+EXPOSE ${API_PORT}/tcp
+
+COPY --from=test_debug /app/ /usr/
+
+COPY ./docker/motd.debug /etc/motd
+
+RUN echo '[ ! -z "$TERM" -a -r /etc/motd ] && cat /etc/motd' >> /etc/profile
+
+WORKDIR /home/${USER_NAME}
+RUN adduser --disabled-password --uid "${USER_ID}" "${USER_NAME}"
+USER "${USER_NAME}":"${USER_NAME}"
+
+RUN env
+
+## Torrust-Index-Backend (release) (default)
+FROM gcr.io/distroless/cc:nonroot as index_backend
+COPY --from=gcr.io/distroless/cc:debug /busybox/wget /usr/bin/wget
+COPY --from=test /app/ /usr/
+
+ARG API_PORT=3001
+
+ENV API_PORT=${API_PORT}
+ENV TZ=Etc/UTC
+
+EXPOSE ${API_PORT}/tcp
+
+HEALTHCHECK CMD ["/usr/bin/wget", "--no-verbose", "--tries=1", "--spider", "localhost:${API_PORT}"]
+
+CMD ["/usr/bin/torrust-index-backend"]

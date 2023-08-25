@@ -1,12 +1,15 @@
 actix
 addrs
 alekitto
+appuser
 AUTOINCREMENT
 bencode
 bencoded
 Benoit
 binascii
 btih
+buildcache
+buildx
 chrono
 clippy
 codecov

@@ -42,7 +42,7 @@ cargo install imdl || exit 1
 # Install app (no docker) that will run the test suite against the E2E testing 
 # environment (in docker).
 cp .env.local .env || exit 1
-./bin/install.sh || exit 1
+./docker/bin/install.sh || exit 1
 
 # TEST USING SQLITE
 echo "Running E2E tests using SQLite ..."
@@ -60,7 +60,7 @@ sleep 20s
 docker ps
 
 # Run E2E tests with shared app instance
-TORRUST_IDX_BACK_E2E_SHARED=true TORRUST_IDX_BACK_E2E_CONFIG_PATH="./config-idx-back.sqlite.local.toml" cargo test || exit 1
+TORRUST_IDX_BACK_E2E_SHARED=true TORRUST_IDX_BACK_E2E_CONFIG_PATH="./config-index.sqlite.local.toml" cargo test || exit 1
 
 # Stop E2E testing environment
 docker compose down
@@ -91,7 +91,7 @@ echo "Creating MySQL database $MYSQL_DATABASE for for E2E testing ..."
 mysql -h $MYSQL_HOST -u $MYSQL_USER -p$MYSQL_PASSWORD -e "CREATE DATABASE IF NOT EXISTS $MYSQL_DATABASE;"
 
 # Run E2E tests with shared app instance
-TORRUST_IDX_BACK_E2E_SHARED=true TORRUST_IDX_BACK_E2E_CONFIG_PATH="./config-idx-back.mysql.local.toml" cargo test || exit 1
+TORRUST_IDX_BACK_E2E_SHARED=true TORRUST_IDX_BACK_E2E_CONFIG_PATH="./config-index.mysql.local.toml" cargo test || exit 1
 
 # Stop E2E testing environment
 docker compose down

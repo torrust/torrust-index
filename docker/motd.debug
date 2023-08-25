@@ -1,0 +1,5 @@
+            in debug mode
+
+run  'torrust-index-backend'           to   start index
+run  'torrust-index-backend-upgrader'  to   upgrade from v1 index
+run  'torrust-index-backend-importer'  to   import tracker statistics

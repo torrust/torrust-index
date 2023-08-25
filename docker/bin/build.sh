@@ -10,4 +10,4 @@ echo "TORRUST_IDX_BACK_RUN_AS_USER: $TORRUST_IDX_BACK_RUN_AS_USER"
 docker build \
     --build-arg UID="$TORRUST_IDX_BACK_USER_UID" \
     --build-arg RUN_AS_USER="$TORRUST_IDX_BACK_RUN_AS_USER" \
-    -t torrust-index-backend .
+    --tag torrust-index-backend:local .

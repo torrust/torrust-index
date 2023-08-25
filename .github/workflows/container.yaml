@@ -1,0 +1,59 @@
+name: Container (Docker)
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - id: checkout
+        name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - id: setup
+        name: Setup Toolchain
+        uses: docker/setup-buildx-action@v2
+
+      - id: build
+        name: Build
+        uses: docker/build-push-action@v4
+        with:
+          push: false
+          load: true
+          tags: torrust-index-backend:local
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - id: inspect
+        name: Inspect
+        run: docker image inspect torrust-index-backend:local
+
+      - id: compose
+        name: Compose Applications
+        run: |
+          export TORRUST_IDX_BACK_CONFIG=$(cat config-index.mysql.local.toml)
+          export TORRUST_TRACKER_CONFIG=$(cat config-tracker.local.toml)
+
+          docker compose build \
+          --build-arg TORRUST_IDX_BACK_CONFIG="$TORRUST_IDX_BACK_CONFIG" \
+          --build-arg TORRUST_TRACKER_CONFIG="$TORRUST_TRACKER_CONFIG"
+
+      - id: run
+        name: Run Applications
+        
+        run: |
+          export TORRUST_IDX_BACK_CONFIG=$(cat config-index.mysql.local.toml)
+          export TORRUST_TRACKER_CONFIG=$(cat config-tracker.local.toml)
+
+          docker compose up --detach
+
+      - id: check
+        name: Check Applications
+        run: docker ps

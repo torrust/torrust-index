@@ -6,15 +6,12 @@
 /.gitignore
 /.vscode
 /bin/
-/config-idx-back.local.toml
-/config-tracker.local.toml
-/config.local.toml
-/config.toml
+/config*
 /cspell.json
 /data_v2.db*
 /data.db
 /data.db*
-/docker/
+/docker/bin/
 /project-words.txt
 /README.md
 /rustfmt.toml
