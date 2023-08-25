@@ -20,7 +20,7 @@ pub struct TorrentFileInfo {
     pub content_size: u64,
     pub private: bool,
     pub tracker: Option<String>,
-    pub announce_list: Vec<String>,
+    pub announce_list: Vec<Vec<String>>,
     pub update_url: Option<String>,
     pub dht_nodes: Vec<String>,
     pub piece_size: u64,

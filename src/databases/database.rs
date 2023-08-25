@@ -191,6 +191,7 @@ pub trait Database: Sync + Send {
     /// Add new torrent and return the newly inserted `torrent_id` with `torrent`, `uploader_id`, `category_id`, `title` and `description`.
     async fn insert_torrent_and_get_id(
         &self,
+        original_info_hash: &InfoHash,
         torrent: &Torrent,
         uploader_id: UserId,
         category_id: i64,

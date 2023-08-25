@@ -43,6 +43,12 @@ pub struct AddTorrentRequest {
     pub torrent_buffer: Vec<u8>,
 }
 
+pub struct AddTorrentResponse {
+    pub torrent_id: TorrentId,
+    pub info_hash: String,
+    pub original_info_hash: String,
+}
+
 /// User request to generate a torrent listing.
 #[derive(Debug, Deserialize)]
 pub struct ListingRequest {
@@ -120,7 +126,7 @@ impl Index {
         &self,
         add_torrent_form: AddTorrentRequest,
         user_id: UserId,
-    ) -> Result<(TorrentId, InfoHash), ServiceError> {
+    ) -> Result<AddTorrentResponse, ServiceError> {
         let metadata = Metadata {
             title: add_torrent_form.title,
             description: add_torrent_form.description,
@@ -129,6 +135,8 @@ impl Index {
         };
 
         metadata.verify()?;
+
+        let original_info_hash = parse_torrent::calculate_info_hash(&add_torrent_form.torrent_buffer);
 
         let mut torrent =
             parse_torrent::decode_torrent(&add_torrent_form.torrent_buffer).map_err(|_| ServiceError::InvalidTorrentFile)?;
@@ -154,7 +162,11 @@ impl Index {
             .await
             .map_err(|_| ServiceError::InvalidCategory)?;
 
-        let torrent_id = self.torrent_repository.add(&torrent, &metadata, user_id, category).await?;
+        let torrent_id = self
+            .torrent_repository
+            .add(&original_info_hash, &torrent, &metadata, user_id, category)
+            .await?;
+
         let info_hash: InfoHash = torrent
             .info_hash()
             .parse()
@@ -178,7 +190,11 @@ impl Index {
             .link_torrent_to_tags(&torrent_id, &metadata.tags)
             .await?;
 
-        Ok((torrent_id, info_hash))
+        Ok(AddTorrentResponse {
+            torrent_id,
+            info_hash: info_hash.to_string(),
+            original_info_hash: original_info_hash.to_string(),
+        })
     }
 
     /// Gets a torrent from the Index.
@@ -474,13 +490,21 @@ impl DbTorrentRepository {
     /// This function will return an error there is a database error.
     pub async fn add(
         &self,
+        original_info_hash: &InfoHash,
         torrent: &Torrent,
         metadata: &Metadata,
         user_id: UserId,
         category: Category,
     ) -> Result<TorrentId, Error> {
         self.database
-            .insert_torrent_and_get_id(torrent, user_id, category.category_id, &metadata.title, &metadata.description)
+            .insert_torrent_and_get_id(
+                original_info_hash,
+                torrent,
+                user_id,
+                category.category_id,
+                &metadata.title,
+                &metadata.description,
+            )
             .await
     }
 

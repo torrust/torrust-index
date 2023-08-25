@@ -4,6 +4,7 @@ use hyper::{header, HeaderMap, StatusCode};
 use serde::{Deserialize, Serialize};
 
 use crate::models::torrent::TorrentId;
+use crate::services::torrent::AddTorrentResponse;
 use crate::web::api::v1::responses::OkResponseData;
 
 #[allow(clippy::module_name_repetitions)]
@@ -11,14 +12,16 @@ use crate::web::api::v1::responses::OkResponseData;
 pub struct NewTorrentResponseData {
     pub torrent_id: TorrentId,
     pub info_hash: String,
+    pub original_info_hash: String,
 }
 
 /// Response after successfully uploading a new torrent.
-pub fn new_torrent_response(torrent_id: TorrentId, info_hash: &str) -> Json<OkResponseData<NewTorrentResponseData>> {
+pub fn new_torrent_response(add_torrent_response: &AddTorrentResponse) -> Json<OkResponseData<NewTorrentResponseData>> {
     Json(OkResponseData {
         data: NewTorrentResponseData {
-            torrent_id,
-            info_hash: info_hash.to_owned(),
+            torrent_id: add_torrent_response.torrent_id,
+            info_hash: add_torrent_response.info_hash.clone(),
+            original_info_hash: add_torrent_response.original_info_hash.clone(),
         },
     })
 }
