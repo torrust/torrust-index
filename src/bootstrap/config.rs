@@ -7,13 +7,13 @@ use std::env;
 
 /// The whole `config.toml` file content. It has priority over the config file.
 /// Even if the file is not on the default path.
-pub const ENV_VAR_CONFIG: &str = "TORRUST_IDX_BACK_CONFIG";
+pub const ENV_VAR_CONFIG: &str = "TORRUST_INDEX_CONFIG";
 
 /// The `config.toml` file location.
-pub const ENV_VAR_CONFIG_PATH: &str = "TORRUST_IDX_BACK_CONFIG_PATH";
+pub const ENV_VAR_CONFIG_PATH: &str = "TORRUST_INDEX_CONFIG_PATH";
 
 /// If present, CORS will be permissive.
-pub const ENV_VAR_CORS_PERMISSIVE: &str = "TORRUST_IDX_BACK_CORS_PERMISSIVE";
+pub const ENV_VAR_CORS_PERMISSIVE: &str = "TORRUST_INDEX_CORS_PERMISSIVE";
 
 // Default values
 

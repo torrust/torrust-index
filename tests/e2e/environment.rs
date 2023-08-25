@@ -98,7 +98,7 @@ impl TestEnv {
 
     /// Provides a database connect URL to connect to the database. For example:
     ///
-    /// `sqlite://storage/database/torrust_index_backend_e2e_testing.db?mode=rwc`.
+    /// `sqlite://var/lib/torrust/database/torrust_index_backend_e2e_testing.db?mode=rwc`.
     ///
     /// It's used to run SQL queries against the database needed for some tests.
     pub fn database_connect_url(&self) -> Option<String> {

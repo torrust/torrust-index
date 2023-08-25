@@ -5,7 +5,7 @@ if ! [ -f "./config.toml" ]; then
     cp ./config-index.local.toml ./config.toml
 fi
 
-# Generate storage directory if it does not exist
+# Generate lib/torrust directory if it does not exist
 mkdir -p "./storage/database"
 
 # Generate the sqlite database for the index backend if it does not exist

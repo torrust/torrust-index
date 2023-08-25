@@ -225,7 +225,7 @@ conditions:
 A compilation of a covered work with other separate and independent
 works, which are not by their nature extensions of the covered work,
 and which are not combined with it such as to form a larger program,
-in or on a volume of a storage or distribution medium, is called an
+in or on a volume of a lib/torrust or distribution medium, is called an
 "aggregate" if the compilation and its resulting copyright are not
 used to limit the access or legal rights of the compilation's users
 beyond what the individual works permit. Inclusion of a covered work

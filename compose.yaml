@@ -1,26 +1,28 @@
 name: torrust
 services:
 
-  index-back:
-    image: torrust-index-backend:local
+  index:
+    image: torrust-index-backend:debug
+    entrypoint: torrust-index-backend
     tty: true
     environment:
-      - TORRUST_IDX_BACK_CONFIG=${TORRUST_IDX_BACK_CONFIG}
-      - TORRUST_IDX_BACK_CORS_PERMISSIVE=true
+      - TORRUST_INDEX_CONFIG=${TORRUST_INDEX_CONFIG}
+      - TORRUST_INDEX_CORS_PERMISSIVE=true
       - CARGO_HOME=/home/appuser/.cargo
     networks:
       - server_side
     ports:
       - 3001:3001
     volumes:
-      - ./storage:/app/storage    
+      - ./lib/torrust:/var/lib/torrust
     depends_on:
       - tracker
       - mailcatcher
       - mysql
 
   tracker:
-    image: torrust/tracker:develop
+    image: torrust-tracker:debug
+    entrypoint: torrust-tracker
     tty: true
     environment:
       - TORRUST_TRACKER_CONFIG=${TORRUST_TRACKER_CONFIG}
@@ -31,7 +33,7 @@ services:
       - 6969:6969/udp
       - 1212:1212/tcp
     volumes:
-      - ./storage:/app/storage
+      - ./lib/torrust:/var/lib/torrust
     depends_on:
       - mysql
 
@@ -58,7 +60,7 @@ services:
     environment:
       - MYSQL_ROOT_HOST=%
       - MYSQL_ROOT_PASSWORD=root_secret_password
-      - MYSQL_DATABASE=${TORRUST_IDX_BACK_MYSQL_DATABASE:-torrust_index_backend_e2e_testing}
+      - MYSQL_DATABASE=${TORRUST_INDEX_MYSQL_DATABASE:-torrust_index_backend_e2e_testing}
       - MYSQL_USER=db_user
       - MYSQL_PASSWORD=db_user_secret_password
     networks:

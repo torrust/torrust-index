@@ -1,7 +1,7 @@
 log_level = "info"
 mode = "public"
 db_driver = "Sqlite3"
-db_path = "./storage/database/torrust_tracker_e2e_testing.db"
+db_path = "/var/lib/torrust/database/torrust_tracker_e2e_testing.db"
 announce_interval = 120
 min_announce_interval = 120
 max_peer_timeout = 900

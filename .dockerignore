@@ -15,5 +15,6 @@
 /project-words.txt
 /README.md
 /rustfmt.toml
-/storage/
+/lib/torrust/
 /target/
+/tracker/

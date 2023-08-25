@@ -21,7 +21,7 @@ mysql -h $MYSQL_HOST -u $MYSQL_USER -p$MYSQL_PASSWORD -e "DROP DATABASE IF EXIST
 # Delete tracker database
 rm -f ./storage/database/torrust_tracker_e2e_testing.db
 
-# Generate storage directory if it does not exist
+# Generate lib/torrust directory if it does not exist
 mkdir -p "./storage/database"
 
 # Generate the sqlite database for the tracker if it does not exist

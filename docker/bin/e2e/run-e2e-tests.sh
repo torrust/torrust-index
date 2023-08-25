@@ -5,10 +5,8 @@ CURRENT_USER_ID=$(id -u)
 echo "User name: $CURRENT_USER_NAME"
 echo "User   id: $CURRENT_USER_ID"
 
-TORRUST_IDX_BACK_USER_UID=$CURRENT_USER_ID
-TORRUST_TRACKER_USER_UID=$CURRENT_USER_ID
-export TORRUST_IDX_BACK_USER_UID
-export TORRUST_TRACKER_USER_UID
+USER_ID=$CURRENT_USER_ID
+export USER_ID
 
 wait_for_container_to_be_healthy() {
     local container_name="$1"
@@ -37,7 +35,8 @@ wait_for_container_to_be_healthy() {
 
 # Install tool to create torrent files.
 # It's needed by some tests to generate and parse test torrent files.
-cargo install imdl || exit 1
+curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash || exit 1
+cargo binstall --no-confirm imdl || exit 1
 
 # Install app (no docker) that will run the test suite against the E2E testing 
 # environment (in docker).

@@ -95,47 +95,36 @@ RUN chmod -R u=rw,go=r,a+X /app
 RUN chmod -R a+x /app/bin
 
 
-## Torrust-Index-Backend (debug)
-FROM gcr.io/distroless/cc:debug as index_backend_debug
-
+## Runtime
+FROM gcr.io/distroless/cc:debug as Runtime
 RUN ["/busybox/cp", "-sp", "/busybox/sh", "/bin/sh"]
-ENV ENV=/etc/profile
 
 ARG USER_ID=1000
-ARG USER_NAME=appuser
 ARG API_PORT=3001
 
 ENV USER_ID=${USER_ID}
-ENV USER_NAME=${USER_NAME}
 ENV API_PORT=${API_PORT}
 ENV TZ=Etc/UTC
 
 EXPOSE ${API_PORT}/tcp
 
-COPY --from=test_debug /app/ /usr/
+WORKDIR /home/torrust
+RUN adduser --disabled-password --uid "${USER_ID}" "torrust"
+RUN mkdir -p /var/lib/torrust; chown -R "${USER_ID}":"${USER_ID}" /var/lib/torrust; chmod -R 2775 /var/lib/torrust
 
+ENV ENV=/etc/profile
 COPY ./docker/motd.debug /etc/motd
-
 RUN echo '[ ! -z "$TERM" -a -r /etc/motd ] && cat /etc/motd' >> /etc/profile
+USER "torrust":"torrust"
 
-WORKDIR /home/${USER_NAME}
-RUN adduser --disabled-password --uid "${USER_ID}" "${USER_NAME}"
-USER "${USER_NAME}":"${USER_NAME}"
 
+## Torrust-Index-Backend (debug)
+FROM runtime as debug
+COPY --from=test_debug /app/ /usr/
 RUN env
 
 ## Torrust-Index-Backend (release) (default)
-FROM gcr.io/distroless/cc:nonroot as index_backend
-COPY --from=gcr.io/distroless/cc:debug /busybox/wget /usr/bin/wget
+FROM runtime as release
 COPY --from=test /app/ /usr/
-
-ARG API_PORT=3001
-
-ENV API_PORT=${API_PORT}
-ENV TZ=Etc/UTC
-
-EXPOSE ${API_PORT}/tcp
-
-HEALTHCHECK CMD ["/usr/bin/wget", "--no-verbose", "--tries=1", "--spider", "localhost:${API_PORT}"]
-
+HEALTHCHECK CMD ["/busybox/wget", "--no-verbose", "--tries=1", "--spider", "localhost:${API_PORT}"]
 CMD ["/usr/bin/torrust-index-backend"]

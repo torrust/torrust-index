@@ -7,50 +7,90 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+
 jobs:
   test:
-    name: Test
+    name: Test Release
     runs-on: ubuntu-latest
 
     steps:
-      - id: checkout
-        name: Checkout Repository
-        uses: actions/checkout@v3
-
       - id: setup
         name: Setup Toolchain
         uses: docker/setup-buildx-action@v2
-
-      - id: build
+      
+      - id: build_index
         name: Build
         uses: docker/build-push-action@v4
         with:
           push: false
           load: true
-          tags: torrust-index-backend:local
+          target: release
+          tags: torrust-index-backend:release
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - id: inspect
-        name: Inspect
-        run: docker image inspect torrust-index-backend:local
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - id: checkout_index
+        name: Checkout Repository (Index)
+        uses: actions/checkout@v3
+
+      - id: checkout_tracker
+        name: Checkout Repository (Tracker)
+        uses: actions/checkout@v3
+        with:
+          repository: torrust/torrust-tracker
+          path: tracker
+
+      - id: setup
+        name: Setup Toolchain
+        uses: docker/setup-buildx-action@v2
+
+      - id: build_index
+        name: Build (index)
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: false
+          load: true
+          target: debug
+          tags: torrust-index-backend:debug
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - id: build_tracker
+        name: Build (tracker)
+        uses: docker/build-push-action@v4
+        with:
+          context: tracker
+          push: false
+          load: true
+          target: debug
+          tags: torrust-tracker:debug
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - id: inspect_index
+        name: Inspect (index)
+        run: docker image inspect torrust-index-backend:debug
+
+      - id: inspect_tracker
+        name: Inspect (tracker)
+        run: docker image inspect torrust-tracker:debug
 
       - id: compose
         name: Compose Applications
-        run: |
-          export TORRUST_IDX_BACK_CONFIG=$(cat config-index.mysql.local.toml)
-          export TORRUST_TRACKER_CONFIG=$(cat config-tracker.local.toml)
-
-          docker compose build \
-          --build-arg TORRUST_IDX_BACK_CONFIG="$TORRUST_IDX_BACK_CONFIG" \
-          --build-arg TORRUST_TRACKER_CONFIG="$TORRUST_TRACKER_CONFIG"
+        run: docker compose build 
 
       - id: run
         name: Run Applications
         
         run: |
-          export TORRUST_IDX_BACK_CONFIG=$(cat config-index.mysql.local.toml)
-          export TORRUST_TRACKER_CONFIG=$(cat config-tracker.local.toml)
+          export TORRUST_INDEX_CONFIG=$(cat index/config-index.mysql.local.toml)
+          export TORRUST_TRACKER_CONFIG=$(cat index/config-tracker.local.toml)
 
           docker compose up --detach
 

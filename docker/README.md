@@ -3,11 +3,11 @@
 ## Requirements
 
 - Docker version 20.10.21
-- You need to create the `storage` directory with this structure and files:
+- You need to create the `lib/torrust` directory with this structure and files:
 
 ```s
-$ tree storage/
-storage/
+$ tree lib/torrust/
+lib/torrust/
 └── database
     ├── data.db
     └── tracker.db
@@ -21,20 +21,20 @@ Build and run locally:
 
 ```s
 docker context use default
-export TORRUST_IDX_BACK_USER_UID=$(id -u)
-./docker/bin/build.sh $TORRUST_IDX_BACK_USER_UID
+export USER_UID=$(id -u)
+./docker/bin/build.sh $USER_UID
 ./bin/install.sh
-./docker/bin/run.sh $TORRUST_IDX_BACK_USER_UID
+./docker/bin/run.sh $USER_UID
 ```
 
 Run using the pre-built public docker image:
 
 ```s
-export TORRUST_IDX_BACK_USER_UID=$(id -u)
+export USER_UID=$(id -u)
 docker run -it \
-    --user="$TORRUST_IDX_BACK_USER_UID" \
+    --user="$USER_UID" \
     --publish 3001:3001/tcp \
-    --volume "$(pwd)/storage":"/app/storage" \
+    --volume "$(pwd)/lib/torrust":"/var/lib/torrust" \
     torrust/index-backend
 ```
 
@@ -49,7 +49,7 @@ docker run -it \
 The docker-compose configuration includes the MySQL service configuration. If you want to use MySQL instead of SQLite you have to change your `config.toml` or `config-idx-back.local.toml` configuration from:
 
 ```toml
-connect_url = "sqlite://storage/database/data.db?mode=rwc"
+connect_url = "sqlite:///var/lib/torrust/database/data.db?mode=rwc"
 ```
 
 to:
@@ -63,8 +63,8 @@ If you want to inject an environment variable into docker-compose you can use th
 Build and run it locally:
 
 ```s
-TORRUST_IDX_BACK_USER_UID=${TORRUST_IDX_BACK_USER_UID:-1000} \
-    TORRUST_IDX_BACK_CONFIG=$(cat config-index.mysql.local.toml) \
+USER_UID=${USER_UID:-1000} \
+    TORRUST_INDEX_CONFIG=$(cat config-index.mysql.local.toml) \
     TORRUST_TRACKER_CONFIG=$(cat config-tracker.local.toml) \
     TORRUST_TRACKER_API_TOKEN=${TORRUST_TRACKER_API_TOKEN:-MyAccessToken} \
     docker compose up -d --build
