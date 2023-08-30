@@ -5,6 +5,7 @@ use std::sync::Arc;
 use axum::extract::DefaultBodyLimit;
 use axum::routing::get;
 use axum::Router;
+use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 
 use super::contexts::about::handlers::about_page_handler;
@@ -42,5 +43,5 @@ pub fn router(app_data: Arc<AppData>) -> Router {
         router
     };
 
-    router.layer(DefaultBodyLimit::max(10_485_760))
+    router.layer(DefaultBodyLimit::max(10_485_760)).layer(CompressionLayer::new())
 }
