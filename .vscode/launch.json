@@ -1,0 +1,35 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug executable 'parse_torrent'",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/target/debug/parse_torrent",
+            "args": ["./tests/fixtures/torrents/MC_GRID.zip-3cd18ff2d3eec881207dcc5ca5a2c3a2a3afe462.torrent"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "cargo build",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "linux": {
+                "miDebuggerPath": "/usr/bin/gdb"
+            },
+            "windows": {
+                "miDebuggerPath": "C:\\MinGW\\bin\\gdb.exe"
+            },
+            "osx": {
+                "miDebuggerPath": "/usr/local/bin/gdb"
+            }
+        }
+    ]
+}
