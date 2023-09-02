@@ -61,6 +61,7 @@ pub struct TorrentResponse {
     pub trackers: Vec<String>,
     pub magnet_link: String,
     pub tags: Vec<TorrentTag>,
+    pub name: String,
 }
 
 impl TorrentResponse {
@@ -81,6 +82,7 @@ impl TorrentResponse {
             trackers: vec![],
             magnet_link: String::new(),
             tags: vec![],
+            name: torrent_listing.name,
         }
     }
 }
