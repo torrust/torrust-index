@@ -92,7 +92,7 @@ pub async fn download_torrent_handler(
         return ServiceError::InternalServerError.into_response();
     };
 
-    torrent_file_response(bytes, &format!("{}.torrent", torrent.info.name), &torrent.info_hash())
+    torrent_file_response(bytes, &format!("{}.torrent", torrent.info.name), &torrent.info_hash_hex())
 }
 
 /// It returns a list of torrents matching the search criteria.
@@ -242,7 +242,7 @@ pub async fn create_random_torrent_handler(State(_app_data): State<Arc<AppData>>
         return ServiceError::InternalServerError.into_response();
     };
 
-    torrent_file_response(bytes, &format!("{}.torrent", torrent.info.name), &torrent.info_hash())
+    torrent_file_response(bytes, &format!("{}.torrent", torrent.info.name), &torrent.info_hash_hex())
 }
 
 /// Extracts the [`TorrentRequest`] from the multipart form payload.

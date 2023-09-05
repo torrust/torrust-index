@@ -3,6 +3,7 @@ use serde_bencode::ser;
 use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
 
+use super::info_hash::InfoHash;
 use crate::config::Configuration;
 use crate::services::torrent_file::NewTorrentInfoRequest;
 use crate::utils::hex::{from_bytes, into_bytes};
@@ -228,9 +229,13 @@ impl Torrent {
     }
 
     #[must_use]
-    pub fn info_hash(&self) -> String {
-        // todo: return an InfoHash struct
+    pub fn info_hash_hex(&self) -> String {
         from_bytes(&self.calculate_info_hash_as_bytes()).to_lowercase()
+    }
+
+    #[must_use]
+    pub fn canonical_info_hash(&self) -> InfoHash {
+        self.calculate_info_hash_as_bytes().into()
     }
 
     #[must_use]
@@ -372,7 +377,7 @@ mod tests {
                 httpseeds: None,
             };
 
-            assert_eq!(torrent.info_hash(), "79fa9e4a2927804fe4feab488a76c8c2d3d1cdca");
+            assert_eq!(torrent.info_hash_hex(), "79fa9e4a2927804fe4feab488a76c8c2d3d1cdca");
         }
 
         mod infohash_should_be_calculated_for {
@@ -413,7 +418,7 @@ mod tests {
                     httpseeds: None,
                 };
 
-                assert_eq!(torrent.info_hash(), "79fa9e4a2927804fe4feab488a76c8c2d3d1cdca");
+                assert_eq!(torrent.info_hash_hex(), "79fa9e4a2927804fe4feab488a76c8c2d3d1cdca");
             }
 
             #[test]
@@ -452,7 +457,7 @@ mod tests {
                     httpseeds: None,
                 };
 
-                assert_eq!(torrent.info_hash(), "aa2aca91ab650c4d249c475ca3fa604f2ccb0d2a");
+                assert_eq!(torrent.info_hash_hex(), "aa2aca91ab650c4d249c475ca3fa604f2ccb0d2a");
             }
 
             #[test]
@@ -487,7 +492,7 @@ mod tests {
                     httpseeds: None,
                 };
 
-                assert_eq!(torrent.info_hash(), "ccc1cf4feb59f3fa85c96c9be1ebbafcfe8a9cc8");
+                assert_eq!(torrent.info_hash_hex(), "ccc1cf4feb59f3fa85c96c9be1ebbafcfe8a9cc8");
             }
 
             #[test]
@@ -522,7 +527,7 @@ mod tests {
                     httpseeds: None,
                 };
 
-                assert_eq!(torrent.info_hash(), "d3a558d0a19aaa23ba6f9f430f40924d10fefa86");
+                assert_eq!(torrent.info_hash_hex(), "d3a558d0a19aaa23ba6f9f430f40924d10fefa86");
             }
         }
     }

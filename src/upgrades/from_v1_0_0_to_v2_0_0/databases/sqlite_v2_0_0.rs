@@ -118,7 +118,7 @@ impl SqliteDatabaseV2_0_0 {
             .map(|v| v.last_insert_rowid())
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
-                    if err.message().contains("UNIQUE") {
+                    if err.message().contains("UNIQUE") && err.message().contains("name") {
                         database::Error::CategoryAlreadyExists
                     } else {
                         database::Error::Error
