@@ -65,9 +65,13 @@ jobs:
         name: Run Lint Checks
         run: cargo clippy --tests --benches --examples --workspace --all-targets --all-features -- -D clippy::correctness -D clippy::suspicious -D clippy::complexity -D clippy::perf -D clippy::style -D clippy::pedantic
 
-      - id: doc
-        name: Run Documentation Checks
+      - id: testdoc
+        name: Run Documentation Tests
         run: cargo test --doc
+
+      - id: builddoc
+        name: Build Documentation
+        run: cargo doc --no-deps --bins --examples --workspace --all-features
 
   unit:
     name: Units

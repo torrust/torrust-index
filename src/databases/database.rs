@@ -231,14 +231,17 @@ pub trait Database: Sync + Send {
         ))
     }
 
-    /// Returns the list of original infohashes ofr a canonical infohash.
+    /// Returns the list of all infohashes producing the same canonical infohash.
     ///
     /// When you upload a torrent the infohash migth change because the Index
     /// remove the non-standard fields in the `info` dictionary. That makes the
     /// infohash change. The canonical infohash is the resulting infohash.
     /// This function returns the original infohashes of a canonical infohash.
+    ///
+    /// If the original infohash was unknown, it returns the canonical infohash.
+    ///
     /// The relationship is 1 canonical infohash -> N original infohashes.
-    async fn get_torrent_original_info_hashes(&self, canonical: &InfoHash) -> Result<OriginalInfoHashes, Error>;
+    async fn get_torrent_canonical_info_hash_group(&self, canonical: &InfoHash) -> Result<OriginalInfoHashes, Error>;
 
     async fn insert_torrent_info_hash(&self, original: &InfoHash, canonical: &InfoHash) -> Result<(), Error>;
 

@@ -592,7 +592,7 @@ impl Database for Mysql {
         }
     }
 
-    async fn get_torrent_original_info_hashes(&self, canonical: &InfoHash) -> Result<OriginalInfoHashes, database::Error> {
+    async fn get_torrent_canonical_info_hash_group(&self, canonical: &InfoHash) -> Result<OriginalInfoHashes, database::Error> {
         let db_info_hashes = query_as::<_, DbTorrentInfoHash>(
             "SELECT info_hash, canonical_info_hash, original_is_known FROM torrust_torrent_info_hashes WHERE canonical_info_hash = ?",
         )

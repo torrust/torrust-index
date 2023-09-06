@@ -2,7 +2,7 @@
 //!
 //! The API is organized in contexts.
 //!
-//! Refer to the [`contexts`](crate::web::api::v1::contexts) module for more
+//! Refer to the [`contexts`] module for more
 //! information.
 pub mod auth;
 pub mod contexts;

@@ -170,7 +170,7 @@ impl Index {
 
         let original_info_hashes = self
             .torrent_info_hash_repository
-            .get_torrent_original_info_hashes(&canonical_info_hash)
+            .get_canonical_info_hash_group(&canonical_info_hash)
             .await?;
 
         if !original_info_hashes.is_empty() {
@@ -582,13 +582,13 @@ impl DbTorrentInfoHashRepository {
         Self { database }
     }
 
-    /// It returns all the original infohashes associated to the canonical one.
+    /// It returns all the infohashes associated to the canonical one.
     ///
     /// # Errors
     ///
     /// This function will return an error there is a database error.
-    pub async fn get_torrent_original_info_hashes(&self, info_hash: &InfoHash) -> Result<OriginalInfoHashes, Error> {
-        self.database.get_torrent_original_info_hashes(info_hash).await
+    pub async fn get_canonical_info_hash_group(&self, info_hash: &InfoHash) -> Result<OriginalInfoHashes, Error> {
+        self.database.get_torrent_canonical_info_hash_group(info_hash).await
     }
 
     /// Inserts a new infohash for the torrent. Torrents can be associated to

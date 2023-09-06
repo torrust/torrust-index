@@ -293,10 +293,11 @@ mod for_authenticated_users {
 
     use torrust_index_backend::utils::parse_torrent::decode_torrent;
     use torrust_index_backend::web::api;
+    use uuid::Uuid;
 
     use crate::common::asserts::assert_json_error_response;
     use crate::common::client::Client;
-    use crate::common::contexts::torrent::fixtures::random_torrent;
+    use crate::common::contexts::torrent::fixtures::{random_torrent, TestTorrent};
     use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
     use crate::common::contexts::torrent::responses::UploadedTorrentResponse;
     use crate::e2e::environment::TestEnv;
@@ -405,6 +406,38 @@ mod for_authenticated_users {
         // because of the duplicate title.
         first_torrent_clone.index_info.title = format!("{first_torrent_title}-clone");
         let form: UploadTorrentMultipartForm = first_torrent_clone.index_info.into();
+        let response = client.upload_torrent(form.into()).await;
+
+        assert_eq!(response.status, 400);
+    }
+
+    #[tokio::test]
+    async fn it_should_not_allow_uploading_a_torrent_whose_canonical_info_hash_already_exists() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
+
+        if !env.provides_a_tracker() {
+            println!("test skipped. It requires a tracker to be running.");
+            return;
+        }
+
+        let uploader = new_logged_in_user(&env).await;
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+        let id1 = Uuid::new_v4();
+
+        // Upload the first torrent
+        let first_torrent = TestTorrent::with_custom_info_dict_field(id1, "data", "custom 01");
+        let first_torrent_title = first_torrent.index_info.title.clone();
+        let form: UploadTorrentMultipartForm = first_torrent.index_info.into();
+        let _response = client.upload_torrent(form.into()).await;
+
+        // Upload the second torrent with the same canonical info-hash as the first one.
+        // We need to change the title otherwise the torrent will be rejected
+        // because of the duplicate title.
+        let mut torrent_with_the_same_canonical_info_hash = TestTorrent::with_custom_info_dict_field(id1, "data", "custom 02");
+        torrent_with_the_same_canonical_info_hash.index_info.title = format!("{first_torrent_title}-clone");
+        let form: UploadTorrentMultipartForm = torrent_with_the_same_canonical_info_hash.index_info.into();
         let response = client.upload_torrent(form.into()).await;
 
         assert_eq!(response.status, 400);

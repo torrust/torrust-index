@@ -2,6 +2,32 @@
 //!
 //! This API context is responsible for handling all torrent related requests.
 //!
+//! # Original and canonical infohashes
+//!
+//! Uploaded torrents can contain non-standard fields in the `info` dictionary.
+//!
+//! For example, this is a torrent file in JSON format with a "custom" field.
+//!
+//! ```json
+//! {
+//!     "info": {
+//!        "length": 602515,
+//!        "name": "mandelbrot_set_01",
+//!        "piece length": 32768,
+//!        "pieces": "<hex>8A 88 32 BE ED 05 5F AA C4 AF 4A 90 4B 9A BF 0D EC 83 42 1C 73 39 05 B8 D6 20 2C 1B D1 8A 53 28 1F B5 D4 23 0A 23 C8 DB AC C4 E6 6B 16 12 08 C7 A4 AD 64 45 70 ED 91 0D F1 38 E7 DF 0C 1A D0 C9 23 27 7C D1 F9 D4 E5 A1 5F F5 E5 A0 E4 9E FB B1 43 F5 4B AD 0E D4 9D CB 49 F7 E6 7B BA 30 5F AF F9 88 56 FB 45 9A B4 95 92 3E 2C 7F DA A6 D3 82 E7 63 A3 BB 4B 28 F3 57 C7 CB 7D 8C 06 E3 46 AB D7 E8 8E 8A 8C 9F C7 E6 C5 C5 64 82 ED 47 BB 2A F1 B7 3F A5 3C 5B 9C AF 43 EC 2A E1 08 68 9A 49 C8 BF 1B 07 AD BE E9 2D 7E BE 9C 18 7F 4C A1 97 0E 54 3A 18 94 0E 60 8D 5C 69 0E 41 46 0D 3C 9A 37 F6 81 62 4F 95 C0 73 92 CA 9A D5 A9 89 AC 8B 85 12 53 0B FB E2 96 26 3E 26 A6 5B 70 53 48 65 F3 6C 27 0F 6B BD 1C EE EB 1A 9D 5F 77 A8 D8 AF D8 14 82 4A E0 B4 62 BC F1 A5 F5 F2 C7 60 F8 38 C8 5B 0B A9 07 DD 86 FA C0 7B F0 26 D7 D1 9A 42 C3 1F 9F B9 59 83 10 62 41 E9 06 3C 6D A1 19 75 01 57 25 9E B7 FE DF 91 04 D4 51 4B 6D 44 02 8D 31 8E 84 26 95 0F 30 31 F0 2C 16 39 BD 53 1D CF D3 5E 3E 41 A9 1E 14 3F 73 24 AC 5E 9E FC 4D C5 70 45 0F 45 8B 9B 52 E6 D0 26 47 8F 43 08 9E 2A 7C C5 92 D5 86 36 FE 48 E9 B8 86 84 92 23 49 5B EE C4 31 B2 1D 10 75 8E 4C 07 84 8F</hex>",
+//!        "custom": "custom03"
+//!     }
+//! }
+//! ```
+//!
+//! When you upload a torrent file with non-standards fields in the `info`
+//! dictionary, the Index removes those non-standard fields. That generates a
+//! new info-hash because all fields in the `info` key are used to calculate it.
+//!
+//! The Index stores the original info-hash. The resulting info-hash after
+//! removing the non-standard fields is called "canonical" infohash. The Index
+//! stores the relationship between the original info-hash and the canonical one.
+//!
 //! # Endpoints
 //!
 //! - [Upload new torrent](#upload-new-torrent)

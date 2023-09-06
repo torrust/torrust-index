@@ -202,7 +202,7 @@
 //! torrent_info_update_interval = 3600
 //! ```
 //!
-//! For more information about configuration you can visit the documentation for the [`config`](crate::config) module.
+//! For more information about configuration you can visit the documentation for the [`config`]) module.
 //!
 //! Alternatively to the `config.toml` file you can use one environment variable `TORRUST_IDX_BACK_CONFIG` to pass the configuration to the tracker:
 //!
