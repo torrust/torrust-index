@@ -18,6 +18,7 @@ pub struct TorrentIndexInfo {
     pub description: String,
     pub category: String,
     pub torrent_file: BinaryFile,
+    pub name: String,
 }
 
 impl From<TorrentIndexInfo> for UploadTorrentMultipartForm {
@@ -84,6 +85,7 @@ impl TestTorrent {
             description: format!("description-{id}"),
             category: software_predefined_category_name(),
             torrent_file,
+            name: format!("name-{id}"),
         };
 
         TestTorrent {

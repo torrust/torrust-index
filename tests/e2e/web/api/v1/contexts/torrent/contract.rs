@@ -208,6 +208,7 @@ mod for_guests {
                 encoded_tracker_url,
                 encoded_tracker_url
             ),
+            name: test_torrent.index_info.name.clone(),
         };
 
         assert_expected_torrent_details(&torrent_details_response.data, &expected_torrent);
