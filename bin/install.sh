@@ -10,13 +10,13 @@ mkdir -p "./storage/database"
 
 # Generate the sqlite database for the index backend if it does not exist
 if ! [ -f "./storage/database/data.db" ]; then
-    # todo: it should get the path from config.toml and only do it when we use sqlite
-    touch ./storage/database/data.db
-    echo ";" | sqlite3 ./storage/database/data.db
+    sqlite3 ./storage/database/data.db "VACUUM;"
 fi
 
+# Generate storage directory if it does not exist
+mkdir -p "./storage/tracker/lib/database"
+
 # Generate the sqlite database for the tracker if it does not exist
-if ! [ -f "./storage/database/tracker.db" ]; then
-    touch ./storage/database/tracker.db
-    echo ";" | sqlite3 ./storage/database/tracker.db
+if ! [ -f "./storage/tracker/lib/database/sqlite3.db" ]; then
+    sqlite3 ./storage/tracker/lib/database/sqlite3.db "VACUUM;"
 fi
