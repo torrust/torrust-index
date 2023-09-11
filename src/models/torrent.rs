@@ -20,6 +20,7 @@ pub struct TorrentListing {
     pub file_size: i64,
     pub seeders: i64,
     pub leechers: i64,
+    pub name: String,
 }
 
 #[derive(Debug, Deserialize)]

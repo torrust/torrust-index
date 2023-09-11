@@ -38,6 +38,7 @@ pub struct ListItem {
     pub file_size: i64,
     pub seeders: i64,
     pub leechers: i64,
+    pub name: String,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
@@ -60,6 +61,7 @@ pub struct TorrentDetails {
     pub files: Vec<File>,
     pub trackers: Vec<String>,
     pub magnet_link: String,
+    pub name: String,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
