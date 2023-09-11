@@ -12,7 +12,6 @@ mkdir -p "./storage/database"
 
 # Generate the sqlite database for the index backend if it does not exist
 if ! [ -f "./storage/database/torrust_index_backend_e2e_testing.db" ]; then
-    # todo: it should get the path from config.toml and only do it when we use sqlite
     sqlite3 ./storage/database/torrust_index_backend_e2e_testing.db "VACUUM;"
 fi
 
