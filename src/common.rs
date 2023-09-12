@@ -7,7 +7,7 @@ use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebTok
 use crate::services::category::{self, DbCategoryRepository};
 use crate::services::tag::{self, DbTagRepository};
 use crate::services::torrent::{
-    DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoHashRepository, DbTorrentInfoRepository,
+    DbCanonicalInfoHashGroupRepository, DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository,
     DbTorrentListingGenerator, DbTorrentRepository, DbTorrentTagRepository,
 };
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
@@ -34,7 +34,7 @@ pub struct AppData {
     pub user_authentication_repository: Arc<DbUserAuthenticationRepository>,
     pub user_profile_repository: Arc<DbUserProfileRepository>,
     pub torrent_repository: Arc<DbTorrentRepository>,
-    pub torrent_info_hash_repository: Arc<DbTorrentInfoHashRepository>,
+    pub torrent_info_hash_repository: Arc<DbCanonicalInfoHashGroupRepository>,
     pub torrent_info_repository: Arc<DbTorrentInfoRepository>,
     pub torrent_file_repository: Arc<DbTorrentFileRepository>,
     pub torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
@@ -70,7 +70,7 @@ impl AppData {
         user_authentication_repository: Arc<DbUserAuthenticationRepository>,
         user_profile_repository: Arc<DbUserProfileRepository>,
         torrent_repository: Arc<DbTorrentRepository>,
-        torrent_info_hash_repository: Arc<DbTorrentInfoHashRepository>,
+        torrent_info_hash_repository: Arc<DbCanonicalInfoHashGroupRepository>,
         torrent_info_repository: Arc<DbTorrentInfoRepository>,
         torrent_file_repository: Arc<DbTorrentFileRepository>,
         torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,

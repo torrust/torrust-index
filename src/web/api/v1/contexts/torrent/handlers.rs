@@ -5,7 +5,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::extract::{self, Multipart, Path, Query, State};
-use axum::response::{IntoResponse, Response};
+use axum::response::{IntoResponse, Redirect, Response};
 use axum::Json;
 use serde::Deserialize;
 use uuid::Uuid;
@@ -78,21 +78,25 @@ pub async fn download_torrent_handler(
         return errors::Request::InvalidInfoHashParam.into_response();
     };
 
-    let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
-        Ok(opt_user_id) => opt_user_id,
-        Err(error) => return error.into_response(),
-    };
+    if let Some(redirect_response) = guard_that_canonical_info_hash_is_used_or_redirect(&app_data, &info_hash).await {
+        redirect_response
+    } else {
+        let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
+            Ok(opt_user_id) => opt_user_id,
+            Err(error) => return error.into_response(),
+        };
 
-    let torrent = match app_data.torrent_service.get_torrent(&info_hash, opt_user_id).await {
-        Ok(torrent) => torrent,
-        Err(error) => return error.into_response(),
-    };
+        let torrent = match app_data.torrent_service.get_torrent(&info_hash, opt_user_id).await {
+            Ok(torrent) => torrent,
+            Err(error) => return error.into_response(),
+        };
 
-    let Ok(bytes) = parse_torrent::encode_torrent(&torrent) else {
-        return ServiceError::InternalServerError.into_response();
-    };
+        let Ok(bytes) = parse_torrent::encode_torrent(&torrent) else {
+            return ServiceError::InternalServerError.into_response();
+        };
 
-    torrent_file_response(bytes, &format!("{}.torrent", torrent.info.name), &torrent.info_hash_hex())
+        torrent_file_response(bytes, &format!("{}.torrent", torrent.info.name), &torrent.info_hash_hex())
+    }
 }
 
 /// It returns a list of torrents matching the search criteria.
@@ -128,14 +132,37 @@ pub async fn get_torrent_info_handler(
         return errors::Request::InvalidInfoHashParam.into_response();
     };
 
-    let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
-        Ok(opt_user_id) => opt_user_id,
-        Err(error) => return error.into_response(),
-    };
+    if let Some(redirect_response) = guard_that_canonical_info_hash_is_used_or_redirect(&app_data, &info_hash).await {
+        redirect_response
+    } else {
+        let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
+            Ok(opt_user_id) => opt_user_id,
+            Err(error) => return error.into_response(),
+        };
 
-    match app_data.torrent_service.get_torrent_info(&info_hash, opt_user_id).await {
-        Ok(torrent_response) => Json(OkResponseData { data: torrent_response }).into_response(),
-        Err(error) => error.into_response(),
+        match app_data.torrent_service.get_torrent_info(&info_hash, opt_user_id).await {
+            Ok(torrent_response) => Json(OkResponseData { data: torrent_response }).into_response(),
+            Err(error) => error.into_response(),
+        }
+    }
+}
+
+async fn guard_that_canonical_info_hash_is_used_or_redirect(app_data: &Arc<AppData>, info_hash: &InfoHash) -> Option<Response> {
+    match app_data
+        .torrent_info_hash_repository
+        .find_canonical_info_hash_for(info_hash)
+        .await
+    {
+        Ok(Some(canonical_info_hash)) => {
+            if canonical_info_hash != *info_hash {
+                return Some(
+                    Redirect::temporary(&format!("/v1/torrent/{}", canonical_info_hash.to_hex_string())).into_response(),
+                );
+            }
+            None
+        }
+        Ok(None) => None,
+        Err(error) => Some(error.into_response()),
     }
 }
 

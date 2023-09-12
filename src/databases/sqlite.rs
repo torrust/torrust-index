@@ -17,7 +17,7 @@ use crate::models::torrent_file::{DbTorrentAnnounceUrl, DbTorrentFile, DbTorrent
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
-use crate::services::torrent::{DbTorrentInfoHash, OriginalInfoHashes};
+use crate::services::torrent::{CanonicalInfoHashGroup, DbTorrentInfoHash};
 use crate::utils::clock;
 use crate::utils::hex::from_bytes;
 
@@ -580,7 +580,10 @@ impl Database for Sqlite {
         }
     }
 
-    async fn get_torrent_canonical_info_hash_group(&self, canonical: &InfoHash) -> Result<OriginalInfoHashes, database::Error> {
+    async fn get_torrent_canonical_info_hash_group(
+        &self,
+        canonical: &InfoHash,
+    ) -> Result<CanonicalInfoHashGroup, database::Error> {
         let db_info_hashes = query_as::<_, DbTorrentInfoHash>(
             "SELECT info_hash, canonical_info_hash, original_is_known FROM torrust_torrent_info_hashes WHERE canonical_info_hash = ?",
         )
@@ -597,13 +600,35 @@ impl Database for Sqlite {
             })
             .collect();
 
-        Ok(OriginalInfoHashes {
+        Ok(CanonicalInfoHashGroup {
             canonical_info_hash: *canonical,
             original_info_hashes: info_hashes,
         })
     }
 
-    async fn insert_torrent_info_hash(&self, original: &InfoHash, canonical: &InfoHash) -> Result<(), database::Error> {
+    async fn find_canonical_info_hash_for(&self, info_hash: &InfoHash) -> Result<Option<InfoHash>, database::Error> {
+        let maybe_db_torrent_info_hash = query_as::<_, DbTorrentInfoHash>(
+            "SELECT info_hash, canonical_info_hash, original_is_known FROM torrust_torrent_info_hashes WHERE info_hash = ?",
+        )
+        .bind(info_hash.to_hex_string())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|err| database::Error::ErrorWithText(err.to_string()))?;
+
+        match maybe_db_torrent_info_hash {
+            Some(db_torrent_info_hash) => Ok(Some(
+                InfoHash::from_str(&db_torrent_info_hash.canonical_info_hash)
+                    .unwrap_or_else(|_| panic!("Invalid info-hash in database: {}", db_torrent_info_hash.canonical_info_hash)),
+            )),
+            None => Ok(None),
+        }
+    }
+
+    async fn add_info_hash_to_canonical_info_hash_group(
+        &self,
+        original: &InfoHash,
+        canonical: &InfoHash,
+    ) -> Result<(), database::Error> {
         query("INSERT INTO torrust_torrent_info_hashes (info_hash, canonical_info_hash, original_is_known) VALUES (?, ?, ?)")
             .bind(original.to_hex_string())
             .bind(canonical.to_hex_string())
