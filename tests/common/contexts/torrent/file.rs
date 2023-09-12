@@ -8,21 +8,21 @@ use serde::Deserialize;
 use which::which;
 
 /// Attributes parsed from a torrent file.
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct TorrentFileInfo {
     pub name: String,
     pub comment: Option<String>,
-    pub creation_date: u64,
-    pub created_by: String,
+    pub creation_date: Option<u64>,
+    pub created_by: Option<String>,
     pub source: Option<String>,
     pub info_hash: String,
     pub torrent_size: u64,
     pub content_size: u64,
     pub private: bool,
     pub tracker: Option<String>,
-    pub announce_list: Vec<Vec<String>>,
+    pub announce_list: Option<Vec<Vec<String>>>,
     pub update_url: Option<String>,
-    pub dht_nodes: Vec<String>,
+    pub dht_nodes: Option<Vec<String>>,
     pub piece_size: u64,
     pub piece_count: u64,
     pub file_count: u64,

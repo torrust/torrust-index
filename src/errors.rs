@@ -112,6 +112,9 @@ pub enum ServiceError {
     #[display(fmt = "This torrent already exists in our database.")]
     InfoHashAlreadyExists,
 
+    #[display(fmt = "A torrent with the same canonical infohash already exists in our database.")]
+    CanonicalInfoHashAlreadyExists,
+
     #[display(fmt = "This torrent title has already been used.")]
     TorrentTitleAlreadyExists,
 
@@ -147,6 +150,7 @@ impl From<sqlx::Error> for ServiceError {
         if let Some(err) = e.as_database_error() {
             return if err.code() == Some(Cow::from("2067")) {
                 if err.message().contains("torrust_torrents.info_hash") {
+                    println!("info_hash already exists {}", err.message());
                     ServiceError::InfoHashAlreadyExists
                 } else {
                     ServiceError::InternalServerError
@@ -228,6 +232,7 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::InvalidTag => StatusCode::BAD_REQUEST,
         ServiceError::Unauthorized => StatusCode::FORBIDDEN,
         ServiceError::InfoHashAlreadyExists => StatusCode::BAD_REQUEST,
+        ServiceError::CanonicalInfoHashAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::TorrentTitleAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::TrackerOffline => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::CategoryAlreadyExists => StatusCode::BAD_REQUEST,
@@ -259,5 +264,6 @@ pub fn map_database_error_to_service_error(error: &database::Error) -> ServiceEr
         database::Error::TorrentAlreadyExists => ServiceError::InfoHashAlreadyExists,
         database::Error::TorrentTitleAlreadyExists => ServiceError::TorrentTitleAlreadyExists,
         database::Error::UnrecognizedDatabaseDriver => ServiceError::InternalServerError,
+        database::Error::TorrentInfoHashNotFound => ServiceError::TorrentNotFound,
     }
 }

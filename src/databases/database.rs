@@ -12,6 +12,7 @@ use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
+use crate::services::torrent::OriginalInfoHashes;
 
 /// Database tables to be truncated when upgrading from v1.0.0 to v2.0.0.
 /// They must be in the correct order to avoid foreign key errors.
@@ -87,6 +88,7 @@ pub enum Error {
     TorrentNotFound,
     TorrentAlreadyExists, // when uploading an already uploaded info_hash
     TorrentTitleAlreadyExists,
+    TorrentInfoHashNotFound,
 }
 
 /// Get the Driver of the Database from the Connection String
@@ -228,6 +230,20 @@ pub trait Database: Sync + Send {
             torrent_announce_urls,
         ))
     }
+
+    /// Returns the list of all infohashes producing the same canonical infohash.
+    ///
+    /// When you upload a torrent the infohash migth change because the Index
+    /// remove the non-standard fields in the `info` dictionary. That makes the
+    /// infohash change. The canonical infohash is the resulting infohash.
+    /// This function returns the original infohashes of a canonical infohash.
+    ///
+    /// If the original infohash was unknown, it returns the canonical infohash.
+    ///
+    /// The relationship is 1 canonical infohash -> N original infohashes.
+    async fn get_torrent_canonical_info_hash_group(&self, canonical: &InfoHash) -> Result<OriginalInfoHashes, Error>;
+
+    async fn insert_torrent_info_hash(&self, original: &InfoHash, canonical: &InfoHash) -> Result<(), Error>;
 
     /// Get torrent's info as `DbTorrentInfo` from `torrent_id`.
     async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, Error>;

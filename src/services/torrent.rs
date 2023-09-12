@@ -1,7 +1,8 @@
 //! Torrent service.
 use std::sync::Arc;
 
-use serde_derive::Deserialize;
+use log::debug;
+use serde_derive::{Deserialize, Serialize};
 
 use super::category::DbCategoryRepository;
 use super::user::DbUserRepository;
@@ -28,6 +29,7 @@ pub struct Index {
     user_repository: Arc<DbUserRepository>,
     category_repository: Arc<DbCategoryRepository>,
     torrent_repository: Arc<DbTorrentRepository>,
+    torrent_info_hash_repository: Arc<DbTorrentInfoHashRepository>,
     torrent_info_repository: Arc<DbTorrentInfoRepository>,
     torrent_file_repository: Arc<DbTorrentFileRepository>,
     torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
@@ -83,6 +85,7 @@ impl Index {
         user_repository: Arc<DbUserRepository>,
         category_repository: Arc<DbCategoryRepository>,
         torrent_repository: Arc<DbTorrentRepository>,
+        torrent_info_hash_repository: Arc<DbTorrentInfoHashRepository>,
         torrent_info_repository: Arc<DbTorrentInfoRepository>,
         torrent_file_repository: Arc<DbTorrentFileRepository>,
         torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
@@ -96,6 +99,7 @@ impl Index {
             user_repository,
             category_repository,
             torrent_repository,
+            torrent_info_hash_repository,
             torrent_info_repository,
             torrent_file_repository,
             torrent_announce_url_repository,
@@ -162,25 +166,51 @@ impl Index {
             .await
             .map_err(|_| ServiceError::InvalidCategory)?;
 
+        let canonical_info_hash = torrent.canonical_info_hash();
+
+        let original_info_hashes = self
+            .torrent_info_hash_repository
+            .get_canonical_info_hash_group(&canonical_info_hash)
+            .await?;
+
+        if !original_info_hashes.is_empty() {
+            // Torrent with the same canonical infohash was already uploaded
+            debug!("Canonical infohash found: {:?}", canonical_info_hash.to_hex_string());
+
+            if let Some(original_info_hash) = original_info_hashes.find(&original_info_hash) {
+                // The exact original infohash was already uploaded
+                debug!("Original infohash found: {:?}", original_info_hash.to_hex_string());
+
+                return Err(ServiceError::InfoHashAlreadyExists);
+            }
+
+            // A new original infohash is being uploaded with a canonical infohash that already exists.
+            debug!("Original infohash not found: {:?}", original_info_hash.to_hex_string());
+
+            // Add the new associated original infohash to the canonical one.
+            self.torrent_info_hash_repository
+                .add(&original_info_hash, &canonical_info_hash)
+                .await?;
+            return Err(ServiceError::CanonicalInfoHashAlreadyExists);
+        }
+
+        // First time a torrent with this original infohash is uploaded.
+
         let torrent_id = self
             .torrent_repository
             .add(&original_info_hash, &torrent, &metadata, user_id, category)
             .await?;
-
-        let info_hash: InfoHash = torrent
-            .info_hash()
-            .parse()
-            .expect("the parsed torrent should have a valid info hash");
+        let info_hash = torrent.canonical_info_hash();
 
         drop(
             self.tracker_statistics_importer
-                .import_torrent_statistics(torrent_id, &torrent.info_hash())
+                .import_torrent_statistics(torrent_id, &torrent.info_hash_hex())
                 .await,
         );
 
         // We always whitelist the torrent on the tracker because even if the tracker mode is `public`
         // it could be changed to `private` later on.
-        if let Err(e) = self.tracker_service.whitelist_info_hash(torrent.info_hash()).await {
+        if let Err(e) = self.tracker_service.whitelist_info_hash(torrent.info_hash_hex()).await {
             // If the torrent can't be whitelisted somehow, remove the torrent from database
             drop(self.torrent_repository.delete(&torrent_id).await);
             return Err(e);
@@ -505,6 +535,73 @@ impl DbTorrentRepository {
                 &metadata.title,
                 &metadata.description,
             )
+            .await
+    }
+
+    /// Deletes the entire torrent in the database.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error there is a database error.
+    pub async fn delete(&self, torrent_id: &TorrentId) -> Result<(), Error> {
+        self.database.delete_torrent(*torrent_id).await
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DbTorrentInfoHash {
+    pub info_hash: String,
+    pub canonical_info_hash: String,
+    pub original_is_known: bool,
+}
+
+pub struct DbTorrentInfoHashRepository {
+    database: Arc<Box<dyn Database>>,
+}
+
+pub struct OriginalInfoHashes {
+    pub canonical_info_hash: InfoHash,
+    pub original_info_hashes: Vec<InfoHash>,
+}
+
+impl OriginalInfoHashes {
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.original_info_hashes.is_empty()
+    }
+
+    #[must_use]
+    pub fn find(&self, original_info_hash: &InfoHash) -> Option<&InfoHash> {
+        self.original_info_hashes.iter().find(|&hash| *hash == *original_info_hash)
+    }
+}
+
+impl DbTorrentInfoHashRepository {
+    #[must_use]
+    pub fn new(database: Arc<Box<dyn Database>>) -> Self {
+        Self { database }
+    }
+
+    /// It returns all the infohashes associated to the canonical one.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error there is a database error.
+    pub async fn get_canonical_info_hash_group(&self, info_hash: &InfoHash) -> Result<OriginalInfoHashes, Error> {
+        self.database.get_torrent_canonical_info_hash_group(info_hash).await
+    }
+
+    /// Inserts a new infohash for the torrent. Torrents can be associated to
+    /// different infohashes because the Index might change the original infohash.
+    /// The index track the final infohash used (canonical) and all the original
+    /// ones.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error there is a database error.
+    pub async fn add(&self, original_info_hash: &InfoHash, canonical_info_hash: &InfoHash) -> Result<(), Error> {
+        self.database
+            .insert_torrent_info_hash(original_info_hash, canonical_info_hash)
             .await
     }
 

@@ -17,6 +17,7 @@ use crate::models::torrent_file::{DbTorrentAnnounceUrl, DbTorrentFile, DbTorrent
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
+use crate::services::torrent::{DbTorrentInfoHash, OriginalInfoHashes};
 use crate::utils::clock;
 use crate::utils::hex::from_bytes;
 
@@ -240,7 +241,8 @@ impl Database for Sqlite {
             .map(|v| v.last_insert_rowid())
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
-                    if err.message().contains("UNIQUE") {
+                    log::error!("DB error: {:?}", err);
+                    if err.message().contains("UNIQUE") && err.message().contains("name") {
                         database::Error::CategoryAlreadyExists
                     } else {
                         database::Error::Error
@@ -413,7 +415,8 @@ impl Database for Sqlite {
         title: &str,
         description: &str,
     ) -> Result<i64, database::Error> {
-        let info_hash = torrent.info_hash();
+        let info_hash = torrent.info_hash_hex();
+        let canonical_info_hash = torrent.canonical_info_hash();
 
         // open pool connection
         let mut conn = self.pool.acquire().await.map_err(|_| database::Error::Error)?;
@@ -432,7 +435,7 @@ impl Database for Sqlite {
         let private = torrent.info.private.unwrap_or(0);
 
         // add torrent
-        let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, name, pieces, piece_length, private, root_hash, `source`, original_info_hash, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
+        let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, name, pieces, piece_length, private, root_hash, `source`, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
             .bind(uploader_id)
             .bind(category_id)
             .bind(info_hash.to_lowercase())
@@ -443,22 +446,41 @@ impl Database for Sqlite {
             .bind(private)
             .bind(root_hash)
             .bind(torrent.info.source.clone())
-            .bind(original_info_hash.to_hex_string())
-            .execute(&self.pool)
+            .execute(&mut tx)
             .await
             .map(|v| v.last_insert_rowid())
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
-                    if err.message().contains("info_hash") {
+                    log::error!("DB error: {:?}", err);
+                    if err.message().contains("UNIQUE") && err.message().contains("info_hash") {
                         database::Error::TorrentAlreadyExists
-                    } else if err.message().contains("title") {
-                        database::Error::TorrentTitleAlreadyExists
                     } else {
                         database::Error::Error
                     }
                 }
                 _ => database::Error::Error
             })?;
+
+        // add torrent canonical infohash
+
+        let insert_info_hash_result =
+            query("INSERT INTO torrust_torrent_info_hashes (info_hash, canonical_info_hash, original_is_known) VALUES (?, ?, ?)")
+                .bind(original_info_hash.to_hex_string())
+                .bind(canonical_info_hash.to_hex_string())
+                .bind(true)
+                .execute(&mut tx)
+                .await
+                .map(|_| ())
+                .map_err(|err| {
+                    log::error!("DB error: {:?}", err);
+                    database::Error::Error
+                });
+
+        // rollback transaction on error
+        if let Err(e) = insert_info_hash_result {
+            drop(tx.rollback().await);
+            return Err(e);
+        }
 
         let insert_torrent_files_result = if let Some(length) = torrent.info.length {
             query("INSERT INTO torrust_torrent_files (md5sum, torrent_id, length) VALUES (?, ?, ?)")
@@ -537,9 +559,8 @@ impl Database for Sqlite {
                 .await
                 .map_err(|e| match e {
                     sqlx::Error::Database(err) => {
-                        if err.message().contains("info_hash") {
-                            database::Error::TorrentAlreadyExists
-                        } else if err.message().contains("title") {
+                        log::error!("DB error: {:?}", err);
+                        if err.message().contains("UNIQUE") && err.message().contains("title") {
                             database::Error::TorrentTitleAlreadyExists
                         } else {
                             database::Error::Error
@@ -559,6 +580,40 @@ impl Database for Sqlite {
                 Err(e)
             }
         }
+    }
+
+    async fn get_torrent_canonical_info_hash_group(&self, canonical: &InfoHash) -> Result<OriginalInfoHashes, database::Error> {
+        let db_info_hashes = query_as::<_, DbTorrentInfoHash>(
+            "SELECT info_hash, canonical_info_hash, original_is_known FROM torrust_torrent_info_hashes WHERE canonical_info_hash = ?",
+        )
+        .bind(canonical.to_hex_string())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|err| database::Error::ErrorWithText(err.to_string()))?;
+
+        let info_hashes: Vec<InfoHash> = db_info_hashes
+            .into_iter()
+            .map(|db_info_hash| {
+                InfoHash::from_str(&db_info_hash.info_hash)
+                    .unwrap_or_else(|_| panic!("Invalid info-hash in database: {}", db_info_hash.info_hash))
+            })
+            .collect();
+
+        Ok(OriginalInfoHashes {
+            canonical_info_hash: *canonical,
+            original_info_hashes: info_hashes,
+        })
+    }
+
+    async fn insert_torrent_info_hash(&self, original: &InfoHash, canonical: &InfoHash) -> Result<(), database::Error> {
+        query("INSERT INTO torrust_torrent_info_hashes (info_hash, canonical_info_hash, original_is_known) VALUES (?, ?, ?)")
+            .bind(original.to_hex_string())
+            .bind(canonical.to_hex_string())
+            .bind(true)
+            .execute(&self.pool)
+            .await
+            .map(|_| ())
+            .map_err(|err| database::Error::ErrorWithText(err.to_string()))
     }
 
     async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, database::Error> {
@@ -666,7 +721,8 @@ impl Database for Sqlite {
             .await
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
-                    if err.message().contains("UNIQUE") {
+                    log::error!("DB error: {:?}", err);
+                    if err.message().contains("UNIQUE") && err.message().contains("title") {
                         database::Error::TorrentTitleAlreadyExists
                     } else {
                         database::Error::Error

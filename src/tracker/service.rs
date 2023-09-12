@@ -147,12 +147,17 @@ impl Service {
         let body = response.text().await;
 
         if let Ok(body) = body {
+            if body == *"torrent not known" {
+                // todo: temporary fix. the service should return a 404 (StatusCode::NOT_FOUND).
+                return Err(ServiceError::TorrentNotFound);
+            }
+
             let torrent_info = serde_json::from_str(&body);
 
             if let Ok(torrent_info) = torrent_info {
                 Ok(torrent_info)
             } else {
-                error!("Failed to parse torrent info from tracker response");
+                error!("Failed to parse torrent info from tracker response. Body: {}", body);
                 Err(ServiceError::InternalServerError)
             }
         } else {

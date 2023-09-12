@@ -98,6 +98,9 @@ mod tests {
 
         // The infohash is not the original infohash of the torrent file,
         // but the infohash of the info dictionary without the custom keys.
-        assert_eq!(torrent.info_hash(), "8aa01a4c816332045ffec83247ccbc654547fedf".to_string());
+        assert_eq!(
+            torrent.info_hash_hex(),
+            "8aa01a4c816332045ffec83247ccbc654547fedf".to_string()
+        );
     }
 }
