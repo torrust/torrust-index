@@ -53,11 +53,11 @@ impl BinaryResponse {
             bytes: response.bytes().await.unwrap().to_vec(),
         }
     }
-    pub fn is_bittorrent_and_ok(&self) -> bool {
-        self.is_ok() && self.is_bittorrent()
+    pub fn is_a_bit_torrent_file(&self) -> bool {
+        self.is_ok() && self.is_bittorrent_content_type()
     }
 
-    pub fn is_bittorrent(&self) -> bool {
+    pub fn is_bittorrent_content_type(&self) -> bool {
         if let Some(content_type) = &self.content_type {
             return content_type == "application/x-bittorrent";
         }

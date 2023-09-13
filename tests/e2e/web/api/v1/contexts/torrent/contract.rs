@@ -16,7 +16,6 @@ Get torrent info:
 
 mod for_guests {
 
-    use torrust_index_backend::utils::parse_torrent::{calculate_info_hash, decode_torrent};
     use torrust_index_backend::web::api;
 
     use crate::common::client::Client;
@@ -28,7 +27,6 @@ mod for_guests {
     };
     use crate::common::http::{Query, QueryParam};
     use crate::e2e::environment::TestEnv;
-    use crate::e2e::web::api::v1::contexts::torrent::asserts::expected_torrent;
     use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
     use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
 
@@ -215,44 +213,96 @@ mod for_guests {
         assert!(response.is_json_and_ok());
     }
 
-    #[tokio::test]
-    async fn it_should_allow_guests_to_download_a_torrent_file_searching_by_info_hash() {
-        let mut env = TestEnv::new();
-        env.start(api::Version::V1).await;
+    mod it_should_allow_guests_download_a_torrent_file_searching_by_info_hash {
 
-        if !env.provides_a_tracker() {
-            println!("test skipped. It requires a tracker to be running.");
-            return;
+        use torrust_index_backend::utils::parse_torrent::{calculate_info_hash, decode_torrent};
+        use torrust_index_backend::web::api;
+
+        use crate::common::client::Client;
+        use crate::e2e::environment::TestEnv;
+        use crate::e2e::web::api::v1::contexts::torrent::asserts::canonical_torrent_for;
+        use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
+        use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
+
+        #[tokio::test]
+        async fn returning_a_bittorrent_binary_ok_response() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+            let uploader = new_logged_in_user(&env).await;
+
+            // Upload
+            let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            // Download
+            let response = client.download_torrent(&test_torrent.info_hash_as_hex_string()).await;
+
+            assert!(response.is_a_bit_torrent_file());
         }
 
-        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
-        let uploader = new_logged_in_user(&env).await;
+        #[tokio::test]
+        async fn the_downloaded_torrent_should_keep_the_same_info_hash_if_the_torrent_does_not_have_non_standard_fields_in_the_info_dict(
+        ) {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
 
-        // Upload a new torrent
-        let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
 
-        let uploaded_torrent =
-            decode_torrent(&test_torrent.index_info.torrent_file.contents).expect("could not decode uploaded torrent");
+            let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+            let uploader = new_logged_in_user(&env).await;
 
-        // Download the torrent
-        let response = client.download_torrent(&test_torrent.info_hash_as_hex_string()).await;
+            // Upload
+            let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
 
-        let downloaded_torrent_info_hash = calculate_info_hash(&response.bytes);
-        let downloaded_torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
+            // Download
+            let response = client.download_torrent(&test_torrent.info_hash_as_hex_string()).await;
 
-        // Response should be a torrent file and status OK
-        assert!(response.is_bittorrent_and_ok());
+            let downloaded_torrent_info_hash = calculate_info_hash(&response.bytes);
 
-        // Info-hash should be the same
-        assert_eq!(
-            downloaded_torrent_info_hash.to_hex_string(),
-            test_torrent.info_hash_as_hex_string(),
-            "downloaded torrent info-hash does not match uploaded torrent info-hash"
-        );
+            assert_eq!(
+                downloaded_torrent_info_hash.to_hex_string(),
+                test_torrent.info_hash_as_hex_string(),
+                "downloaded torrent info-hash does not match uploaded torrent info-hash"
+            );
+        }
 
-        // Torrent should be the same
-        let expected_torrent = expected_torrent(uploaded_torrent, &env, &None).await;
-        assert_eq!(downloaded_torrent, expected_torrent);
+        #[tokio::test]
+        async fn the_downloaded_torrent_should_be_the_canonical_version_of_the_uploaded_one() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+            let uploader = new_logged_in_user(&env).await;
+
+            // Upload
+            let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            let uploaded_torrent =
+                decode_torrent(&test_torrent.index_info.torrent_file.contents).expect("could not decode uploaded torrent");
+
+            // Download
+            let response = client.download_torrent(&test_torrent.info_hash_as_hex_string()).await;
+
+            let downloaded_torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
+
+            let expected_downloaded_torrent = canonical_torrent_for(uploaded_torrent, &env, &None).await;
+
+            assert_eq!(downloaded_torrent, expected_downloaded_torrent);
+        }
     }
 
     #[tokio::test]
