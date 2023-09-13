@@ -125,6 +125,14 @@ jobs:
         name: Checkout Repository
         uses: actions/checkout@v3
 
+      - id: setup
+        name: Setup Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - id: cache
+        name: Enable Job Cache
+        uses: Swatinem/rust-cache@v2        
+
       - id: test
         name: Run Integration Tests
         run: ./docker/bin/e2e/run-e2e-tests.sh
