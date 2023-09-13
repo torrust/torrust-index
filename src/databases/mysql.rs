@@ -442,8 +442,6 @@ impl Database for Mysql {
             (root_hash.to_string(), true)
         };
 
-        let private = torrent.info.private.unwrap_or(0);
-
         // add torrent
         let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, name, pieces, piece_length, private, root_hash, `source`, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())")
             .bind(uploader_id)
@@ -453,7 +451,7 @@ impl Database for Mysql {
             .bind(torrent.info.name.to_string())
             .bind(pieces)
             .bind(torrent.info.piece_length)
-            .bind(private)
+            .bind(torrent.info.private)
             .bind(root_hash)
             .bind(torrent.info.source.clone())
             .execute(&mut tx)

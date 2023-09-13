@@ -35,11 +35,3 @@ pub fn assert_expected_torrent_details(torrent: &TorrentDetails, expected_torren
         "torrent `magnet_link` mismatch"
     );
 }
-
-/// Full assert for test debugging purposes.
-pub fn _assert_eq_torrent_details(torrent: &TorrentDetails, expected_torrent: &TorrentDetails) {
-    assert_eq!(
-        torrent, expected_torrent,
-        "\nUnexpected torrent details:\n{torrent:#?} torrent details should match the previously indexed torrent:\n{expected_torrent:#?}"
-    );
-}
