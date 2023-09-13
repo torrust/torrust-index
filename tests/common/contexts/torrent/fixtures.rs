@@ -137,7 +137,7 @@ impl TestTorrent {
         }
     }
 
-    pub fn info_hash(&self) -> InfoHash {
+    pub fn info_hash_as_hex_string(&self) -> InfoHash {
         self.file_info.info_hash.clone()
     }
 }
