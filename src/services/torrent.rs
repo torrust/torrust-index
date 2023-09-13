@@ -29,7 +29,7 @@ pub struct Index {
     user_repository: Arc<DbUserRepository>,
     category_repository: Arc<DbCategoryRepository>,
     torrent_repository: Arc<DbTorrentRepository>,
-    torrent_info_hash_repository: Arc<DbTorrentInfoHashRepository>,
+    torrent_info_hash_repository: Arc<DbCanonicalInfoHashGroupRepository>,
     torrent_info_repository: Arc<DbTorrentInfoRepository>,
     torrent_file_repository: Arc<DbTorrentFileRepository>,
     torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
@@ -85,7 +85,7 @@ impl Index {
         user_repository: Arc<DbUserRepository>,
         category_repository: Arc<DbCategoryRepository>,
         torrent_repository: Arc<DbTorrentRepository>,
-        torrent_info_hash_repository: Arc<DbTorrentInfoHashRepository>,
+        torrent_info_hash_repository: Arc<DbCanonicalInfoHashGroupRepository>,
         torrent_info_repository: Arc<DbTorrentInfoRepository>,
         torrent_file_repository: Arc<DbTorrentFileRepository>,
         torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
@@ -189,7 +189,7 @@ impl Index {
 
             // Add the new associated original infohash to the canonical one.
             self.torrent_info_hash_repository
-                .add(&original_info_hash, &canonical_info_hash)
+                .add_info_hash_to_canonical_info_hash_group(&original_info_hash, &canonical_info_hash)
                 .await?;
             return Err(ServiceError::CanonicalInfoHashAlreadyExists);
         }
@@ -555,16 +555,24 @@ pub struct DbTorrentInfoHash {
     pub original_is_known: bool,
 }
 
-pub struct DbTorrentInfoHashRepository {
+/// All the infohashes associated to a canonical one.
+///
+/// When you upload a torrent the info-hash migth change because the Index
+/// remove the non-standard fields in the `info` dictionary. That makes the
+/// infohash change. The canonical infohash is the resulting infohash.
+/// This function returns the original infohashes of a canonical infohash.
+///
+/// The relationship is 1 canonical infohash -> N original infohashes.
+pub struct CanonicalInfoHashGroup {
+    pub canonical_info_hash: InfoHash,
+    /// The list of original infohashes associated to the canonical one.
+    pub original_info_hashes: Vec<InfoHash>,
+}
+pub struct DbCanonicalInfoHashGroupRepository {
     database: Arc<Box<dyn Database>>,
 }
 
-pub struct OriginalInfoHashes {
-    pub canonical_info_hash: InfoHash,
-    pub original_info_hashes: Vec<InfoHash>,
-}
-
-impl OriginalInfoHashes {
+impl CanonicalInfoHashGroup {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.original_info_hashes.is_empty()
@@ -576,7 +584,7 @@ impl OriginalInfoHashes {
     }
 }
 
-impl DbTorrentInfoHashRepository {
+impl DbCanonicalInfoHashGroupRepository {
     #[must_use]
     pub fn new(database: Arc<Box<dyn Database>>) -> Self {
         Self { database }
@@ -587,31 +595,42 @@ impl DbTorrentInfoHashRepository {
     /// # Errors
     ///
     /// This function will return an error there is a database error.
-    pub async fn get_canonical_info_hash_group(&self, info_hash: &InfoHash) -> Result<OriginalInfoHashes, Error> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error is there was a problem with the database.
+    pub async fn get_canonical_info_hash_group(&self, info_hash: &InfoHash) -> Result<CanonicalInfoHashGroup, Error> {
         self.database.get_torrent_canonical_info_hash_group(info_hash).await
     }
 
-    /// Inserts a new infohash for the torrent. Torrents can be associated to
-    /// different infohashes because the Index might change the original infohash.
-    /// The index track the final infohash used (canonical) and all the original
-    /// ones.
+    /// It returns the list of all infohashes producing the same canonical
+    /// infohash.
+    ///
+    /// If the original infohash was unknown, it returns the canonical infohash.
     ///
     /// # Errors
     ///
-    /// This function will return an error there is a database error.
-    pub async fn add(&self, original_info_hash: &InfoHash, canonical_info_hash: &InfoHash) -> Result<(), Error> {
-        self.database
-            .insert_torrent_info_hash(original_info_hash, canonical_info_hash)
-            .await
+    /// Returns an error is there was a problem with the database.
+    pub async fn find_canonical_info_hash_for(&self, info_hash: &InfoHash) -> Result<Option<InfoHash>, Error> {
+        self.database.find_canonical_info_hash_for(info_hash).await
     }
 
-    /// Deletes the entire torrent in the database.
+    /// It returns the list of all infohashes producing the same canonical
+    /// infohash.
+    ///
+    /// If the original infohash was unknown, it returns the canonical infohash.
     ///
     /// # Errors
     ///
-    /// This function will return an error there is a database error.
-    pub async fn delete(&self, torrent_id: &TorrentId) -> Result<(), Error> {
-        self.database.delete_torrent(*torrent_id).await
+    /// Returns an error is there was a problem with the database.
+    pub async fn add_info_hash_to_canonical_info_hash_group(
+        &self,
+        original_info_hash: &InfoHash,
+        canonical_info_hash: &InfoHash,
+    ) -> Result<(), Error> {
+        self.database
+            .add_info_hash_to_canonical_info_hash_group(original_info_hash, canonical_info_hash)
+            .await
     }
 }
 

@@ -12,7 +12,7 @@ use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebTok
 use crate::services::category::{self, DbCategoryRepository};
 use crate::services::tag::{self, DbTagRepository};
 use crate::services::torrent::{
-    DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoHashRepository, DbTorrentInfoRepository,
+    DbCanonicalInfoHashGroupRepository, DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository,
     DbTorrentListingGenerator, DbTorrentRepository, DbTorrentTagRepository,
 };
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
@@ -68,7 +68,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let user_authentication_repository = Arc::new(DbUserAuthenticationRepository::new(database.clone()));
     let user_profile_repository = Arc::new(DbUserProfileRepository::new(database.clone()));
     let torrent_repository = Arc::new(DbTorrentRepository::new(database.clone()));
-    let torrent_info_hash_repository = Arc::new(DbTorrentInfoHashRepository::new(database.clone()));
+    let canonical_info_hash_group_repository = Arc::new(DbCanonicalInfoHashGroupRepository::new(database.clone()));
     let torrent_info_repository = Arc::new(DbTorrentInfoRepository::new(database.clone()));
     let torrent_file_repository = Arc::new(DbTorrentFileRepository::new(database.clone()));
     let torrent_announce_url_repository = Arc::new(DbTorrentAnnounceUrlRepository::new(database.clone()));
@@ -93,7 +93,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         user_repository.clone(),
         category_repository.clone(),
         torrent_repository.clone(),
-        torrent_info_hash_repository.clone(),
+        canonical_info_hash_group_repository.clone(),
         torrent_info_repository.clone(),
         torrent_file_repository.clone(),
         torrent_announce_url_repository.clone(),
@@ -137,7 +137,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         user_authentication_repository,
         user_profile_repository,
         torrent_repository,
-        torrent_info_hash_repository,
+        canonical_info_hash_group_repository,
         torrent_info_repository,
         torrent_file_repository,
         torrent_announce_url_repository,

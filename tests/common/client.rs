@@ -208,6 +208,10 @@ impl Http {
                 .await
                 .unwrap(),
         };
+        // todo: If the response is a JSON, it returns the JSON body in a byte
+        //   array. This is not the expected behavior.
+        //  - Rename BinaryResponse to BinaryTorrentResponse
+        //  - Return an error if the response is not a bittorrent file
         BinaryResponse::from(response).await
     }
 
