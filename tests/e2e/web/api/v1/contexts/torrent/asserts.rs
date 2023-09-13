@@ -24,10 +24,12 @@ pub async fn expected_torrent(mut uploaded_torrent: Torrent, env: &TestEnv, down
         None => None,
     };
 
-    uploaded_torrent.info.private = Some(0);
     uploaded_torrent.announce = Some(build_announce_url(&tracker_url, &tracker_key));
-    uploaded_torrent.encoding = None;
     uploaded_torrent.announce_list = Some(build_announce_list(&tracker_url, &tracker_key));
+
+    // These fields are not persisted in the database yet.
+    // See https://github.com/torrust/torrust-index-backend/issues/284
+    uploaded_torrent.encoding = None;
     uploaded_torrent.creation_date = None;
     uploaded_torrent.created_by = None;
 

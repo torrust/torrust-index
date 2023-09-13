@@ -432,8 +432,6 @@ impl Database for Sqlite {
             (root_hash.to_string(), true)
         };
 
-        let private = torrent.info.private.unwrap_or(0);
-
         // add torrent
         let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, name, pieces, piece_length, private, root_hash, `source`, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
             .bind(uploader_id)
@@ -443,7 +441,7 @@ impl Database for Sqlite {
             .bind(torrent.info.name.to_string())
             .bind(pieces)
             .bind(torrent.info.piece_length)
-            .bind(private)
+            .bind(torrent.info.private)
             .bind(root_hash)
             .bind(torrent.info.source.clone())
             .execute(&mut tx)

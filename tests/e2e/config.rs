@@ -19,7 +19,7 @@ pub const ENV_VAR_E2E_CONFIG_PATH: &str = "TORRUST_IDX_BACK_E2E_CONFIG_PATH";
 
 // Default values
 
-pub const ENV_VAR_E2E_DEFAULT_CONFIG_PATH: &str = "./config-idx-back.local.toml";
+pub const ENV_VAR_E2E_DEFAULT_CONFIG_PATH: &str = "./config-idx-back.sqlite.local.toml";
 
 /// Initialize configuration from file or env var.
 ///

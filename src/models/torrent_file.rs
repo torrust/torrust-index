@@ -113,8 +113,6 @@ impl Torrent {
     /// This function will panic if the `torrent_info.pieces` is not a valid hex string.
     #[must_use]
     pub fn from_new_torrent_info_request(torrent_info: NewTorrentInfoRequest) -> Self {
-        let private = u8::try_from(torrent_info.private.unwrap_or(0)).ok();
-
         // the info part of the torrent file
         let mut info = TorrentInfo {
             name: torrent_info.name.to_string(),
@@ -123,7 +121,7 @@ impl Torrent {
             md5sum: None,
             length: None,
             files: None,
-            private,
+            private: torrent_info.private,
             path: None,
             root_hash: None,
             source: None,
@@ -296,7 +294,7 @@ pub struct DbTorrentInfo {
     pub pieces: String,
     pub piece_length: i64,
     #[serde(default)]
-    pub private: Option<i64>,
+    pub private: Option<u8>,
     pub root_hash: i64,
 }
 
