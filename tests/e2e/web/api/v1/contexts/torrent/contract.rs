@@ -16,6 +16,7 @@ Get torrent info:
 
 mod for_guests {
 
+    use torrust_index_backend::utils::parse_torrent::decode_torrent;
     use torrust_index_backend::web::api;
     use uuid::Uuid;
 
@@ -234,6 +235,7 @@ mod for_guests {
         let title = format!("title-{id}");
         let file_contents = "data".to_string();
 
+        // Upload the first torrent
         let mut first_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 01");
         first_torrent.index_info.title = title.clone();
 
@@ -241,6 +243,7 @@ mod for_guests {
             .await
             .expect("first torrent should be uploaded");
 
+        // Upload the second torrent with the same canonical info-hash
         let mut second_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 02");
         second_torrent.index_info.title = format!("{title}-clone");
 
@@ -348,6 +351,49 @@ mod for_guests {
 
             assert_eq!(downloaded_torrent, expected_downloaded_torrent);
         }
+    }
+
+    #[tokio::test]
+    async fn it_should_allow_guests_to_download_a_torrent_using_a_non_canonical_info_hash() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
+
+        if !env.provides_a_tracker() {
+            println!("test skipped. It requires a tracker to be running.");
+            return;
+        }
+
+        let uploader = new_logged_in_user(&env).await;
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+        // Sample data needed to build two torrents with the same canonical info-hash.
+        // Those torrents belong to the same Canonical Infohash Group.
+        let id = Uuid::new_v4();
+        let title = format!("title-{id}");
+        let file_contents = "data".to_string();
+
+        // Upload the first torrent
+        let mut first_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 01");
+        first_torrent.index_info.title = title.clone();
+
+        let first_torrent_canonical_info_hash = upload_test_torrent(&client, &first_torrent)
+            .await
+            .expect("first torrent should be uploaded");
+
+        // Upload the second torrent with the same canonical info-hash
+        let mut second_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 02");
+        second_torrent.index_info.title = format!("{title}-clone");
+
+        let _result = upload_test_torrent(&client, &second_torrent).await;
+
+        // Download the torrent using the non-canonical info-hash (second torrent info-hash)
+        let response = client.download_torrent(&second_torrent.file_info_hash()).await;
+
+        let torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
+
+        // The returned torrent info-hash should be the same as the first torrent
+        assert_eq!(response.status, 200);
+        assert_eq!(torrent.info_hash_hex(), first_torrent_canonical_info_hash.to_hex_string());
     }
 
     #[tokio::test]
