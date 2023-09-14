@@ -20,7 +20,7 @@ pub async fn new_logged_in_admin(env: &TestEnv) -> LoggedInUserData {
     let user_profile = database
         .get_user_profile_from_username(&user.username)
         .await
-        .unwrap_or_else(|_| panic!("user {user:#?} should  have a profile."));
+        .unwrap_or_else(|_| panic!("no user profile for the user: {user:#?}."));
 
     database.grant_admin_role(user_profile.user_id).await.unwrap();
 

@@ -52,7 +52,7 @@ pub async fn add_handler(
     };
 
     match app_data.tag_service.add_tag(&add_tag_form.name, &user_id).await {
-        Ok(()) => added_tag(&add_tag_form.name).into_response(),
+        Ok(_) => added_tag(&add_tag_form.name).into_response(),
         Err(error) => error.into_response(),
     }
 }

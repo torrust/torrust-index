@@ -794,13 +794,23 @@ impl Database for Sqlite {
             })
     }
 
-    async fn add_tag(&self, name: &str) -> Result<(), database::Error> {
+    async fn insert_tag_and_get_id(&self, tag_name: &str) -> Result<i64, database::Error> {
         query("INSERT INTO torrust_torrent_tags (name) VALUES (?)")
-            .bind(name)
+            .bind(tag_name)
             .execute(&self.pool)
             .await
-            .map(|_| ())
-            .map_err(|err| database::Error::ErrorWithText(err.to_string()))
+            .map(|v| v.last_insert_rowid())
+            .map_err(|e| match e {
+                sqlx::Error::Database(err) => {
+                    log::error!("DB error: {:?}", err);
+                    if err.message().contains("UNIQUE") && err.message().contains("name") {
+                        database::Error::TagAlreadyExists
+                    } else {
+                        database::Error::Error
+                    }
+                }
+                _ => database::Error::Error,
+            })
     }
 
     async fn delete_tag(&self, tag_id: TagId) -> Result<(), database::Error> {

@@ -280,7 +280,7 @@ impl SqliteDatabaseV2_0_0 {
             query(&format!("DELETE FROM {table};"))
                 .execute(&self.pool)
                 .await
-                .expect("table {table} should be deleted");
+                .unwrap_or_else(|_| panic!("table {table} should be deleted"));
         }
 
         Ok(())

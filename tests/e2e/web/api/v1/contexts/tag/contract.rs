@@ -104,9 +104,7 @@ async fn it_should_allow_admins_to_add_new_tags() {
 }
 
 #[tokio::test]
-async fn it_should_allow_adding_duplicated_tags() {
-    // code-review: is this an intended behavior?
-
+async fn it_should_not_allow_adding_duplicated_tags() {
     let mut env = TestEnv::new();
     env.start(api::Version::V1).await;
 
@@ -117,7 +115,8 @@ async fn it_should_allow_adding_duplicated_tags() {
 
     // Try to add the same tag again
     let response = add_tag(&random_tag_name, &env).await;
-    assert_eq!(response.status, 200);
+
+    assert_eq!(response.status, 400);
 }
 
 #[tokio::test]

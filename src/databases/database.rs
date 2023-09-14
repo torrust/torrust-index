@@ -287,7 +287,7 @@ pub trait Database: Sync + Send {
     async fn update_torrent_category(&self, torrent_id: i64, category_id: CategoryId) -> Result<(), Error>;
 
     /// Add a new tag.
-    async fn add_tag(&self, name: &str) -> Result<(), Error>;
+    async fn insert_tag_and_get_id(&self, name: &str) -> Result<i64, Error>;
 
     /// Delete a tag.
     async fn delete_tag(&self, tag_id: TagId) -> Result<(), Error>;
