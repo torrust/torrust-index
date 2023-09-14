@@ -804,13 +804,23 @@ impl Database for Mysql {
             })
     }
 
-    async fn add_tag(&self, name: &str) -> Result<(), database::Error> {
+    async fn insert_tag_and_get_id(&self, name: &str) -> Result<i64, database::Error> {
         query("INSERT INTO torrust_torrent_tags (name) VALUES (?)")
             .bind(name)
             .execute(&self.pool)
             .await
-            .map(|_| ())
-            .map_err(|err| database::Error::ErrorWithText(err.to_string()))
+            .map(|v| i64::try_from(v.last_insert_id()).expect("last ID is larger than i64"))
+            .map_err(|e| match e {
+                sqlx::Error::Database(err) => {
+                    log::error!("DB error: {:?}", err);
+                    if err.message().contains("Duplicate entry") && err.message().contains("name") {
+                        database::Error::TagAlreadyExists
+                    } else {
+                        database::Error::Error
+                    }
+                }
+                _ => database::Error::Error,
+            })
     }
 
     async fn delete_tag(&self, tag_id: TagId) -> Result<(), database::Error> {

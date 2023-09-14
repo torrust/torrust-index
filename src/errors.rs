@@ -136,6 +136,9 @@ pub enum ServiceError {
     #[display(fmt = "Tag already exists.")]
     TagAlreadyExists,
 
+    #[display(fmt = "Tag name cannot be empty.")]
+    TagNameEmpty,
+
     #[display(fmt = "Category not found.")]
     CategoryNotFound,
 
@@ -240,6 +243,7 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::TrackerOffline => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::CategoryNameEmpty => StatusCode::BAD_REQUEST,
         ServiceError::CategoryAlreadyExists => StatusCode::BAD_REQUEST,
+        ServiceError::TagNameEmpty => StatusCode::BAD_REQUEST,
         ServiceError::TagAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::EmailMissing => StatusCode::NOT_FOUND,
