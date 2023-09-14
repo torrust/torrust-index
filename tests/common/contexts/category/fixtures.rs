@@ -1,6 +1,6 @@
 use rand::Rng;
 
-pub fn software_predefined_category_name() -> String {
+pub fn software_category_name() -> String {
     "software".to_string()
 }
 

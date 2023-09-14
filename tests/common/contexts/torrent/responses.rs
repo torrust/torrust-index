@@ -2,6 +2,7 @@ use serde::Deserialize;
 
 pub type Id = i64;
 pub type CategoryId = i64;
+pub type TagId = i64;
 pub type UtcDateTime = String; // %Y-%m-%d %H:%M:%S
 
 #[derive(Deserialize, PartialEq, Debug)]
@@ -61,6 +62,7 @@ pub struct TorrentDetails {
     pub files: Vec<File>,
     pub trackers: Vec<String>,
     pub magnet_link: String,
+    pub tags: Vec<Tag>,
     pub name: String,
 }
 
@@ -69,6 +71,12 @@ pub struct Category {
     pub category_id: CategoryId,
     pub name: String,
     pub num_torrents: u64,
+}
+
+#[derive(Deserialize, PartialEq, Debug)]
+pub struct Tag {
+    pub tag_id: TagId,
+    pub name: String,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
