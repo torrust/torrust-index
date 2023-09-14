@@ -209,6 +209,7 @@ mod for_guests {
                 encoded_tracker_url,
                 encoded_tracker_url
             ),
+            tags: vec![],
             name: test_torrent.index_info.name.clone(),
         };
 

@@ -13,14 +13,15 @@ use super::file::{create_torrent, parse_torrent, TorrentFileInfo};
 use super::forms::{BinaryFile, UploadTorrentMultipartForm};
 use super::requests::InfoHash;
 use super::responses::Id;
-use crate::common::contexts::category::fixtures::software_predefined_category_name;
+use crate::common::contexts::category::fixtures::software_category_name;
 
-/// Information about a torrent that is going to added to the index.
+/// Information about a torrent that is going to be added to the index.
 #[derive(Clone)]
 pub struct TorrentIndexInfo {
     pub title: String,
     pub description: String,
     pub category: String,
+    pub tags: Option<Vec<i64>>,
     pub torrent_file: BinaryFile,
     pub name: String,
 }
@@ -78,24 +79,7 @@ impl TestTorrent {
         // Create a random torrent file
         let torrent_path = random_torrent_file(&torrents_dir_path, &id);
 
-        // Load torrent binary file
-        let torrent_file = BinaryFile::from_file_at_path(&torrent_path);
-
-        // Load torrent file metadata
-        let torrent_info = parse_torrent(&torrent_path);
-
-        let torrent_to_index = TorrentIndexInfo {
-            title: format!("title-{id}"),
-            description: format!("description-{id}"),
-            category: software_predefined_category_name(),
-            torrent_file,
-            name: format!("name-{id}"),
-        };
-
-        TestTorrent {
-            file_info: torrent_info,
-            index_info: torrent_to_index,
-        }
+        Self::build_from_torrent_file(&id, &torrent_path)
     }
 
     pub fn with_custom_info_dict_field(id: Uuid, file_contents: &str, custom: &str) -> Self {
@@ -110,35 +94,45 @@ impl TestTorrent {
         let torrent_data = TestTorrentWithCustomInfoField::encode(&torrent).unwrap();
 
         // Torrent temporary file path
-        let filename = format!("file-{id}.txt.torrent");
-        let torrent_path = torrents_dir_path.join(filename.clone());
+        let contents_filename = contents_file_name(&id);
+        let torrent_filename = format!("{contents_filename}.torrent");
+        let torrent_path = torrents_dir_path.join(torrent_filename.clone());
 
         // Write the torrent file to the temporary file
         let mut file = File::create(torrent_path.clone()).unwrap();
         file.write_all(&torrent_data).unwrap();
 
+        Self::build_from_torrent_file(&id, &torrent_path)
+    }
+
+    pub fn file_info_hash(&self) -> InfoHash {
+        self.file_info.info_hash.clone()
+    }
+
+    /// It builds a `TestTorrent` from a torrent file.
+    fn build_from_torrent_file(id: &Uuid, torrent_path: &Path) -> TestTorrent {
         // Load torrent binary file
-        let torrent_file = BinaryFile::from_file_at_path(&torrent_path);
+        let torrent_file = BinaryFile::from_file_at_path(torrent_path);
 
         // Load torrent file metadata
-        let torrent_info = parse_torrent(&torrent_path);
+        let torrent_info = parse_torrent(torrent_path);
 
         let torrent_to_index = TorrentIndexInfo {
             title: format!("title-{id}"),
             description: format!("description-{id}"),
-            category: software_predefined_category_name(),
+            category: software_category_name(),
+            // todo: include one tag in test torrents. Implementation is not
+            // trivial because the tag must exist in the database and there are
+            // no predefined tags in the database like there are for categories.
+            tags: None,
             torrent_file,
-            name: filename,
+            name: contents_file_name(id),
         };
 
         TestTorrent {
             file_info: torrent_info,
             index_info: torrent_to_index,
         }
-    }
-
-    pub fn file_info_hash(&self) -> InfoHash {
-        self.file_info.info_hash.clone()
     }
 }
 
@@ -156,7 +150,7 @@ pub fn random_torrent_file(dir: &Path, id: &Uuid) -> PathBuf {
 
 pub fn random_txt_file(dir: &Path, id: &Uuid) -> String {
     // Sample file name
-    let file_name = format!("file-{id}.txt");
+    let file_name = contents_file_name(id);
 
     // Sample file path
     let file_path = dir.join(file_name.clone());
@@ -166,6 +160,10 @@ pub fn random_txt_file(dir: &Path, id: &Uuid) -> String {
     file.write_all(id.as_bytes()).unwrap();
 
     file_name
+}
+
+fn contents_file_name(id: &Uuid) -> String {
+    format!("file-{id}.txt")
 }
 
 pub fn temp_dir() -> TempDir {
