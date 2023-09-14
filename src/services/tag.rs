@@ -38,7 +38,13 @@ impl Service {
             return Err(ServiceError::Unauthorized);
         }
 
-        match self.tag_repository.add(tag_name).await {
+        let trimmed_name = tag_name.trim();
+
+        if trimmed_name.is_empty() {
+            return Err(ServiceError::TagNameEmpty);
+        }
+
+        match self.tag_repository.add(trimmed_name).await {
             Ok(()) => Ok(()),
             Err(e) => match e {
                 DatabaseError::TagAlreadyExists => Err(ServiceError::TagAlreadyExists),

@@ -121,15 +121,17 @@ async fn it_should_allow_adding_duplicated_tags() {
 }
 
 #[tokio::test]
-async fn it_should_allow_adding_a_tag_with_an_empty_name() {
-    // code-review: is this an intended behavior?
-
+async fn it_should_not_allow_adding_a_tag_with_an_empty_name() {
     let mut env = TestEnv::new();
     env.start(api::Version::V1).await;
 
-    let empty_tag_name = String::new();
-    let response = add_tag(&empty_tag_name, &env).await;
-    assert_eq!(response.status, 200);
+    let invalid_tag_names = vec![String::new(), " ".to_string()];
+
+    for invalid_name in invalid_tag_names {
+        let response = add_tag(&invalid_name, &env).await;
+
+        assert_eq!(response.status, 400);
+    }
 }
 
 #[tokio::test]
