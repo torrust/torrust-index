@@ -130,6 +130,9 @@ pub enum ServiceError {
     #[display(fmt = "Category already exists.")]
     CategoryAlreadyExists,
 
+    #[display(fmt = "Category name cannot be empty.")]
+    CategoryNameEmpty,
+
     #[display(fmt = "Tag already exists.")]
     TagAlreadyExists,
 
@@ -235,6 +238,7 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::CanonicalInfoHashAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::TorrentTitleAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::TrackerOffline => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::CategoryNameEmpty => StatusCode::BAD_REQUEST,
         ServiceError::CategoryAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::TagAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,

@@ -38,7 +38,13 @@ impl Service {
             return Err(ServiceError::Unauthorized);
         }
 
-        match self.category_repository.add(category_name).await {
+        let trimmed_name = category_name.trim();
+
+        if trimmed_name.is_empty() {
+            return Err(ServiceError::CategoryNameEmpty);
+        }
+
+        match self.category_repository.add(trimmed_name).await {
             Ok(id) => Ok(id),
             Err(e) => match e {
                 DatabaseError::CategoryAlreadyExists => Err(ServiceError::CategoryAlreadyExists),
