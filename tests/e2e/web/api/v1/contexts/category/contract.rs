@@ -104,32 +104,25 @@ async fn it_should_allow_admins_to_add_new_categories() {
 }
 
 #[tokio::test]
-async fn it_should_allow_adding_empty_categories() {
-    // code-review: this is a bit weird, is it a intended behavior?
-
+async fn it_should_not_allow_adding_empty_categories() {
     let mut env = TestEnv::new();
     env.start(api::Version::V1).await;
-
-    if env.is_shared() {
-        // This test cannot be run in a shared test env because it will fail
-        // when the empty category already exits
-        println!("Skipped");
-        return;
-    }
 
     let logged_in_admin = new_logged_in_admin(&env).await;
     let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
 
-    let category_name = String::new();
+    let invalid_category_names = vec![String::new(), " ".to_string()];
 
-    let response = client
-        .add_category(AddCategoryForm {
-            name: category_name.to_string(),
-            icon: None,
-        })
-        .await;
+    for invalid_name in invalid_category_names {
+        let response = client
+            .add_category(AddCategoryForm {
+                name: invalid_name,
+                icon: None,
+            })
+            .await;
 
-    assert_added_category_response(&response, &category_name);
+        assert_eq!(response.status, 400);
+    }
 }
 
 #[tokio::test]
