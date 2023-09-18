@@ -9,13 +9,16 @@ use crate::services::hasher::sha1;
 /// It's not the full in-memory representation of a torrent file. The full
 /// in-memory representation is the `Torrent` struct.
 pub struct NewTorrentInfoRequest {
+    // The `info` dictionary fields
     pub name: String,
     pub pieces: String,
     pub piece_length: i64,
     pub private: Option<u8>,
     pub root_hash: i64,
     pub files: Vec<TorrentFile>,
+    // Other fields of the root level metainfo dictionary
     pub announce_urls: Vec<Vec<String>>,
+    pub comment: Option<String>,
 }
 
 /// It generates a random single-file torrent for testing purposes.
@@ -48,6 +51,7 @@ pub fn generate_random_torrent(id: Uuid) -> Torrent {
         root_hash: 0,
         files: torrent_files,
         announce_urls: torrent_announce_urls,
+        comment: None,
     };
 
     Torrent::from_new_torrent_info_request(torrent_info_request)

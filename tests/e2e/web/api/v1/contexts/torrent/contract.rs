@@ -211,6 +211,7 @@ mod for_guests {
             ),
             tags: vec![],
             name: test_torrent.index_info.name.clone(),
+            comment: test_torrent.file_info.comment.clone(),
         };
 
         assert_expected_torrent_details(&torrent_details_response.data, &expected_torrent);

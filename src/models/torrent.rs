@@ -21,6 +21,7 @@ pub struct TorrentListing {
     pub seeders: i64,
     pub leechers: i64,
     pub name: String,
+    pub comment: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -98,7 +98,7 @@ pub struct Torrent {
     #[serde(default)]
     #[serde(rename = "creation date")]
     pub creation_date: Option<i64>,
-    #[serde(rename = "comment")]
+    #[serde(default)]
     pub comment: Option<String>,
     #[serde(default)]
     #[serde(rename = "created by")]
@@ -171,7 +171,7 @@ impl Torrent {
             httpseeds: None,
             announce_list: Some(torrent_info.announce_urls),
             creation_date: None,
-            comment: None,
+            comment: torrent_info.comment,
             created_by: None,
         }
     }
@@ -191,6 +191,7 @@ impl Torrent {
             root_hash: torrent_info.root_hash,
             files: torrent_files,
             announce_urls: torrent_announce_urls,
+            comment: torrent_info.comment,
         };
         Torrent::from_new_torrent_info_request(torrent_info_request)
     }
@@ -296,6 +297,7 @@ pub struct DbTorrentInfo {
     #[serde(default)]
     pub private: Option<u8>,
     pub root_hash: i64,
+    pub comment: Option<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
