@@ -5,22 +5,38 @@ use sha1::{Digest, Sha1};
 
 use super::info_hash::InfoHash;
 use crate::config::Configuration;
-use crate::services::torrent_file::NewTorrentInfoRequest;
+use crate::services::torrent_file::CreateTorrentRequest;
 use crate::utils::hex::{from_bytes, into_bytes};
+
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub struct Torrent {
+    pub info: TorrentInfoDictionary, //
+    #[serde(default)]
+    pub announce: Option<String>,
+    #[serde(default)]
+    pub nodes: Option<Vec<TorrentNode>>,
+    #[serde(default)]
+    pub encoding: Option<String>,
+    #[serde(default)]
+    pub httpseeds: Option<Vec<String>>,
+    #[serde(default)]
+    #[serde(rename = "announce-list")]
+    pub announce_list: Option<Vec<Vec<String>>>,
+    #[serde(default)]
+    #[serde(rename = "creation date")]
+    pub creation_date: Option<i64>,
+    #[serde(default)]
+    pub comment: Option<String>,
+    #[serde(default)]
+    #[serde(rename = "created by")]
+    pub created_by: Option<String>,
+}
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct TorrentNode(String, i64);
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
-pub struct TorrentFile {
-    pub path: Vec<String>,
-    pub length: i64,
-    #[serde(default)]
-    pub md5sum: Option<String>,
-}
-
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
-pub struct TorrentInfo {
+pub struct TorrentInfoDictionary {
     pub name: String,
     #[serde(default)]
     pub pieces: Option<ByteBuf>,
@@ -43,108 +59,79 @@ pub struct TorrentInfo {
     pub source: Option<String>,
 }
 
-impl TorrentInfo {
-    /// torrent file can only hold a pieces key or a root hash key:
-    /// [BEP 39](http://www.bittorrent.org/beps/bep_0030.html)
-    #[must_use]
-    pub fn get_pieces_as_string(&self) -> String {
-        match &self.pieces {
-            None => String::new(),
-            Some(byte_buf) => from_bytes(byte_buf.as_ref()),
-        }
-    }
-
-    /// It returns the root hash as a `i64` value.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the root hash cannot be converted into a
-    /// `i64` value.
-    #[must_use]
-    pub fn get_root_hash_as_i64(&self) -> i64 {
-        match &self.root_hash {
-            None => 0i64,
-            Some(root_hash) => root_hash
-                .parse::<i64>()
-                .expect("variable `root_hash` cannot be converted into a `i64`"),
-        }
-    }
-
-    #[must_use]
-    pub fn is_a_single_file_torrent(&self) -> bool {
-        self.length.is_some()
-    }
-
-    #[must_use]
-    pub fn is_a_multiple_file_torrent(&self) -> bool {
-        self.files.is_some()
-    }
-}
-
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
-pub struct Torrent {
-    pub info: TorrentInfo, //
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+pub struct TorrentFile {
+    pub path: Vec<String>,
+    pub length: i64,
     #[serde(default)]
-    pub announce: Option<String>,
-    #[serde(default)]
-    pub nodes: Option<Vec<TorrentNode>>,
-    #[serde(default)]
-    pub encoding: Option<String>,
-    #[serde(default)]
-    pub httpseeds: Option<Vec<String>>,
-    #[serde(default)]
-    #[serde(rename = "announce-list")]
-    pub announce_list: Option<Vec<Vec<String>>>,
-    #[serde(default)]
-    #[serde(rename = "creation date")]
-    pub creation_date: Option<i64>,
-    #[serde(default)]
-    pub comment: Option<String>,
-    #[serde(default)]
-    #[serde(rename = "created by")]
-    pub created_by: Option<String>,
+    pub md5sum: Option<String>,
 }
 
 impl Torrent {
-    /// It builds a `Torrent` from a `NewTorrentInfoRequest`.
+    /// It builds a `Torrent` from a request.
     ///
     /// # Panics
     ///
     /// This function will panic if the `torrent_info.pieces` is not a valid hex string.
     #[must_use]
-    pub fn from_new_torrent_info_request(torrent_info: NewTorrentInfoRequest) -> Self {
-        // the info part of the torrent file
-        let mut info = TorrentInfo {
-            name: torrent_info.name.to_string(),
+    pub fn from_request(create_torrent_req: CreateTorrentRequest) -> Self {
+        let info_dict = create_torrent_req.build_info_dictionary();
+
+        Self {
+            info: info_dict,
+            announce: None,
+            nodes: None,
+            encoding: None,
+            httpseeds: None,
+            announce_list: Some(create_torrent_req.announce_urls),
+            creation_date: None,
+            comment: create_torrent_req.comment,
+            created_by: None,
+        }
+    }
+
+    /// It hydrates a `Torrent` struct from the database data.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the `torrent_info.pieces` is not a valid
+    /// hex string.
+    #[must_use]
+    pub fn from_database(
+        db_torrent: DbTorrent,
+        torrent_files: Vec<TorrentFile>,
+        torrent_announce_urls: Vec<Vec<String>>,
+    ) -> Self {
+        let mut info_dict = TorrentInfoDictionary {
+            name: db_torrent.name,
             pieces: None,
-            piece_length: torrent_info.piece_length,
+            piece_length: db_torrent.piece_length,
             md5sum: None,
             length: None,
             files: None,
-            private: torrent_info.private,
+            private: db_torrent.private,
             path: None,
             root_hash: None,
             source: None,
         };
 
         // a torrent file has a root hash or a pieces key, but not both.
-        if torrent_info.root_hash > 0 {
-            info.root_hash = Some(torrent_info.pieces);
+        if db_torrent.root_hash > 0 {
+            info_dict.root_hash = Some(db_torrent.pieces);
         } else {
-            let pieces = into_bytes(&torrent_info.pieces).expect("variable `torrent_info.pieces` is not a valid hex string");
-            info.pieces = Some(ByteBuf::from(pieces));
+            let buffer = into_bytes(&db_torrent.pieces).expect("variable `torrent_info.pieces` is not a valid hex string");
+            info_dict.pieces = Some(ByteBuf::from(buffer));
         }
 
         // either set the single file or the multiple files information
-        if torrent_info.files.len() == 1 {
-            let torrent_file = torrent_info
-                .files
+        if torrent_files.len() == 1 {
+            let torrent_file = torrent_files
                 .first()
                 .expect("vector `torrent_files` should have at least one element");
 
-            info.md5sum = torrent_file.md5sum.clone();
+            info_dict.md5sum = torrent_file.md5sum.clone();
 
-            info.length = Some(torrent_file.length);
+            info_dict.length = Some(torrent_file.length);
 
             let path = if torrent_file
                 .path
@@ -158,42 +145,22 @@ impl Torrent {
                 Some(torrent_file.path.clone())
             };
 
-            info.path = path;
+            info_dict.path = path;
         } else {
-            info.files = Some(torrent_info.files);
+            info_dict.files = Some(torrent_files);
         }
 
         Self {
-            info,
+            info: info_dict,
             announce: None,
             nodes: None,
             encoding: None,
             httpseeds: None,
-            announce_list: Some(torrent_info.announce_urls),
+            announce_list: Some(torrent_announce_urls),
             creation_date: None,
-            comment: torrent_info.comment,
+            comment: db_torrent.comment.clone(),
             created_by: None,
         }
-    }
-
-    /// It hydrates a `Torrent` struct from the database data.
-    #[must_use]
-    pub fn from_db_info_files_and_announce_urls(
-        torrent_info: DbTorrentInfo,
-        torrent_files: Vec<TorrentFile>,
-        torrent_announce_urls: Vec<Vec<String>>,
-    ) -> Self {
-        let torrent_info_request = NewTorrentInfoRequest {
-            name: torrent_info.name,
-            pieces: torrent_info.pieces,
-            piece_length: torrent_info.piece_length,
-            private: torrent_info.private,
-            root_hash: torrent_info.root_hash,
-            files: torrent_files,
-            announce_urls: torrent_announce_urls,
-            comment: torrent_info.comment,
-        };
-        Torrent::from_new_torrent_info_request(torrent_info_request)
     }
 
     /// Sets the announce url to the tracker url and removes all other trackers
@@ -278,17 +245,46 @@ impl Torrent {
     }
 }
 
-#[allow(clippy::module_name_repetitions)]
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct DbTorrentFile {
-    pub path: Option<String>,
-    pub length: i64,
-    #[serde(default)]
-    pub md5sum: Option<String>,
+impl TorrentInfoDictionary {
+    /// torrent file can only hold a pieces key or a root hash key:
+    /// [BEP 39](http://www.bittorrent.org/beps/bep_0030.html)
+    #[must_use]
+    pub fn get_pieces_as_string(&self) -> String {
+        match &self.pieces {
+            None => String::new(),
+            Some(byte_buf) => from_bytes(byte_buf.as_ref()),
+        }
+    }
+
+    /// It returns the root hash as a `i64` value.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the root hash cannot be converted into a
+    /// `i64` value.
+    #[must_use]
+    pub fn get_root_hash_as_i64(&self) -> i64 {
+        match &self.root_hash {
+            None => 0i64,
+            Some(root_hash) => root_hash
+                .parse::<i64>()
+                .expect("variable `root_hash` cannot be converted into a `i64`"),
+        }
+    }
+
+    #[must_use]
+    pub fn is_a_single_file_torrent(&self) -> bool {
+        self.length.is_some()
+    }
+
+    #[must_use]
+    pub fn is_a_multiple_file_torrent(&self) -> bool {
+        self.files.is_some()
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct DbTorrentInfo {
+pub struct DbTorrent {
     pub torrent_id: i64,
     pub info_hash: String,
     pub name: String,
@@ -298,6 +294,15 @@ pub struct DbTorrentInfo {
     pub private: Option<u8>,
     pub root_hash: i64,
     pub comment: Option<String>,
+}
+
+#[allow(clippy::module_name_repetitions)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DbTorrentFile {
+    pub path: Option<String>,
+    pub length: i64,
+    #[serde(default)]
+    pub md5sum: Option<String>,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -312,7 +317,7 @@ mod tests {
 
         use serde_bytes::ByteBuf;
 
-        use crate::models::torrent_file::{Torrent, TorrentInfo};
+        use crate::models::torrent_file::{Torrent, TorrentInfoDictionary};
 
         #[test]
         fn the_parsed_torrent_file_should_calculated_the_torrent_info_hash() {
@@ -349,7 +354,7 @@ mod tests {
 
             let sample_data_in_txt_file = "mandelbrot\n";
 
-            let info = TorrentInfo {
+            let info = TorrentInfoDictionary {
                 name: "sample.txt".to_string(),
                 pieces: Some(ByteBuf::from(vec![
                     // D4 91  58   7F  1C  42   DF   F0   CB  0F   F5   C2   B8   CE   FE  22   B3   AD  31  0A  // hex
@@ -384,13 +389,13 @@ mod tests {
 
             use serde_bytes::ByteBuf;
 
-            use crate::models::torrent_file::{Torrent, TorrentFile, TorrentInfo};
+            use crate::models::torrent_file::{Torrent, TorrentFile, TorrentInfoDictionary};
 
             #[test]
             fn a_simple_single_file_torrent() {
                 let sample_data_in_txt_file = "mandelbrot\n";
 
-                let info = TorrentInfo {
+                let info = TorrentInfoDictionary {
                     name: "sample.txt".to_string(),
                     pieces: Some(ByteBuf::from(vec![
                         // D4 91  58   7F  1C  42   DF   F0   CB  0F   F5   C2   B8   CE   FE  22   B3   AD  31  0A  // hex
@@ -425,7 +430,7 @@ mod tests {
             fn a_simple_multi_file_torrent() {
                 let sample_data_in_txt_file = "mandelbrot\n";
 
-                let info = TorrentInfo {
+                let info = TorrentInfoDictionary {
                     name: "sample".to_string(),
                     pieces: Some(ByteBuf::from(vec![
                         // D4 91  58   7F  1C  42   DF   F0   CB  0F   F5   C2   B8   CE   FE  22   B3   AD  31  0A  // hex
@@ -464,7 +469,7 @@ mod tests {
             fn a_simple_single_file_torrent_with_a_source() {
                 let sample_data_in_txt_file = "mandelbrot\n";
 
-                let info = TorrentInfo {
+                let info = TorrentInfoDictionary {
                     name: "sample.txt".to_string(),
                     pieces: Some(ByteBuf::from(vec![
                         // D4 91  58   7F  1C  42   DF   F0   CB  0F   F5   C2   B8   CE   FE  22   B3   AD  31  0A  // hex
@@ -499,7 +504,7 @@ mod tests {
             fn a_simple_single_file_private_torrent() {
                 let sample_data_in_txt_file = "mandelbrot\n";
 
-                let info = TorrentInfo {
+                let info = TorrentInfoDictionary {
                     name: "sample.txt".to_string(),
                     pieces: Some(ByteBuf::from(vec![
                         // D4 91  58   7F  1C  42   DF   F0   CB  0F   F5   C2   B8   CE   FE  22   B3   AD  31  0A  // hex

@@ -13,7 +13,7 @@ use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
-use crate::models::torrent_file::{DbTorrentAnnounceUrl, DbTorrentFile, DbTorrentInfo, Torrent, TorrentFile};
+use crate::models::torrent_file::{DbTorrent, DbTorrentAnnounceUrl, DbTorrentFile, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
@@ -676,16 +676,16 @@ impl Database for Mysql {
             .map_err(|err| database::Error::ErrorWithText(err.to_string()))
     }
 
-    async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, database::Error> {
-        query_as::<_, DbTorrentInfo>("SELECT * FROM torrust_torrents WHERE torrent_id = ?")
+    async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrent, database::Error> {
+        query_as::<_, DbTorrent>("SELECT * FROM torrust_torrents WHERE torrent_id = ?")
             .bind(torrent_id)
             .fetch_one(&self.pool)
             .await
             .map_err(|_| database::Error::TorrentNotFound)
     }
 
-    async fn get_torrent_info_from_info_hash(&self, info_hash: &InfoHash) -> Result<DbTorrentInfo, database::Error> {
-        query_as::<_, DbTorrentInfo>("SELECT * FROM torrust_torrents WHERE info_hash = ?")
+    async fn get_torrent_info_from_info_hash(&self, info_hash: &InfoHash) -> Result<DbTorrent, database::Error> {
+        query_as::<_, DbTorrent>("SELECT * FROM torrust_torrents WHERE info_hash = ?")
             .bind(info_hash.to_hex_string().to_lowercase())
             .fetch_one(&self.pool)
             .await

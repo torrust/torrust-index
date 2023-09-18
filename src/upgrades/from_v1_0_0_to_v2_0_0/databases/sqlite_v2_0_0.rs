@@ -7,7 +7,7 @@ use sqlx::{query, query_as, SqlitePool};
 
 use super::sqlite_v1_0_0::{TorrentRecordV1, UserRecordV1};
 use crate::databases::database::{self, TABLES_TO_TRUNCATE};
-use crate::models::torrent_file::{TorrentFile, TorrentInfo};
+use crate::models::torrent_file::{TorrentFile, TorrentInfoDictionary};
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct CategoryRecordV2 {
@@ -32,7 +32,7 @@ pub struct TorrentRecordV2 {
 
 impl TorrentRecordV2 {
     #[must_use]
-    pub fn from_v1_data(torrent: &TorrentRecordV1, torrent_info: &TorrentInfo, uploader: &UserRecordV1) -> Self {
+    pub fn from_v1_data(torrent: &TorrentRecordV1, torrent_info: &TorrentInfoDictionary, uploader: &UserRecordV1) -> Self {
         Self {
             torrent_id: torrent.torrent_id,
             uploader_id: uploader.user_id,

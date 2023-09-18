@@ -13,7 +13,7 @@ use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::{DeletedTorrentResponse, TorrentResponse, TorrentsResponse};
 use crate::models::torrent::{Metadata, TorrentId, TorrentListing};
-use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
+use crate::models::torrent_file::{DbTorrent, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::user::UserId;
 use crate::tracker::statistics_importer::StatisticsImporter;
@@ -649,7 +649,7 @@ impl DbTorrentInfoRepository {
     /// # Errors
     ///
     /// This function will return an error there is a database error.
-    pub async fn get_by_info_hash(&self, info_hash: &InfoHash) -> Result<DbTorrentInfo, Error> {
+    pub async fn get_by_info_hash(&self, info_hash: &InfoHash) -> Result<DbTorrent, Error> {
         self.database.get_torrent_info_from_info_hash(info_hash).await
     }
 
