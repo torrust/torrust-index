@@ -8,7 +8,7 @@ use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
-use crate::models::torrent_file::{DbTorrentInfo, Torrent, TorrentFile};
+use crate::models::torrent_file::{DbTorrent, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
@@ -203,32 +203,24 @@ pub trait Database: Sync + Send {
 
     /// Get `Torrent` from `InfoHash`.
     async fn get_torrent_from_info_hash(&self, info_hash: &InfoHash) -> Result<Torrent, Error> {
-        let torrent_info = self.get_torrent_info_from_info_hash(info_hash).await?;
+        let db_torrent = self.get_torrent_info_from_info_hash(info_hash).await?;
 
-        let torrent_files = self.get_torrent_files_from_id(torrent_info.torrent_id).await?;
+        let torrent_files = self.get_torrent_files_from_id(db_torrent.torrent_id).await?;
 
-        let torrent_announce_urls = self.get_torrent_announce_urls_from_id(torrent_info.torrent_id).await?;
+        let torrent_announce_urls = self.get_torrent_announce_urls_from_id(db_torrent.torrent_id).await?;
 
-        Ok(Torrent::from_db_info_files_and_announce_urls(
-            torrent_info,
-            torrent_files,
-            torrent_announce_urls,
-        ))
+        Ok(Torrent::from_database(&db_torrent, &torrent_files, torrent_announce_urls))
     }
 
     /// Get `Torrent` from `torrent_id`.
     async fn get_torrent_from_id(&self, torrent_id: i64) -> Result<Torrent, Error> {
-        let torrent_info = self.get_torrent_info_from_id(torrent_id).await?;
+        let db_torrent = self.get_torrent_info_from_id(torrent_id).await?;
 
         let torrent_files = self.get_torrent_files_from_id(torrent_id).await?;
 
         let torrent_announce_urls = self.get_torrent_announce_urls_from_id(torrent_id).await?;
 
-        Ok(Torrent::from_db_info_files_and_announce_urls(
-            torrent_info,
-            torrent_files,
-            torrent_announce_urls,
-        ))
+        Ok(Torrent::from_database(&db_torrent, &torrent_files, torrent_announce_urls))
     }
 
     /// It returns the list of all infohashes producing the same canonical
@@ -257,10 +249,10 @@ pub trait Database: Sync + Send {
     async fn add_info_hash_to_canonical_info_hash_group(&self, original: &InfoHash, canonical: &InfoHash) -> Result<(), Error>;
 
     /// Get torrent's info as `DbTorrentInfo` from `torrent_id`.
-    async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, Error>;
+    async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrent, Error>;
 
     /// Get torrent's info as `DbTorrentInfo` from torrent `InfoHash`.
-    async fn get_torrent_info_from_info_hash(&self, info_hash: &InfoHash) -> Result<DbTorrentInfo, Error>;
+    async fn get_torrent_info_from_info_hash(&self, info_hash: &InfoHash) -> Result<DbTorrent, Error>;
 
     /// Get all torrent's files as `Vec<TorrentFile>` from `torrent_id`.
     async fn get_torrent_files_from_id(&self, torrent_id: i64) -> Result<Vec<TorrentFile>, Error>;

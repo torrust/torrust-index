@@ -1,7 +1,7 @@
 use rand::Rng;
 
 pub fn random_tag_name() -> String {
-    format!("category name {}", random_id())
+    format!("tag name {}", random_id())
 }
 
 fn random_id() -> u64 {

@@ -13,7 +13,7 @@ use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
 use crate::models::torrent::TorrentListing;
-use crate::models::torrent_file::{DbTorrentAnnounceUrl, DbTorrentFile, DbTorrentInfo, Torrent, TorrentFile};
+use crate::models::torrent_file::{DbTorrent, DbTorrentAnnounceUrl, DbTorrentFile, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
@@ -290,7 +290,8 @@ impl Database for Sqlite {
             })
     }
 
-    // TODO: refactor this
+    // todo: refactor this
+    #[allow(clippy::too_many_lines)]
     async fn get_torrents_search_sorted_paginated(
         &self,
         search: &Option<String>,
@@ -365,7 +366,17 @@ impl Database for Sqlite {
         };
 
         let mut query_string = format!(
-            "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, tt.date_uploaded, tt.size AS file_size, tt.name, 
+            "SELECT
+            tt.torrent_id,
+            tp.username AS uploader,
+            tt.info_hash,
+            ti.title,
+            ti.description,
+            tt.category_id,
+            tt.date_uploaded,
+            tt.size AS file_size,
+            tt.name,
+            tt.comment,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
             FROM torrust_torrents tt
@@ -433,31 +444,47 @@ impl Database for Sqlite {
         };
 
         // add torrent
-        let torrent_id = query("INSERT INTO torrust_torrents (uploader_id, category_id, info_hash, size, name, pieces, piece_length, private, root_hash, `source`, date_uploaded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
-            .bind(uploader_id)
-            .bind(category_id)
-            .bind(info_hash.to_lowercase())
-            .bind(torrent.file_size())
-            .bind(torrent.info.name.to_string())
-            .bind(pieces)
-            .bind(torrent.info.piece_length)
-            .bind(torrent.info.private)
-            .bind(root_hash)
-            .bind(torrent.info.source.clone())
-            .execute(&mut tx)
-            .await
-            .map(|v| v.last_insert_rowid())
-            .map_err(|e| match e {
-                sqlx::Error::Database(err) => {
-                    log::error!("DB error: {:?}", err);
-                    if err.message().contains("UNIQUE") && err.message().contains("info_hash") {
-                        database::Error::TorrentAlreadyExists
-                    } else {
-                        database::Error::Error
-                    }
+        let torrent_id = query(
+            "INSERT INTO torrust_torrents (
+            uploader_id,
+            category_id,
+            info_hash,
+            size,
+            name,
+            pieces,
+            piece_length,
+            private,
+            root_hash,
+            `source`,
+            comment,
+            date_uploaded
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))",
+        )
+        .bind(uploader_id)
+        .bind(category_id)
+        .bind(info_hash.to_lowercase())
+        .bind(torrent.file_size())
+        .bind(torrent.info.name.to_string())
+        .bind(pieces)
+        .bind(torrent.info.piece_length)
+        .bind(torrent.info.private)
+        .bind(root_hash)
+        .bind(torrent.info.source.clone())
+        .bind(torrent.comment.clone())
+        .execute(&mut tx)
+        .await
+        .map(|v| v.last_insert_rowid())
+        .map_err(|e| match e {
+            sqlx::Error::Database(err) => {
+                log::error!("DB error: {:?}", err);
+                if err.message().contains("UNIQUE") && err.message().contains("info_hash") {
+                    database::Error::TorrentAlreadyExists
+                } else {
+                    database::Error::Error
                 }
-                _ => database::Error::Error
-            })?;
+            }
+            _ => database::Error::Error,
+        })?;
 
         // add torrent canonical infohash
 
@@ -639,24 +666,20 @@ impl Database for Sqlite {
             .map_err(|err| database::Error::ErrorWithText(err.to_string()))
     }
 
-    async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrentInfo, database::Error> {
-        query_as::<_, DbTorrentInfo>(
-            "SELECT torrent_id, info_hash, name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE torrent_id = ?",
-        )
-        .bind(torrent_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|_| database::Error::TorrentNotFound)
+    async fn get_torrent_info_from_id(&self, torrent_id: i64) -> Result<DbTorrent, database::Error> {
+        query_as::<_, DbTorrent>("SELECT * FROM torrust_torrents WHERE torrent_id = ?")
+            .bind(torrent_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|_| database::Error::TorrentNotFound)
     }
 
-    async fn get_torrent_info_from_info_hash(&self, info_hash: &InfoHash) -> Result<DbTorrentInfo, database::Error> {
-        query_as::<_, DbTorrentInfo>(
-            "SELECT torrent_id, info_hash, name, pieces, piece_length, private, root_hash FROM torrust_torrents WHERE info_hash = ?",
-        )
-        .bind(info_hash.to_hex_string().to_lowercase())
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|_| database::Error::TorrentNotFound)
+    async fn get_torrent_info_from_info_hash(&self, info_hash: &InfoHash) -> Result<DbTorrent, database::Error> {
+        query_as::<_, DbTorrent>("SELECT * FROM torrust_torrents WHERE info_hash = ?")
+            .bind(info_hash.to_hex_string().to_lowercase())
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|_| database::Error::TorrentNotFound)
     }
 
     async fn get_torrent_files_from_id(&self, torrent_id: i64) -> Result<Vec<TorrentFile>, database::Error> {
@@ -695,7 +718,16 @@ impl Database for Sqlite {
 
     async fn get_torrent_listing_from_id(&self, torrent_id: i64) -> Result<TorrentListing, database::Error> {
         query_as::<_, TorrentListing>(
-            "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, tt.date_uploaded, tt.size AS file_size, tt.name,
+            "SELECT 
+            tt.torrent_id,
+            tp.username AS uploader,
+            tt.info_hash, ti.title,
+            ti.description,
+            tt.category_id,
+            tt.date_uploaded,
+            tt.size AS file_size,
+            tt.name,
+            tt.comment,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
             FROM torrust_torrents tt
@@ -703,17 +735,26 @@ impl Database for Sqlite {
             INNER JOIN torrust_torrent_info ti ON tt.torrent_id = ti.torrent_id
             LEFT JOIN torrust_torrent_tracker_stats ts ON tt.torrent_id = ts.torrent_id
             WHERE tt.torrent_id = ?
-            GROUP BY ts.torrent_id"
+            GROUP BY ts.torrent_id",
         )
-            .bind(torrent_id)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|_| database::Error::TorrentNotFound)
+        .bind(torrent_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|_| database::Error::TorrentNotFound)
     }
 
     async fn get_torrent_listing_from_info_hash(&self, info_hash: &InfoHash) -> Result<TorrentListing, database::Error> {
         query_as::<_, TorrentListing>(
-            "SELECT tt.torrent_id, tp.username AS uploader, tt.info_hash, ti.title, ti.description, tt.category_id, tt.date_uploaded, tt.size AS file_size, tt.name,
+            "SELECT
+            tt.torrent_id,
+            tp.username AS uploader,
+            tt.info_hash, ti.title,
+            ti.description,
+            tt.category_id,
+            tt.date_uploaded,
+            tt.size AS file_size,
+            tt.name,
+            tt.comment,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
             FROM torrust_torrents tt
@@ -721,12 +762,12 @@ impl Database for Sqlite {
             INNER JOIN torrust_torrent_info ti ON tt.torrent_id = ti.torrent_id
             LEFT JOIN torrust_torrent_tracker_stats ts ON tt.torrent_id = ts.torrent_id
             WHERE tt.info_hash = ?
-            GROUP BY ts.torrent_id"
+            GROUP BY ts.torrent_id",
         )
-            .bind(info_hash.to_string().to_lowercase())
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|_| database::Error::TorrentNotFound)
+        .bind(info_hash.to_string().to_lowercase())
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|_| database::Error::TorrentNotFound)
     }
 
     async fn get_all_torrents_compact(&self) -> Result<Vec<TorrentCompact>, database::Error> {

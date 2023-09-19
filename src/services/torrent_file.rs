@@ -1,21 +1,65 @@
 //! This module contains the services related to torrent file management.
 use uuid::Uuid;
 
-use crate::models::torrent_file::{Torrent, TorrentFile};
+use crate::models::torrent_file::{Torrent, TorrentFile, TorrentInfoDictionary};
 use crate::services::hasher::sha1;
 
 /// It contains the information required to create a new torrent file.
 ///
 /// It's not the full in-memory representation of a torrent file. The full
 /// in-memory representation is the `Torrent` struct.
-pub struct NewTorrentInfoRequest {
+pub struct CreateTorrentRequest {
+    // The `info` dictionary fields
     pub name: String,
     pub pieces: String,
     pub piece_length: i64,
     pub private: Option<u8>,
-    pub root_hash: i64,
+    pub root_hash: i64, // True (1) if it's a BEP 30 torrent.
     pub files: Vec<TorrentFile>,
+    // Other fields of the root level metainfo dictionary
     pub announce_urls: Vec<Vec<String>>,
+    pub comment: Option<String>,
+}
+
+impl CreateTorrentRequest {
+    /// It builds a `Torrent` from a request.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the `torrent_info.pieces` is not a valid hex string.
+    #[must_use]
+    pub fn build_torrent(&self) -> Torrent {
+        let info_dict = self.build_info_dictionary();
+
+        Torrent {
+            info: info_dict,
+            announce: None,
+            nodes: None,
+            encoding: None,
+            httpseeds: None,
+            announce_list: Some(self.announce_urls.clone()),
+            creation_date: None,
+            comment: self.comment.clone(),
+            created_by: None,
+        }
+    }
+
+    /// It builds a `TorrentInfoDictionary` from the current torrent request.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the `pieces` field is not a valid hex string.
+    #[must_use]
+    fn build_info_dictionary(&self) -> TorrentInfoDictionary {
+        TorrentInfoDictionary::with(
+            &self.name,
+            self.piece_length,
+            self.private,
+            self.root_hash,
+            &self.pieces,
+            &self.files,
+        )
+    }
 }
 
 /// It generates a random single-file torrent for testing purposes.
@@ -40,7 +84,7 @@ pub fn generate_random_torrent(id: Uuid) -> Torrent {
 
     let torrent_announce_urls: Vec<Vec<String>> = vec![];
 
-    let torrent_info_request = NewTorrentInfoRequest {
+    let create_torrent_req = CreateTorrentRequest {
         name: format!("file-{id}.txt"),
         pieces: sha1(&file_contents),
         piece_length: 16384,
@@ -48,9 +92,10 @@ pub fn generate_random_torrent(id: Uuid) -> Torrent {
         root_hash: 0,
         files: torrent_files,
         announce_urls: torrent_announce_urls,
+        comment: None,
     };
 
-    Torrent::from_new_torrent_info_request(torrent_info_request)
+    create_torrent_req.build_torrent()
 }
 
 #[cfg(test)]
@@ -58,7 +103,7 @@ mod tests {
     use serde_bytes::ByteBuf;
     use uuid::Uuid;
 
-    use crate::models::torrent_file::{Torrent, TorrentInfo};
+    use crate::models::torrent_file::{Torrent, TorrentInfoDictionary};
     use crate::services::torrent_file::generate_random_torrent;
 
     #[test]
@@ -68,7 +113,7 @@ mod tests {
         let torrent = generate_random_torrent(uuid);
 
         let expected_torrent = Torrent {
-            info: TorrentInfo {
+            info: TorrentInfoDictionary {
                 name: "file-d6170378-2c14-4ccc-870d-2a8e15195e23.txt".to_string(),
                 pieces: Some(ByteBuf::from(vec![
                     62, 231, 243, 51, 234, 165, 204, 209, 51, 132, 163, 133, 249, 50, 107, 46, 24, 15, 251, 32,

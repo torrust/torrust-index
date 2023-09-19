@@ -40,6 +40,7 @@ pub struct ListItem {
     pub seeders: i64,
     pub leechers: i64,
     pub name: String,
+    pub comment: Option<String>,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
@@ -64,6 +65,7 @@ pub struct TorrentDetails {
     pub magnet_link: String,
     pub tags: Vec<Tag>,
     pub name: String,
+    pub comment: Option<String>,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
