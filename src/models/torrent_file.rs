@@ -5,7 +5,6 @@ use sha1::{Digest, Sha1};
 
 use super::info_hash::InfoHash;
 use crate::config::Configuration;
-use crate::services::torrent_file::CreateTorrentRequest;
 use crate::utils::hex::{from_bytes, into_bytes};
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
@@ -68,28 +67,6 @@ pub struct TorrentFile {
 }
 
 impl Torrent {
-    /// It builds a `Torrent` from a request.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the `torrent_info.pieces` is not a valid hex string.
-    #[must_use]
-    pub fn from_request(create_torrent_req: CreateTorrentRequest) -> Self {
-        let info_dict = create_torrent_req.build_info_dictionary();
-
-        Self {
-            info: info_dict,
-            announce: None,
-            nodes: None,
-            encoding: None,
-            httpseeds: None,
-            announce_list: Some(create_torrent_req.announce_urls),
-            creation_date: None,
-            comment: create_torrent_req.comment,
-            created_by: None,
-        }
-    }
-
     /// It hydrates a `Torrent` struct from the database data.
     ///
     /// # Panics

@@ -22,13 +22,35 @@ pub struct CreateTorrentRequest {
 }
 
 impl CreateTorrentRequest {
+    /// It builds a `Torrent` from a request.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the `torrent_info.pieces` is not a valid hex string.
+    #[must_use]
+    pub fn build_torrent(&self) -> Torrent {
+        let info_dict = self.build_info_dictionary();
+
+        Torrent {
+            info: info_dict,
+            announce: None,
+            nodes: None,
+            encoding: None,
+            httpseeds: None,
+            announce_list: Some(self.announce_urls.clone()),
+            creation_date: None,
+            comment: self.comment.clone(),
+            created_by: None,
+        }
+    }
+
     /// It builds a `TorrentInfoDictionary` from the current torrent request.
     ///
     /// # Panics
     ///
     /// This function will panic if the `pieces` field is not a valid hex string.
     #[must_use]
-    pub fn build_info_dictionary(&self) -> TorrentInfoDictionary {
+    fn build_info_dictionary(&self) -> TorrentInfoDictionary {
         TorrentInfoDictionary::with(
             &self.name,
             self.piece_length,
@@ -62,7 +84,7 @@ pub fn generate_random_torrent(id: Uuid) -> Torrent {
 
     let torrent_announce_urls: Vec<Vec<String>> = vec![];
 
-    let torrent_info_request = CreateTorrentRequest {
+    let create_torrent_req = CreateTorrentRequest {
         name: format!("file-{id}.txt"),
         pieces: sha1(&file_contents),
         piece_length: 16384,
@@ -73,7 +95,7 @@ pub fn generate_random_torrent(id: Uuid) -> Torrent {
         comment: None,
     };
 
-    Torrent::from_request(torrent_info_request)
+    create_torrent_req.build_torrent()
 }
 
 #[cfg(test)]
