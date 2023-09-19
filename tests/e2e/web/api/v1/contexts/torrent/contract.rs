@@ -451,154 +451,164 @@ mod for_authenticated_users {
 
     use torrust_index_backend::utils::parse_torrent::decode_torrent;
     use torrust_index_backend::web::api;
-    use uuid::Uuid;
 
-    use crate::common::asserts::assert_json_error_response;
     use crate::common::client::Client;
-    use crate::common::contexts::torrent::fixtures::{random_torrent, TestTorrent};
-    use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
-    use crate::common::contexts::torrent::responses::UploadedTorrentResponse;
     use crate::e2e::environment::TestEnv;
     use crate::e2e::web::api::v1::contexts::torrent::asserts::{build_announce_url, get_user_tracker_key};
     use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
     use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
 
-    #[tokio::test]
-    async fn it_should_allow_authenticated_users_to_upload_new_torrents() {
-        let mut env = TestEnv::new();
-        env.start(api::Version::V1).await;
+    mod uploading_a_torrent {
 
-        if !env.provides_a_tracker() {
-            println!("test skipped. It requires a tracker to be running.");
-            return;
+        use torrust_index_backend::web::api;
+        use uuid::Uuid;
+
+        use crate::common::asserts::assert_json_error_response;
+        use crate::common::client::Client;
+        use crate::common::contexts::torrent::fixtures::{random_torrent, TestTorrent};
+        use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
+        use crate::common::contexts::torrent::responses::UploadedTorrentResponse;
+        use crate::e2e::environment::TestEnv;
+        use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
+
+        #[tokio::test]
+        async fn it_should_allow_authenticated_users_to_upload_new_torrents() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+            let test_torrent = random_torrent();
+            let info_hash = test_torrent.file_info_hash().clone();
+
+            let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
+
+            let response = client.upload_torrent(form.into()).await;
+
+            let uploaded_torrent_response: UploadedTorrentResponse = serde_json::from_str(&response.body).unwrap();
+
+            assert_eq!(
+                uploaded_torrent_response.data.info_hash.to_lowercase(),
+                info_hash.to_lowercase()
+            );
+            assert!(response.is_json_and_ok());
         }
 
-        let uploader = new_logged_in_user(&env).await;
-        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+        #[tokio::test]
+        async fn it_should_not_allow_uploading_a_torrent_with_a_non_existing_category() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
 
-        let test_torrent = random_torrent();
-        let info_hash = test_torrent.file_info_hash().clone();
+            let uploader = new_logged_in_user(&env).await;
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
 
-        let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
+            let mut test_torrent = random_torrent();
 
-        let response = client.upload_torrent(form.into()).await;
+            test_torrent.index_info.category = "non-existing-category".to_string();
 
-        let uploaded_torrent_response: UploadedTorrentResponse = serde_json::from_str(&response.body).unwrap();
+            let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
-        assert_eq!(
-            uploaded_torrent_response.data.info_hash.to_lowercase(),
-            info_hash.to_lowercase()
-        );
-        assert!(response.is_json_and_ok());
-    }
+            let response = client.upload_torrent(form.into()).await;
 
-    #[tokio::test]
-    async fn it_should_not_allow_uploading_a_torrent_with_a_non_existing_category() {
-        let mut env = TestEnv::new();
-        env.start(api::Version::V1).await;
-
-        let uploader = new_logged_in_user(&env).await;
-        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
-
-        let mut test_torrent = random_torrent();
-
-        test_torrent.index_info.category = "non-existing-category".to_string();
-
-        let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
-
-        let response = client.upload_torrent(form.into()).await;
-
-        assert_eq!(response.status, 400);
-    }
-
-    #[tokio::test]
-    async fn it_should_not_allow_uploading_a_torrent_with_a_title_that_already_exists() {
-        let mut env = TestEnv::new();
-        env.start(api::Version::V1).await;
-
-        if !env.provides_a_tracker() {
-            println!("test skipped. It requires a tracker to be running.");
-            return;
+            assert_eq!(response.status, 400);
         }
 
-        let uploader = new_logged_in_user(&env).await;
-        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+        #[tokio::test]
+        async fn it_should_not_allow_uploading_a_torrent_with_a_title_that_already_exists() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
 
-        // Upload the first torrent
-        let first_torrent = random_torrent();
-        let first_torrent_title = first_torrent.index_info.title.clone();
-        let form: UploadTorrentMultipartForm = first_torrent.index_info.into();
-        let _response = client.upload_torrent(form.into()).await;
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
 
-        // Upload the second torrent with the same title as the first one
-        let mut second_torrent = random_torrent();
-        second_torrent.index_info.title = first_torrent_title;
-        let form: UploadTorrentMultipartForm = second_torrent.index_info.into();
-        let response = client.upload_torrent(form.into()).await;
+            let uploader = new_logged_in_user(&env).await;
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
 
-        assert_json_error_response(&response, "This torrent title has already been used.");
-    }
+            // Upload the first torrent
+            let first_torrent = random_torrent();
+            let first_torrent_title = first_torrent.index_info.title.clone();
+            let form: UploadTorrentMultipartForm = first_torrent.index_info.into();
+            let _response = client.upload_torrent(form.into()).await;
 
-    #[tokio::test]
-    async fn it_should_not_allow_uploading_a_torrent_with_a_info_hash_that_already_exists() {
-        let mut env = TestEnv::new();
-        env.start(api::Version::V1).await;
+            // Upload the second torrent with the same title as the first one
+            let mut second_torrent = random_torrent();
+            second_torrent.index_info.title = first_torrent_title;
+            let form: UploadTorrentMultipartForm = second_torrent.index_info.into();
+            let response = client.upload_torrent(form.into()).await;
 
-        if !env.provides_a_tracker() {
-            println!("test skipped. It requires a tracker to be running.");
-            return;
+            assert_json_error_response(&response, "This torrent title has already been used.");
         }
 
-        let uploader = new_logged_in_user(&env).await;
-        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+        #[tokio::test]
+        async fn it_should_not_allow_uploading_a_torrent_with_a_info_hash_that_already_exists() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
 
-        // Upload the first torrent
-        let first_torrent = random_torrent();
-        let mut first_torrent_clone = first_torrent.clone();
-        let first_torrent_title = first_torrent.index_info.title.clone();
-        let form: UploadTorrentMultipartForm = first_torrent.index_info.into();
-        let _response = client.upload_torrent(form.into()).await;
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
 
-        // Upload the second torrent with the same info-hash as the first one.
-        // We need to change the title otherwise the torrent will be rejected
-        // because of the duplicate title.
-        first_torrent_clone.index_info.title = format!("{first_torrent_title}-clone");
-        let form: UploadTorrentMultipartForm = first_torrent_clone.index_info.into();
-        let response = client.upload_torrent(form.into()).await;
+            let uploader = new_logged_in_user(&env).await;
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
 
-        assert_eq!(response.status, 400);
-    }
+            // Upload the first torrent
+            let first_torrent = random_torrent();
+            let mut first_torrent_clone = first_torrent.clone();
+            let first_torrent_title = first_torrent.index_info.title.clone();
+            let form: UploadTorrentMultipartForm = first_torrent.index_info.into();
+            let _response = client.upload_torrent(form.into()).await;
 
-    #[tokio::test]
-    async fn it_should_not_allow_uploading_a_torrent_whose_canonical_info_hash_already_exists() {
-        let mut env = TestEnv::new();
-        env.start(api::Version::V1).await;
+            // Upload the second torrent with the same info-hash as the first one.
+            // We need to change the title otherwise the torrent will be rejected
+            // because of the duplicate title.
+            first_torrent_clone.index_info.title = format!("{first_torrent_title}-clone");
+            let form: UploadTorrentMultipartForm = first_torrent_clone.index_info.into();
+            let response = client.upload_torrent(form.into()).await;
 
-        if !env.provides_a_tracker() {
-            println!("test skipped. It requires a tracker to be running.");
-            return;
+            assert_eq!(response.status, 400);
         }
 
-        let uploader = new_logged_in_user(&env).await;
-        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+        #[tokio::test]
+        async fn it_should_not_allow_uploading_a_torrent_whose_canonical_info_hash_already_exists() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
 
-        let id1 = Uuid::new_v4();
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
 
-        // Upload the first torrent
-        let first_torrent = TestTorrent::with_custom_info_dict_field(id1, "data", "custom 01");
-        let first_torrent_title = first_torrent.index_info.title.clone();
-        let form: UploadTorrentMultipartForm = first_torrent.index_info.into();
-        let _response = client.upload_torrent(form.into()).await;
+            let uploader = new_logged_in_user(&env).await;
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
 
-        // Upload the second torrent with the same canonical info-hash as the first one.
-        // We need to change the title otherwise the torrent will be rejected
-        // because of the duplicate title.
-        let mut torrent_with_the_same_canonical_info_hash = TestTorrent::with_custom_info_dict_field(id1, "data", "custom 02");
-        torrent_with_the_same_canonical_info_hash.index_info.title = format!("{first_torrent_title}-clone");
-        let form: UploadTorrentMultipartForm = torrent_with_the_same_canonical_info_hash.index_info.into();
-        let response = client.upload_torrent(form.into()).await;
+            let id1 = Uuid::new_v4();
 
-        assert_eq!(response.status, 400);
+            // Upload the first torrent
+            let first_torrent = TestTorrent::with_custom_info_dict_field(id1, "data", "custom 01");
+            let first_torrent_title = first_torrent.index_info.title.clone();
+            let form: UploadTorrentMultipartForm = first_torrent.index_info.into();
+            let _response = client.upload_torrent(form.into()).await;
+
+            // Upload the second torrent with the same canonical info-hash as the first one.
+            // We need to change the title otherwise the torrent will be rejected
+            // because of the duplicate title.
+            let mut torrent_with_the_same_canonical_info_hash =
+                TestTorrent::with_custom_info_dict_field(id1, "data", "custom 02");
+            torrent_with_the_same_canonical_info_hash.index_info.title = format!("{first_torrent_title}-clone");
+            let form: UploadTorrentMultipartForm = torrent_with_the_same_canonical_info_hash.index_info.into();
+            let response = client.upload_torrent(form.into()).await;
+
+            assert_eq!(response.status, 400);
+        }
     }
 
     #[tokio::test]
