@@ -216,6 +216,7 @@ impl TorrentInfoDictionary {
 
         // a torrent file has a root hash or a pieces key, but not both.
         if root_hash > 0 {
+            // If `root_hash` is true the `pieces` field contains the `root hash`
             info_dict.root_hash = Some(pieces.to_owned());
         } else {
             let buffer = into_bytes(pieces).expect("variable `torrent_info.pieces` is not a valid hex string");

@@ -14,7 +14,7 @@ pub struct CreateTorrentRequest {
     pub pieces: String,
     pub piece_length: i64,
     pub private: Option<u8>,
-    pub root_hash: i64,
+    pub root_hash: i64, // True (1) if it's a BEP 30 torrent.
     pub files: Vec<TorrentFile>,
     // Other fields of the root level metainfo dictionary
     pub announce_urls: Vec<Vec<String>>,
