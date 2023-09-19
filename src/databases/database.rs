@@ -209,7 +209,7 @@ pub trait Database: Sync + Send {
 
         let torrent_announce_urls = self.get_torrent_announce_urls_from_id(torrent_info.torrent_id).await?;
 
-        Ok(Torrent::from_database(torrent_info, torrent_files, torrent_announce_urls))
+        Ok(Torrent::from_database(&torrent_info, &torrent_files, torrent_announce_urls))
     }
 
     /// Get `Torrent` from `torrent_id`.
@@ -220,7 +220,7 @@ pub trait Database: Sync + Send {
 
         let torrent_announce_urls = self.get_torrent_announce_urls_from_id(torrent_id).await?;
 
-        Ok(Torrent::from_database(torrent_info, torrent_files, torrent_announce_urls))
+        Ok(Torrent::from_database(&torrent_info, &torrent_files, torrent_announce_urls))
     }
 
     /// It returns the list of all infohashes producing the same canonical

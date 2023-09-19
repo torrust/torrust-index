@@ -98,57 +98,18 @@ impl Torrent {
     /// hex string.
     #[must_use]
     pub fn from_database(
-        db_torrent: DbTorrent,
-        torrent_files: Vec<TorrentFile>,
+        db_torrent: &DbTorrent,
+        torrent_files: &Vec<TorrentFile>,
         torrent_announce_urls: Vec<Vec<String>>,
     ) -> Self {
-        let mut info_dict = TorrentInfoDictionary {
-            name: db_torrent.name,
-            pieces: None,
-            piece_length: db_torrent.piece_length,
-            md5sum: None,
-            length: None,
-            files: None,
-            private: db_torrent.private,
-            path: None,
-            root_hash: None,
-            source: None,
-        };
-
-        // a torrent file has a root hash or a pieces key, but not both.
-        if db_torrent.root_hash > 0 {
-            info_dict.root_hash = Some(db_torrent.pieces);
-        } else {
-            let buffer = into_bytes(&db_torrent.pieces).expect("variable `torrent_info.pieces` is not a valid hex string");
-            info_dict.pieces = Some(ByteBuf::from(buffer));
-        }
-
-        // either set the single file or the multiple files information
-        if torrent_files.len() == 1 {
-            let torrent_file = torrent_files
-                .first()
-                .expect("vector `torrent_files` should have at least one element");
-
-            info_dict.md5sum = torrent_file.md5sum.clone();
-
-            info_dict.length = Some(torrent_file.length);
-
-            let path = if torrent_file
-                .path
-                .first()
-                .as_ref()
-                .expect("the vector for the `path` should have at least one element")
-                .is_empty()
-            {
-                None
-            } else {
-                Some(torrent_file.path.clone())
-            };
-
-            info_dict.path = path;
-        } else {
-            info_dict.files = Some(torrent_files);
-        }
+        let info_dict = TorrentInfoDictionary::with(
+            &db_torrent.name,
+            db_torrent.piece_length,
+            db_torrent.private,
+            db_torrent.root_hash,
+            &db_torrent.pieces,
+            torrent_files,
+        );
 
         Self {
             info: info_dict,
@@ -246,6 +207,74 @@ impl Torrent {
 }
 
 impl TorrentInfoDictionary {
+    /// Constructor.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if:
+    ///
+    /// - The `pieces` field is not a valid hex string.
+    /// - For single files torrents the `TorrentFile` path is empty.
+    #[must_use]
+    pub fn with(
+        name: &str,
+        piece_length: i64,
+        private: Option<u8>,
+        root_hash: i64,
+        pieces: &str,
+        files: &Vec<TorrentFile>,
+    ) -> Self {
+        let mut info_dict = Self {
+            name: name.to_string(),
+            pieces: None,
+            piece_length,
+            md5sum: None,
+            length: None,
+            files: None,
+            private,
+            path: None,
+            root_hash: None,
+            source: None,
+        };
+
+        // a torrent file has a root hash or a pieces key, but not both.
+        if root_hash > 0 {
+            info_dict.root_hash = Some(pieces.to_owned());
+        } else {
+            let buffer = into_bytes(pieces).expect("variable `torrent_info.pieces` is not a valid hex string");
+            info_dict.pieces = Some(ByteBuf::from(buffer));
+        }
+
+        // either set the single file or the multiple files information
+        if files.len() == 1 {
+            let torrent_file = files
+                .first()
+                .expect("vector `torrent_files` should have at least one element");
+
+            info_dict.md5sum = torrent_file.md5sum.clone();
+
+            info_dict.length = Some(torrent_file.length);
+
+            let path = if torrent_file
+                .path
+                .first()
+                .as_ref()
+                .expect("the vector for the `path` should have at least one element")
+                .is_empty()
+            {
+                None
+            } else {
+                Some(torrent_file.path.clone())
+            };
+
+            info_dict.path = path;
+        } else {
+            info_dict.files = Some(files.clone());
+        }
+
+        info_dict
+    }
+
     /// torrent file can only hold a pieces key or a root hash key:
     /// [BEP 39](http://www.bittorrent.org/beps/bep_0030.html)
     #[must_use]
