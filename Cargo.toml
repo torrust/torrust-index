@@ -15,9 +15,6 @@ default-run = "main"
 opt-level = 3
 
 [dependencies]
-actix-web = "4.3"
-actix-multipart = "0.6"
-actix-cors = "0.6"
 async-trait = "0.1"
 futures = "0.3"
 sqlx = { version = "0.6", features = [
