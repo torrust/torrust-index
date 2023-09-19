@@ -18,10 +18,12 @@ use crate::common::contexts::category::fixtures::software_category_name;
 /// Information about a torrent that is going to be added to the index.
 #[derive(Clone)]
 pub struct TorrentIndexInfo {
+    // Metadata
     pub title: String,
     pub description: String,
     pub category: String,
     pub tags: Option<Vec<i64>>,
+    // Other fields
     pub torrent_file: BinaryFile,
     pub name: String,
 }

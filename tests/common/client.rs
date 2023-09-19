@@ -253,7 +253,7 @@ impl Http {
                 .bearer_auth(token)
                 .send()
                 .await
-                .unwrap(),
+                .expect("failed to send multipart request with token"),
             None => reqwest::Client::builder()
                 .build()
                 .unwrap()
@@ -261,7 +261,7 @@ impl Http {
                 .multipart(form)
                 .send()
                 .await
-                .unwrap(),
+                .expect("failed to send multipart request without token"),
         };
         TextResponse::from(response).await
     }

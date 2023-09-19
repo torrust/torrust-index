@@ -23,7 +23,8 @@ mod for_guests {
     use crate::common::client::Client;
     use crate::common::contexts::category::fixtures::software_predefined_category_id;
     use crate::common::contexts::torrent::asserts::assert_expected_torrent_details;
-    use crate::common::contexts::torrent::fixtures::TestTorrent;
+    use crate::common::contexts::torrent::fixtures::{random_torrent, TestTorrent};
+    use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
     use crate::common::contexts::torrent::requests::InfoHash;
     use crate::common::contexts::torrent::responses::{
         Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
@@ -427,6 +428,22 @@ mod for_guests {
     }
 
     #[tokio::test]
+    async fn it_should_not_allow_guests_to_upload_torrents() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
+
+        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+        let test_torrent = random_torrent();
+
+        let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
+
+        let response = client.upload_torrent(form.into()).await;
+
+        assert_eq!(response.status, 401);
+    }
+
+    #[tokio::test]
     async fn it_should_not_allow_guests_to_delete_torrents() {
         let mut env = TestEnv::new();
         env.start(api::Version::V1).await;
@@ -498,6 +515,149 @@ mod for_authenticated_users {
                 info_hash.to_lowercase()
             );
             assert!(response.is_json_and_ok());
+        }
+
+        mod it_should_guard_that_torrent_metadata {
+            use torrust_index_backend::web::api;
+
+            use crate::common::client::Client;
+            use crate::common::contexts::torrent::fixtures::random_torrent;
+            use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
+            use crate::e2e::environment::TestEnv;
+            use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
+
+            #[tokio::test]
+            async fn contains_a_non_empty_category_name() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                let uploader = new_logged_in_user(&env).await;
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+                let mut test_torrent = random_torrent();
+
+                test_torrent.index_info.category = String::new();
+
+                let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
+
+                let response = client.upload_torrent(form.into()).await;
+
+                assert_eq!(response.status, 400);
+            }
+
+            #[tokio::test]
+            async fn contains_a_non_empty_title() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                let uploader = new_logged_in_user(&env).await;
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+                let mut test_torrent = random_torrent();
+
+                test_torrent.index_info.title = String::new();
+
+                let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
+
+                let response = client.upload_torrent(form.into()).await;
+
+                assert_eq!(response.status, 400);
+            }
+
+            #[tokio::test]
+            async fn title_has_at_least_3_chars() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                let uploader = new_logged_in_user(&env).await;
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+                let mut test_torrent = random_torrent();
+
+                test_torrent.index_info.title = "12".to_string();
+
+                let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
+
+                let response = client.upload_torrent(form.into()).await;
+
+                assert_eq!(response.status, 400);
+            }
+        }
+
+        mod it_should_guard_that_the_torrent_file {
+
+            use torrust_index_backend::web::api;
+
+            use crate::common::client::Client;
+            use crate::common::contexts::torrent::fixtures::random_torrent;
+            use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
+            use crate::e2e::environment::TestEnv;
+            use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
+
+            #[tokio::test]
+            #[should_panic]
+            async fn contains_a_bencoded_dictionary_with_the_info_key_in_order_to_calculate_the_original_info_hash() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                let uploader = new_logged_in_user(&env).await;
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+                let mut test_torrent = random_torrent();
+
+                // Make the random torrent invalid by changing the bytes of the torrent file
+                let minimal_bencoded_value = b"de".to_vec();
+                test_torrent.index_info.torrent_file.contents = minimal_bencoded_value;
+
+                let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
+
+                let _response = client.upload_torrent(form.into()).await;
+            }
+
+            #[tokio::test]
+            async fn contains_a_valid_metainfo_file() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                let uploader = new_logged_in_user(&env).await;
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+                let mut test_torrent = random_torrent();
+
+                // Make the random torrent invalid by changing the bytes of the torrent file.
+                // It's a valid bencoded format but an invalid torrent. It contains
+                // a `info` otherwise the test to validate the `info` key would fail.
+                // cspell:disable-next-line
+                let minimal_bencoded_value_with_info_key = b"d4:infod6:custom6:customee".to_vec();
+                test_torrent.index_info.torrent_file.contents = minimal_bencoded_value_with_info_key;
+
+                let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
+
+                let response = client.upload_torrent(form.into()).await;
+
+                assert_eq!(response.status, 400);
+            }
+
+            #[tokio::test]
+            async fn pieces_key_has_a_length_that_is_a_multiple_of_20() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                let uploader = new_logged_in_user(&env).await;
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+                let mut test_torrent = random_torrent();
+
+                // cspell:disable-next-line
+                let torrent_with_19_pieces = b"d4:infod6:lengthi2e4:name42:torrent-with-invalid-pieces-key-length.txt12:piece lengthi16384e6:pieces19:\x3F\x78\x68\x50\xE3\x87\x55\x0F\xDA\xB8\x36\xED\x7E\x6D\xC8\x81\xDE\x23\x00ee";
+                test_torrent.index_info.torrent_file.contents = torrent_with_19_pieces.to_vec();
+
+                let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
+
+                let response = client.upload_torrent(form.into()).await;
+
+                assert_eq!(response.status, 400);
+            }
         }
 
         #[tokio::test]
