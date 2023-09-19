@@ -60,7 +60,7 @@ pub fn convert_timestamp_to_datetime(timestamp: i64) -> String {
     // MySQL uses a DATETIME column and SQLite uses a TEXT column.
 
     let naive_datetime = NaiveDateTime::from_timestamp_opt(timestamp, 0).expect("Overflow of i64 seconds, very future!");
-    let datetime_again: DateTime<Utc> = DateTime::from_utc(naive_datetime, Utc);
+    let datetime_again: DateTime<Utc> = DateTime::from_naive_utc_and_offset(naive_datetime, Utc);
 
     // Format without timezone
     datetime_again.format("%Y-%m-%d %H:%M:%S").to_string()
