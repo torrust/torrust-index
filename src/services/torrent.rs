@@ -140,33 +140,8 @@ impl Index {
 
         let canonical_info_hash = torrent.canonical_info_hash();
 
-        // Canonical InfoHash Group checks
-
-        let original_info_hashes = self
-            .torrent_info_hash_repository
-            .get_canonical_info_hash_group(&canonical_info_hash)
+        self.canonical_info_hash_group_checks(&original_info_hash, &canonical_info_hash)
             .await?;
-
-        if !original_info_hashes.is_empty() {
-            // Torrent with the same canonical infohash was already uploaded
-            debug!("Canonical infohash found: {:?}", canonical_info_hash.to_hex_string());
-
-            if let Some(original_info_hash) = original_info_hashes.find(&original_info_hash) {
-                // The exact original infohash was already uploaded
-                debug!("Original infohash found: {:?}", original_info_hash.to_hex_string());
-
-                return Err(ServiceError::InfoHashAlreadyExists);
-            }
-
-            // A new original infohash is being uploaded with a canonical infohash that already exists.
-            debug!("Original infohash not found: {:?}", original_info_hash.to_hex_string());
-
-            // Add the new associated original infohash to the canonical one.
-            self.torrent_info_hash_repository
-                .add_info_hash_to_canonical_info_hash_group(&original_info_hash, &canonical_info_hash)
-                .await?;
-            return Err(ServiceError::CanonicalInfoHashAlreadyExists);
-        }
 
         // Store the torrent into the database
 
@@ -229,6 +204,40 @@ impl Index {
         )?;
 
         Ok(metadata)
+    }
+
+    async fn canonical_info_hash_group_checks(
+        &self,
+        original_info_hash: &InfoHash,
+        canonical_info_hash: &InfoHash,
+    ) -> Result<(), ServiceError> {
+        let original_info_hashes = self
+            .torrent_info_hash_repository
+            .get_canonical_info_hash_group(canonical_info_hash)
+            .await?;
+
+        if !original_info_hashes.is_empty() {
+            // Torrent with the same canonical infohash was already uploaded
+            debug!("Canonical infohash found: {:?}", canonical_info_hash.to_hex_string());
+
+            if let Some(original_info_hash) = original_info_hashes.find(original_info_hash) {
+                // The exact original infohash was already uploaded
+                debug!("Original infohash found: {:?}", original_info_hash.to_hex_string());
+
+                return Err(ServiceError::InfoHashAlreadyExists);
+            }
+
+            // A new original infohash is being uploaded with a canonical infohash that already exists.
+            debug!("Original infohash not found: {:?}", original_info_hash.to_hex_string());
+
+            // Add the new associated original infohash to the canonical one.
+            self.torrent_info_hash_repository
+                .add_info_hash_to_canonical_info_hash_group(original_info_hash, canonical_info_hash)
+                .await?;
+            return Err(ServiceError::CanonicalInfoHashAlreadyExists);
+        }
+
+        Ok(())
     }
 
     async fn customize_announcement_info_for(&self, torrent: &mut Torrent) {
