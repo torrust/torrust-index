@@ -17,7 +17,7 @@ use crate::models::torrent_file::{DbTorrent, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::user::UserId;
 use crate::tracker::statistics_importer::StatisticsImporter;
-use crate::utils::parse_torrent;
+use crate::utils::parse_torrent::decode_and_validate_torrent_file;
 use crate::{tracker, AsCSV};
 
 pub struct Index {
@@ -134,20 +134,10 @@ impl Index {
 
         let metadata = self.validate_and_build_metadata(&add_torrent_req).await?;
 
-        // Validate and build torrent file
+        let (mut torrent, original_info_hash) = decode_and_validate_torrent_file(&add_torrent_req.torrent_buffer)?;
 
-        let original_info_hash = parse_torrent::calculate_info_hash(&add_torrent_req.torrent_buffer);
-
-        let mut torrent =
-            parse_torrent::decode_torrent(&add_torrent_req.torrent_buffer).map_err(|_| ServiceError::InvalidTorrentFile)?;
-
-        // Make sure that the pieces key has a length that is a multiple of 20
-        if let Some(pieces) = torrent.info.pieces.as_ref() {
-            if pieces.as_ref().len() % 20 != 0 {
-                return Err(ServiceError::InvalidTorrentPiecesLength);
-            }
-        }
-
+        // Customize the announce URLs with the linked tracker URL
+        // and remove others if the torrent is private.
         torrent.set_announce_urls(&self.configuration).await;
 
         let canonical_info_hash = torrent.canonical_info_hash();

@@ -6,6 +6,7 @@ use hyper::StatusCode;
 
 use crate::databases::database;
 use crate::models::torrent::MetadataError;
+use crate::utils::parse_torrent::MetainfoFileDataError;
 
 pub type ServiceResult<V> = Result<V, ServiceError>;
 
@@ -211,6 +212,16 @@ impl From<MetadataError> for ServiceError {
         match e {
             MetadataError::MissingTorrentTitle => ServiceError::MissingMandatoryMetadataFields,
             MetadataError::InvalidTorrentTitleLength => ServiceError::InvalidTorrentTitleLength,
+        }
+    }
+}
+
+impl From<MetainfoFileDataError> for ServiceError {
+    fn from(e: MetainfoFileDataError) -> Self {
+        eprintln!("{e}");
+        match e {
+            MetainfoFileDataError::InvalidBencodeData => ServiceError::InvalidTorrentFile,
+            MetainfoFileDataError::InvalidTorrentPiecesLength => ServiceError::InvalidTorrentTitleLength,
         }
     }
 }

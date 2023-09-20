@@ -1,5 +1,6 @@
 use std::error;
 
+use derive_more::{Display, Error};
 use serde::{self, Deserialize, Serialize};
 use serde_bencode::value::Value;
 use serde_bencode::{de, Error};
@@ -7,6 +8,43 @@ use sha1::{Digest, Sha1};
 
 use crate::models::info_hash::InfoHash;
 use crate::models::torrent_file::Torrent;
+
+#[derive(Debug, Display, PartialEq, Eq, Error)]
+pub enum MetainfoFileDataError {
+    #[display(fmt = "Torrent data could not be decoded from the bencoded format.")]
+    InvalidBencodeData,
+
+    #[display(fmt = "Torrent has an invalid pieces key length. It should be a multiple of 20.")]
+    InvalidTorrentPiecesLength,
+}
+
+/// It decodes and validate an array of bytes containing a torrent file.
+///
+/// It returns a tuple containing the decoded torrent and the original info hash.
+/// The original info-hash migth not match the new one in the `Torrent` because
+/// the info dictionary might have been modified. For example, ignoring some
+/// non-standard fields.
+///
+/// # Errors
+///
+/// This function will return an error if
+///
+/// - The torrent file is not a valid bencoded file.
+/// - The pieces key has a length that is not a multiple of 20.
+pub fn decode_and_validate_torrent_file(bytes: &[u8]) -> Result<(Torrent, InfoHash), MetainfoFileDataError> {
+    let original_info_hash = calculate_info_hash(bytes);
+
+    let torrent = decode_torrent(bytes).map_err(|_| MetainfoFileDataError::InvalidBencodeData)?;
+
+    // Make sure that the pieces key has a length that is a multiple of 20
+    if let Some(pieces) = torrent.info.pieces.as_ref() {
+        if pieces.as_ref().len() % 20 != 0 {
+            return Err(MetainfoFileDataError::InvalidTorrentPiecesLength);
+        }
+    }
+
+    Ok((torrent, original_info_hash))
+}
 
 /// Decode a Torrent from Bencoded Bytes.
 ///
