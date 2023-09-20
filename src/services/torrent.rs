@@ -138,20 +138,12 @@ impl Index {
 
         self.customize_announcement_info_for(&mut torrent).await;
 
-        let canonical_info_hash = torrent.canonical_info_hash();
-
-        self.canonical_info_hash_group_checks(&original_info_hash, &canonical_info_hash)
+        self.canonical_info_hash_group_checks(&original_info_hash, &torrent.canonical_info_hash())
             .await?;
-
-        // Store the torrent into the database
 
         let torrent_id = self
             .torrent_repository
-            .add(&original_info_hash, &torrent, &metadata, user_id, metadata.category_id)
-            .await?;
-
-        self.torrent_tag_repository
-            .link_torrent_to_tags(&torrent_id, &metadata.tags)
+            .add(&original_info_hash, &torrent, &metadata, user_id)
             .await?;
 
         // Secondary task: import torrent statistics from the tracker
@@ -544,17 +536,9 @@ impl DbTorrentRepository {
         torrent: &Torrent,
         metadata: &Metadata,
         user_id: UserId,
-        category_id: CategoryId,
     ) -> Result<TorrentId, Error> {
         self.database
-            .insert_torrent_and_get_id(
-                original_info_hash,
-                torrent,
-                user_id,
-                category_id,
-                &metadata.title,
-                &metadata.description,
-            )
+            .insert_torrent_and_get_id(original_info_hash, torrent, user_id, metadata)
             .await
     }
 

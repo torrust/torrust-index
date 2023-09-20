@@ -7,7 +7,7 @@ use crate::databases::sqlite::Sqlite;
 use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
-use crate::models::torrent::TorrentListing;
+use crate::models::torrent::{Metadata, TorrentListing};
 use crate::models::torrent_file::{DbTorrent, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
@@ -196,9 +196,7 @@ pub trait Database: Sync + Send {
         original_info_hash: &InfoHash,
         torrent: &Torrent,
         uploader_id: UserId,
-        category_id: CategoryId,
-        title: &str,
-        description: &str,
+        metadata: &Metadata,
     ) -> Result<i64, Error>;
 
     /// Get `Torrent` from `InfoHash`.
