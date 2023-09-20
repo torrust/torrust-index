@@ -136,9 +136,7 @@ impl Index {
 
         let (mut torrent, original_info_hash) = decode_and_validate_torrent_file(&add_torrent_req.torrent_buffer)?;
 
-        // Customize the announce URLs with the linked tracker URL
-        // and remove others if the torrent is private.
-        torrent.set_announce_urls(&self.configuration).await;
+        self.customize_announcement_info_for(&mut torrent).await;
 
         let canonical_info_hash = torrent.canonical_info_hash();
 
@@ -231,6 +229,13 @@ impl Index {
         )?;
 
         Ok(metadata)
+    }
+
+    async fn customize_announcement_info_for(&self, torrent: &mut Torrent) {
+        let settings = self.configuration.settings.read().await;
+        let tracker_url = settings.tracker.url.clone();
+        torrent.set_announce_to(&tracker_url);
+        torrent.reset_announce_list_if_private();
     }
 
     /// Gets a torrent from the Index.

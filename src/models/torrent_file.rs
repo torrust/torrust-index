@@ -4,7 +4,6 @@ use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
 
 use super::info_hash::InfoHash;
-use crate::config::Configuration;
 use crate::utils::hex::{from_bytes, into_bytes};
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
@@ -101,19 +100,25 @@ impl Torrent {
         }
     }
 
-    /// Sets the announce url to the tracker url and removes all other trackers
-    /// if the torrent is private.
-    pub async fn set_announce_urls(&mut self, cfg: &Configuration) {
-        let settings = cfg.settings.read().await;
+    /// Sets the announce url to the tracker url.
+    pub fn set_announce_to(&mut self, tracker_url: &str) {
+        self.announce = Some(tracker_url.to_owned());
+    }
 
-        self.announce = Some(settings.tracker.url.clone());
+    /// Removes all other trackers if the torrent is private.
+    pub fn reset_announce_list_if_private(&mut self) {
+        if self.is_private() {
+            self.announce_list = None;
+        }
+    }
 
-        // if torrent is private, remove all other trackers
+    fn is_private(&self) -> bool {
         if let Some(private) = self.info.private {
             if private == 1 {
-                self.announce_list = None;
+                return true;
             }
         }
+        false
     }
 
     /// It calculates the info hash of the torrent file.
