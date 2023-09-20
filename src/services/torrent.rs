@@ -7,7 +7,7 @@ use serde_derive::{Deserialize, Serialize};
 use super::category::DbCategoryRepository;
 use super::user::DbUserRepository;
 use crate::config::Configuration;
-use crate::databases::database::{Category, Database, Error, Sorting};
+use crate::databases::database::{Database, Error, Sorting};
 use crate::errors::ServiceError;
 use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
@@ -17,10 +17,8 @@ use crate::models::torrent_file::{DbTorrent, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::user::UserId;
 use crate::tracker::statistics_importer::StatisticsImporter;
-use crate::utils::parse_torrent;
+use crate::utils::parse_torrent::decode_and_validate_torrent_file;
 use crate::{tracker, AsCSV};
-
-const MIN_TORRENT_TITLE_LENGTH: usize = 3;
 
 pub struct Index {
     configuration: Arc<Configuration>,
@@ -40,7 +38,7 @@ pub struct Index {
 pub struct AddTorrentRequest {
     pub title: String,
     pub description: String,
-    pub category: String,
+    pub category_name: String,
     pub tags: Vec<TagId>,
     pub torrent_buffer: Vec<u8>,
 }
@@ -128,56 +126,93 @@ impl Index {
     /// * Unable to parse the torrent info-hash.
     pub async fn add_torrent(
         &self,
-        add_torrent_form: AddTorrentRequest,
+        add_torrent_req: AddTorrentRequest,
         user_id: UserId,
     ) -> Result<AddTorrentResponse, ServiceError> {
-        let metadata = Metadata {
-            title: add_torrent_form.title,
-            description: add_torrent_form.description,
-            category: add_torrent_form.category,
-            tags: add_torrent_form.tags,
-        };
-
-        metadata.verify()?;
-
-        let original_info_hash = parse_torrent::calculate_info_hash(&add_torrent_form.torrent_buffer);
-
-        let mut torrent =
-            parse_torrent::decode_torrent(&add_torrent_form.torrent_buffer).map_err(|_| ServiceError::InvalidTorrentFile)?;
-
-        // Make sure that the pieces key has a length that is a multiple of 20
-        if let Some(pieces) = torrent.info.pieces.as_ref() {
-            if pieces.as_ref().len() % 20 != 0 {
-                return Err(ServiceError::InvalidTorrentPiecesLength);
-            }
-        }
-
+        // Guard that the users exists
         let _user = self.user_repository.get_compact(&user_id).await?;
 
-        torrent.set_announce_urls(&self.configuration).await;
+        let metadata = self.validate_and_build_metadata(&add_torrent_req).await?;
 
-        if metadata.title.len() < MIN_TORRENT_TITLE_LENGTH {
-            return Err(ServiceError::InvalidTorrentTitleLength);
+        let (mut torrent, original_info_hash) = decode_and_validate_torrent_file(&add_torrent_req.torrent_buffer)?;
+
+        self.customize_announcement_info_for(&mut torrent).await;
+
+        self.canonical_info_hash_group_checks(&original_info_hash, &torrent.canonical_info_hash())
+            .await?;
+
+        let torrent_id = self
+            .torrent_repository
+            .add(&original_info_hash, &torrent, &metadata, user_id)
+            .await?;
+
+        // Synchronous secondary tasks
+
+        // code-review: consider moving this to a background task
+        self.import_torrent_statistics_from_tracker(torrent_id, &torrent.canonical_info_hash())
+            .await;
+
+        // We always whitelist the torrent on the tracker because
+        // even if the tracker mode is `public` it could be changed to `private`
+        // later on.
+        //
+        // code-review: maybe we should consider adding a new feature to
+        // whitelist  all torrents from the admin panel if that change happens.
+        if let Err(e) = self
+            .tracker_service
+            .whitelist_info_hash(torrent.canonical_info_hash_hex())
+            .await
+        {
+            // If the torrent can't be whitelisted somehow, remove the torrent from database
+            drop(self.torrent_repository.delete(&torrent_id).await);
+            return Err(e);
+        }
+
+        // Build response
+
+        Ok(AddTorrentResponse {
+            torrent_id,
+            info_hash: torrent.canonical_info_hash_hex(),
+            original_info_hash: original_info_hash.to_string(),
+        })
+    }
+
+    async fn validate_and_build_metadata(&self, add_torrent_req: &AddTorrentRequest) -> Result<Metadata, ServiceError> {
+        if add_torrent_req.category_name.is_empty() {
+            return Err(ServiceError::MissingMandatoryMetadataFields);
         }
 
         let category = self
             .category_repository
-            .get_by_name(&metadata.category)
+            .get_by_name(&add_torrent_req.category_name)
             .await
             .map_err(|_| ServiceError::InvalidCategory)?;
 
-        let canonical_info_hash = torrent.canonical_info_hash();
+        let metadata = Metadata::new(
+            &add_torrent_req.title,
+            &add_torrent_req.description,
+            category.category_id,
+            &add_torrent_req.tags,
+        )?;
 
+        Ok(metadata)
+    }
+
+    async fn canonical_info_hash_group_checks(
+        &self,
+        original_info_hash: &InfoHash,
+        canonical_info_hash: &InfoHash,
+    ) -> Result<(), ServiceError> {
         let original_info_hashes = self
             .torrent_info_hash_repository
-            .get_canonical_info_hash_group(&canonical_info_hash)
+            .get_canonical_info_hash_group(canonical_info_hash)
             .await?;
 
         if !original_info_hashes.is_empty() {
             // Torrent with the same canonical infohash was already uploaded
             debug!("Canonical infohash found: {:?}", canonical_info_hash.to_hex_string());
 
-            if let Some(original_info_hash) = original_info_hashes.find(&original_info_hash) {
+            if let Some(original_info_hash) = original_info_hashes.find(original_info_hash) {
                 // The exact original infohash was already uploaded
                 debug!("Original infohash found: {:?}", original_info_hash.to_hex_string());
 
@@ -189,42 +224,27 @@ impl Index {
 
             // Add the new associated original infohash to the canonical one.
             self.torrent_info_hash_repository
-                .add_info_hash_to_canonical_info_hash_group(&original_info_hash, &canonical_info_hash)
+                .add_info_hash_to_canonical_info_hash_group(original_info_hash, canonical_info_hash)
                 .await?;
             return Err(ServiceError::CanonicalInfoHashAlreadyExists);
         }
 
-        // First time a torrent with this original infohash is uploaded.
+        Ok(())
+    }
 
-        let torrent_id = self
-            .torrent_repository
-            .add(&original_info_hash, &torrent, &metadata, user_id, category)
-            .await?;
-        let info_hash = torrent.canonical_info_hash();
+    async fn customize_announcement_info_for(&self, torrent: &mut Torrent) {
+        let settings = self.configuration.settings.read().await;
+        let tracker_url = settings.tracker.url.clone();
+        torrent.set_announce_to(&tracker_url);
+        torrent.reset_announce_list_if_private();
+    }
 
+    async fn import_torrent_statistics_from_tracker(&self, torrent_id: TorrentId, canonical_info_hash: &InfoHash) {
         drop(
             self.tracker_statistics_importer
-                .import_torrent_statistics(torrent_id, &torrent.info_hash_hex())
+                .import_torrent_statistics(torrent_id, &canonical_info_hash.to_hex_string())
                 .await,
         );
-
-        // We always whitelist the torrent on the tracker because even if the tracker mode is `public`
-        // it could be changed to `private` later on.
-        if let Err(e) = self.tracker_service.whitelist_info_hash(torrent.info_hash_hex()).await {
-            // If the torrent can't be whitelisted somehow, remove the torrent from database
-            drop(self.torrent_repository.delete(&torrent_id).await);
-            return Err(e);
-        }
-
-        self.torrent_tag_repository
-            .link_torrent_to_tags(&torrent_id, &metadata.tags)
-            .await?;
-
-        Ok(AddTorrentResponse {
-            torrent_id,
-            info_hash: info_hash.to_string(),
-            original_info_hash: original_info_hash.to_string(),
-        })
     }
 
     /// Gets a torrent from the Index.
@@ -524,17 +544,9 @@ impl DbTorrentRepository {
         torrent: &Torrent,
         metadata: &Metadata,
         user_id: UserId,
-        category: Category,
     ) -> Result<TorrentId, Error> {
         self.database
-            .insert_torrent_and_get_id(
-                original_info_hash,
-                torrent,
-                user_id,
-                category.category_id,
-                &metadata.title,
-                &metadata.description,
-            )
+            .insert_torrent_and_get_id(original_info_hash, torrent, user_id, metadata)
             .await
     }
 

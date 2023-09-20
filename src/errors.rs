@@ -5,6 +5,8 @@ use derive_more::{Display, Error};
 use hyper::StatusCode;
 
 use crate::databases::database;
+use crate::models::torrent::MetadataError;
+use crate::utils::parse_torrent::DecodeTorrentFileError;
 
 pub type ServiceResult<V> = Result<V, ServiceError>;
 
@@ -201,6 +203,28 @@ impl From<serde_json::Error> for ServiceError {
     fn from(e: serde_json::Error) -> Self {
         eprintln!("{e}");
         ServiceError::InternalServerError
+    }
+}
+
+impl From<MetadataError> for ServiceError {
+    fn from(e: MetadataError) -> Self {
+        eprintln!("{e}");
+        match e {
+            MetadataError::MissingTorrentTitle => ServiceError::MissingMandatoryMetadataFields,
+            MetadataError::InvalidTorrentTitleLength => ServiceError::InvalidTorrentTitleLength,
+        }
+    }
+}
+
+impl From<DecodeTorrentFileError> for ServiceError {
+    fn from(e: DecodeTorrentFileError) -> Self {
+        eprintln!("{e}");
+        match e {
+            DecodeTorrentFileError::InvalidTorrentPiecesLength => ServiceError::InvalidTorrentTitleLength,
+            DecodeTorrentFileError::CannotBencodeInfoDict
+            | DecodeTorrentFileError::InvalidInfoDictionary
+            | DecodeTorrentFileError::InvalidBencodeData => ServiceError::InvalidTorrentFile,
+        }
     }
 }
 

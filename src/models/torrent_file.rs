@@ -4,7 +4,6 @@ use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
 
 use super::info_hash::InfoHash;
-use crate::config::Configuration;
 use crate::utils::hex::{from_bytes, into_bytes};
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
@@ -101,19 +100,25 @@ impl Torrent {
         }
     }
 
-    /// Sets the announce url to the tracker url and removes all other trackers
-    /// if the torrent is private.
-    pub async fn set_announce_urls(&mut self, cfg: &Configuration) {
-        let settings = cfg.settings.read().await;
+    /// Sets the announce url to the tracker url.
+    pub fn set_announce_to(&mut self, tracker_url: &str) {
+        self.announce = Some(tracker_url.to_owned());
+    }
 
-        self.announce = Some(settings.tracker.url.clone());
+    /// Removes all other trackers if the torrent is private.
+    pub fn reset_announce_list_if_private(&mut self) {
+        if self.is_private() {
+            self.announce_list = None;
+        }
+    }
 
-        // if torrent is private, remove all other trackers
+    fn is_private(&self) -> bool {
         if let Some(private) = self.info.private {
             if private == 1 {
-                self.announce_list = None;
+                return true;
             }
         }
+        false
     }
 
     /// It calculates the info hash of the torrent file.
@@ -133,13 +138,13 @@ impl Torrent {
     }
 
     #[must_use]
-    pub fn info_hash_hex(&self) -> String {
-        from_bytes(&self.calculate_info_hash_as_bytes()).to_lowercase()
+    pub fn canonical_info_hash(&self) -> InfoHash {
+        self.calculate_info_hash_as_bytes().into()
     }
 
     #[must_use]
-    pub fn canonical_info_hash(&self) -> InfoHash {
-        self.calculate_info_hash_as_bytes().into()
+    pub fn canonical_info_hash_hex(&self) -> String {
+        self.canonical_info_hash().to_hex_string()
     }
 
     #[must_use]
@@ -389,7 +394,7 @@ mod tests {
                 httpseeds: None,
             };
 
-            assert_eq!(torrent.info_hash_hex(), "79fa9e4a2927804fe4feab488a76c8c2d3d1cdca");
+            assert_eq!(torrent.canonical_info_hash_hex(), "79fa9e4a2927804fe4feab488a76c8c2d3d1cdca");
         }
 
         mod infohash_should_be_calculated_for {
@@ -430,7 +435,7 @@ mod tests {
                     httpseeds: None,
                 };
 
-                assert_eq!(torrent.info_hash_hex(), "79fa9e4a2927804fe4feab488a76c8c2d3d1cdca");
+                assert_eq!(torrent.canonical_info_hash_hex(), "79fa9e4a2927804fe4feab488a76c8c2d3d1cdca");
             }
 
             #[test]
@@ -469,7 +474,7 @@ mod tests {
                     httpseeds: None,
                 };
 
-                assert_eq!(torrent.info_hash_hex(), "aa2aca91ab650c4d249c475ca3fa604f2ccb0d2a");
+                assert_eq!(torrent.canonical_info_hash_hex(), "aa2aca91ab650c4d249c475ca3fa604f2ccb0d2a");
             }
 
             #[test]
@@ -504,7 +509,7 @@ mod tests {
                     httpseeds: None,
                 };
 
-                assert_eq!(torrent.info_hash_hex(), "ccc1cf4feb59f3fa85c96c9be1ebbafcfe8a9cc8");
+                assert_eq!(torrent.canonical_info_hash_hex(), "ccc1cf4feb59f3fa85c96c9be1ebbafcfe8a9cc8");
             }
 
             #[test]
@@ -539,7 +544,7 @@ mod tests {
                     httpseeds: None,
                 };
 
-                assert_eq!(torrent.info_hash_hex(), "d3a558d0a19aaa23ba6f9f430f40924d10fefa86");
+                assert_eq!(torrent.canonical_info_hash_hex(), "d3a558d0a19aaa23ba6f9f430f40924d10fefa86");
             }
         }
     }

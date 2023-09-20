@@ -12,7 +12,7 @@ use crate::databases::database::{Category, Database, Driver, Sorting, TorrentCom
 use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
-use crate::models::torrent::TorrentListing;
+use crate::models::torrent::{Metadata, TorrentListing};
 use crate::models::torrent_file::{DbTorrent, DbTorrentAnnounceUrl, DbTorrentFile, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
@@ -422,11 +422,9 @@ impl Database for Sqlite {
         original_info_hash: &InfoHash,
         torrent: &Torrent,
         uploader_id: UserId,
-        category_id: i64,
-        title: &str,
-        description: &str,
+        metadata: &Metadata,
     ) -> Result<i64, database::Error> {
-        let info_hash = torrent.info_hash_hex();
+        let info_hash = torrent.canonical_info_hash_hex();
         let canonical_info_hash = torrent.canonical_info_hash();
 
         // open pool connection
@@ -461,7 +459,7 @@ impl Database for Sqlite {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))",
         )
         .bind(uploader_id)
-        .bind(category_id)
+        .bind(metadata.category_id)
         .bind(info_hash.to_lowercase())
         .bind(torrent.file_size())
         .bind(torrent.info.name.to_string())
@@ -575,11 +573,28 @@ impl Database for Sqlite {
             return Err(e);
         }
 
+        // Insert tags
+
+        for tag_id in &metadata.tags {
+            let insert_torrent_tag_result = query("INSERT INTO torrust_torrent_tag_links (torrent_id, tag_id) VALUES (?, ?)")
+                .bind(torrent_id)
+                .bind(tag_id)
+                .execute(&mut tx)
+                .await
+                .map_err(|err| database::Error::ErrorWithText(err.to_string()));
+
+            // rollback transaction on error
+            if let Err(e) = insert_torrent_tag_result {
+                drop(tx.rollback().await);
+                return Err(e);
+            }
+        }
+
         let insert_torrent_info_result =
             query(r#"INSERT INTO torrust_torrent_info (torrent_id, title, description) VALUES (?, ?, NULLIF(?, ""))"#)
                 .bind(torrent_id)
-                .bind(title)
-                .bind(description)
+                .bind(metadata.title.clone())
+                .bind(metadata.description.clone())
                 .execute(&mut tx)
                 .await
                 .map_err(|e| match e {
