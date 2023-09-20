@@ -148,13 +148,16 @@ impl Index {
 
         // Synchronous secondary tasks
 
+        // code-review: consider moving this to a background task
         self.import_torrent_statistics_from_tracker(torrent_id, &torrent.canonical_info_hash())
             .await;
 
-        // Secondary task: whitelist torrent on the tracker
-
-        // We always whitelist the torrent on the tracker because even if the tracker mode is `public`
-        // it could be changed to `private` later on.
+        // We always whitelist the torrent on the tracker because
+        // even if the tracker mode is `public` it could be changed to `private`
+        // later on.
+        //
+        // code-review: maybe we should consider adding a new feature to
+        // whitelist  all torrents from the admin panel if that change happens.
         if let Err(e) = self
             .tracker_service
             .whitelist_info_hash(torrent.canonical_info_hash_hex())
