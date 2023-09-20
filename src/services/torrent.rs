@@ -146,13 +146,10 @@ impl Index {
             .add(&original_info_hash, &torrent, &metadata, user_id)
             .await?;
 
-        // Secondary task: import torrent statistics from the tracker
+        // Synchronous secondary tasks
 
-        drop(
-            self.tracker_statistics_importer
-                .import_torrent_statistics(torrent_id, &torrent.canonical_info_hash_hex())
-                .await,
-        );
+        self.import_torrent_statistics_from_tracker(torrent_id, &torrent.canonical_info_hash())
+            .await;
 
         // Secondary task: whitelist torrent on the tracker
 
@@ -237,6 +234,14 @@ impl Index {
         let tracker_url = settings.tracker.url.clone();
         torrent.set_announce_to(&tracker_url);
         torrent.reset_announce_list_if_private();
+    }
+
+    async fn import_torrent_statistics_from_tracker(&self, torrent_id: TorrentId, canonical_info_hash: &InfoHash) {
+        drop(
+            self.tracker_statistics_importer
+                .import_torrent_statistics(torrent_id, &canonical_info_hash.to_hex_string())
+                .await,
+        );
     }
 
     /// Gets a torrent from the Index.
