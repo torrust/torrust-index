@@ -317,7 +317,8 @@ mod for_guests {
             // Download
             let response = client.download_torrent(&test_torrent.file_info_hash()).await;
 
-            let downloaded_torrent_info_hash = calculate_info_hash(&response.bytes);
+            let downloaded_torrent_info_hash =
+                calculate_info_hash(&response.bytes).expect("failed to calculate info-hash of the downloaded torrent");
 
             assert_eq!(
                 downloaded_torrent_info_hash.to_hex_string(),
@@ -598,7 +599,6 @@ mod for_authenticated_users {
             use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
 
             #[tokio::test]
-            #[should_panic]
             async fn contains_a_bencoded_dictionary_with_the_info_key_in_order_to_calculate_the_original_info_hash() {
                 let mut env = TestEnv::new();
                 env.start(api::Version::V1).await;
@@ -614,7 +614,9 @@ mod for_authenticated_users {
 
                 let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
-                let _response = client.upload_torrent(form.into()).await;
+                let response = client.upload_torrent(form.into()).await;
+
+                assert_eq!(response.status, 400);
             }
 
             #[tokio::test]

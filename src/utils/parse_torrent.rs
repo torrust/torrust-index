@@ -10,12 +10,18 @@ use crate::models::info_hash::InfoHash;
 use crate::models::torrent_file::Torrent;
 
 #[derive(Debug, Display, PartialEq, Eq, Error)]
-pub enum MetainfoFileDataError {
+pub enum DecodeTorrentFileError {
     #[display(fmt = "Torrent data could not be decoded from the bencoded format.")]
     InvalidBencodeData,
 
+    #[display(fmt = "Torrent info dictionary key could not be decoded from the bencoded format.")]
+    InvalidInfoDictionary,
+
     #[display(fmt = "Torrent has an invalid pieces key length. It should be a multiple of 20.")]
     InvalidTorrentPiecesLength,
+
+    #[display(fmt = "Cannot bencode the parsed `info` dictionary again to generate the info-hash.")]
+    CannotBencodeInfoDict,
 }
 
 /// It decodes and validate an array of bytes containing a torrent file.
@@ -31,15 +37,15 @@ pub enum MetainfoFileDataError {
 ///
 /// - The torrent file is not a valid bencoded file.
 /// - The pieces key has a length that is not a multiple of 20.
-pub fn decode_and_validate_torrent_file(bytes: &[u8]) -> Result<(Torrent, InfoHash), MetainfoFileDataError> {
-    let original_info_hash = calculate_info_hash(bytes);
+pub fn decode_and_validate_torrent_file(bytes: &[u8]) -> Result<(Torrent, InfoHash), DecodeTorrentFileError> {
+    let original_info_hash = calculate_info_hash(bytes)?;
 
-    let torrent = decode_torrent(bytes).map_err(|_| MetainfoFileDataError::InvalidBencodeData)?;
+    let torrent = decode_torrent(bytes).map_err(|_| DecodeTorrentFileError::InvalidBencodeData)?;
 
     // Make sure that the pieces key has a length that is a multiple of 20
     if let Some(pieces) = torrent.info.pieces.as_ref() {
         if pieces.as_ref().len() % 20 != 0 {
-            return Err(MetainfoFileDataError::InvalidTorrentPiecesLength);
+            return Err(DecodeTorrentFileError::InvalidTorrentPiecesLength);
         }
     }
 
@@ -77,30 +83,34 @@ pub fn encode_torrent(torrent: &Torrent) -> Result<Vec<u8>, Error> {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-struct MetainfoFile {
+struct ParsedInfoDictFromMetainfoFile {
     pub info: Value,
 }
 
 /// Calculates the `InfoHash` from a the torrent file binary data.
 ///
-/// # Panics
+/// # Errors
 ///
-/// This function will panic if the torrent file is not a valid bencoded file
-/// or if the info dictionary cannot be bencoded.
-#[must_use]
-pub fn calculate_info_hash(bytes: &[u8]) -> InfoHash {
+/// This function will return an error if:
+///
+/// - The torrent file is not a valid bencoded torrent file containing an `info`
+///  dictionary key.
+/// - The original torrent info-hash cannot be bencoded from the parsed `info`
+/// dictionary is not a valid bencoded dictionary.
+pub fn calculate_info_hash(bytes: &[u8]) -> Result<InfoHash, DecodeTorrentFileError> {
     // Extract the info dictionary
-    let metainfo: MetainfoFile = serde_bencode::from_bytes(bytes).expect("Torrent file cannot be parsed from bencoded format");
+    let metainfo: ParsedInfoDictFromMetainfoFile =
+        serde_bencode::from_bytes(bytes).map_err(|_| DecodeTorrentFileError::InvalidInfoDictionary)?;
 
     // Bencode the info dictionary
-    let info_dict_bytes = serde_bencode::to_bytes(&metainfo.info).expect("Info dictionary cannot by bencoded");
+    let info_dict_bytes = serde_bencode::to_bytes(&metainfo.info).map_err(|_| DecodeTorrentFileError::CannotBencodeInfoDict)?;
 
     // Calculate the SHA-1 hash of the bencoded info dictionary
     let mut hasher = Sha1::new();
     hasher.update(&info_dict_bytes);
     let result = hasher.finalize();
 
-    InfoHash::from_bytes(&result)
+    Ok(InfoHash::from_bytes(&result))
 }
 
 #[cfg(test)]
@@ -117,7 +127,7 @@ mod tests {
             "tests/fixtures/torrents/6c690018c5786dbbb00161f62b0712d69296df97_with_custom_info_dict_key.torrent",
         );
 
-        let original_info_hash = super::calculate_info_hash(&std::fs::read(torrent_path).unwrap());
+        let original_info_hash = super::calculate_info_hash(&std::fs::read(torrent_path).unwrap()).unwrap();
 
         assert_eq!(
             original_info_hash,
