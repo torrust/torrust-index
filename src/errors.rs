@@ -209,9 +209,7 @@ impl From<MetadataError> for ServiceError {
     fn from(e: MetadataError) -> Self {
         eprintln!("{e}");
         match e {
-            MetadataError::MissingTorrentTitle | MetadataError::MissingTorrentCategoryName => {
-                ServiceError::MissingMandatoryMetadataFields
-            }
+            MetadataError::MissingTorrentTitle => ServiceError::MissingMandatoryMetadataFields,
             MetadataError::InvalidTorrentTitleLength => ServiceError::InvalidTorrentTitleLength,
         }
     }

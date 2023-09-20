@@ -1,6 +1,7 @@
 use derive_more::{Display, Error};
 use serde::{Deserialize, Serialize};
 
+use super::category::CategoryId;
 use super::torrent_tag::TagId;
 
 const MIN_TORRENT_TITLE_LENGTH: usize = 3;
@@ -28,11 +29,8 @@ pub struct TorrentListing {
 
 #[derive(Debug, Display, PartialEq, Eq, Error)]
 pub enum MetadataError {
-    #[display(fmt = "Missing mandatory torrent title")]
+    #[display(fmt = "Missing mandatory torrent title.")]
     MissingTorrentTitle,
-
-    #[display(fmt = "Missing mandatory torrent category name")]
-    MissingTorrentCategoryName,
 
     #[display(fmt = "Torrent title is too short.")]
     InvalidTorrentTitleLength,
@@ -42,7 +40,7 @@ pub enum MetadataError {
 pub struct Metadata {
     pub title: String,
     pub description: String,
-    pub category: String,
+    pub category_id: CategoryId,
     pub tags: Vec<TagId>,
 }
 
@@ -53,13 +51,13 @@ impl Metadata {
     ///
     /// This function will return an error if the metadata fields do not have a
     /// valid format.
-    pub fn new(title: &str, description: &str, category: &str, tag_ids: &[TagId]) -> Result<Self, MetadataError> {
-        Self::validate_format(title, description, category, tag_ids)?;
+    pub fn new(title: &str, description: &str, category_id: CategoryId, tag_ids: &[TagId]) -> Result<Self, MetadataError> {
+        Self::validate_format(title, description, category_id, tag_ids)?;
 
         Ok(Self {
             title: title.to_owned(),
             description: description.to_owned(),
-            category: category.to_owned(),
+            category_id,
             tags: tag_ids.to_vec(),
         })
     }
@@ -76,13 +74,14 @@ impl Metadata {
     ///
     /// This function will return an error if any of the metadata fields does
     /// not have a valid format.
-    fn validate_format(title: &str, _description: &str, category: &str, _tag_ids: &[TagId]) -> Result<(), MetadataError> {
+    fn validate_format(
+        title: &str,
+        _description: &str,
+        _category_id: CategoryId,
+        _tag_ids: &[TagId],
+    ) -> Result<(), MetadataError> {
         if title.is_empty() {
             return Err(MetadataError::MissingTorrentTitle);
-        }
-
-        if category.is_empty() {
-            return Err(MetadataError::MissingTorrentCategoryName);
         }
 
         if title.len() < MIN_TORRENT_TITLE_LENGTH {

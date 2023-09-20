@@ -7,7 +7,7 @@ use serde_derive::{Deserialize, Serialize};
 use super::category::DbCategoryRepository;
 use super::user::DbUserRepository;
 use crate::config::Configuration;
-use crate::databases::database::{Category, Database, Error, Sorting};
+use crate::databases::database::{Database, Error, Sorting};
 use crate::errors::ServiceError;
 use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
@@ -38,7 +38,7 @@ pub struct Index {
 pub struct AddTorrentRequest {
     pub title: String,
     pub description: String,
-    pub category: String,
+    pub category_name: String,
     pub tags: Vec<TagId>,
     pub torrent_buffer: Vec<u8>,
 }
@@ -130,23 +130,9 @@ impl Index {
         user_id: UserId,
     ) -> Result<AddTorrentResponse, ServiceError> {
         // Authorization: only authenticated users ere allowed to upload torrents
-
         let _user = self.user_repository.get_compact(&user_id).await?;
 
-        // Validate and build metadata
-
-        let metadata = Metadata::new(
-            &add_torrent_req.title,
-            &add_torrent_req.description,
-            &add_torrent_req.category,
-            &add_torrent_req.tags,
-        )?;
-
-        let category = self
-            .category_repository
-            .get_by_name(&metadata.category)
-            .await
-            .map_err(|_| ServiceError::InvalidCategory)?;
+        let metadata = self.validate_and_build_metadata(&add_torrent_req).await?;
 
         // Validate and build torrent file
 
@@ -198,7 +184,7 @@ impl Index {
 
         let torrent_id = self
             .torrent_repository
-            .add(&original_info_hash, &torrent, &metadata, user_id, category)
+            .add(&original_info_hash, &torrent, &metadata, user_id, metadata.category_id)
             .await?;
 
         self.torrent_tag_repository
@@ -234,6 +220,27 @@ impl Index {
             info_hash: torrent.canonical_info_hash_hex(),
             original_info_hash: original_info_hash.to_string(),
         })
+    }
+
+    async fn validate_and_build_metadata(&self, add_torrent_req: &AddTorrentRequest) -> Result<Metadata, ServiceError> {
+        if add_torrent_req.category_name.is_empty() {
+            return Err(ServiceError::MissingMandatoryMetadataFields);
+        }
+
+        let category = self
+            .category_repository
+            .get_by_name(&add_torrent_req.category_name)
+            .await
+            .map_err(|_| ServiceError::InvalidCategory)?;
+
+        let metadata = Metadata::new(
+            &add_torrent_req.title,
+            &add_torrent_req.description,
+            category.category_id,
+            &add_torrent_req.tags,
+        )?;
+
+        Ok(metadata)
     }
 
     /// Gets a torrent from the Index.
@@ -533,14 +540,14 @@ impl DbTorrentRepository {
         torrent: &Torrent,
         metadata: &Metadata,
         user_id: UserId,
-        category: Category,
+        category_id: CategoryId,
     ) -> Result<TorrentId, Error> {
         self.database
             .insert_torrent_and_get_id(
                 original_info_hash,
                 torrent,
                 user_id,
-                category.category_id,
+                category_id,
                 &metadata.title,
                 &metadata.description,
             )

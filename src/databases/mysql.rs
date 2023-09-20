@@ -432,7 +432,7 @@ impl Database for Mysql {
         original_info_hash: &InfoHash,
         torrent: &Torrent,
         uploader_id: UserId,
-        category_id: i64,
+        category_id: CategoryId,
         title: &str,
         description: &str,
     ) -> Result<i64, database::Error> {

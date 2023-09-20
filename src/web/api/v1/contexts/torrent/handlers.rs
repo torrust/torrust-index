@@ -396,7 +396,7 @@ async fn build_add_torrent_request_from_payload(mut payload: Multipart) -> Resul
     Ok(AddTorrentRequest {
         title,
         description,
-        category,
+        category_name: category,
         tags,
         torrent_buffer: torrent_cursor.into_inner(),
     })
