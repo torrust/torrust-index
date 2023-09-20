@@ -133,13 +133,13 @@ impl Torrent {
     }
 
     #[must_use]
-    pub fn info_hash_hex(&self) -> String {
-        from_bytes(&self.calculate_info_hash_as_bytes()).to_lowercase()
+    pub fn canonical_info_hash(&self) -> InfoHash {
+        self.calculate_info_hash_as_bytes().into()
     }
 
     #[must_use]
-    pub fn canonical_info_hash(&self) -> InfoHash {
-        self.calculate_info_hash_as_bytes().into()
+    pub fn canonical_info_hash_hex(&self) -> String {
+        self.canonical_info_hash().to_hex_string()
     }
 
     #[must_use]
@@ -389,7 +389,7 @@ mod tests {
                 httpseeds: None,
             };
 
-            assert_eq!(torrent.info_hash_hex(), "79fa9e4a2927804fe4feab488a76c8c2d3d1cdca");
+            assert_eq!(torrent.canonical_info_hash_hex(), "79fa9e4a2927804fe4feab488a76c8c2d3d1cdca");
         }
 
         mod infohash_should_be_calculated_for {
@@ -430,7 +430,7 @@ mod tests {
                     httpseeds: None,
                 };
 
-                assert_eq!(torrent.info_hash_hex(), "79fa9e4a2927804fe4feab488a76c8c2d3d1cdca");
+                assert_eq!(torrent.canonical_info_hash_hex(), "79fa9e4a2927804fe4feab488a76c8c2d3d1cdca");
             }
 
             #[test]
@@ -469,7 +469,7 @@ mod tests {
                     httpseeds: None,
                 };
 
-                assert_eq!(torrent.info_hash_hex(), "aa2aca91ab650c4d249c475ca3fa604f2ccb0d2a");
+                assert_eq!(torrent.canonical_info_hash_hex(), "aa2aca91ab650c4d249c475ca3fa604f2ccb0d2a");
             }
 
             #[test]
@@ -504,7 +504,7 @@ mod tests {
                     httpseeds: None,
                 };
 
-                assert_eq!(torrent.info_hash_hex(), "ccc1cf4feb59f3fa85c96c9be1ebbafcfe8a9cc8");
+                assert_eq!(torrent.canonical_info_hash_hex(), "ccc1cf4feb59f3fa85c96c9be1ebbafcfe8a9cc8");
             }
 
             #[test]
@@ -539,7 +539,7 @@ mod tests {
                     httpseeds: None,
                 };
 
-                assert_eq!(torrent.info_hash_hex(), "d3a558d0a19aaa23ba6f9f430f40924d10fefa86");
+                assert_eq!(torrent.canonical_info_hash_hex(), "d3a558d0a19aaa23ba6f9f430f40924d10fefa86");
             }
         }
     }

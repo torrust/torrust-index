@@ -396,7 +396,10 @@ mod for_guests {
 
         // The returned torrent info-hash should be the same as the first torrent
         assert_eq!(response.status, 200);
-        assert_eq!(torrent.info_hash_hex(), first_torrent_canonical_info_hash.to_hex_string());
+        assert_eq!(
+            torrent.canonical_info_hash_hex(),
+            first_torrent_canonical_info_hash.to_hex_string()
+        );
     }
 
     #[tokio::test]

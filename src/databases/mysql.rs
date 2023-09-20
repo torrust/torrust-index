@@ -436,7 +436,7 @@ impl Database for Mysql {
         title: &str,
         description: &str,
     ) -> Result<i64, database::Error> {
-        let info_hash = torrent.info_hash_hex();
+        let info_hash = torrent.canonical_info_hash_hex();
         let canonical_info_hash = torrent.canonical_info_hash();
 
         // open pool connection
