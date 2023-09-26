@@ -12,7 +12,7 @@ pub struct Torrent {
     #[serde(default)]
     pub announce: Option<String>,
     #[serde(default)]
-    pub nodes: Option<Vec<TorrentNode>>,
+    pub nodes: Option<Vec<(String, i64)>>,
     #[serde(default)]
     pub encoding: Option<String>,
     #[serde(default)]
@@ -29,9 +29,6 @@ pub struct Torrent {
     #[serde(rename = "created by")]
     pub created_by: Option<String>,
 }
-
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
-pub struct TorrentNode(String, i64);
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct TorrentInfoDictionary {
