@@ -19,6 +19,9 @@ pub struct CreateTorrentRequest {
     // Other fields of the root level metainfo dictionary
     pub announce_urls: Vec<Vec<String>>,
     pub comment: Option<String>,
+    pub creation_date: Option<i64>,
+    pub created_by: Option<String>,
+    pub encoding: Option<String>,
 }
 
 impl CreateTorrentRequest {
@@ -35,12 +38,12 @@ impl CreateTorrentRequest {
             info: info_dict,
             announce: None,
             nodes: None,
-            encoding: None,
+            encoding: self.encoding.clone(),
             httpseeds: None,
             announce_list: Some(self.announce_urls.clone()),
-            creation_date: None,
+            creation_date: self.creation_date.clone(),
             comment: self.comment.clone(),
-            created_by: None,
+            created_by: self.created_by.clone(),
         }
     }
 
@@ -93,6 +96,9 @@ pub fn generate_random_torrent(id: Uuid) -> Torrent {
         files: torrent_files,
         announce_urls: torrent_announce_urls,
         comment: None,
+        creation_date: None,
+        created_by: None,
+        encoding: None,
     };
 
     create_torrent_req.build_torrent()

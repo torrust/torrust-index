@@ -63,6 +63,9 @@ pub struct TorrentResponse {
     pub tags: Vec<TorrentTag>,
     pub name: String,
     pub comment: Option<String>,
+    pub creation_date: Option<i64>,
+    pub created_by: Option<String>,
+    pub encoding: Option<String>,
 }
 
 impl TorrentResponse {
@@ -85,6 +88,9 @@ impl TorrentResponse {
             tags: vec![],
             name: torrent_listing.name,
             comment: torrent_listing.comment,
+            creation_date: torrent_listing.creation_date,
+            created_by: torrent_listing.created_by,
+            encoding: torrent_listing.encoding,
         }
     }
 }

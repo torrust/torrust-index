@@ -387,6 +387,9 @@ impl Database for Mysql {
             tt.size AS file_size,
             tt.name,
             tt.comment,
+            tt.creation_date,
+            tt.created_by,
+            tt.encoding,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
             FROM torrust_torrents tt
@@ -465,8 +468,11 @@ impl Database for Mysql {
             root_hash,
             `source`,
             comment,
-            date_uploaded
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())",
+            date_uploaded,
+            creation_date,
+            created_by,
+            encoding
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?, ?)",
         )
         .bind(uploader_id)
         .bind(metadata.category_id)
@@ -754,6 +760,9 @@ impl Database for Mysql {
             tt.size AS file_size,
             tt.name,
             tt.comment,
+            tt.creation_date,
+            tt.created_by,
+            tt.encoding,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
             FROM torrust_torrents tt
@@ -782,6 +791,9 @@ impl Database for Mysql {
             tt.size AS file_size,
             tt.name,
             tt.comment,
+            tt.creation_date,
+            tt.created_by,
+            tt.encoding,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
             FROM torrust_torrents tt
