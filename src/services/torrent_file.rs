@@ -41,7 +41,7 @@ impl CreateTorrentRequest {
             encoding: self.encoding.clone(),
             httpseeds: None,
             announce_list: Some(self.announce_urls.clone()),
-            creation_date: self.creation_date.clone(),
+            creation_date: self.creation_date,
             comment: self.comment.clone(),
             created_by: self.created_by.clone(),
         }

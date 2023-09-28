@@ -475,7 +475,7 @@ impl Database for Sqlite {
         .bind(root_hash)
         .bind(torrent.info.source.clone())
         .bind(torrent.comment.clone())
-        .bind(torrent.creation_date.clone())
+        .bind(torrent.creation_date)
         .bind(torrent.created_by.clone())
         .bind(torrent.encoding.clone())
         .execute(&mut *tx)

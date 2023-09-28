@@ -91,7 +91,7 @@ impl Torrent {
             encoding: db_torrent.encoding.clone(),
             httpseeds: None,
             announce_list: Some(torrent_announce_urls),
-            creation_date: db_torrent.creation_date.clone(),
+            creation_date: db_torrent.creation_date,
             comment: db_torrent.comment.clone(),
             created_by: db_torrent.created_by.clone(),
         }
