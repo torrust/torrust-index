@@ -485,6 +485,9 @@ impl Database for Mysql {
         .bind(root_hash)
         .bind(torrent.info.source.clone())
         .bind(torrent.comment.clone())
+        .bind(torrent.creation_date)
+        .bind(torrent.created_by.clone())
+        .bind(torrent.encoding.clone())
         .execute(&mut *tx)
         .await
         .map(|v| i64::try_from(v.last_insert_id()).expect("last ID is larger than i64"))
