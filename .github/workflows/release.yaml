@@ -83,7 +83,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Download builds
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: torrust-index-backend
           path: torrust-index-backend
