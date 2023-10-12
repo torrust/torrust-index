@@ -22,7 +22,7 @@ jobs:
       - name: Wait for databases to start
         run: sleep 15s
         shell: bash
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Install torrent edition tool (needed for testing)
         run: cargo install imdl      
       - name: Run tests
