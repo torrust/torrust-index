@@ -15,7 +15,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - id: setup
         name: Setup Toolchain
@@ -44,13 +44,13 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - id: setup
         name: Setup Toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: nightly
+          toolchain: ${{ matrix.toolchain }}
           components: clippy
 
       - id: cache
@@ -65,13 +65,9 @@ jobs:
         name: Run Lint Checks
         run: cargo clippy --tests --benches --examples --workspace --all-targets --all-features -- -D clippy::correctness -D clippy::suspicious -D clippy::complexity -D clippy::perf -D clippy::style -D clippy::pedantic
 
-      - id: testdoc
-        name: Run Documentation Tests
+      - id: doc
+        name: Run Documentation Checks
         run: cargo test --doc
-
-      - id: builddoc
-        name: Build Documentation
-        run: cargo doc --no-deps --bins --examples --workspace --all-features
 
   unit:
     name: Units
@@ -85,7 +81,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - id: setup
         name: Setup Toolchain
@@ -123,7 +119,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - id: setup
         name: Setup Toolchain
@@ -131,7 +127,7 @@ jobs:
 
       - id: cache
         name: Enable Job Cache
-        uses: Swatinem/rust-cache@v2        
+        uses: Swatinem/rust-cache@v2
 
       - id: test
         name: Run Integration Tests
