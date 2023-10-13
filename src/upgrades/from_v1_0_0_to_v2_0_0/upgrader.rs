@@ -45,7 +45,7 @@
 //! and `avatar`. Empty string is used as default value.
 //!
 //!
-//! If you want more information about this command you can read the [issue 56](https://github.com/torrust/torrust-index-backend/issues/56).
+//! If you want more information about this command you can read the [issue 56](https://github.com/torrust/torrust-index/issues/56).
 use std::env;
 use std::time::SystemTime;
 

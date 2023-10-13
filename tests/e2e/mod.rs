@@ -23,7 +23,7 @@
 //!
 //! > **NOTICE**: Some tests require the real tracker to be running, so they
 //! can only be run in shared mode until we implement a mock for the
-//! `torrust_index_backend::tracker::TrackerService`.
+//! `torrust_index::tracker::TrackerService`.
 //!
 //! You may have errors like `Too many open files (os error 24)`. If so, you
 //! need to increase the limit of open files for the current user. You can do

@@ -3,7 +3,7 @@
 //! This context contains the API routes for the proxy service.
 //!
 //! The torrent descriptions can contain images. These images are proxied
-//! through the backend to:
+//! through the index to:
 //!
 //! - Prevent leaking the user's IP address.
 //! - Avoid storing images on the server.
@@ -23,12 +23,12 @@
 //!
 //! The PNG image:
 //!
-//! <https://raw.githubusercontent.com/torrust/torrust-index-backend/develop/docs/media/torrust_logo.png>
+//! <https://raw.githubusercontent.com/torrust/torrust-index/develop/docs/media/torrust_logo.png>
 //!
 //! The percent encoded image URL:
 //!
 //! ```text
-//! https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index-backend%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
+//! https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
 //! ```
 //!
 //! For unauthenticated clients:
@@ -38,7 +38,7 @@
 //!   --header "cache-control: no-cache" \
 //!   --header "pragma: no-cache" \
 //!   --output mandelbrotset.jpg \
-//!   http://0.0.0.0:3001/v1/proxy/image/https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index-backend%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
+//!   http://0.0.0.0:3001/v1/proxy/image/https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
 //! ```
 //!
 //! You will receive an image with the text "Sign in to see image" instead.
@@ -51,7 +51,7 @@
 //!   --header "cache-control: no-cache" \
 //!   --header "pragma: no-cache" \
 //!   --output mandelbrotset.jpg \
-//!   http://0.0.0.0:3001/v1/proxy/image/https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index-backend%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
+//!   http://0.0.0.0:3001/v1/proxy/image/https%3A%2F%2Fraw.githubusercontent.com%2Ftorrust%2Ftorrust-index%2Fdevelop%2Fdocs%2Fmedia%2Ftorrust_logo.png
 //! ```
 pub mod handlers;
 pub mod responses;

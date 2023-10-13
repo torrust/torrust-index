@@ -1,4 +1,4 @@
-//! The torrust Index Backend API version `v1`.
+//! The torrust Index API version `v1`.
 //!
 //! The API is organized in contexts.
 //!

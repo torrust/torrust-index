@@ -8,4 +8,4 @@ docker run -it \
     --publish 3001:3001/tcp \
     --env TORRUST_IDX_BACK_CONFIG="$TORRUST_IDX_BACK_CONFIG" \
     --volume "$(pwd)/storage":"/app/storage" \
-    torrust-index-backend
+    torrust-index

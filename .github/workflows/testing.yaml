@@ -65,9 +65,11 @@ jobs:
         name: Run Lint Checks
         run: cargo clippy --tests --benches --examples --workspace --all-targets --all-features -- -D clippy::correctness -D clippy::suspicious -D clippy::complexity -D clippy::perf -D clippy::style -D clippy::pedantic
 
-      - id: doc
-        name: Run Documentation Checks
-        run: cargo test --doc
+      - id: docs
+        name: Lint Documentation
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+        run: cargo doc --no-deps --bins --examples --workspace --all-features
 
   unit:
     name: Units
@@ -103,6 +105,10 @@ jobs:
       - id: imdl
         name: Install Intermodal
         run: cargo install imdl
+
+      - id: test-docs
+        name: Run Documentation Tests
+        run: cargo test --doc
 
       - id: test
         name: Run Unit Tests

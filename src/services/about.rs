@@ -15,11 +15,11 @@ pub fn page() -> String {
             <title>About</title>
         </head>
         <body style="margin-left: auto;margin-right: auto;max-width: 30em;">
-            <h1>Torrust Index Backend</h1>
+            <h1>Torrust Index</h1>
 
             <h2>About</h2>
 
-            <p>Hi! This is a running <a href="https://github.com/torrust/torrust-index-backend">torrust-index-backend</a>.</p>
+            <p>Hi! This is a running <a href="https://github.com/torrust/torrust-index">torrust-index</a>.</p>
         </body>
         <footer style="padding: 1.25em 0;border-top: dotted 1px;">
             <a href="/{API_VERSION_URL_PREFIX}/about/license">license</a>
@@ -38,7 +38,7 @@ pub fn license_page() -> String {
             <title>Licensing</title>
         </head>
         <body style="margin-left: auto;margin-right: auto;max-width: 30em;">
-            <h1>Torrust Index Backend</h1>
+            <h1>Torrust Index</h1>
 
             <h2>Licensing</h2>
 
@@ -48,11 +48,11 @@ pub fn license_page() -> String {
 
             <p>The two main applicable license to most of its content are:</p>
 
-            <p>- For Code -- <a href="https://github.com/torrust/torrust-index-backend/blob/main/licensing/agpl-3.0.md">agpl-3.0</a></p>
+            <p>- For Code -- <a href="https://github.com/torrust/torrust-index/blob/main/licensing/agpl-3.0.md">agpl-3.0</a></p>
 
-            <p>- For Media (Images, etc.) -- <a href="https://github.com/torrust/torrust-index-backend/blob/main/licensing/cc-by-sa.md">cc-by-sa</a></p>
+            <p>- For Media (Images, etc.) -- <a href="https://github.com/torrust/torrust-index/blob/main/licensing/cc-by-sa.md">cc-by-sa</a></p>
 
-            <p>If you want to read more about all the licenses and how they apply please refer to the <a href="https://github.com/torrust/torrust-index-backend/blob/develop/licensing/contributor_agreement_v01.md">contributor agreement</a>.</p>
+            <p>If you want to read more about all the licenses and how they apply please refer to the <a href="https://github.com/torrust/torrust-index/blob/develop/licensing/contributor_agreement_v01.md">contributor agreement</a>.</p>
         </body>
         <footer style="padding: 1.25em 0;border-top: dotted 1px;">
             <a href="/{API_VERSION_URL_PREFIX}/about">about</a>

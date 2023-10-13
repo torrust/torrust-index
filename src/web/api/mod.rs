@@ -1,4 +1,4 @@
-//! The Torrust Index Backend API.
+//! The Torrust Index API.
 //!
 //! Currently, the API has only one version: `v1`.
 //!

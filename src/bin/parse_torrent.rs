@@ -7,7 +7,7 @@ use std::io::{self, Read};
 
 use serde_bencode::de::from_bytes;
 use serde_bencode::value::Value as BValue;
-use torrust_index_backend::utils::parse_torrent;
+use torrust_index::utils::parse_torrent;
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();

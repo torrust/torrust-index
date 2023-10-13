@@ -1,9 +1,9 @@
-//! Documentation for [Torrust Tracker Index Backend](https://github.com/torrust/torrust-index-backend) API.
+//! Documentation for [Torrust Tracker Index](https://github.com/torrust/torrust-index) API.
 //!
-//! This is the backend API for [Torrust Tracker Index](https://github.com/torrust/torrust-index).
+//! This is the index API for [Torrust Tracker Index](https://github.com/torrust/torrust-index).
 //!
 //! It is written in Rust and uses the [Axum](https://github.com/tokio-rs/axum) framework. It is designed to be
-//! used with by the [Torrust Tracker Index Frontend](https://github.com/torrust/torrust-index-frontend).
+//! used with by the [Torrust Tracker Index Gui](https://github.com/torrust/torrust-index-gui).
 //!
 //! If you are looking for information on how to use the API, please see the
 //! [API v1](crate::web::api::v1) section of the documentation.
@@ -39,7 +39,7 @@
 //!
 //! - A REST [API](crate::web::api::v1)
 //!
-//! From the administrator perspective, the Torrust Index Backend exposes:
+//! From the administrator perspective, the Torrust Index exposes:
 //!
 //! - A console command to update torrents statistics from the associated tracker
 //! - A console command to upgrade the database schema from version `1.0.0` to `2.0.0`
@@ -52,8 +52,8 @@
 //!
 //! ## Prerequisites
 //!
-//! In order the run the backend you will need a running torrust tracker. In the
-//! configuration you need to fill the `backend` section with the following:
+//! In order the run the index you will need a running torrust tracker. In the
+//! configuration you need to fill the `index` section with the following:
 //!
 //! ```toml
 //! [tracker]
@@ -67,7 +67,7 @@
 //! Refer to the [`config::tracker`](crate::config::Tracker) documentation for more information.
 //!
 //! You can follow the tracker installation instructions [here](https://docs.rs/torrust-tracker)
-//! or you can use the docker to run both the tracker and the backend. Refer to the
+//! or you can use the docker to run both the tracker and the index. Refer to the
 //! [Run with docker](#run-with-docker) section for more information.
 //!
 //! If you are using `SQLite3` as database driver, you will need to install the
@@ -91,13 +91,13 @@
 //!
 //! The default configuration expects a directory `./storage/database` to be writable by the app process.
 //!
-//! By default the backend uses `SQLite` and the database file name `data.db`.
+//! By default the index uses `SQLite` and the database file name `data.db`.
 //!
 //! ## Install from sources
 //!
 //! ```text
-//! git clone git@github.com:torrust/torrust-index-backend.git \
-//!   && cd torrust-index-backend \
+//! git clone git@github.com:torrust/torrust-index.git \
+//!   && cd torrust-index \
 //!   && cargo build --release \
 //!   && mkdir -p ./storage/database
 //! ```
@@ -106,7 +106,7 @@
 //!
 //! ## Run with docker
 //!
-//! You can run the backend with a pre-built docker image:
+//! You can run the index with a pre-built docker image:
 //!
 //! ```text
 //! mkdir -p ./storage/database \
@@ -115,10 +115,10 @@
 //!     --user="$TORRUST_IDX_BACK_USER_UID" \
 //!     --publish 3001:3001/tcp \
 //!     --volume "$(pwd)/storage":"/app/storage" \
-//!     torrust/index-backend
+//!     torrust/index
 //! ```
 //!
-//! For more information about using docker visit the [tracker docker documentation](https://github.com/torrust/torrust-index-backend/tree/develop/docker).
+//! For more information about using docker visit the [tracker docker documentation](https://github.com/torrust/torrust-index/tree/develop/docker).
 //!
 //! ## Development
 //!
@@ -146,10 +146,10 @@
 //! > **NOTICE**: Refer to the [sqlx-cli](https://github.com/launchbadge/sqlx/tree/main/sqlx-cli)
 //! documentation for other commands to create new migrations or run them.
 //!
-//! > **NOTICE**: You can run the backend with [tmux](https://github.com/tmux/tmux/wiki) with `tmux new -s torrust-index-backend`.
+//! > **NOTICE**: You can run the index with [tmux](https://github.com/tmux/tmux/wiki) with `tmux new -s torrust-index`.
 //!
 //! # Configuration
-//! In order to run the backend you need to provide the configuration. If you run the backend without providing the configuration,
+//! In order to run the index you need to provide the configuration. If you run the index without providing the configuration,
 //! the tracker will generate the default configuration the first time you run it. It will generate a `config.toml` file with
 //! in the root directory.
 //!
@@ -213,7 +213,7 @@
 //!
 //! In the previous example you are just setting the env var with the contents of the `config.toml` file.
 //!
-//! The env var contains the same data as the `config.toml`. It's particularly useful in you are [running the backend with docker](https://github.com/torrust/torrust-index-backend/tree/develop/docker).
+//! The env var contains the same data as the `config.toml`. It's particularly useful in you are [running the index with docker](https://github.com/torrust/torrust-index/tree/develop/docker).
 //!
 //! > **NOTICE**: The `TORRUST_IDX_BACK_CONFIG` env var has priority over the `config.toml` file.
 //!
@@ -223,7 +223,7 @@
 //!
 //! ## API
 //!
-//! Running the backend with the default configuration will expose the REST API on port 3001: <http://localhost:3001>
+//! Running the index with the default configuration will expose the REST API on port 3001: <http://localhost:3001>
 //!
 //! ## Tracker Statistics Importer
 //!
@@ -244,18 +244,18 @@
 //!
 //! If you want to contribute to this documentation you can:
 //!
-//! - [Open a new discussion](https://github.com/torrust/torrust-index-backend/discussions)
-//! - [Open a new issue](https://github.com/torrust/torrust-index-backend/issues).
-//! - [Open a new pull request](https://github.com/torrust/torrust-index-backend/pulls).
+//! - [Open a new discussion](https://github.com/torrust/torrust-index/discussions)
+//! - [Open a new issue](https://github.com/torrust/torrust-index/issues).
+//! - [Open a new pull request](https://github.com/torrust/torrust-index/pulls).
 //!
 //! # Documentation
 //!
-//! You can find this documentation on [docs.rs](https://docs.rs/torrust-index-backend/).
+//! You can find this documentation on [docs.rs](https://docs.rs/torrust-index/).
 //!
-//! If you want to contribute to this documentation you can [open a new pull request](https://github.com/torrust/torrust-index-backend/pulls).
+//! If you want to contribute to this documentation you can [open a new pull request](https://github.com/torrust/torrust-index/pulls).
 //!
 //! In addition to the production code documentation you can find a lot of
-//! examples in the [tests](https://github.com/torrust/torrust-index-backend/tree/develop/tests/e2e/contexts) directory.
+//! examples in the [tests](https://github.com/torrust/torrust-index/tree/develop/tests/e2e/contexts) directory.
 pub mod app;
 pub mod bootstrap;
 pub mod cache;

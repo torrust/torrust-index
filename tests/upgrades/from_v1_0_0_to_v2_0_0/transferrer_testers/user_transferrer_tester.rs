@@ -3,7 +3,7 @@ use std::sync::Arc;
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
 use rand_core::OsRng;
-use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::UserRecordV1;
+use torrust_index::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::UserRecordV1;
 
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;

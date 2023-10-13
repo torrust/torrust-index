@@ -4,7 +4,7 @@
 //! All environment variables are prefixed with `TORRUST_IDX_BACK_E2E`.
 use std::env;
 
-use torrust_index_backend::config::Configuration;
+use torrust_index::config::Configuration;
 
 // Environment variables
 

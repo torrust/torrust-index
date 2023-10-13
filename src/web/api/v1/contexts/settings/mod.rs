@@ -81,7 +81,7 @@
 //! ```
 //! **Resource**
 //!
-//! Refer to the [`TorrustBackend`](crate::config::TorrustBackend)
+//! Refer to the [`TorrustIndex`](crate::config::TorrustIndex)
 //! struct for more information about the response attributes.
 //!
 //! # Update all settings
@@ -89,7 +89,7 @@
 //! **NOTICE**: This endpoint to update the settings does not work when you use
 //! environment variables to configure the application. You need to use a
 //! configuration file instead. Because settings are persisted in that file.
-//! Refer to the issue [#144](https://github.com/torrust/torrust-index-backend/issues/144)
+//! Refer to the issue [#144](https://github.com/torrust/torrust-index/issues/144)
 //! for more information.
 //!
 //! `POST /v1/settings`
@@ -109,7 +109,7 @@
 //!
 //! **Resource**
 //!
-//! Refer to the [`TorrustBackend`](crate::config::TorrustBackend)
+//! Refer to the [`TorrustIndex`](crate::config::TorrustIndex)
 //! struct for more information about the response attributes.
 //!
 //! # Get site name

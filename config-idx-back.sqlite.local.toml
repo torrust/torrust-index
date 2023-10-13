@@ -20,7 +20,7 @@ max_password_length = 64
 secret_key = "MaxVerstappenWC2021"
 
 [database]
-connect_url = "sqlite://storage/database/torrust_index_backend_e2e_testing.db?mode=rwc"
+connect_url = "sqlite://storage/database/torrust_index_e2e_testing.db?mode=rwc"
 
 [mail]
 email_verification_enabled = false

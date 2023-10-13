@@ -15,7 +15,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::upgrader::{datetime_iso_8601, upgrade, Arguments};
+use torrust_index::upgrades::from_v1_0_0_to_v2_0_0::upgrader::{datetime_iso_8601, upgrade, Arguments};
 
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;

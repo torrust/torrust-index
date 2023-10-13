@@ -1,7 +1,7 @@
 use tempfile::TempDir;
-use torrust_index_backend::config;
-use torrust_index_backend::config::FREE_PORT;
-use torrust_index_backend::web::api::Version;
+use torrust_index::config;
+use torrust_index::config::FREE_PORT;
+use torrust_index::web::api::Version;
 
 use super::app_starter::AppStarter;
 use crate::common::random;
@@ -50,7 +50,7 @@ impl TestEnv {
 
     /// Provides the whole server configuration.
     #[must_use]
-    pub fn server_configuration(&self) -> config::TorrustBackend {
+    pub fn server_configuration(&self) -> config::TorrustIndex {
         self.app_starter.server_configuration()
     }
 
@@ -73,10 +73,10 @@ impl Default for TestEnv {
 }
 
 /// Provides a configuration with ephemeral data for testing.
-fn ephemeral(temp_dir: &TempDir) -> config::TorrustBackend {
-    let mut configuration = config::TorrustBackend {
+fn ephemeral(temp_dir: &TempDir) -> config::TorrustIndex {
+    let mut configuration = config::TorrustIndex {
         log_level: Some("off".to_owned()), // Change to `debug` for tests debugging
-        ..config::TorrustBackend::default()
+        ..config::TorrustIndex::default()
     };
 
     // Ephemeral API port
