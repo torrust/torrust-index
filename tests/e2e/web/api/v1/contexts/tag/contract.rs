@@ -1,6 +1,6 @@
 //! API contract for `tag` context.
 
-use torrust_index_backend::web::api;
+use torrust_index::web::api;
 
 use crate::common::asserts::assert_json_ok_response;
 use crate::common::client::Client;

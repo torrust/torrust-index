@@ -254,9 +254,9 @@ impl Default for ImageCache {
     }
 }
 
-/// The whole configuration for the backend.
+/// The whole configuration for the index.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct TorrustBackend {
+pub struct TorrustIndex {
     /// Logging level. Possible values are: `Off`, `Error`, `Warn`, `Info`,
     /// `Debug` and `Trace`. Default is `Info`.
     pub log_level: Option<String>,
@@ -284,7 +284,7 @@ pub struct TorrustBackend {
 #[derive(Debug)]
 pub struct Configuration {
     /// The state of the configuration.
-    pub settings: RwLock<TorrustBackend>,
+    pub settings: RwLock<TorrustIndex>,
     /// The path to the configuration file. This is `None` if the configuration
     /// was loaded from the environment.
     pub config_path: Option<String>,
@@ -293,7 +293,7 @@ pub struct Configuration {
 impl Default for Configuration {
     fn default() -> Configuration {
         Configuration {
-            settings: RwLock::new(TorrustBackend::default()),
+            settings: RwLock::new(TorrustIndex::default()),
             config_path: None,
         }
     }
@@ -325,7 +325,7 @@ impl Configuration {
             )));
         }
 
-        let torrust_config: TorrustBackend = match config.try_deserialize() {
+        let torrust_config: TorrustIndex = match config.try_deserialize() {
             Ok(data) => Ok(data),
             Err(e) => Err(ConfigError::Message(format!("Errors while processing config: {e}."))),
         }?;
@@ -349,7 +349,7 @@ impl Configuration {
                 let config_builder = Config::builder()
                     .add_source(File::from_str(&config_toml, FileFormat::Toml))
                     .build()?;
-                let torrust_config: TorrustBackend = config_builder.try_deserialize()?;
+                let torrust_config: TorrustIndex = config_builder.try_deserialize()?;
                 Ok(Configuration {
                     settings: RwLock::new(torrust_config),
                     config_path: None,
@@ -376,7 +376,7 @@ impl Configuration {
         fs::write(config_path, toml_string).expect("Could not write to file!");
     }
 
-    pub async fn get_all(&self) -> TorrustBackend {
+    pub async fn get_all(&self) -> TorrustIndex {
         let settings_lock = self.settings.read().await;
 
         settings_lock.clone()
@@ -406,7 +406,7 @@ impl Configuration {
     }
 }
 
-/// The public backend configuration.
+/// The public index configuration.
 /// There is an endpoint to get this configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigurationPublic {

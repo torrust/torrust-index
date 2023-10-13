@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{query_as, SqlitePool};
-use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::TorrentRecordV2;
+use torrust_index::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::TorrentRecordV2;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct CategoryRecordV2 {

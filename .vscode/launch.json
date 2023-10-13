@@ -7,16 +7,16 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug unit tests in library 'torrust-index-backend'",
+            "name": "Debug unit tests in library 'torrust-index'",
             "cargo": {
                 "args": [
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=torrust-index-backend"
+                    "--package=torrust-index"
                 ],
                 "filter": {
-                    "name": "torrust-index-backend",
+                    "name": "torrust-index",
                     "kind": "lib"
                 }
             },
@@ -31,7 +31,7 @@
                 "args": [
                     "build",
                     "--bin=main",
-                    "--package=torrust-index-backend"
+                    "--package=torrust-index"
                 ],
                 "filter": {
                     "name": "main",
@@ -50,7 +50,7 @@
                     "test",
                     "--no-run",
                     "--bin=main",
-                    "--package=torrust-index-backend"
+                    "--package=torrust-index"
                 ],
                 "filter": {
                     "name": "main",
@@ -68,7 +68,7 @@
                 "args": [
                     "build",
                     "--bin=import_tracker_statistics",
-                    "--package=torrust-index-backend"
+                    "--package=torrust-index"
                 ],
                 "filter": {
                     "name": "import_tracker_statistics",
@@ -87,7 +87,7 @@
                     "test",
                     "--no-run",
                     "--bin=import_tracker_statistics",
-                    "--package=torrust-index-backend"
+                    "--package=torrust-index"
                 ],
                 "filter": {
                     "name": "import_tracker_statistics",
@@ -105,7 +105,7 @@
                 "args": [
                     "build",
                     "--bin=parse_torrent",
-                    "--package=torrust-index-backend"
+                    "--package=torrust-index"
                 ],
                 "filter": {
                     "name": "parse_torrent",
@@ -124,7 +124,7 @@
                     "test",
                     "--no-run",
                     "--bin=parse_torrent",
-                    "--package=torrust-index-backend"
+                    "--package=torrust-index"
                 ],
                 "filter": {
                     "name": "parse_torrent",
@@ -142,7 +142,7 @@
                 "args": [
                     "build",
                     "--bin=upgrade",
-                    "--package=torrust-index-backend"
+                    "--package=torrust-index"
                 ],
                 "filter": {
                     "name": "upgrade",
@@ -161,7 +161,7 @@
                     "test",
                     "--no-run",
                     "--bin=upgrade",
-                    "--package=torrust-index-backend"
+                    "--package=torrust-index"
                 ],
                 "filter": {
                     "name": "upgrade",
@@ -180,7 +180,7 @@
                     "test",
                     "--no-run",
                     "--test=mod",
-                    "--package=torrust-index-backend"
+                    "--package=torrust-index"
                 ],
                 "filter": {
                     "name": "mod",

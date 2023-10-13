@@ -35,12 +35,12 @@ docker run -it \
     --user="$TORRUST_IDX_BACK_USER_UID" \
     --publish 3001:3001/tcp \
     --volume "$(pwd)/storage":"/app/storage" \
-    torrust/index-backend
+    torrust/index
 ```
 
 > NOTES:
 >
-> - You have to create the SQLite DB (`data.db`) and configuration (`config.toml`) before running the index backend. See `bin/install.sh`.
+> - You have to create the SQLite DB (`data.db`) and configuration (`config.toml`) before running the index. See `bin/install.sh`.
 > - You have to replace the user UID (`1000`) with yours.
 > - Remember to switch to your default docker context `docker context use default`.
 
@@ -55,7 +55,7 @@ connect_url = "sqlite://storage/database/data.db?mode=rwc"
 to:
 
 ```toml
-connect_url = "mysql://root:root_secret_password@mysql:3306/torrust_index_backend"
+connect_url = "mysql://root:root_secret_password@mysql:3306/torrust_index"
 ```
 
 If you want to inject an environment variable into docker-compose you can use the file `.env`. There is a template `.env.local`.
@@ -148,7 +148,7 @@ mysql> show databases;
 | mysql                 |
 | performance_schema    |
 | sys                   |
-| torrust_index_backend |
+| torrust_index |
 | torrust_tracker       |
 +-----------------------+
 6 rows in set (0,00 sec)

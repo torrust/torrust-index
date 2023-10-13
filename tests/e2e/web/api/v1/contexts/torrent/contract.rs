@@ -16,8 +16,8 @@ Get torrent info:
 
 mod for_guests {
 
-    use torrust_index_backend::utils::parse_torrent::decode_torrent;
-    use torrust_index_backend::web::api;
+    use torrust_index::utils::parse_torrent::decode_torrent;
+    use torrust_index::web::api;
     use uuid::Uuid;
 
     use crate::common::client::Client;
@@ -266,8 +266,8 @@ mod for_guests {
 
     mod it_should_allow_guests_to_download_a_torrent_file_searching_by_info_hash {
 
-        use torrust_index_backend::utils::parse_torrent::{calculate_info_hash, decode_torrent};
-        use torrust_index_backend::web::api;
+        use torrust_index::utils::parse_torrent::{calculate_info_hash, decode_torrent};
+        use torrust_index::web::api;
 
         use crate::common::client::Client;
         use crate::e2e::environment::TestEnv;
@@ -470,8 +470,8 @@ mod for_guests {
 
 mod for_authenticated_users {
 
-    use torrust_index_backend::utils::parse_torrent::decode_torrent;
-    use torrust_index_backend::web::api;
+    use torrust_index::utils::parse_torrent::decode_torrent;
+    use torrust_index::web::api;
 
     use crate::common::client::Client;
     use crate::e2e::environment::TestEnv;
@@ -481,7 +481,7 @@ mod for_authenticated_users {
 
     mod uploading_a_torrent {
 
-        use torrust_index_backend::web::api;
+        use torrust_index::web::api;
         use uuid::Uuid;
 
         use crate::common::asserts::assert_json_error_response;
@@ -522,7 +522,7 @@ mod for_authenticated_users {
         }
 
         mod it_should_guard_that_torrent_metadata {
-            use torrust_index_backend::web::api;
+            use torrust_index::web::api;
 
             use crate::common::client::Client;
             use crate::common::contexts::torrent::fixtures::random_torrent;
@@ -590,7 +590,7 @@ mod for_authenticated_users {
 
         mod it_should_guard_that_the_torrent_file {
 
-            use torrust_index_backend::web::api;
+            use torrust_index::web::api;
 
             use crate::common::client::Client;
             use crate::common::contexts::torrent::fixtures::random_torrent;
@@ -814,7 +814,7 @@ mod for_authenticated_users {
 
     mod and_non_admins {
 
-        use torrust_index_backend::web::api;
+        use torrust_index::web::api;
 
         use crate::common::client::Client;
         use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
@@ -881,7 +881,7 @@ mod for_authenticated_users {
 
     mod and_torrent_owners {
 
-        use torrust_index_backend::web::api;
+        use torrust_index::web::api;
 
         use crate::common::client::Client;
         use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
@@ -932,7 +932,7 @@ mod for_authenticated_users {
 
     mod and_admins {
 
-        use torrust_index_backend::web::api;
+        use torrust_index::web::api;
 
         use crate::common::client::Client;
         use crate::common::contexts::torrent::forms::UpdateTorrentFrom;

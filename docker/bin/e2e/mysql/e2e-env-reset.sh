@@ -4,15 +4,15 @@
 
 docker compose down
 
-# Index Backend
+# Index
 
 # Database credentials
 MYSQL_USER="root"
 MYSQL_PASSWORD="root_secret_password"
 MYSQL_HOST="localhost"
-MYSQL_DATABASE="torrust_index_backend_e2e_testing"
+MYSQL_DATABASE="torrust_index_e2e_testing"
 
-# Create the MySQL database for the index backend. Assumes MySQL client is installed.
+# Create the MySQL database for the index. Assumes MySQL client is installed.
 echo "Creating MySQL database $MYSQL_DATABASE for E2E testing ..."
 mysql -h $MYSQL_HOST -u $MYSQL_USER -p$MYSQL_PASSWORD -e "DROP DATABASE IF EXISTS $MYSQL_DATABASE; CREATE DATABASE $MYSQL_DATABASE;"
 

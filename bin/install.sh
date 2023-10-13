@@ -8,7 +8,7 @@ fi
 # Generate storage directory if it does not exist
 mkdir -p "./storage/database"
 
-# Generate the sqlite database for the index backend if it does not exist
+# Generate the sqlite database for the index if it does not exist
 if ! [ -f "./storage/database/data.db" ]; then
     sqlite3 ./storage/database/data.db "VACUUM;"
 fi

@@ -69,11 +69,11 @@
 //! ```
 //!
 //! **NOTICE**: Info-hashes will be lowercase hex-encoded strings in the future
-//! and the [internal database ID could be removed from the response](https://github.com/torrust/torrust-index-backend/discussions/149).
+//! and the [internal database ID could be removed from the response](https://github.com/torrust/torrust-index/discussions/149).
 //!
 //! **Resource**
 //!
-//! Refer to the [`TorrustBackend`](crate::models::response::NewTorrentResponse)
+//! Refer to the [`TorrustIndex`](crate::models::response::NewTorrentResponse)
 //! struct for more information about the response attributes.
 //!
 //! # Download a torrent

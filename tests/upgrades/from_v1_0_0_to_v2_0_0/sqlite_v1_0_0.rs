@@ -4,7 +4,7 @@ use std::fs;
 
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::{query, SqlitePool};
-use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::{
+use torrust_index::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::{
     CategoryRecordV1, TorrentRecordV1, TrackerKeyRecordV1, UserRecordV1,
 };
 

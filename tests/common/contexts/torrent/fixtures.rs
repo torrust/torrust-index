@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use tempfile::{tempdir, TempDir};
-use torrust_index_backend::services::hasher::sha1;
-use torrust_index_backend::utils::hex::into_bytes;
+use torrust_index::services::hasher::sha1;
+use torrust_index::utils::hex::into_bytes;
 use uuid::Uuid;
 
 use super::file::{create_torrent, parse_torrent, TorrentFileInfo};

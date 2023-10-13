@@ -156,6 +156,6 @@ pub async fn ban_handler(
 /// It returns the base API URL without the port. For example: `http://localhost`.
 fn api_base_url(host: &str) -> String {
     // HTTPS is not supported yet.
-    // See https://github.com/torrust/torrust-index-backend/issues/131
+    // See https://github.com/torrust/torrust-index/issues/131
     format!("http://{host}")
 }

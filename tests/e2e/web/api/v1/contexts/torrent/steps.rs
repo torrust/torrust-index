@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
-use torrust_index_backend::models::info_hash::InfoHash;
-use torrust_index_backend::web::api::v1::responses::ErrorResponseData;
+use torrust_index::models::info_hash::InfoHash;
+use torrust_index::web::api::v1::responses::ErrorResponseData;
 
 use crate::common::client::Client;
 use crate::common::contexts::torrent::fixtures::{random_torrent, TestTorrent, TorrentIndexInfo, TorrentListedInIndex};

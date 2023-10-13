@@ -1,7 +1,7 @@
 use std::env;
 
-use torrust_index_backend::databases::database;
-use torrust_index_backend::web::api::Version;
+use torrust_index::databases::database;
+use torrust_index::web::api::Version;
 
 use super::config::{init_shared_env_configuration, ENV_VAR_E2E_SHARED};
 use crate::common::contexts::settings::Settings;
@@ -98,7 +98,7 @@ impl TestEnv {
 
     /// Provides a database connect URL to connect to the database. For example:
     ///
-    /// `sqlite://storage/database/torrust_index_backend_e2e_testing.db?mode=rwc`.
+    /// `sqlite://storage/database/torrust_index_e2e_testing.db?mode=rwc`.
     ///
     /// It's used to run SQL queries against the database needed for some tests.
     pub fn database_connect_url(&self) -> Option<String> {
@@ -131,13 +131,13 @@ impl TestEnv {
     ///
     /// For:
     ///
-    /// `mysql://root:root_secret_password@mysql:3306/torrust_index_backend_e2e_testing`.
+    /// `mysql://root:root_secret_password@mysql:3306/torrust_index_e2e_testing`.
     ///
     /// It changes the `mysql` host name to `localhost`:
     ///
-    /// `mysql://root:root_secret_password@localhost:3306/torrust_index_backend_e2e_testing`.
+    /// `mysql://root:root_secret_password@localhost:3306/torrust_index_e2e_testing`.
     ///
-    /// For E2E tests, we use docker compose, internally the backend connects to
+    /// For E2E tests, we use docker compose, internally the index connects to
     /// the database using the "mysql" host, which is the docker compose service
     /// name, but tests connects directly to the localhost since the `MySQL`
     /// is exposed to the host.

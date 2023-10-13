@@ -46,7 +46,7 @@ impl StatisticsImporter {
             // This is the log when the torrent is not found in the tracker:
             //
             // ```
-            // 2023-05-09T13:31:24.497465723+00:00 [torrust_index_backend::tracker::statistics_importer][ERROR] Error updating torrent tracker stats for torrent with id 140: TorrentNotFound
+            // 2023-05-09T13:31:24.497465723+00:00 [torrust_index::tracker::statistics_importer][ERROR] Error updating torrent tracker stats for torrent with id 140: TorrentNotFound
             // ```
 
             if let Some(err) = ret.err() {

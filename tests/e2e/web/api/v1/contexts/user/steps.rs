@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use torrust_index_backend::databases::database;
+use torrust_index::databases::database;
 
 use crate::common::client::Client;
 use crate::common::contexts::user::fixtures::random_user_registration_form;

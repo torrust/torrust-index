@@ -150,7 +150,7 @@
 //!  }
 //! ```
 //!
-//! Refer to the struct [`TorrentInfo`](crate::models::torrent_file::TorrentInfo) for more info.
+//! Refer to the struct [`TorrentInfoDictionary`](crate::models::torrent_file::TorrentInfoDictionary) for more info.
 //!
 //! Regarding the `source` field, it is not clear was was the initial intention
 //! for that field. It could be an string to identify the source of the torrent.

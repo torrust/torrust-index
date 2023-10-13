@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use torrust_index_backend::models::torrent_file::Torrent;
-use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::{TorrentRecordV1, UserRecordV1};
-use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::convert_timestamp_to_datetime;
-use torrust_index_backend::upgrades::from_v1_0_0_to_v2_0_0::transferrers::torrent_transferrer::read_torrent_from_file;
+use torrust_index::models::torrent_file::Torrent;
+use torrust_index::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::{TorrentRecordV1, UserRecordV1};
+use torrust_index::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::convert_timestamp_to_datetime;
+use torrust_index::upgrades::from_v1_0_0_to_v2_0_0::transferrers::torrent_transferrer::read_torrent_from_file;
 
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v2_0_0::SqliteDatabaseV2_0_0;

@@ -1,4 +1,4 @@
-use torrust_index_backend::models::torrent_tag::TagId;
+use torrust_index::models::torrent_tag::TagId;
 
 use crate::common::asserts::assert_json_ok_response;
 use crate::common::contexts::tag::responses::{AddedTagResponse, DeletedTagResponse};

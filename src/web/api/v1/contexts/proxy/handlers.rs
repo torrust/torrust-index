@@ -26,7 +26,7 @@ pub async fn get_proxy_image_handler(
         return png_image(map_error_to_image(&Error::Unauthenticated));
     };
 
-    // code-review: Handling status codes in the frontend other tan OK is quite a pain.
+    // code-review: Handling status codes in the index-gui other tan OK is quite a pain.
     // Return OK for now.
 
     // todo: it also work for other image types but we are always returning the

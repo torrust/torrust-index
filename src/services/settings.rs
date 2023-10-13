@@ -2,7 +2,7 @@
 use std::sync::Arc;
 
 use super::user::DbUserRepository;
-use crate::config::{Configuration, ConfigurationPublic, TorrustBackend};
+use crate::config::{Configuration, ConfigurationPublic, TorrustIndex};
 use crate::errors::ServiceError;
 use crate::models::user::UserId;
 
@@ -25,7 +25,7 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if the user does not have the required permissions.
-    pub async fn get_all(&self, user_id: &UserId) -> Result<TorrustBackend, ServiceError> {
+    pub async fn get_all(&self, user_id: &UserId) -> Result<TorrustIndex, ServiceError> {
         let user = self.user_repository.get_compact(user_id).await?;
 
         // Check if user is administrator

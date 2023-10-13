@@ -1,6 +1,6 @@
 //! API contract for `root` context.
 
-use torrust_index_backend::web::api;
+use torrust_index::web::api;
 
 use crate::common::asserts::{assert_response_title, assert_text_ok};
 use crate::common::client::Client;

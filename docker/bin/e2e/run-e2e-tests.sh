@@ -51,7 +51,7 @@ echo "Running E2E tests using SQLite ..."
 ./docker/bin/e2e/sqlite/e2e-env-up.sh || exit 1
 
 wait_for_container_to_be_healthy torrust-mysql-1 10 3
-# todo: implement healthchecks for tracker and backend and wait until they are healthy
+# todo: implement healthchecks for tracker and index and wait until they are healthy
 #wait_for_container torrust-tracker-1 10 3
 #wait_for_container torrust-idx-back-1 10 3
 sleep 20s
@@ -72,7 +72,7 @@ echo "Running E2E tests using MySQL ..."
 ./docker/bin/e2e/mysql/e2e-env-up.sh || exit 1
 
 wait_for_container_to_be_healthy torrust-mysql-1 10 3
-# todo: implement healthchecks for tracker and backend and wait until they are healthy
+# todo: implement healthchecks for tracker and index and wait until they are healthy
 #wait_for_container torrust-tracker-1 10 3
 #wait_for_container torrust-idx-back-1 10 3
 sleep 20s
@@ -84,9 +84,9 @@ docker ps
 MYSQL_USER="root"
 MYSQL_PASSWORD="root_secret_password"
 MYSQL_HOST="localhost"
-MYSQL_DATABASE="torrust_index_backend_e2e_testing"
+MYSQL_DATABASE="torrust_index_e2e_testing"
 
-# Create the MySQL database for the index backend. Assumes MySQL client is installed.
+# Create the MySQL database for the index. Assumes MySQL client is installed.
 echo "Creating MySQL database $MYSQL_DATABASE for for E2E testing ..."
 mysql -h $MYSQL_HOST -u $MYSQL_USER -p$MYSQL_PASSWORD -e "CREATE DATABASE IF NOT EXISTS $MYSQL_DATABASE;"
 

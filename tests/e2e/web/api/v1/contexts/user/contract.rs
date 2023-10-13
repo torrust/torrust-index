@@ -28,7 +28,7 @@ the mailcatcher API.
 
 mod registration {
 
-    use torrust_index_backend::web::api;
+    use torrust_index::web::api;
 
     use crate::common::client::Client;
     use crate::common::contexts::user::asserts::assert_added_user_response;
@@ -52,7 +52,7 @@ mod registration {
 
 mod authentication {
 
-    use torrust_index_backend::web::api;
+    use torrust_index::web::api;
 
     use crate::common::client::Client;
     use crate::common::contexts::user::asserts::{
@@ -120,7 +120,7 @@ mod authentication {
 
 mod banned_user_list {
 
-    use torrust_index_backend::web::api;
+    use torrust_index::web::api;
 
     use crate::common::client::Client;
     use crate::common::contexts::user::asserts::assert_banned_user_response;
