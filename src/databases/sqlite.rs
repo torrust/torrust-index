@@ -32,8 +32,8 @@ impl Database for Sqlite {
     }
 
     async fn new(database_url: &str) -> Self {
-        let mut connection_options = SqliteConnectOptions::from_str(database_url).expect("Unable to create connection options.");
-        connection_options
+        let connection_options = SqliteConnectOptions::from_str(database_url)
+            .expect("Unable to create connection options.")
             .log_statements(log::LevelFilter::Error)
             .log_slow_statements(log::LevelFilter::Warn, Duration::from_secs(1));
 
@@ -60,7 +60,7 @@ impl Database for Sqlite {
         // create the user account and get the user id
         let user_id =
             query("INSERT INTO torrust_users (date_registered) VALUES (strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')))")
-                .execute(&mut tx)
+                .execute(&mut *tx)
                 .await
                 .map(|v| v.last_insert_rowid())
                 .map_err(|_| database::Error::Error)?;
@@ -69,7 +69,7 @@ impl Database for Sqlite {
         let insert_user_auth_result = query("INSERT INTO torrust_user_authentication (user_id, password_hash) VALUES (?, ?)")
             .bind(user_id)
             .bind(password_hash)
-            .execute(&mut tx)
+            .execute(&mut *tx)
             .await
             .map_err(|_| database::Error::Error);
 
@@ -84,7 +84,7 @@ impl Database for Sqlite {
             .bind(user_id)
             .bind(username)
             .bind(email)
-            .execute(&mut tx)
+            .execute(&mut *tx)
             .await
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
@@ -469,7 +469,7 @@ impl Database for Sqlite {
         .bind(root_hash)
         .bind(torrent.info.source.clone())
         .bind(torrent.comment.clone())
-        .execute(&mut tx)
+        .execute(&mut *tx)
         .await
         .map(|v| v.last_insert_rowid())
         .map_err(|e| match e {
@@ -491,7 +491,7 @@ impl Database for Sqlite {
                 .bind(original_info_hash.to_hex_string())
                 .bind(canonical_info_hash.to_hex_string())
                 .bind(true)
-                .execute(&mut tx)
+                .execute(&mut *tx)
                 .await
                 .map(|_| ())
                 .map_err(|err| {
@@ -510,7 +510,7 @@ impl Database for Sqlite {
                 .bind(torrent.info.md5sum.clone())
                 .bind(torrent_id)
                 .bind(length)
-                .execute(&mut tx)
+                .execute(&mut *tx)
                 .await
                 .map(|_| ())
                 .map_err(|_| database::Error::Error)
@@ -525,7 +525,7 @@ impl Database for Sqlite {
                     .bind(torrent_id)
                     .bind(file.length)
                     .bind(path)
-                    .execute(&mut tx)
+                    .execute(&mut *tx)
                     .await
                     .map_err(|_| database::Error::Error)?;
             }
@@ -548,7 +548,7 @@ impl Database for Sqlite {
                 let () = query("INSERT INTO torrust_torrent_announce_urls (torrent_id, tracker_url) VALUES (?, ?)")
                     .bind(torrent_id)
                     .bind(tracker_url)
-                    .execute(&mut tx)
+                    .execute(&mut *tx)
                     .await
                     .map(|_| ())
                     .map_err(|_| database::Error::Error)?;
@@ -561,7 +561,7 @@ impl Database for Sqlite {
             query("INSERT INTO torrust_torrent_announce_urls (torrent_id, tracker_url) VALUES (?, ?)")
                 .bind(torrent_id)
                 .bind(tracker_url)
-                .execute(&mut tx)
+                .execute(&mut *tx)
                 .await
                 .map(|_| ())
                 .map_err(|_| database::Error::Error)
@@ -579,7 +579,7 @@ impl Database for Sqlite {
             let insert_torrent_tag_result = query("INSERT INTO torrust_torrent_tag_links (torrent_id, tag_id) VALUES (?, ?)")
                 .bind(torrent_id)
                 .bind(tag_id)
-                .execute(&mut tx)
+                .execute(&mut *tx)
                 .await
                 .map_err(|err| database::Error::ErrorWithText(err.to_string()));
 
@@ -595,7 +595,7 @@ impl Database for Sqlite {
                 .bind(torrent_id)
                 .bind(metadata.title.clone())
                 .bind(metadata.description.clone())
-                .execute(&mut tx)
+                .execute(&mut *tx)
                 .await
                 .map_err(|e| match e {
                     sqlx::Error::Database(err) => {
@@ -889,7 +889,7 @@ impl Database for Sqlite {
     }
 
     async fn add_torrent_tag_links(&self, torrent_id: i64, tag_ids: &[TagId]) -> Result<(), database::Error> {
-        let mut transaction = self
+        let mut tx = self
             .pool
             .begin()
             .await
@@ -899,13 +899,12 @@ impl Database for Sqlite {
             query("INSERT INTO torrust_torrent_tag_links (torrent_id, tag_id) VALUES (?, ?)")
                 .bind(torrent_id)
                 .bind(tag_id)
-                .execute(&mut transaction)
+                .execute(&mut *tx)
                 .await
                 .map_err(|err| database::Error::ErrorWithText(err.to_string()))?;
         }
 
-        transaction
-            .commit()
+        tx.commit()
             .await
             .map_err(|err| database::Error::ErrorWithText(err.to_string()))
     }
