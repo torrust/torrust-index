@@ -74,7 +74,7 @@ lettre = { version = "0.10", features = [
     "tokio1-native-tls",
     "smtp-transport",
 ] }
-sailfish = "0.6"
+sailfish = "0.8"
 regex = "1.8"
 pbkdf2 = { version = "0.12", features = ["simple"] }
 text-colorizer = "1.0.0"
