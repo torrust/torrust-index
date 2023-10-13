@@ -43,7 +43,7 @@ sqlx = { version = "0.6", features = [
     "time",
 ] }
 config = "0.13"
-toml = "0.7"
+toml = "0.8"
 derive_more = "0.99"
 serde = { version = "1.0", features = ["rc"] }
 serde_derive = "1"
