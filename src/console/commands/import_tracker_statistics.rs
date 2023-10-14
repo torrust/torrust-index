@@ -27,7 +27,7 @@ use std::sync::Arc;
 use derive_more::{Display, Error};
 use text_colorizer::Colorize;
 
-use crate::bootstrap::config::init_configuration;
+use crate::bootstrap::config::initialize_configuration;
 use crate::bootstrap::logging;
 use crate::databases::database;
 use crate::tracker::service::Service;
@@ -88,7 +88,7 @@ pub async fn run_importer() {
 pub async fn import() {
     println!("Importing statistics from linked tracker ...");
 
-    let configuration = init_configuration().await;
+    let configuration = initialize_configuration();
 
     let log_level = configuration.settings.read().await.log_level.clone();
 

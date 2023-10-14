@@ -1,10 +1,10 @@
 use torrust_index::app;
-use torrust_index::bootstrap::config::init_configuration;
+use torrust_index::bootstrap::config::initialize_configuration;
 use torrust_index::web::api::Version;
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    let configuration = init_configuration().await;
+    let configuration = initialize_configuration();
 
     let api_version = Version::V1;
 

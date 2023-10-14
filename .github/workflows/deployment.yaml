@@ -51,4 +51,5 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: "${{ secrets.TORRUST_UPDATE_CARGO_REGISTRY_TOKEN }}"
         run: |
+          cargo publish -p torrust-index-located-error
           cargo publish -p torrust-index

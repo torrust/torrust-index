@@ -1,11 +1,107 @@
 //! Configuration for the application.
 use std::path::Path;
+use std::sync::Arc;
 use std::{env, fs};
 
 use config::{Config, ConfigError, File, FileFormat};
 use log::warn;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::sync::RwLock;
+use torrust_index_located_error::{Located, LocatedError};
+
+/// Information required for loading config
+#[derive(Debug, Default, Clone)]
+pub struct Info {
+    index_toml: String,
+    tracker_api_token: Option<String>,
+}
+
+impl Info {
+    /// Build Configuration Info
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use torrust_index::config::Info;
+    /// # let (env_var_config, env_var_path_config, default_path_config, env_var_tracker_api_token) = ("".to_string(), "".to_string(), "".to_string(), "".to_string());
+    /// let result = Info::new(env_var_config, env_var_path_config, default_path_config, env_var_tracker_api_token);
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if unable to obtain a configuration.
+    ///
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new(
+        env_var_config: String,
+        env_var_path_config: String,
+        default_path_config: String,
+        env_var_tracker_api_token: String,
+    ) -> Result<Self, Error> {
+        let index_toml = if let Ok(index_toml) = env::var(&env_var_config) {
+            println!("Loading configuration from env var {env_var_config} ...");
+
+            index_toml
+        } else {
+            let config_path = if let Ok(config_path) = env::var(env_var_path_config) {
+                println!("Loading configuration file: `{config_path}` ...");
+
+                config_path
+            } else {
+                println!("Loading default configuration file: `{default_path_config}` ...");
+
+                default_path_config
+            };
+
+            fs::read_to_string(config_path)
+                .map_err(|e| Error::UnableToLoadFromConfigFile {
+                    source: (Arc::new(e) as Arc<dyn std::error::Error + Send + Sync>).into(),
+                })?
+                .parse()
+                .map_err(|_e: std::convert::Infallible| Error::Infallible)?
+        };
+        let tracker_api_token = env::var(env_var_tracker_api_token).ok();
+
+        Ok(Self {
+            index_toml,
+            tracker_api_token,
+        })
+    }
+}
+
+/// Errors that can occur when loading the configuration.
+#[derive(Error, Debug)]
+pub enum Error {
+    /// Unable to load the configuration from the environment variable.
+    /// This error only occurs if there is no configuration file and the
+    /// `TORRUST_TRACKER_CONFIG` environment variable is not set.
+    #[error("Unable to load from Environmental Variable: {source}")]
+    UnableToLoadFromEnvironmentVariable {
+        source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
+    },
+
+    #[error("Unable to load from Config File: {source}")]
+    UnableToLoadFromConfigFile {
+        source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
+    },
+
+    /// Unable to load the configuration from the configuration file.
+    #[error("Failed processing the configuration: {source}")]
+    ConfigError { source: LocatedError<'static, ConfigError> },
+
+    #[error("The error for errors that can never happen.")]
+    Infallible,
+}
+
+impl From<ConfigError> for Error {
+    #[track_caller]
+    fn from(err: ConfigError) -> Self {
+        Self::ConfigError {
+            source: Located(err).into(),
+        }
+    }
+}
 
 /// Information displayed to the user in the website.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,6 +154,12 @@ pub struct Tracker {
     pub token: String,
     /// The amount of seconds the token is valid.
     pub token_valid_seconds: u64,
+}
+
+impl Tracker {
+    fn override_tracker_api_token(&mut self, tracker_api_token: &str) {
+        self.token = tracker_api_token.to_string();
+    }
 }
 
 impl Default for Tracker {
@@ -280,6 +382,12 @@ pub struct TorrustIndex {
     pub tracker_statistics_importer: TrackerStatisticsImporter,
 }
 
+impl TorrustIndex {
+    fn override_tracker_api_token(&mut self, tracker_api_token: &str) {
+        self.tracker.override_tracker_api_token(tracker_api_token);
+    }
+}
+
 /// The configuration service.
 #[derive(Debug)]
 pub struct Configuration {
@@ -336,29 +444,28 @@ impl Configuration {
         })
     }
 
-    /// Loads the configuration from the environment variable. The whole
-    /// configuration must be in the environment variable. It contains the same
-    /// configuration as the configuration file with the same format.
+    /// Loads the configuration from the `Info` struct. The whole
+    /// configuration in toml format is included in the `info.index_toml` string.
+    ///
+    /// Optionally will override the tracker api token.
     ///
     /// # Errors
     ///
     /// Will return `Err` if the environment variable does not exist or has a bad configuration.
-    pub fn load_from_env_var(config_env_var_name: &str) -> Result<Configuration, ConfigError> {
-        match env::var(config_env_var_name) {
-            Ok(config_toml) => {
-                let config_builder = Config::builder()
-                    .add_source(File::from_str(&config_toml, FileFormat::Toml))
-                    .build()?;
-                let torrust_config: TorrustIndex = config_builder.try_deserialize()?;
-                Ok(Configuration {
-                    settings: RwLock::new(torrust_config),
-                    config_path: None,
-                })
-            }
-            Err(_) => Err(ConfigError::Message(
-                "Unable to load configuration from the configuration environment variable.".to_string(),
-            )),
-        }
+    pub fn load(info: &Info) -> Result<Configuration, Error> {
+        let config_builder = Config::builder()
+            .add_source(File::from_str(&info.index_toml, FileFormat::Toml))
+            .build()?;
+        let mut index_config: TorrustIndex = config_builder.try_deserialize()?;
+
+        if let Some(ref token) = info.tracker_api_token {
+            index_config.override_tracker_api_token(token);
+        };
+
+        Ok(Configuration {
+            settings: RwLock::new(index_config),
+            config_path: None,
+        })
     }
 
     /// Returns the save to file of this [`Configuration`].
