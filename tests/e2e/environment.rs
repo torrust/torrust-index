@@ -3,7 +3,7 @@ use std::env;
 use torrust_index::databases::database;
 use torrust_index::web::api::Version;
 
-use super::config::{init_shared_env_configuration, ENV_VAR_E2E_SHARED};
+use super::config::{initialize_configuration, ENV_VAR_INDEX_SHARED};
 use crate::common::contexts::settings::Settings;
 use crate::environments::{isolated, shared};
 
@@ -57,7 +57,7 @@ impl TestEnv {
     /// It starts the test environment. It can be a shared or isolated test
     /// environment depending on the value of the `ENV_VAR_E2E_SHARED` env var.
     pub async fn start(&mut self, api_version: Version) {
-        let e2e_shared = ENV_VAR_E2E_SHARED; // bool
+        let e2e_shared = ENV_VAR_INDEX_SHARED; // bool
 
         if let Ok(_e2e_test_env_is_shared) = env::var(e2e_shared) {
             // Using the shared test env.
@@ -164,7 +164,7 @@ impl TestEnv {
     }
 
     async fn server_settings_for_shared_env(&self) -> Option<Settings> {
-        let configuration = init_shared_env_configuration().await;
+        let configuration = initialize_configuration();
         let settings = configuration.settings.read().await;
         Some(Settings::from(settings.clone()))
     }

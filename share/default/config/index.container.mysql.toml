@@ -3,6 +3,10 @@ log_level = "info"
 [website]
 name = "Torrust"
 
+# Please override the tracker token setting the
+#    `TORRUST_INDEX_TRACKER_API_TOKEN`
+#                     environmental variable!
+
 [tracker]
 url = "udp://tracker:6969"
 mode = "Public"

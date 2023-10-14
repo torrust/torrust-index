@@ -1,5 +1,4 @@
 [package]
-default-run = "main"
 name = "torrust-index"
 readme = "README.md"
 
@@ -68,6 +67,7 @@ text-to-png = "0"
 thiserror = "1"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "0"
+torrust-index-located-error = { version = "3.0.0-alpha.1-develop", path = "packages/located-error" }
 tower-http = { version = "0", features = ["compression-full", "cors"] }
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }

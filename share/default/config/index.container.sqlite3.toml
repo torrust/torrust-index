@@ -3,6 +3,10 @@ log_level = "info"
 [website]
 name = "Torrust"
 
+# Please override the tracker token setting the
+#    `TORRUST_INDEX_TRACKER_API_TOKEN`
+#                     environmental variable!
+
 [tracker]
 url = "udp://tracker:6969"
 mode = "Public"
@@ -20,7 +24,7 @@ max_password_length = 64
 secret_key = "MaxVerstappenWC2021"
 
 [database]
-connect_url = "sqlite://storage/database/torrust_index_e2e_testing.db?mode=rwc"
+connect_url = "sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc"
 
 [mail]
 email_verification_enabled = false

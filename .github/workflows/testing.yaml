@@ -132,29 +132,3 @@ jobs:
       - id: coverage
         name: Generate Coverage Report
         run: cargo llvm-cov nextest --tests --benches --examples --workspace --all-targets --all-features
-
-  integration:
-    name: Integrations
-    runs-on: ubuntu-latest
-
-    steps:
-      - id: checkout
-        name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - id: setup
-        name: Setup Toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - id: cache
-        name: Enable Job Cache
-        uses: Swatinem/rust-cache@v2
-
-      # Temporary Cleaning to avoid Rust Compiler Bug
-      - id: clean
-        name: Make Build Clean
-        run: cargo clean
-
-      - id: test
-        name: Run Integration Tests
-        run: ./docker/bin/e2e/run-e2e-tests.sh

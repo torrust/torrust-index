@@ -1,0 +1,178 @@
+name: Container
+
+on:
+  push:
+    branches:
+      - "develop"
+      - "main"
+      - "releases/**/*"
+  pull_request:
+    branches:
+      - "develop"
+      - "main"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test (Docker)
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        target: [debug, release]
+
+    steps:
+      - id: setup
+        name: Setup Toolchain
+        uses: docker/setup-buildx-action@v3
+
+      - id: build
+        name: Build
+        uses: docker/build-push-action@v5
+        with:
+          file: ./Containerfile
+          push: false
+          load: true
+          target: ${{ matrix.target }}
+          tags: torrust-tracker:local
+          cache-from: type=gha
+          cache-to: type=gha
+
+      - id: inspect
+        name: Inspect
+        run: docker image inspect torrust-tracker:local
+
+      - id: checkout
+        name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - id: compose
+        name: Compose
+        run: docker compose build
+
+  context:
+    name: Context
+    needs: test
+    runs-on: ubuntu-latest
+
+    outputs:
+      continue: ${{ steps.check.outputs.continue }}
+      type: ${{ steps.check.outputs.type }}
+      version: ${{ steps.check.outputs.version }}
+
+    steps:
+      - id: check
+        name: Check Context
+        run: |
+          if [[ "${{ github.repository }}" == "torrust/torrust-tracker" ]]; then
+            if [[ "${{ github.event_name }}" == "push" ]]; then
+              if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+
+                echo "type=development" >> $GITHUB_OUTPUT
+                echo "continue=true" >> $GITHUB_OUTPUT
+                echo "On \`main\` Branch, Type: \`development\`"
+
+              elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+
+                echo "type=development" >> $GITHUB_OUTPUT
+                echo "continue=true" >> $GITHUB_OUTPUT
+                echo "On \`develop\` Branch, Type: \`development\`"
+
+              elif [[ $(echo "${{ github.ref }}" | grep -P '^(refs\/heads\/releases\/)(v)(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$') ]]; then
+
+                version=$(echo "${{ github.ref }}" | sed -n -E 's/^(refs\/heads\/releases\/)//p')
+                echo "version=$version" >> $GITHUB_OUTPUT
+                echo "type=release" >> $GITHUB_OUTPUT
+                echo "continue=true" >> $GITHUB_OUTPUT
+                echo "In \`releases/$version\` Branch, Type: \`release\`"
+
+              else
+                echo "Not Correct Branch. Will Not Continue"
+              fi
+            else
+              echo "Not a Push Event. Will Not Continue"
+            fi
+          else
+            echo "On a Forked Repository. Will Not Continue"
+          fi
+
+  publish_development:
+    name: Publish (Development)
+    environment: dockerhub-torrust
+    needs: context
+    if: needs.context.outputs.continue == 'true' && needs.context.outputs.type == 'development'
+    runs-on: ubuntu-latest
+
+    steps:
+      - id: meta
+        name: Docker Meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            "${{ secrets.DOCKER_HUB_USERNAME }}/${{secrets.DOCKER_HUB_REPOSITORY_NAME }}"
+          tags: |
+            type=ref,event=branch
+
+      - id: login
+        name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - id: setup
+        name: Setup Toolchain
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          file: ./Containerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha
+
+  publish_release:
+    name: Publish (Release)
+    environment: dockerhub-torrust
+    needs: context
+    if: needs.context.outputs.continue == 'true' && needs.context.outputs.type == 'release'
+    runs-on: ubuntu-latest
+
+    steps:
+      - id: meta
+        name: Docker Meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            "${{ secrets.DOCKER_HUB_USERNAME }}/${{secrets.DOCKER_HUB_REPOSITORY_NAME }}"
+          tags: |
+            type=semver,value=${{ needs.context.outputs.version }},pattern={{raw}}
+            type=semver,value=${{ needs.context.outputs.version }},pattern={{version}}
+            type=semver,value=${{ needs.context.outputs.version }},pattern=v{{major}}
+            type=semver,value=${{ needs.context.outputs.version }},pattern={{major}}.{{minor}}
+
+      - id: login
+        name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - id: setup
+        name: Setup Toolchain
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          file: ./Containerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha

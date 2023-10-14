@@ -1,36 +1,21 @@
 name: torrust
 services:
 
-  idx-back:
-    build:
-      context: .
-      args:
-        RUN_AS_USER: appuser
-        UID: ${TORRUST_IDX_BACK_USER_UID:-1000}
-      target: development
-    user: ${TORRUST_IDX_BACK_USER_UID:-1000}:${TORRUST_IDX_BACK_USER_UID:-1000}
+  index:
+    image: torrust-index:release
     tty: true
     environment:
-      - TORRUST_IDX_BACK_CONFIG=${TORRUST_IDX_BACK_CONFIG}
-      - CARGO_HOME=/home/appuser/.cargo
+      - TORRUST_INDEX_CONFIG=${TORRUST_TRACKER_CONFIG}
+      - TORRUST_INDEX_DATABASE_DRIVER=${TORRUST_TRACKER_DATABASE_DRIVER:-sqlite3}
+      - TORRUST_INDEX_TRACKER_API_TOKEN=${TORRUST_INDEX_TRACKER_API_TOKEN:-MyAccessToken}
     networks:
       - server_side
     ports:
       - 3001:3001
-    # todo: implement healthcheck
-    #healthcheck:
-    #  test:
-    #    [
-    #      "CMD-SHELL",
-    #      "cargo run healthcheck"
-    #    ]
-    #  interval: 10s
-    #  retries: 5
-    #  start_period: 10s
-    #  timeout: 3s
     volumes:
-      - ./:/app
-      - ~/.cargo:/home/appuser/.cargo
+      - ./storage/tracker/lib:/var/lib/torrust/index:Z
+      - ./storage/tracker/log:/var/log/torrust/index:Z
+      - ./storage/tracker/etc:/etc/torrust/index:Z
     depends_on:
       - tracker
       - mailcatcher
