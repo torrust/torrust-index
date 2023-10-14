@@ -16,7 +16,9 @@ rust-version.workspace = true
 version.workspace = true
 
 [workspace.package]
-authors = ["Nautilus Cyberneering <info@nautilus-cyberneering.de>, Mick van Dijke <mick@dutchbits.nl>"]
+authors = [
+    "Nautilus Cyberneering <info@nautilus-cyberneering.de>, Mick van Dijke <mick@dutchbits.nl>",
+]
 categories = ["network-programming", "web-programming"]
 description = "A BitTorrent Index"
 documentation = "https://docs.rs/crate/torrust-tracker/"
@@ -74,7 +76,7 @@ lettre = { version = "0", features = [
     "tokio1-native-tls",
     "smtp-transport",
 ] }
-sailfish = "0"
+tera = { version = "1", default-features = false }
 regex = "1"
 pbkdf2 = { version = "0", features = ["simple"] }
 text-colorizer = "1"
@@ -91,6 +93,7 @@ tower-http = { version = "0", features = ["cors", "compression-full"] }
 email_address = "0"
 hex = "0"
 uuid = { version = "1", features = ["v4"] }
+lazy_static = "1.4.0"
 
 [dev-dependencies]
 rand = "0"
