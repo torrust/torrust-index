@@ -45,6 +45,11 @@ jobs:
         name: Enable Workflow Cache
         uses: Swatinem/rust-cache@v2
 
+      # Temporary Cleaning to avoid Rust Compiler Bug
+      - id: clean
+        name: Make Build Clean
+        run: cargo clean
+
       - id: tools
         name: Install Tools
         uses: taiki-e/install-action@v2
@@ -55,10 +60,9 @@ jobs:
         name: Install Intermodal
         run: cargo install imdl
 
-      # Temporary Disabled to avoid Rust Compiler Bug
-      # - id: check
-      #   name: Run Build Checks
-      #   run: cargo check --tests --benches --examples --workspace --all-targets --all-features
+      - id: check
+        name: Run Build Checks
+        run: cargo check --tests --benches --examples --workspace --all-targets --all-features
 
       - id: test
         name: Run Unit Tests
