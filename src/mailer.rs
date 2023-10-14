@@ -1,16 +1,52 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use jsonwebtoken::{encode, EncodingKey, Header};
+use lazy_static::lazy_static;
 use lettre::message::{MessageBuilder, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
-use sailfish::TemplateOnce;
 use serde::{Deserialize, Serialize};
+use serde_json::value::{to_value, Value};
+use tera::{try_get_value, Context, Tera};
 
 use crate::config::Configuration;
 use crate::errors::ServiceError;
 use crate::utils::clock;
 use crate::web::api::v1::routes::API_VERSION_URL_PREFIX;
+
+lazy_static! {
+    pub static ref TEMPLATES: Tera = {
+        let mut tera = Tera::default();
+
+        match tera.add_template_file("templates/verify.html", Some("html_verify_email")) {
+            Ok(()) => {}
+            Err(e) => {
+                println!("Parsing error(s): {e}");
+                ::std::process::exit(1);
+            }
+        };
+
+        tera.autoescape_on(vec![".html", ".sql"]);
+        tera.register_filter("do_nothing", do_nothing_filter);
+        tera
+    };
+}
+
+/// This function is a dummy filter for tera.
+///
+/// # Panics
+///
+/// Panics if unable to convert values.
+///
+/// # Errors
+///
+/// This function will return an error if...
+#[allow(clippy::implicit_hasher)]
+pub fn do_nothing_filter(value: &Value, _: &HashMap<String, Value>) -> tera::Result<Value> {
+    let s = try_get_value!("do_nothing_filter", "value", String, value);
+    Ok(to_value(s).unwrap())
+}
 
 pub struct Service {
     cfg: Arc<Configuration>,
@@ -22,13 +58,6 @@ pub struct VerifyClaims {
     pub iss: String,
     pub sub: i64,
     pub exp: u64,
-}
-
-#[derive(TemplateOnce)]
-#[template(path = "../templates/verify.html")]
-struct VerifyTemplate {
-    username: String,
-    verification_url: String,
 }
 
 impl Service {
@@ -77,41 +106,7 @@ impl Service {
         let builder = self.get_builder(to).await;
         let verification_url = self.get_verification_url(user_id, base_url).await;
 
-        let mail_body = format!(
-            r#"
-                Welcome to Torrust, {username}!
-
-                Please click the confirmation link below to verify your account.
-                {verification_url}
-
-                If this account wasn't made by you, you can ignore this email.
-            "#
-        );
-
-        let ctx = VerifyTemplate {
-            username: String::from(username),
-            verification_url,
-        };
-
-        let mail = builder
-            .subject("Torrust - Email verification")
-            .multipart(
-                MultiPart::alternative()
-                    .singlepart(
-                        SinglePart::builder()
-                            .header(lettre::message::header::ContentType::TEXT_PLAIN)
-                            .body(mail_body),
-                    )
-                    .singlepart(
-                        SinglePart::builder()
-                            .header(lettre::message::header::ContentType::TEXT_HTML)
-                            .body(
-                                ctx.render_once()
-                                    .expect("value `ctx` must have some internal error passed into it"),
-                            ),
-                    ),
-            )
-            .expect("the `multipart` builder had an error");
+        let mail = build_letter(verification_url.as_str(), username, builder)?;
 
         match self.mailer.send(mail).await {
             Ok(_res) => Ok(()),
@@ -155,4 +150,70 @@ impl Service {
     }
 }
 
+fn build_letter(verification_url: &str, username: &str, builder: MessageBuilder) -> Result<Message, ServiceError> {
+    let (plain_body, html_body) = build_content(verification_url, username).map_err(|e| {
+        log::error!("{e}");
+        ServiceError::InternalServerError
+    })?;
+
+    Ok(builder
+        .subject("Torrust - Email verification")
+        .multipart(
+            MultiPart::alternative()
+                .singlepart(
+                    SinglePart::builder()
+                        .header(lettre::message::header::ContentType::TEXT_PLAIN)
+                        .body(plain_body),
+                )
+                .singlepart(
+                    SinglePart::builder()
+                        .header(lettre::message::header::ContentType::TEXT_HTML)
+                        .body(html_body),
+                ),
+        )
+        .expect("the `multipart` builder had an error"))
+}
+
+fn build_content(verification_url: &str, username: &str) -> Result<(String, String), tera::Error> {
+    let plain_body = format!(
+        r#"
+                Welcome to Torrust, {username}!
+
+                Please click the confirmation link below to verify your account.
+                {verification_url}
+
+                If this account wasn't made by you, you can ignore this email.
+            "#
+    );
+    let mut context = Context::new();
+    context.insert("verification", &verification_url);
+    context.insert("username", &username);
+    let html_body = TEMPLATES.render("html_verify_email", &context)?;
+    Ok((plain_body, html_body))
+}
+
 pub type Mailer = AsyncSmtpTransport<Tokio1Executor>;
+
+#[cfg(test)]
+mod tests {
+    use lettre::Message;
+
+    use super::{build_content, build_letter};
+
+    #[test]
+    fn it_should_build_a_letter() {
+        let builder = Message::builder()
+            .from("from@a.b.c".parse().unwrap())
+            .reply_to("reply@a.b.c".parse().unwrap())
+            .to("to@a.b.c".parse().unwrap());
+
+        let _letter = build_letter("https://a.b.c/", "user", builder).unwrap();
+    }
+
+    #[test]
+    fn it_should_build_content() {
+        let (plain_body, html_body) = build_content("https://a.b.c/", "user").unwrap();
+        assert_ne!(plain_body, "");
+        assert_ne!(html_body, "");
+    }
+}
