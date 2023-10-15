@@ -25,6 +25,10 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain }}
 
+      - id: imdl
+        name: Install Intermodal
+        run: cargo install imdl
+
       - id: test
         name: Run Unit Tests
         run: cargo test --tests --benches --examples --workspace --all-targets --all-features
