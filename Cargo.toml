@@ -29,6 +29,7 @@ repository = "https://github.com/torrust/torrust-tracker"
 rust-version = "1.72"
 version = "3.0.0-alpha.2"
 
+
 [profile.dev.package.sqlx-macros]
 opt-level = 3
 
