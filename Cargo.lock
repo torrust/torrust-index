@@ -2994,7 +2994,7 @@ dependencies = [
 
 [[package]]
 name = "torrust-index"
-version = "3.0.0-alpha.2-develop"
+version = "3.0.0-alpha.2"
 dependencies = [
  "argon2",
  "async-trait",
@@ -3042,7 +3042,7 @@ dependencies = [
 
 [[package]]
 name = "torrust-index-located-error"
-version = "3.0.0-alpha.2-develop"
+version = "3.0.0-alpha.2"
 dependencies = [
  "log",
  "thiserror",
