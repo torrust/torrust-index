@@ -3013,7 +3013,7 @@ dependencies = [
  "futures",
  "hex",
  "hyper",
- "indexmap 1.9.3",
+ "indexmap 2.0.2",
  "jsonwebtoken",
  "lazy_static",
  "lettre",
