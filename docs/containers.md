@@ -143,9 +143,7 @@ The following environmental variables can be set:
 - `TORRUST_INDEX_DATABASE_DRIVER` - The database type used for the container, (options: `sqlite3`, `mysql`, default `sqlite3`). Please Note: This dose not override the database configuration within the `.toml` config file.
 - `TORRUST_INDEX_CONFIG` - Load config from this environmental variable instead from a file, (i.e: `TORRUST_INDEX_CONFIG=$(cat index-index.toml)`).
 - `USER_ID` - The user id for the runtime crated `torrust` user. Please Note: This user id should match the ownership of the host-mapped volumes, (default `1000`).
-- `UDP_PORT` - The port for the UDP index. This should match the port used in the configuration, (default `6969`).
-- `HTTP_PORT` - The port for the HTTP index. This should match the port used in the configuration, (default `7070`).
-- `API_PORT` - The port for the index API. This should match the port used in the configuration, (default `1212`).
+- `API_PORT` - The port for the index API. This should match the port used in the configuration, (default `3001`).
 
 
 ### Sockets

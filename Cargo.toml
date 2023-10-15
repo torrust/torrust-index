@@ -1,4 +1,5 @@
 [package]
+default-run = "torrust-index"
 name = "torrust-index"
 readme = "README.md"
 
