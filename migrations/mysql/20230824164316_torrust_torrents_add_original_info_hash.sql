@@ -1,0 +1,1 @@
+ALTER TABLE torrust_torrents ADD COLUMN original_info_hash TEXT DEFAULT NULL

@@ -1,0 +1,1 @@
+ALTER TABLE torrust_users ADD COLUMN date_imported TEXT DEFAULT NULL

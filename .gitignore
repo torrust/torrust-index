@@ -1,4 +1,9 @@
+/.coverage/
 /.env
-/data.db*
 /config.toml
+/data_v2.db*
+/data.db*
+/storage/
+/target
 /uploads/
+/.idea/

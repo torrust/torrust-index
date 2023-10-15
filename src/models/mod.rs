@@ -1,5 +1,8 @@
-pub mod user;
+pub mod category;
+pub mod info_hash;
+pub mod response;
 pub mod torrent;
 pub mod torrent_file;
-pub mod response;
+pub mod torrent_tag;
 pub mod tracker_key;
+pub mod user;

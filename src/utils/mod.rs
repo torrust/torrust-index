@@ -1,4 +1,4 @@
-pub mod parse_torrent;
-pub mod time;
+pub mod clock;
 pub mod hex;
-pub mod regex;
+pub mod parse_torrent;
+pub mod validation;

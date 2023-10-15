@@ -1,0 +1,81 @@
+name: torrust
+services:
+
+  index:
+    image: torrust-index:release
+    tty: true
+    environment:
+      - TORRUST_INDEX_CONFIG=${TORRUST_TRACKER_CONFIG}
+      - TORRUST_INDEX_DATABASE_DRIVER=${TORRUST_TRACKER_DATABASE_DRIVER:-sqlite3}
+      - TORRUST_INDEX_TRACKER_API_TOKEN=${TORRUST_INDEX_TRACKER_API_TOKEN:-MyAccessToken}
+    networks:
+      - server_side
+    ports:
+      - 3001:3001
+    volumes:
+      - ./storage/tracker/lib:/var/lib/torrust/index:Z
+      - ./storage/tracker/log:/var/log/torrust/index:Z
+      - ./storage/tracker/etc:/etc/torrust/index:Z
+    depends_on:
+      - tracker
+      - mailcatcher
+      - mysql
+
+  tracker:
+    image: torrust/tracker:develop
+    tty: true
+    environment:
+      - TORRUST_TRACKER_CONFIG=${TORRUST_TRACKER_CONFIG}
+      - TORRUST_TRACKER_DATABASE_DRIVER=${TORRUST_TRACKER_DATABASE_DRIVER:-sqlite3}
+      - TORRUST_TRACKER_API_ADMIN_TOKEN=${TORRUST_TRACKER_API_ADMIN_TOKEN:-MyAccessToken}
+    networks:
+      - server_side
+    ports:
+      - 6969:6969/udp
+      - 7070:7070
+      - 1212:1212
+    volumes:
+      - ./storage/tracker/lib:/var/lib/torrust/tracker:Z
+      - ./storage/tracker/log:/var/log/torrust/tracker:Z
+      - ./storage/tracker/etc:/etc/torrust/tracker:Z
+    depends_on:
+      - mysql
+
+  mailcatcher:
+    image: dockage/mailcatcher:0.8.2
+    networks:
+      - server_side
+    ports:
+      - 1080:1080
+      - 1025:1025
+
+  mysql:
+    image: mysql:8.0
+    command: '--default-authentication-plugin=mysql_native_password'
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'mysqladmin ping -h 127.0.0.1 --password="$$(cat /run/secrets/db-password)" --silent'
+        ]
+      interval: 3s
+      retries: 5
+      start_period: 30s
+    environment:
+      - MYSQL_ROOT_HOST=%
+      - MYSQL_ROOT_PASSWORD=root_secret_password
+      - MYSQL_DATABASE=${TORRUST_IDX_BACK_MYSQL_DATABASE:-torrust_index_e2e_testing}
+      - MYSQL_USER=db_user
+      - MYSQL_PASSWORD=db_user_secret_password
+    networks:
+      - server_side
+    ports:
+      - 3306:3306
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+networks:
+  server_side: {}
+
+volumes:
+  mysql_data: {}
