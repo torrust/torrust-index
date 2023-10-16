@@ -48,7 +48,7 @@ futures = "0"
 hex = "0"
 hyper = "0"
 indexmap = "2"
-jsonwebtoken = "8"
+jsonwebtoken = "9"
 lazy_static = "1.4.0"
 lettre = { version = "0", features = ["builder", "smtp-transport", "tokio1", "tokio1-native-tls", "tokio1-rustls-tls"] }
 log = "0"
