@@ -78,4 +78,4 @@ uuid = { version = "1", features = ["v4"] }
 rand = "0"
 tempfile = "3"
 uuid = { version = "1", features = ["v4"] }
-which = "4"
+which = "5"
