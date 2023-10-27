@@ -5,17 +5,17 @@ services:
     image: torrust-index:release
     tty: true
     environment:
-      - TORRUST_INDEX_CONFIG=${TORRUST_TRACKER_CONFIG}
-      - TORRUST_INDEX_DATABASE_DRIVER=${TORRUST_TRACKER_DATABASE_DRIVER:-sqlite3}
+      - TORRUST_INDEX_CONFIG=${TORRUST_INDEX_CONFIG}
+      - TORRUST_INDEX_DATABASE_DRIVER=${TORRUST_INDEX_DATABASE_DRIVER:-sqlite3}
       - TORRUST_INDEX_TRACKER_API_TOKEN=${TORRUST_INDEX_TRACKER_API_TOKEN:-MyAccessToken}
     networks:
       - server_side
     ports:
       - 3001:3001
     volumes:
-      - ./storage/tracker/lib:/var/lib/torrust/index:Z
-      - ./storage/tracker/log:/var/log/torrust/index:Z
-      - ./storage/tracker/etc:/etc/torrust/index:Z
+      - ./storage/index/lib:/var/lib/torrust/index:Z
+      - ./storage/index/log:/var/log/torrust/index:Z
+      - ./storage/index/etc:/etc/torrust/index:Z
     depends_on:
       - tracker
       - mailcatcher
