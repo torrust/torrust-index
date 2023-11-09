@@ -379,7 +379,7 @@ impl Database for Sqlite {
             tt.comment,
             tt.creation_date,
             tt.created_by,
-            tt.encoding,
+            tt.`encoding`,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
             FROM torrust_torrents tt
@@ -461,7 +461,7 @@ impl Database for Sqlite {
             date_uploaded,
             creation_date,
             created_by,
-            encoding
+            `encoding`
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%d %H:%M:%S',DATETIME('now', 'utc')), ?, ?, ?)",
         )
         .bind(uploader_id)
@@ -754,7 +754,7 @@ impl Database for Sqlite {
             tt.comment,
             tt.creation_date,
             tt.created_by,
-            tt.encoding,
+            tt.`encoding`,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
             FROM torrust_torrents tt
@@ -784,7 +784,7 @@ impl Database for Sqlite {
             tt.comment,
             tt.creation_date,
             tt.created_by,
-            tt.encoding,
+            tt.`encoding`,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
             FROM torrust_torrents tt

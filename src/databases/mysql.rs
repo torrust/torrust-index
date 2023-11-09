@@ -389,7 +389,7 @@ impl Database for Mysql {
             tt.comment,
             tt.creation_date,
             tt.created_by,
-            tt.encoding,
+            tt.`encoding`,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
             FROM torrust_torrents tt
@@ -471,7 +471,7 @@ impl Database for Mysql {
             date_uploaded,
             creation_date,
             created_by,
-            encoding
+            `encoding`
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?, ?)",
         )
         .bind(uploader_id)
@@ -765,7 +765,7 @@ impl Database for Mysql {
             tt.comment,
             tt.creation_date,
             tt.created_by,
-            tt.encoding,
+            tt.`encoding`,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
             FROM torrust_torrents tt
@@ -796,7 +796,7 @@ impl Database for Mysql {
             tt.comment,
             tt.creation_date,
             tt.created_by,
-            tt.encoding,
+            tt.`encoding`,
             CAST(COALESCE(sum(ts.seeders),0) as signed) as seeders,
             CAST(COALESCE(sum(ts.leechers),0) as signed) as leechers
             FROM torrust_torrents tt
