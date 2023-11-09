@@ -41,6 +41,9 @@ pub struct ListItem {
     pub leechers: i64,
     pub name: String,
     pub comment: Option<String>,
+    pub creation_date: Option<i64>,
+    pub created_by: Option<String>,
+    pub encoding: Option<String>,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
@@ -66,6 +69,9 @@ pub struct TorrentDetails {
     pub tags: Vec<Tag>,
     pub name: String,
     pub comment: Option<String>,
+    pub creation_date: Option<i64>,
+    pub created_by: Option<String>,
+    pub encoding: Option<String>,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]

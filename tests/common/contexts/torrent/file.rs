@@ -12,8 +12,9 @@ use which::which;
 pub struct TorrentFileInfo {
     pub name: String,
     pub comment: Option<String>,
-    pub creation_date: Option<u64>,
+    pub creation_date: Option<i64>,
     pub created_by: Option<String>,
+    pub encoding: Option<String>,
     pub source: Option<String>,
     pub info_hash: String,
     pub torrent_size: u64,

@@ -213,6 +213,9 @@ mod for_guests {
             tags: vec![],
             name: test_torrent.index_info.name.clone(),
             comment: test_torrent.file_info.comment.clone(),
+            creation_date: test_torrent.file_info.creation_date,
+            created_by: test_torrent.file_info.created_by.clone(),
+            encoding: test_torrent.file_info.encoding.clone(),
         };
 
         assert_expected_torrent_details(&torrent_details_response.data, &expected_torrent);

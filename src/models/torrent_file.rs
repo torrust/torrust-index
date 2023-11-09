@@ -88,12 +88,12 @@ impl Torrent {
             info: info_dict,
             announce: None,
             nodes: None,
-            encoding: None,
+            encoding: db_torrent.encoding.clone(),
             httpseeds: None,
             announce_list: Some(torrent_announce_urls),
-            creation_date: None,
+            creation_date: db_torrent.creation_date,
             comment: db_torrent.comment.clone(),
-            created_by: None,
+            created_by: db_torrent.created_by.clone(),
         }
     }
 
@@ -303,6 +303,9 @@ pub struct DbTorrent {
     pub private: Option<u8>,
     pub root_hash: i64,
     pub comment: Option<String>,
+    pub creation_date: Option<i64>,
+    pub created_by: Option<String>,
+    pub encoding: Option<String>,
 }
 
 #[allow(clippy::module_name_repetitions)]
