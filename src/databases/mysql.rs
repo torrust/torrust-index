@@ -249,17 +249,7 @@ impl Database for Mysql {
             .execute(&self.pool)
             .await
             .map(|v| i64::try_from(v.last_insert_id()).expect("last ID is larger than i64"))
-            .map_err(|e| match e {
-                sqlx::Error::Database(err) => {
-                    log::error!("DB error: {:?}", err);
-                    if err.message().contains("Duplicate entry") && err.message().contains("name") {
-                        database::Error::CategoryAlreadyExists
-                    } else {
-                        database::Error::Error
-                    }
-                }
-                _ => database::Error::Error,
-            })
+            .map_err(|_| database::Error::Error)
     }
 
     async fn get_category_from_id(&self, category_id: i64) -> Result<Category, database::Error> {
