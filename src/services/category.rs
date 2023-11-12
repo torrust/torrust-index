@@ -28,6 +28,8 @@ impl Service {
     /// It returns an error if:
     ///
     /// * The user does not have the required permissions.
+    /// * The category name is empty.
+    /// * The category already exists.
     /// * There is a database error.
     pub async fn add_category(&self, category_name: &str, user_id: &UserId) -> Result<i64, ServiceError> {
         let user = self.user_repository.get_compact(user_id).await?;
