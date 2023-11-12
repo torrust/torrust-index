@@ -48,9 +48,10 @@ impl Service {
 
         // Try to get the category by name to check if it already exists
         match self.category_repository.get_by_name(trimmed_name).await {
-            // Return ServiceError::CategoryAlreadyExists when the category already exists
+            // Return ServiceError::CategoryAlreadyExists if the category exists
             Ok(_) => Err(ServiceError::CategoryAlreadyExists),
             Err(e) => match e {
+                // Otherwise try to create it
                 DatabaseError::CategoryNotFound => match self.category_repository.add(trimmed_name).await {
                     Ok(id) => Ok(id),
                     Err(_) => Err(ServiceError::DatabaseError),
