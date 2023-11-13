@@ -111,7 +111,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            "${{ secrets.DOCKER_HUB_USERNAME }}/${{secrets.DOCKER_HUB_REPOSITORY_NAME }}"
+            "${{ vars.DOCKER_HUB_USERNAME }}/${{vars.DOCKER_HUB_REPOSITORY_NAME }}"
           tags: |
             type=ref,event=branch
 
@@ -119,7 +119,7 @@ jobs:
         name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          username: ${{ vars.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
       - id: setup
@@ -149,7 +149,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            "${{ secrets.DOCKER_HUB_USERNAME }}/${{secrets.DOCKER_HUB_REPOSITORY_NAME }}"
+            "${{ vars.DOCKER_HUB_USERNAME }}/${{vars.DOCKER_HUB_REPOSITORY_NAME }}"
           tags: |
             type=semver,value=${{ needs.context.outputs.version }},pattern={{raw}}
             type=semver,value=${{ needs.context.outputs.version }},pattern={{version}}
@@ -160,7 +160,7 @@ jobs:
         name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          username: ${{ vars.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
       - id: setup
