@@ -11,8 +11,10 @@ The core purpose of a [BitTorrent][bittorrent] Index is to maintain a database t
 
 The __Torrust Index__ serves a [high-level api][api] for our [Torrust Index GUI][gui] client. It also connects to the [management api][api_tracker] of our [Torrust Tracker][tracker], to provide statistic and whitelisting functionally.
 
-## Key Features
+![Torrust Index Architecture](./docs/images/torrust-index-architecture.jpg)
 
+## Key Features
+**
 - [x] High Quality and Modern Rust Codebase.
 - [x] [Documentation][docs] Generated from Code Comments.
 - [x] [Comprehensive Suit][coverage] of Unit and Functional Tests.
