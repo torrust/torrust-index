@@ -1,4 +1,4 @@
 #!/bin/bash
 
-docker compose down
-./docker/bin/e2e/mysql/e2e-env-up.sh
+./contrib/dev-tools/container/e2e/mysql/e2e-env-downp.sh
+./contrib/dev-tools/container/e2e/mysql/e2e-env-up.sh
