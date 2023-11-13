@@ -28,6 +28,8 @@ impl Service {
     /// It returns an error if:
     ///
     /// * The user does not have the required permissions.
+    /// * The category name is empty.
+    /// * The category already exists.
     /// * There is a database error.
     pub async fn add_category(&self, category_name: &str, user_id: &UserId) -> Result<i64, ServiceError> {
         let user = self.user_repository.get_compact(user_id).await?;
@@ -44,10 +46,16 @@ impl Service {
             return Err(ServiceError::CategoryNameEmpty);
         }
 
-        match self.category_repository.add(trimmed_name).await {
-            Ok(id) => Ok(id),
+        // Try to get the category by name to check if it already exists
+        match self.category_repository.get_by_name(trimmed_name).await {
+            // Return ServiceError::CategoryAlreadyExists if the category exists
+            Ok(_) => Err(ServiceError::CategoryAlreadyExists),
             Err(e) => match e {
-                DatabaseError::CategoryAlreadyExists => Err(ServiceError::CategoryAlreadyExists),
+                // Otherwise try to create it
+                DatabaseError::CategoryNotFound => match self.category_repository.add(trimmed_name).await {
+                    Ok(id) => Ok(id),
+                    Err(_) => Err(ServiceError::DatabaseError),
+                },
                 _ => Err(ServiceError::DatabaseError),
             },
         }

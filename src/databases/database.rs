@@ -81,7 +81,6 @@ pub enum Error {
     UsernameTaken,
     EmailTaken,
     UserNotFound,
-    CategoryAlreadyExists,
     CategoryNotFound,
     TagAlreadyExists,
     TagNotFound,

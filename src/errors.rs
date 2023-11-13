@@ -288,7 +288,6 @@ pub fn map_database_error_to_service_error(error: &database::Error) -> ServiceEr
         database::Error::UsernameTaken => ServiceError::UsernameTaken,
         database::Error::EmailTaken => ServiceError::EmailTaken,
         database::Error::UserNotFound => ServiceError::UserNotFound,
-        database::Error::CategoryAlreadyExists => ServiceError::CategoryAlreadyExists,
         database::Error::CategoryNotFound => ServiceError::InvalidCategory,
         database::Error::TagAlreadyExists => ServiceError::TagAlreadyExists,
         database::Error::TagNotFound => ServiceError::InvalidTag,

@@ -116,16 +116,7 @@ impl SqliteDatabaseV2_0_0 {
             .execute(&self.pool)
             .await
             .map(|v| v.last_insert_rowid())
-            .map_err(|e| match e {
-                sqlx::Error::Database(err) => {
-                    if err.message().contains("UNIQUE") && err.message().contains("name") {
-                        database::Error::CategoryAlreadyExists
-                    } else {
-                        database::Error::Error
-                    }
-                }
-                _ => database::Error::Error,
-            })
+            .map_err(|_| database::Error::Error)
     }
 
     pub async fn insert_category(&self, category: &CategoryRecordV2) -> Result<i64, sqlx::Error> {
