@@ -2,7 +2,7 @@
 
 # Delete the databases and recreate them.
 
-docker compose down
+./contrib/dev-tools/container/e2e/mysql/e2e-env-down.sh
 
 # Index
 
@@ -29,4 +29,4 @@ if ! [ -f "./storage/tracker/lib/database/torrust_tracker_e2e_testing.db" ]; the
     sqlite3 ./storage/tracker/lib/database/torrust_tracker_e2e_testing.db "VACUUM;"
 fi
 
-./docker/bin/e2e/mysql/e2e-env-up.sh
+./contrib/dev-tools/container/e2e/mysql/e2e-env-up.sh

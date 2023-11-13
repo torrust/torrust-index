@@ -2,7 +2,7 @@
 
 # Delete the databases and recreate them.
 
-docker compose down
+./contrib/dev-tools/container/e2e/sqlite/e2e-env-down.sh
 
 rm -f ./storage/database/torrust_index_e2e_testing.db
 rm -f ./storage/tracker/lib/database/torrust_tracker_e2e_testing.db
@@ -20,4 +20,4 @@ if ! [ -f "./storage/tracker/lib/database/torrust_tracker_e2e_testing.db" ]; the
     sqlite3 ./storage/tracker/lib/database/torrust_tracker_e2e_testing.db "VACUUM;"
 fi
 
-./docker/bin/e2e/sqlite/e2e-env-up.sh
+./contrib/dev-tools/container/e2e/sqlite/e2e-env-up.sh

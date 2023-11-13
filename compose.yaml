@@ -2,7 +2,10 @@ name: torrust
 services:
 
   index:
-    image: torrust-index:release
+    build:
+      context: .
+      dockerfile: ./Containerfile
+      target: debug     
     tty: true
     environment:
       - TORRUST_INDEX_CONFIG=${TORRUST_INDEX_CONFIG}

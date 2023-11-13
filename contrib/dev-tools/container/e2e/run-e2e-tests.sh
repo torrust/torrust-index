@@ -42,13 +42,13 @@ cargo install imdl || exit 1
 # Install app (no docker) that will run the test suite against the E2E testing 
 # environment (in docker).
 cp .env.local .env || exit 1
-./bin/install.sh || exit 1
+./contrib/dev-tools/init/install-local.sh || exit 1
 
 # TEST USING SQLITE
 echo "Running E2E tests using SQLite ..."
 
 # Start E2E testing environment
-./docker/bin/e2e/sqlite/e2e-env-up.sh || exit 1
+./contrib/dev-tools/container/e2e/sqlite/e2e-env-up.sh || exit 1
 
 wait_for_container_to_be_healthy torrust-mysql-1 10 3
 # todo: implement healthchecks for tracker and index and wait until they are healthy
@@ -60,16 +60,16 @@ sleep 20s
 docker ps
 
 # Run E2E tests with shared app instance
-TORRUST_IDX_BACK_E2E_SHARED=true TORRUST_IDX_BACK_E2E_CONFIG_PATH="./config-idx-back.sqlite.local.toml" cargo test || exit 1
+TORRUST_IDX_BACK_E2E_SHARED=true TORRUST_IDX_BACK_E2E_CONFIG_PATH="./share/default/config/index.container.sqlite3.toml" cargo test || exit 1
 
 # Stop E2E testing environment
-docker compose down
+./contrib/dev-tools/container/e2e/sqlite/e2e-env-down.sh || exit 1
 
 # TEST USING MYSQL
 echo "Running E2E tests using MySQL ..."
 
 # Start E2E testing environment
-./docker/bin/e2e/mysql/e2e-env-up.sh || exit 1
+./contrib/dev-tools/container/e2e/mysql/e2e-env-up.sh || exit 1
 
 wait_for_container_to_be_healthy torrust-mysql-1 10 3
 # todo: implement healthchecks for tracker and index and wait until they are healthy
@@ -91,7 +91,8 @@ echo "Creating MySQL database $MYSQL_DATABASE for for E2E testing ..."
 mysql -h $MYSQL_HOST -u $MYSQL_USER -p$MYSQL_PASSWORD -e "CREATE DATABASE IF NOT EXISTS $MYSQL_DATABASE;"
 
 # Run E2E tests with shared app instance
-TORRUST_IDX_BACK_E2E_SHARED=true TORRUST_IDX_BACK_E2E_CONFIG_PATH="./config-idx-back.mysql.local.toml" cargo test || exit 1
+TORRUST_IDX_BACK_E2E_SHARED=true TORRUST_IDX_BACK_E2E_CONFIG_PATH="./share/default/config/index.container.mysql.toml" cargo test || exit 1
 
 # Stop E2E testing environment
-docker compose down
+./contrib/dev-tools/container/e2e/mysql/e2e-env-down.sh || exit 1
+
