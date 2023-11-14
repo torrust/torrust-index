@@ -163,6 +163,10 @@ jobs:
         name: Make Build Clean
         run: cargo clean
 
-      - id: test
-        name: Run Integration Tests
-        run: ./contrib/dev-tools/container/e2e/run-e2e-tests.sh
+      - id: test-sqlite
+        name: Run Integration Tests (SQLite)
+        run: ./contrib/dev-tools/container/e2e/sqlite/run-e2e-tests.sh
+
+      - id: test-mysql
+        name: Run Integration Tests (MySQL)
+        run: ./contrib/dev-tools/container/e2e/mysql/run-e2e-tests.sh        

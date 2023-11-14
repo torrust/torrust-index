@@ -76,7 +76,7 @@ pub struct TorrentDetails {
 
 #[derive(Deserialize, PartialEq, Debug)]
 pub struct Category {
-    pub id: CategoryId,
+    pub category_id: CategoryId,
     pub name: String,
     pub num_torrents: u64,
 }
