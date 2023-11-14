@@ -114,7 +114,7 @@ impl TestEnv {
 
                     return match maybe_db_driver {
                         Ok(db_driver) => match db_driver {
-                            database::Driver::Sqlite3 => Some(db_path),
+                            database::Driver::Sqlite3 => Some(Self::overwrite_sqlite_path(&db_path, "./storage/index/lib")),
                             database::Driver::Mysql => Some(Self::overwrite_mysql_host(&db_path, "localhost")),
                         },
                         Err(_) => None,
@@ -127,7 +127,26 @@ impl TestEnv {
         }
     }
 
-    /// It overrides the "Host" in a `SQLx` database connection URL. For example:
+    /// It overrides the `SQLite` file path in a `SQLx` database connection URL.
+    /// For example:
+    ///
+    /// For:
+    ///
+    /// `sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc`.
+    ///
+    /// It changes the `mysql` host name to `localhost`:
+    ///
+    /// `sqlite://./storage/index/lib/database/sqlite3.db?mode=rwc`.
+    ///
+    /// For E2E tests, we use docker compose. Inside the container, the
+    /// `SQLite` file path is not the same as the host path.
+    fn overwrite_sqlite_path(db_path: &str, host_path: &str) -> String {
+        // todo: inject value with env var
+        db_path.replace("/var/lib/torrust/index", host_path)
+    }
+
+    /// It overrides the "Host" in a `SQLx` database connection URL.
+    /// For example:
     ///
     /// For:
     ///
@@ -138,10 +157,11 @@ impl TestEnv {
     /// `mysql://root:root_secret_password@localhost:3306/torrust_index_e2e_testing`.
     ///
     /// For E2E tests, we use docker compose, internally the index connects to
-    /// the database using the "mysql" host, which is the docker compose service
-    /// name, but tests connects directly to the localhost since the `MySQL`
-    /// is exposed to the host.
+    /// the `MySQL` database using the "mysql" host, which is the docker compose
+    /// service name, but tests connects directly to the localhost since the
+    /// `MySQL` is exposed to the host.
     fn overwrite_mysql_host(db_path: &str, new_host: &str) -> String {
+        // todo: inject value with env var
         db_path.replace("@mysql:", &format!("@{new_host}:"))
     }
 

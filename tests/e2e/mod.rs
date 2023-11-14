@@ -4,14 +4,14 @@
 //! against an in-process server (isolated).
 //!
 //! If you want to run the tests against an out-of-process server, you need to
-//! set the environment variable `TORRUST_IDX_BACK_E2E_SHARED` to `true`.
+//! set the environment variable `TORRUST_INDEX_E2E_SHARED` to `true`.
 //!
 //! > **NOTICE**: The server must be running before running the tests. The
 //! server url is hardcoded to `http://localhost:3001` for now. We are planning
 //! to make it configurable in the future via a environment variable.
 //!
 //! ```text
-//! TORRUST_IDX_BACK_E2E_SHARED=true cargo test
+//! TORRUST_INDEX_E2E_SHARED=true cargo test
 //! ```
 //!
 //! If you want to run the tests against an isolated server, you need to execute

@@ -74,9 +74,19 @@ pub struct TorrentDetails {
     pub encoding: Option<String>,
 }
 
+#[rustversion::stable]
 #[derive(Deserialize, PartialEq, Debug)]
 pub struct Category {
-    pub id: CategoryId,
+    pub category_id: CategoryId, // todo: rename to `id`
+    pub name: String,
+    pub num_torrents: u64,
+}
+
+#[rustversion::nightly]
+#[derive(Deserialize, PartialEq, Debug)]
+#[allow(clippy::struct_field_names)]
+pub struct Category {
+    pub category_id: CategoryId, // todo: rename to `id`
     pub name: String,
     pub num_torrents: u64,
 }

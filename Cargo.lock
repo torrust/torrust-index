@@ -3008,6 +3008,7 @@ dependencies = [
  "rand_core",
  "regex",
  "reqwest",
+ "rustversion",
  "serde",
  "serde_bencode",
  "serde_bytes",

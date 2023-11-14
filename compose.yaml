@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: ./Containerfile
-      target: debug     
+      target: release
     tty: true
     environment:
       - TORRUST_INDEX_CONFIG=${TORRUST_INDEX_CONFIG}

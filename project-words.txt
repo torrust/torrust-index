@@ -68,6 +68,7 @@ rowid
 RUSTDOCFLAGS
 RUSTFLAGS
 rustfmt
+rustversion
 serde
 sgxj
 singlepart

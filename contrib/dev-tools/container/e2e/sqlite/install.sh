@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script is only intended to be used for local development or testing environments.
+# This script is only intended to be used for E2E testing environment.
 
 # Generate storage directory if it does not exist
 mkdir -p ./storage/index/lib/database
