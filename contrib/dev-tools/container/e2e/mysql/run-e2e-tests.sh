@@ -59,15 +59,8 @@ sleep 20s
 # Just to make sure that everything is up and running
 docker ps
 
-# Database credentials
-MYSQL_USER="root"
-MYSQL_PASSWORD="root_secret_password"
-MYSQL_HOST="localhost"
-MYSQL_DATABASE="torrust_index_e2e_testing"
-
-# Create the MySQL database for the index. Assumes MySQL client is installed.
-echo "Creating MySQL database $MYSQL_DATABASE for for E2E testing ..."
-mysql -h $MYSQL_HOST -u $MYSQL_USER -p$MYSQL_PASSWORD -e "CREATE DATABASE IF NOT EXISTS $MYSQL_DATABASE;"
+# Install MySQL database for the index
+./contrib/dev-tools/container/e2e/mysql/install.sh || exit 1
 
 # Run E2E tests with shared app instance
 TORRUST_INDEX_E2E_SHARED=true TORRUST_INDEX_E2E_PATH_CONFIG="./share/default/config/index.container.mysql.toml" cargo test || exit 1

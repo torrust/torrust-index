@@ -169,4 +169,4 @@ jobs:
 
       - id: test-mysql
         name: Run Integration Tests (MySQL)
-        run: ./contrib/dev-tools/container/e2e/mysql/run-e2e-tests.sh        
+        run: ./contrib/dev-tools/container/e2e/mysql/run-e2e-tests.sh
