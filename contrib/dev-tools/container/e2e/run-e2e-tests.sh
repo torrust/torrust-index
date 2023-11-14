@@ -60,7 +60,7 @@ sleep 20s
 docker ps
 
 # Run E2E tests with shared app instance
-TORRUST_IDX_BACK_E2E_SHARED=true TORRUST_IDX_BACK_E2E_CONFIG_PATH="./share/default/config/index.container.sqlite3.toml" cargo test || exit 1
+TORRUST_INDEX_E2E_SHARED=true TORRUST_INDEX_E2E_PATH_CONFIG="./share/default/config/index.container.sqlite3.toml" cargo test || exit 1
 
 # Stop E2E testing environment
 ./contrib/dev-tools/container/e2e/sqlite/e2e-env-down.sh || exit 1
@@ -91,7 +91,7 @@ echo "Creating MySQL database $MYSQL_DATABASE for for E2E testing ..."
 mysql -h $MYSQL_HOST -u $MYSQL_USER -p$MYSQL_PASSWORD -e "CREATE DATABASE IF NOT EXISTS $MYSQL_DATABASE;"
 
 # Run E2E tests with shared app instance
-TORRUST_IDX_BACK_E2E_SHARED=true TORRUST_IDX_BACK_E2E_CONFIG_PATH="./share/default/config/index.container.mysql.toml" cargo test || exit 1
+TORRUST_INDEX_E2E_SHARED=true TORRUST_INDEX_E2E_PATH_CONFIG="./share/default/config/index.container.mysql.toml" cargo test || exit 1
 
 # Stop E2E testing environment
 ./contrib/dev-tools/container/e2e/mysql/e2e-env-down.sh || exit 1
