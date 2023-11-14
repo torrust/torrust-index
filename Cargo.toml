@@ -56,6 +56,7 @@ pbkdf2 = { version = "0", features = ["simple"] }
 rand_core = { version = "0", features = ["std"] }
 regex = "1"
 reqwest = { version = "0", features = ["json", "multipart"] }
+rustversion = "1.0.14"
 serde = { version = "1", features = ["rc"] }
 serde_bencode = "0"
 serde_bytes = "0"
