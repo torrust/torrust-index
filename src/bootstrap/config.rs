@@ -20,7 +20,7 @@ pub const ENV_VAR_PATH_CONFIG: &str = "TORRUST_INDEX_PATH_CONFIG";
 pub const DEFAULT_PATH_CONFIG: &str = "./share/default/config/index.development.sqlite3.toml";
 
 /// If present, CORS will be permissive.
-pub const ENV_VAR_CORS_PERMISSIVE: &str = "TORRUST_INDEX_BACK_CORS_PERMISSIVE";
+pub const ENV_VAR_CORS_PERMISSIVE: &str = "TORRUST_INDEX_API_CORS_PERMISSIVE";
 
 /// It loads the application configuration from the environment.
 ///

@@ -110,9 +110,9 @@
 //!
 //! ```text
 //! mkdir -p ./storage/database \
-//!   && export TORRUST_IDX_BACK_USER_UID=1000 \
+//!   && export USER_ID=1000 \
 //!   && docker run -it \
-//!     --user="$TORRUST_IDX_BACK_USER_UID" \
+//!     --user="$USER_ID" \
 //!     --publish 3001:3001/tcp \
 //!     --volume "$(pwd)/storage":"/app/storage" \
 //!     torrust/index
@@ -204,10 +204,10 @@
 //!
 //! For more information about configuration you can visit the documentation for the [`config`]) module.
 //!
-//! Alternatively to the `config.toml` file you can use one environment variable `TORRUST_IDX_BACK_CONFIG` to pass the configuration to the tracker:
+//! Alternatively to the `config.toml` file you can use one environment variable `TORRUST_INDEX_CONFIG` to pass the configuration to the tracker:
 //!
 //! ```text
-//! TORRUST_IDX_BACK_CONFIG=$(cat config.toml)
+//! TORRUST_INDEX_CONFIG=$(cat config.toml)
 //! cargo run
 //! ```
 //!
@@ -215,9 +215,9 @@
 //!
 //! The env var contains the same data as the `config.toml`. It's particularly useful in you are [running the index with docker](https://github.com/torrust/torrust-index/tree/develop/docker).
 //!
-//! > **NOTICE**: The `TORRUST_IDX_BACK_CONFIG` env var has priority over the `config.toml` file.
+//! > **NOTICE**: The `TORRUST_INDEX_CONFIG` env var has priority over the `config.toml` file.
 //!
-//! > **NOTICE**: You can also change the location for the configuration file with the `TORRUST_IDX_BACK_CONFIG_PATH` env var.
+//! > **NOTICE**: You can also change the location for the configuration file with the `TORRUST_INDEX_CONFIG_PATH` env var.
 //!
 //! # Usage
 //!
