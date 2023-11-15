@@ -8,6 +8,7 @@ services:
       target: release
     tty: true
     environment:
+      - USER_ID=${USER_ID}
       - TORRUST_INDEX_CONFIG=${TORRUST_INDEX_CONFIG}
       - TORRUST_INDEX_DATABASE_DRIVER=${TORRUST_INDEX_DATABASE_DRIVER:-sqlite3}
       - TORRUST_INDEX_TRACKER_API_TOKEN=${TORRUST_INDEX_TRACKER_API_TOKEN:-MyAccessToken}
@@ -28,6 +29,7 @@ services:
     image: torrust/tracker:develop
     tty: true
     environment:
+      - USER_ID=${USER_ID}
       - TORRUST_TRACKER_CONFIG=${TORRUST_TRACKER_CONFIG}
       - TORRUST_TRACKER_DATABASE_DRIVER=${TORRUST_TRACKER_DATABASE_DRIVER:-sqlite3}
       - TORRUST_TRACKER_API_ADMIN_TOKEN=${TORRUST_TRACKER_API_ADMIN_TOKEN:-MyAccessToken}
