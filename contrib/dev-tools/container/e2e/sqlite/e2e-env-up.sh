@@ -11,3 +11,4 @@ USER_ID=${USER_ID:-1000} \
     TORRUST_TRACKER_DATABASE_DRIVER="sqlite3" \
     TORRUST_TRACKER_API_ADMIN_TOKEN="MyAccessToken" \
     docker compose up -d
+
