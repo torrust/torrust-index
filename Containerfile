@@ -85,7 +85,9 @@ COPY --from=build \
 RUN cargo nextest run --workspace-remap /test/src/ --extract-to /test/src/ --no-run --archive-file /test/torrust-index.tar.zst
 RUN cargo nextest run --workspace-remap /test/src/ --target-dir-remap /test/src/target/ --cargo-metadata /test/src/target/nextest/cargo-metadata.json --binaries-metadata /test/src/target/nextest/binaries-metadata.json
 
-RUN mkdir -p /app/bin/; cp -l /test/src/target/release/torrust-index /app/bin/torrust-index
+RUN mkdir -p /app/bin/; \
+  cp -l /test/src/target/release/torrust-index /app/bin/torrust-index; \
+  cp -l /test/src/target/release/health_check /app/bin/health_check;
 # RUN mkdir -p /app/lib/; cp -l $(realpath $(ldd /app/bin/torrust-index | grep "libz\.so\.1" | awk '{print $3}')) /app/lib/libz.so.1
 RUN chown -R root:root /app; chmod -R u=rw,go=r,a+X /app; chmod -R a+x /app/bin
 
@@ -99,11 +101,13 @@ ARG TORRUST_INDEX_PATH_CONFIG="/etc/torrust/index/index.toml"
 ARG TORRUST_INDEX_DATABASE_DRIVER="sqlite3"
 ARG USER_ID=1000
 ARG API_PORT=3001
+ARG IMPORTER_API_PORT=3002
 
 ENV TORRUST_INDEX_PATH_CONFIG=${TORRUST_INDEX_PATH_CONFIG}
 ENV TORRUST_INDEX_DATABASE_DRIVER=${TORRUST_INDEX_DATABASE_DRIVER}
 ENV USER_ID=${USER_ID}
 ENV API_PORT=${API_PORT}
+ENV IMPORTER_API_PORT=${IMPORTER_API_PORT}
 ENV TZ=Etc/UTC
 
 EXPOSE ${API_PORT}/tcp
@@ -130,5 +134,6 @@ CMD ["sh"]
 FROM runtime as release
 ENV RUNTIME="release"
 COPY --from=test /app/ /usr/
-# HEALTHCHECK CMD ["/usr/bin/wget", "--no-verbose", "--tries=1", "--spider", "localhost:${API_PORT}/version"]
+HEALTHCHECK --interval=5s --timeout=5s --start-period=3s --retries=3 \  
+  CMD /usr/bin/health_check http://localhost:${API_PORT}/health_check && /usr/bin/health_check http://localhost:${IMPORTER_API_PORT}/health_check || exit 1
 CMD ["/usr/bin/torrust-index"]

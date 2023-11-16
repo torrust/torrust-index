@@ -25,10 +25,10 @@ echo "Running E2E tests using MySQL ..."
 ./contrib/dev-tools/container/e2e/mysql/e2e-env-up.sh || exit 1
 
 # Wait for conatiners to be healthy
-./contrib/dev-tools/container/functions/wait_for_container_to_be_healthy.sh torrust-mysql-1 10 3
-# todo: implement healthchecks for tracker and index and wait until they are healthy
-#wait_for_container torrust-tracker-1 10 3
-#wait_for_container torrust-idx-back-1 10 3
+./contrib/dev-tools/container/functions/wait_for_container_to_be_healthy.sh torrust-mysql-1 10 3 || exit 1
+# todo: implement healthchecks for the tracker and wait until it's healthy
+#./contrib/dev-tools/container/functions/wait_for_container_to_be_healthy.sh torrust-tracker-1 10 3
+./contrib/dev-tools/container/functions/wait_for_container_to_be_healthy.sh  torrust-index-1 10 3 || exit 1
 sleep 20s
 
 # Just to make sure that everything is up and running

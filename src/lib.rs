@@ -200,6 +200,7 @@
 //!
 //! [tracker_statistics_importer]
 //! torrent_info_update_interval = 3600
+//! port = 3002
 //! ```
 //!
 //! For more information about configuration you can visit the documentation for the [`config`]) module.

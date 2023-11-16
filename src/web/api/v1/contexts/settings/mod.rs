@@ -75,6 +75,7 @@
 //!     },
 //!     "tracker_statistics_importer": {
 //!       "torrent_info_update_interval": 3600
+//!       "port": 3002
 //!     }
 //!   }
 //! }
