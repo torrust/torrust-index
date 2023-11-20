@@ -132,11 +132,11 @@ impl TestEnv {
     ///
     /// For:
     ///
-    /// `sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc`.
+    /// `sqlite:///var/lib/torrust/index/database/e2e_testing_sqlite3.db?mode=rwc`.
     ///
     /// It changes the `mysql` host name to `localhost`:
     ///
-    /// `sqlite://./storage/index/lib/database/sqlite3.db?mode=rwc`.
+    /// `sqlite://./storage/index/lib/database/e2e_testing_sqlite3.db?mode=rwc`.
     ///
     /// For E2E tests, we use docker compose. Inside the container, the
     /// `SQLite` file path is not the same as the host path.

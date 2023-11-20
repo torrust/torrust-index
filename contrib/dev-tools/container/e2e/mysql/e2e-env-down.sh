@@ -1,6 +1,5 @@
 #!/bin/bash
 
-TORRUST_INDEX_CONFIG=$(cat ./share/default/config/index.container.mysql.toml) \
-    TORRUST_TRACKER_CONFIG=$(cat ./share/default/config/tracker.container.mysql.toml) \
+TORRUST_INDEX_CONFIG=$(cat ./share/default/config/index.e2e.container.mysql.toml) \
+    TORRUST_TRACKER_CONFIG=$(cat ./share/default/config/tracker.e2e.container.sqlite.toml) \
     docker compose down
-
