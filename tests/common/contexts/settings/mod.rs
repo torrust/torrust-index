@@ -82,6 +82,7 @@ pub struct Api {
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct TrackerStatisticsImporter {
     pub torrent_info_update_interval: u64,
+    port: u16,
 }
 
 impl From<DomainSettings> for Settings {
@@ -185,6 +186,7 @@ impl From<DomainTrackerStatisticsImporter> for TrackerStatisticsImporter {
     fn from(tracker_statistics_importer: DomainTrackerStatisticsImporter) -> Self {
         Self {
             torrent_info_update_interval: tracker_statistics_importer.torrent_info_update_interval,
+            port: tracker_statistics_importer.port,
         }
     }
 }

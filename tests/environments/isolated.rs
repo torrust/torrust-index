@@ -82,6 +82,9 @@ fn ephemeral(temp_dir: &TempDir) -> config::TorrustIndex {
     // Ephemeral API port
     configuration.net.port = FREE_PORT;
 
+    // Ephemeral Importer API port
+    configuration.tracker_statistics_importer.port = FREE_PORT;
+
     // Ephemeral SQLite database
     configuration.database.connect_url = format!("sqlite://{}?mode=rwc", random_database_file_path_in(temp_dir));
 

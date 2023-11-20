@@ -19,8 +19,8 @@ use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbU
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::web::api::v1::auth::Authentication;
-use crate::web::api::{start, Version};
-use crate::{mailer, tracker};
+use crate::web::api::Version;
+use crate::{console, mailer, tracker, web};
 
 pub struct Running {
     pub api_socket_addr: SocketAddr,
@@ -46,8 +46,12 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
 
     let settings = configuration.settings.read().await;
 
+    // From [database] config
     let database_connect_url = settings.database.connect_url.clone();
-    let torrent_info_update_interval = settings.tracker_statistics_importer.torrent_info_update_interval;
+    // From [importer] config
+    let importer_torrent_info_update_interval = settings.tracker_statistics_importer.torrent_info_update_interval;
+    let importer_port = settings.tracker_statistics_importer.port;
+    // From [net] config
     let net_ip = "0.0.0.0".to_string();
     let net_port = settings.net.port;
 
@@ -153,29 +157,18 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         ban_service,
     ));
 
-    // Start repeating task to import tracker torrent data and updating
+    // Start cronjob to import tracker torrent data and updating
     // seeders and leechers info.
-
-    let weak_tracker_statistics_importer = Arc::downgrade(&tracker_statistics_importer);
-
-    let tracker_statistics_importer_handle = tokio::spawn(async move {
-        let interval = std::time::Duration::from_secs(torrent_info_update_interval);
-        let mut interval = tokio::time::interval(interval);
-        interval.tick().await; // first tick is immediate...
-        loop {
-            interval.tick().await;
-            if let Some(tracker) = weak_tracker_statistics_importer.upgrade() {
-                drop(tracker.import_all_torrents_statistics().await);
-            } else {
-                break;
-            }
-        }
-    });
+    let tracker_statistics_importer_handle = console::tracker_statistics_importer::start(
+        importer_port,
+        importer_torrent_info_update_interval,
+        &tracker_statistics_importer,
+    );
 
     // Start API server
+    let running_api = web::api::start(app_data, &net_ip, net_port, api_version).await;
 
-    let running_api = start(app_data, &net_ip, net_port, api_version).await;
-
+    // Full running application
     Running {
         api_socket_addr: running_api.socket_addr,
         api_server: running_api.api_server,
