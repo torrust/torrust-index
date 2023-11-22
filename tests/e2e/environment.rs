@@ -1,9 +1,8 @@
 use std::env;
 
-use torrust_index::databases::database;
 use torrust_index::web::api::Version;
 
-use super::config::{initialize_configuration, ENV_VAR_INDEX_SHARED};
+use super::config::{initialize_configuration, ENV_VAR_DB_CONNECT_URL, ENV_VAR_INDEX_SHARED};
 use crate::common::contexts::settings::Settings;
 use crate::environments::{isolated, shared};
 
@@ -98,9 +97,10 @@ impl TestEnv {
 
     /// Provides a database connect URL to connect to the database. For example:
     ///
-    /// `sqlite://storage/database/torrust_index_e2e_testing.db?mode=rwc`.
+    /// - `sqlite://storage/database/torrust_index_e2e_testing.db?mode=rwc`.
+    /// - `mysql://root:root_secret_password@localhost:3306/torrust_index_e2e_testing`.
     ///
-    /// It's used to run SQL queries against the database needed for some tests.
+    /// It's used to run SQL queries against the E2E database needed for some tests.
     pub fn database_connect_url(&self) -> Option<String> {
         let internal_connect_url = self
             .starting_settings
@@ -109,60 +109,17 @@ impl TestEnv {
 
         match self.state() {
             State::RunningShared => {
-                if let Some(db_path) = internal_connect_url {
-                    let maybe_db_driver = database::get_driver(&db_path);
+                let connect_url_env_var = ENV_VAR_DB_CONNECT_URL;
 
-                    return match maybe_db_driver {
-                        Ok(db_driver) => match db_driver {
-                            database::Driver::Sqlite3 => Some(Self::overwrite_sqlite_path(&db_path, "./storage/index/lib")),
-                            database::Driver::Mysql => Some(Self::overwrite_mysql_host(&db_path, "localhost")),
-                        },
-                        Err(_) => None,
-                    };
+                if let Ok(connect_url) = env::var(connect_url_env_var) {
+                    Some(connect_url)
+                } else {
+                    None
                 }
-                None
             }
             State::RunningIsolated => internal_connect_url,
             State::Stopped => None,
         }
-    }
-
-    /// It overrides the `SQLite` file path in a `SQLx` database connection URL.
-    /// For example:
-    ///
-    /// For:
-    ///
-    /// `sqlite:///var/lib/torrust/index/database/e2e_testing_sqlite3.db?mode=rwc`.
-    ///
-    /// It changes the `mysql` host name to `localhost`:
-    ///
-    /// `sqlite://./storage/index/lib/database/e2e_testing_sqlite3.db?mode=rwc`.
-    ///
-    /// For E2E tests, we use docker compose. Inside the container, the
-    /// `SQLite` file path is not the same as the host path.
-    fn overwrite_sqlite_path(db_path: &str, host_path: &str) -> String {
-        // todo: inject value with env var
-        db_path.replace("/var/lib/torrust/index", host_path)
-    }
-
-    /// It overrides the "Host" in a `SQLx` database connection URL.
-    /// For example:
-    ///
-    /// For:
-    ///
-    /// `mysql://root:root_secret_password@mysql:3306/torrust_index_e2e_testing`.
-    ///
-    /// It changes the `mysql` host name to `localhost`:
-    ///
-    /// `mysql://root:root_secret_password@localhost:3306/torrust_index_e2e_testing`.
-    ///
-    /// For E2E tests, we use docker compose, internally the index connects to
-    /// the `MySQL` database using the "mysql" host, which is the docker compose
-    /// service name, but tests connects directly to the localhost since the
-    /// `MySQL` is exposed to the host.
-    fn overwrite_mysql_host(db_path: &str, new_host: &str) -> String {
-        // todo: inject value with env var
-        db_path.replace("@mysql:", &format!("@{new_host}:"))
     }
 
     fn state(&self) -> State {
