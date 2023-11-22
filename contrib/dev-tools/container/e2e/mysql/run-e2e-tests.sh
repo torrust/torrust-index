@@ -10,6 +10,9 @@ TORRUST_TRACKER_USER_UID=$CURRENT_USER_ID
 export USER_ID
 export TORRUST_TRACKER_USER_UID
 
+export TORRUST_INDEX_DATABASE="torrust_index_e2e_testing"
+export TORRUST_TRACKER_DATABASE="e2e_testing_sqlite3"
+
 # Install tool to create torrent files.
 # It's needed by some tests to generate and parse test torrent files.
 cargo install imdl || exit 1
@@ -38,7 +41,7 @@ docker ps
 ./contrib/dev-tools/container/e2e/mysql/install.sh || exit 1
 
 # Run E2E tests with shared app instance
-TORRUST_INDEX_E2E_SHARED=true TORRUST_INDEX_E2E_PATH_CONFIG="./share/default/config/index.container.mysql.toml" cargo test || exit 1
+TORRUST_INDEX_E2E_SHARED=true TORRUST_INDEX_E2E_PATH_CONFIG="./share/default/config/index.e2e.container.mysql.toml" cargo test || exit 1
 
 # Stop E2E testing environment
 ./contrib/dev-tools/container/e2e/mysql/e2e-env-down.sh || exit 1
