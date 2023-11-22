@@ -23,6 +23,9 @@ pub const DEFAULT_PATH_CONFIG: &str = "./share/default/config/index.development.
 /// If present, E2E tests will run against a shared instance of the server
 pub const ENV_VAR_INDEX_SHARED: &str = "TORRUST_INDEX_E2E_SHARED";
 
+/// `SQLx` connection string to connect to the E2E database
+pub const ENV_VAR_DB_CONNECT_URL: &str = "TORRUST_INDEX_E2E_DB_CONNECT_URL";
+
 /// It loads the application configuration from the environment.
 ///
 /// There are two methods to inject the configuration:
