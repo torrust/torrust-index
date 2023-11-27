@@ -29,10 +29,8 @@ echo "Running E2E tests using MySQL ..."
 
 # Wait for conatiners to be healthy
 ./contrib/dev-tools/container/functions/wait_for_container_to_be_healthy.sh torrust-mysql-1 10 3 || exit 1
-# todo: implement healthchecks for the tracker and wait until it's healthy
-#./contrib/dev-tools/container/functions/wait_for_container_to_be_healthy.sh torrust-tracker-1 10 3
+./contrib/dev-tools/container/functions/wait_for_container_to_be_healthy.sh torrust-tracker-1 10 3 || exit 1
 ./contrib/dev-tools/container/functions/wait_for_container_to_be_healthy.sh  torrust-index-1 10 3 || exit 1
-sleep 20s
 
 # Just to make sure that everything is up and running
 docker ps
