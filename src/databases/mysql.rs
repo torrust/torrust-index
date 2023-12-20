@@ -34,8 +34,8 @@ impl Database for Mysql {
     async fn new(database_url: &str) -> Self {
         let connection_options = MySqlConnectOptions::from_str(database_url)
             .expect("Unable to create connection options.")
-            .log_statements(log::LevelFilter::Error)
-            .log_slow_statements(log::LevelFilter::Warn, Duration::from_secs(1));
+            .log_statements(log::LevelFilter::Debug)
+            .log_slow_statements(log::LevelFilter::Info, Duration::from_secs(1));
 
         let db = MySqlPoolOptions::new()
             .connect_with(connection_options)

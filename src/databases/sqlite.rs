@@ -34,8 +34,8 @@ impl Database for Sqlite {
     async fn new(database_url: &str) -> Self {
         let connection_options = SqliteConnectOptions::from_str(database_url)
             .expect("Unable to create connection options.")
-            .log_statements(log::LevelFilter::Error)
-            .log_slow_statements(log::LevelFilter::Warn, Duration::from_secs(1));
+            .log_statements(log::LevelFilter::Debug)
+            .log_slow_statements(log::LevelFilter::Info, Duration::from_secs(1));
 
         let db = SqlitePoolOptions::new()
             .connect_with(connection_options)
@@ -259,7 +259,7 @@ impl Database for Sqlite {
     }
 
     async fn get_categories(&self) -> Result<Vec<Category>, database::Error> {
-        query_as::<_, Category>("SELECT tc.category_id, tc.name, COUNT(tt.category_id) as num_torrents FROM torrust_categories tc LEFT JOIN torrust_torrents tt on tc.category_id = tt.category_id GROUP BY tc.name")
+        query_as::<_, Category>("SELECT tc.category_id, tc.name, COUNT(tt.category_id) as num_torrents FROM torrust_categories tc LEFT JOIN torrust_torrents tt on tc.category_id = tt.category_id GROUP BY tc.name;")
             .fetch_all(&self.pool)
             .await
             .map_err(|_| database::Error::Error)
