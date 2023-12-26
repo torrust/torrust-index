@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use hyper::StatusCode;
 use log::error;
+use reqwest::Response;
 use serde::{Deserialize, Serialize};
 
 use super::api::{Client, ConnectionInfo};
@@ -11,7 +12,7 @@ use crate::errors::ServiceError;
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::UserId;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct TorrentInfo {
     pub info_hash: String,
     pub seeders: i64,
@@ -20,7 +21,7 @@ pub struct TorrentInfo {
     pub peers: Vec<Peer>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Peer {
     pub peer_id: Option<PeerId>,
     pub peer_addr: Option<String>,
@@ -31,7 +32,7 @@ pub struct Peer {
     pub event: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct PeerId {
     pub id: Option<String>,
     pub client: Option<String>,
@@ -140,30 +141,7 @@ impl Service {
             .await
             .map_err(|_| ServiceError::InternalServerError)?;
 
-        if response.status() == StatusCode::NOT_FOUND {
-            return Err(ServiceError::TorrentNotFound);
-        }
-
-        let body = response.text().await;
-
-        if let Ok(body) = body {
-            if body == *"torrent not known" {
-                // todo: temporary fix. the service should return a 404 (StatusCode::NOT_FOUND).
-                return Err(ServiceError::TorrentNotFound);
-            }
-
-            let torrent_info = serde_json::from_str(&body);
-
-            if let Ok(torrent_info) = torrent_info {
-                Ok(torrent_info)
-            } else {
-                error!("Failed to parse torrent info from tracker response. Body: {}", body);
-                Err(ServiceError::InternalServerError)
-            }
-        } else {
-            error!("Tracker API response without body");
-            Err(ServiceError::InternalServerError)
-        }
+        map_torrent_info_response(response).await
     }
 
     /// It builds the announce url appending the user tracker key.
@@ -193,5 +171,104 @@ impl Service {
 
         // return tracker key
         Ok(tracker_key)
+    }
+}
+
+async fn map_torrent_info_response(response: Response) -> Result<TorrentInfo, ServiceError> {
+    if response.status() == StatusCode::NOT_FOUND {
+        return Err(ServiceError::TorrentNotFound);
+    }
+
+    let body = response.text().await.map_err(|_| {
+        error!("Tracker API response without body");
+        ServiceError::InternalServerError
+    })?;
+
+    if body == *"torrent not known" {
+        // todo: temporary fix. the service should return a 404 (StatusCode::NOT_FOUND).
+        return Err(ServiceError::TorrentNotFound);
+    }
+
+    serde_json::from_str(&body).map_err(|e| {
+        error!(
+            "Failed to parse torrent info from tracker response. Body: {}, Error: {}",
+            body, e
+        );
+        ServiceError::InternalServerError
+    })
+}
+
+#[cfg(test)]
+mod tests {
+
+    mod getting_the_torrent_info_from_the_tracker {
+        use hyper::{Response, StatusCode};
+
+        use crate::errors::ServiceError;
+        use crate::tracker::service::{map_torrent_info_response, TorrentInfo};
+
+        #[tokio::test]
+        async fn it_should_return_a_torrent_not_found_response_when_the_tracker_returns_the_current_torrent_not_known_response() {
+            let tracker_response = Response::new("torrent not known");
+
+            let result = map_torrent_info_response(tracker_response.into()).await.unwrap_err();
+
+            assert_eq!(result, ServiceError::TorrentNotFound);
+        }
+
+        #[tokio::test]
+        async fn it_should_return_a_torrent_not_found_response_when_the_tracker_returns_the_future_torrent_not_known_response() {
+            // In the future the tracker should return a 4040 response.
+            // See: https://github.com/torrust/torrust-tracker/issues/144
+
+            let tracker_response = Response::builder().status(StatusCode::NOT_FOUND).body("").unwrap();
+
+            let result = map_torrent_info_response(tracker_response.into()).await.unwrap_err();
+
+            assert_eq!(result, ServiceError::TorrentNotFound);
+        }
+
+        #[tokio::test]
+        async fn it_should_return_the_torrent_info_when_the_tracker_returns_the_torrent_info() {
+            let body = r#"
+                {
+                    "info_hash": "4f2ae7294f2c4865c38565f92a077d1591a0dd41",
+                    "seeders": 0,
+                    "completed": 0,
+                    "leechers": 0,
+                    "peers": []
+                }
+            "#;
+
+            let tracker_response = Response::new(body);
+
+            let torrent_info = map_torrent_info_response(tracker_response.into()).await.unwrap();
+
+            assert_eq!(
+                torrent_info,
+                TorrentInfo {
+                    info_hash: "4f2ae7294f2c4865c38565f92a077d1591a0dd41".to_string(),
+                    seeders: 0,
+                    completed: 0,
+                    leechers: 0,
+                    peers: vec![]
+                }
+            );
+        }
+
+        #[tokio::test]
+        async fn it_should_return_an_internal_server_error_when_the_tracker_response_cannot_be_parsed() {
+            let invalid_json_body_for_torrent_info = r#"
+                {
+                    "field": "value"
+                }
+            "#;
+
+            let tracker_response = Response::new(invalid_json_body_for_torrent_info);
+
+            let result = map_torrent_info_response(tracker_response.into()).await.unwrap_err();
+
+            assert_eq!(result, ServiceError::InternalServerError);
+        }
     }
 }

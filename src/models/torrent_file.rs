@@ -70,11 +70,7 @@ impl Torrent {
     /// This function will panic if the `torrent_info.pieces` is not a valid
     /// hex string.
     #[must_use]
-    pub fn from_database(
-        db_torrent: &DbTorrent,
-        torrent_files: &Vec<TorrentFile>,
-        torrent_announce_urls: Vec<Vec<String>>,
-    ) -> Self {
+    pub fn from_database(db_torrent: &DbTorrent, torrent_files: &[TorrentFile], torrent_announce_urls: Vec<Vec<String>>) -> Self {
         let info_dict = TorrentInfoDictionary::with(
             &db_torrent.name,
             db_torrent.piece_length,
@@ -195,14 +191,7 @@ impl TorrentInfoDictionary {
     /// - The `pieces` field is not a valid hex string.
     /// - For single files torrents the `TorrentFile` path is empty.
     #[must_use]
-    pub fn with(
-        name: &str,
-        piece_length: i64,
-        private: Option<u8>,
-        root_hash: i64,
-        pieces: &str,
-        files: &Vec<TorrentFile>,
-    ) -> Self {
+    pub fn with(name: &str, piece_length: i64, private: Option<u8>, root_hash: i64, pieces: &str, files: &[TorrentFile]) -> Self {
         let mut info_dict = Self {
             name: name.to_string(),
             pieces: None,
@@ -249,7 +238,7 @@ impl TorrentInfoDictionary {
 
             info_dict.path = path;
         } else {
-            info_dict.files = Some(files.clone());
+            info_dict.files = Some(files.to_vec());
         }
 
         info_dict
