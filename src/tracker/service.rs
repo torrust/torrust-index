@@ -184,7 +184,7 @@ async fn map_torrent_info_response(response: Response) -> Result<TorrentInfo, Se
         ServiceError::InternalServerError
     })?;
 
-    if body == *"torrent not known" {
+    if body == "\"torrent not known\"" {
         // todo: temporary fix. the service should return a 404 (StatusCode::NOT_FOUND).
         return Err(ServiceError::TorrentNotFound);
     }
@@ -209,7 +209,7 @@ mod tests {
 
         #[tokio::test]
         async fn it_should_return_a_torrent_not_found_response_when_the_tracker_returns_the_current_torrent_not_known_response() {
-            let tracker_response = Response::new("torrent not known");
+            let tracker_response = Response::new("\"torrent not known\"");
 
             let result = map_torrent_info_response(tracker_response.into()).await.unwrap_err();
 

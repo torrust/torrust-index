@@ -34,14 +34,13 @@ impl Client {
     ///
     /// Will return an error if the HTTP request fails.
     pub async fn whitelist_torrent(&self, info_hash: &str) -> Result<Response, Error> {
-        let request_url = format!(
-            "{}/whitelist/{}?token={}",
-            self.base_url, info_hash, self.connection_info.token
-        );
+        let request_url = format!("{}/whitelist/{}", self.base_url, info_hash);
 
         let client = reqwest::Client::new();
 
-        client.post(request_url).send().await
+        let params = [("token", &self.connection_info.token)];
+
+        client.post(request_url).query(&params).send().await
     }
 
     /// Remove a torrent from the tracker whitelist.
@@ -50,14 +49,13 @@ impl Client {
     ///
     /// Will return an error if the HTTP request fails.
     pub async fn remove_torrent_from_whitelist(&self, info_hash: &str) -> Result<Response, Error> {
-        let request_url = format!(
-            "{}/whitelist/{}?token={}",
-            self.base_url, info_hash, self.connection_info.token
-        );
+        let request_url = format!("{}/whitelist/{}", self.base_url, info_hash);
 
         let client = reqwest::Client::new();
 
-        client.delete(request_url).send().await
+        let params = [("token", &self.connection_info.token)];
+
+        client.delete(request_url).query(&params).send().await
     }
 
     /// Retrieve a new tracker key.
@@ -66,14 +64,13 @@ impl Client {
     ///
     /// Will return an error if the HTTP request fails.
     pub async fn retrieve_new_tracker_key(&self, token_valid_seconds: u64) -> Result<Response, Error> {
-        let request_url = format!(
-            "{}/key/{}?token={}",
-            self.base_url, token_valid_seconds, self.connection_info.token
-        );
+        let request_url = format!("{}/key/{}", self.base_url, token_valid_seconds);
 
         let client = reqwest::Client::new();
 
-        client.post(request_url).send().await
+        let params = [("token", &self.connection_info.token)];
+
+        client.post(request_url).query(&params).send().await
     }
 
     /// Retrieve the info for a torrent.
@@ -82,10 +79,12 @@ impl Client {
     ///
     /// Will return an error if the HTTP request fails.
     pub async fn get_torrent_info(&self, info_hash: &str) -> Result<Response, Error> {
-        let request_url = format!("{}/torrent/{}?token={}", self.base_url, info_hash, self.connection_info.token);
+        let request_url = format!("{}/torrent/{}", self.base_url, info_hash);
 
         let client = reqwest::Client::new();
 
-        client.get(request_url).send().await
+        let params = [("token", &self.connection_info.token)];
+
+        client.get(request_url).query(&params).send().await
     }
 }
