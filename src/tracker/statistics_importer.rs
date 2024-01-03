@@ -2,10 +2,9 @@ use std::sync::Arc;
 
 use log::{error, info};
 
-use super::service::{Service, TorrentInfo};
+use super::service::{Service, TorrentInfo, TrackerAPIError};
 use crate::config::Configuration;
 use crate::databases::database::{self, Database};
-use crate::errors::ServiceError;
 
 pub struct StatisticsImporter {
     database: Arc<Box<dyn Database>>,
@@ -39,22 +38,12 @@ impl StatisticsImporter {
 
             let ret = self.import_torrent_statistics(torrent.torrent_id, &torrent.info_hash).await;
 
-            // code-review: should we treat differently for each case?. The
-            // tracker API could be temporarily offline, or there could be a
-            // tracker misconfiguration.
-            //
-            // This is the log when the torrent is not found in the tracker:
-            //
-            // ```
-            // 2023-05-09T13:31:24.497465723+00:00 [torrust_index::tracker::statistics_importer][ERROR] Error updating torrent tracker stats for torrent with id 140: TorrentNotFound
-            // ```
-
             if let Some(err) = ret.err() {
                 let message = format!(
                     "Error updating torrent tracker stats for torrent with id {}: {:?}",
                     torrent.torrent_id, err
                 );
-                error!("{}", message);
+                error!(target: "statistics_importer", "{}", message);
             }
         }
 
@@ -67,17 +56,20 @@ impl StatisticsImporter {
     ///
     /// Will return an error if the HTTP request failed or the torrent is not
     /// found.
-    pub async fn import_torrent_statistics(&self, torrent_id: i64, info_hash: &str) -> Result<TorrentInfo, ServiceError> {
-        if let Ok(torrent_info) = self.tracker_service.get_torrent_info(info_hash).await {
-            drop(
-                self.database
-                    .update_tracker_info(torrent_id, &self.tracker_url, torrent_info.seeders, torrent_info.leechers)
-                    .await,
-            );
-            Ok(torrent_info)
-        } else {
-            drop(self.database.update_tracker_info(torrent_id, &self.tracker_url, 0, 0).await);
-            Err(ServiceError::TorrentNotFound)
+    pub async fn import_torrent_statistics(&self, torrent_id: i64, info_hash: &str) -> Result<TorrentInfo, TrackerAPIError> {
+        match self.tracker_service.get_torrent_info(info_hash).await {
+            Ok(torrent_info) => {
+                drop(
+                    self.database
+                        .update_tracker_info(torrent_id, &self.tracker_url, torrent_info.seeders, torrent_info.leechers)
+                        .await,
+                );
+                Ok(torrent_info)
+            }
+            Err(err) => {
+                drop(self.database.update_tracker_info(torrent_id, &self.tracker_url, 0, 0).await);
+                Err(err)
+            }
         }
     }
 }
