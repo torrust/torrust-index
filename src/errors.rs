@@ -148,7 +148,7 @@ pub enum ServiceError {
     #[display(fmt = "Database error.")]
     DatabaseError,
 
-    // Tracker errors
+    // Begin tracker errors
     #[display(fmt = "Sorry, we have an error with our tracker connection.")]
     TrackerOffline,
 
@@ -160,6 +160,10 @@ pub enum ServiceError {
 
     #[display(fmt = "Torrent not found in tracker.")]
     TorrentNotFoundInTracker,
+
+    #[display(fmt = "Invalid tracker API token.")]
+    InvalidTrackerToken,
+    // End tracker errors
 }
 
 impl From<sqlx::Error> for ServiceError {
@@ -244,14 +248,13 @@ impl From<TrackerAPIError> for ServiceError {
         eprintln!("{e}");
         match e {
             TrackerAPIError::TrackerOffline => ServiceError::TrackerOffline,
-            TrackerAPIError::AddToWhitelistError
-            | TrackerAPIError::RemoveFromWhitelistError
-            | TrackerAPIError::RetrieveUserKeyError => ServiceError::TrackerResponseError,
+            TrackerAPIError::InternalServerError => ServiceError::TrackerResponseError,
             TrackerAPIError::TorrentNotFound => ServiceError::TorrentNotFoundInTracker,
-            TrackerAPIError::MissingResponseBody | TrackerAPIError::FailedToParseTrackerResponse { body: _ } => {
-                ServiceError::TrackerUnknownResponse
-            }
+            TrackerAPIError::UnexpectedResponseStatus
+            | TrackerAPIError::MissingResponseBody
+            | TrackerAPIError::FailedToParseTrackerResponse { body: _ } => ServiceError::TrackerUnknownResponse,
             TrackerAPIError::CannotSaveUserKey => ServiceError::DatabaseError,
+            TrackerAPIError::InvalidToken => ServiceError::InvalidTrackerToken,
         }
     }
 }
@@ -307,6 +310,7 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::TrackerResponseError => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::TrackerUnknownResponse => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::TorrentNotFoundInTracker => StatusCode::NOT_FOUND,
+        ServiceError::InvalidTrackerToken => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
