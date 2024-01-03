@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use derive_more::{Display, Error};
 use hyper::StatusCode;
 use log::error;
 use reqwest::Response;
@@ -8,9 +9,36 @@ use serde::{Deserialize, Serialize};
 use super::api::{Client, ConnectionInfo};
 use crate::config::Configuration;
 use crate::databases::database::Database;
-use crate::errors::ServiceError;
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::UserId;
+
+#[derive(Debug, Display, PartialEq, Eq, Error)]
+#[allow(dead_code)]
+pub enum TrackerAPIError {
+    #[display(fmt = "Error with tracker connection.")]
+    TrackerOffline,
+
+    #[display(fmt = "Could not whitelist torrent.")]
+    AddToWhitelistError,
+
+    #[display(fmt = "Could not remove torrent from whitelist.")]
+    RemoveFromWhitelistError,
+
+    #[display(fmt = "Could not retrieve a new user key.")]
+    RetrieveUserKeyError,
+
+    #[display(fmt = "Could not save the newly generated user key into the database.")]
+    CannotSaveUserKey,
+
+    #[display(fmt = "Torrent not found.")]
+    TorrentNotFound,
+
+    #[display(fmt = "Expected body in tracker response, received empty body.")]
+    MissingResponseBody,
+
+    #[display(fmt = "Expected body in tracker response, received empty body.")]
+    FailedToParseTrackerResponse { body: String },
+}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct TorrentInfo {
@@ -69,7 +97,7 @@ impl Service {
     ///
     /// Will return an error if the HTTP request failed (for example if the
     /// tracker API is offline) or if the tracker API returned an error.
-    pub async fn whitelist_info_hash(&self, info_hash: String) -> Result<(), ServiceError> {
+    pub async fn whitelist_info_hash(&self, info_hash: String) -> Result<(), TrackerAPIError> {
         let response = self.api_client.whitelist_torrent(&info_hash).await;
 
         match response {
@@ -77,10 +105,10 @@ impl Service {
                 if response.status().is_success() {
                     Ok(())
                 } else {
-                    Err(ServiceError::WhitelistingError)
+                    Err(TrackerAPIError::AddToWhitelistError)
                 }
             }
-            Err(_) => Err(ServiceError::TrackerOffline),
+            Err(_) => Err(TrackerAPIError::TrackerOffline),
         }
     }
 
@@ -90,7 +118,7 @@ impl Service {
     ///
     /// Will return an error if the HTTP request failed (for example if the
     /// tracker API is offline) or if the tracker API returned an error.
-    pub async fn remove_info_hash_from_whitelist(&self, info_hash: String) -> Result<(), ServiceError> {
+    pub async fn remove_info_hash_from_whitelist(&self, info_hash: String) -> Result<(), TrackerAPIError> {
         let response = self.api_client.remove_torrent_from_whitelist(&info_hash).await;
 
         match response {
@@ -98,10 +126,10 @@ impl Service {
                 if response.status().is_success() {
                     Ok(())
                 } else {
-                    Err(ServiceError::InternalServerError)
+                    Err(TrackerAPIError::RemoveFromWhitelistError)
                 }
             }
-            Err(_) => Err(ServiceError::InternalServerError),
+            Err(_) => Err(TrackerAPIError::TrackerOffline),
         }
     }
 
@@ -116,14 +144,14 @@ impl Service {
     ///
     /// Will return an error if the HTTP request to get generated a new
     /// user tracker key failed.
-    pub async fn get_personal_announce_url(&self, user_id: UserId) -> Result<String, ServiceError> {
+    pub async fn get_personal_announce_url(&self, user_id: UserId) -> Result<String, TrackerAPIError> {
         let tracker_key = self.database.get_user_tracker_key(user_id).await;
 
         match tracker_key {
-            Some(v) => Ok(self.announce_url_with_key(&v)),
+            Some(tracker_key) => Ok(self.announce_url_with_key(&tracker_key)),
             None => match self.retrieve_new_tracker_key(user_id).await {
-                Ok(v) => Ok(self.announce_url_with_key(&v)),
-                Err(_) => Err(ServiceError::TrackerOffline),
+                Ok(new_tracker_key) => Ok(self.announce_url_with_key(&new_tracker_key)),
+                Err(_) => Err(TrackerAPIError::TrackerOffline),
             },
         }
     }
@@ -134,14 +162,19 @@ impl Service {
     ///
     /// Will return an error if the HTTP request to get torrent info fails or
     /// if the response cannot be parsed.
-    pub async fn get_torrent_info(&self, info_hash: &str) -> Result<TorrentInfo, ServiceError> {
-        let response = self
-            .api_client
-            .get_torrent_info(info_hash)
-            .await
-            .map_err(|_| ServiceError::InternalServerError)?;
+    pub async fn get_torrent_info(&self, info_hash: &str) -> Result<TorrentInfo, TrackerAPIError> {
+        let response = self.api_client.get_torrent_info(info_hash).await;
 
-        map_torrent_info_response(response).await
+        match response {
+            Ok(response) => {
+                if response.status().is_success() {
+                    map_torrent_info_response(response).await
+                } else {
+                    Err(TrackerAPIError::RemoveFromWhitelistError)
+                }
+            }
+            Err(_) => Err(TrackerAPIError::TrackerOffline),
+        }
     }
 
     /// It builds the announce url appending the user tracker key.
@@ -150,43 +183,51 @@ impl Service {
         format!("{}/{}", self.tracker_url, tracker_key.key)
     }
 
-    /// Issue a new tracker key from tracker and save it in database,
-    /// tied to a user
-    async fn retrieve_new_tracker_key(&self, user_id: i64) -> Result<TrackerKey, ServiceError> {
-        // Request new tracker key from tracker
-        let response = self
-            .api_client
-            .retrieve_new_tracker_key(self.token_valid_seconds)
-            .await
-            .map_err(|_| ServiceError::InternalServerError)?;
+    /// Issue a new tracker key from tracker.
+    async fn retrieve_new_tracker_key(&self, user_id: i64) -> Result<TrackerKey, TrackerAPIError> {
+        let response = self.api_client.retrieve_new_tracker_key(self.token_valid_seconds).await;
 
-        // Parse tracker key from response
-        let tracker_key = response
-            .json::<TrackerKey>()
-            .await
-            .map_err(|_| ServiceError::InternalServerError)?;
+        match response {
+            Ok(response) => {
+                if response.status().is_success() {
+                    let body = response.text().await.map_err(|_| {
+                        error!("Tracker API response without body");
+                        TrackerAPIError::MissingResponseBody
+                    })?;
 
-        // Add tracker key to database (tied to a user)
-        self.database.add_tracker_key(user_id, &tracker_key).await?;
+                    // Parse tracker key from response
+                    let tracker_key =
+                        serde_json::from_str(&body).map_err(|_| TrackerAPIError::FailedToParseTrackerResponse { body })?;
 
-        // return tracker key
-        Ok(tracker_key)
+                    // Add tracker key to database (tied to a user)
+                    self.database
+                        .add_tracker_key(user_id, &tracker_key)
+                        .await
+                        .map_err(|_| TrackerAPIError::CannotSaveUserKey)?;
+
+                    Ok(tracker_key)
+                } else {
+                    Err(TrackerAPIError::RetrieveUserKeyError)
+                }
+            }
+            Err(_) => Err(TrackerAPIError::TrackerOffline),
+        }
     }
 }
 
-async fn map_torrent_info_response(response: Response) -> Result<TorrentInfo, ServiceError> {
+async fn map_torrent_info_response(response: Response) -> Result<TorrentInfo, TrackerAPIError> {
     if response.status() == StatusCode::NOT_FOUND {
-        return Err(ServiceError::TorrentNotFound);
+        return Err(TrackerAPIError::TorrentNotFound);
     }
 
     let body = response.text().await.map_err(|_| {
         error!("Tracker API response without body");
-        ServiceError::InternalServerError
+        TrackerAPIError::MissingResponseBody
     })?;
 
     if body == "\"torrent not known\"" {
         // todo: temporary fix. the service should return a 404 (StatusCode::NOT_FOUND).
-        return Err(ServiceError::TorrentNotFound);
+        return Err(TrackerAPIError::TorrentNotFound);
     }
 
     serde_json::from_str(&body).map_err(|e| {
@@ -194,7 +235,7 @@ async fn map_torrent_info_response(response: Response) -> Result<TorrentInfo, Se
             "Failed to parse torrent info from tracker response. Body: {}, Error: {}",
             body, e
         );
-        ServiceError::InternalServerError
+        TrackerAPIError::FailedToParseTrackerResponse { body }
     })
 }
 
@@ -204,8 +245,7 @@ mod tests {
     mod getting_the_torrent_info_from_the_tracker {
         use hyper::{Response, StatusCode};
 
-        use crate::errors::ServiceError;
-        use crate::tracker::service::{map_torrent_info_response, TorrentInfo};
+        use crate::tracker::service::{map_torrent_info_response, TorrentInfo, TrackerAPIError};
 
         #[tokio::test]
         async fn it_should_return_a_torrent_not_found_response_when_the_tracker_returns_the_current_torrent_not_known_response() {
@@ -213,7 +253,7 @@ mod tests {
 
             let result = map_torrent_info_response(tracker_response.into()).await.unwrap_err();
 
-            assert_eq!(result, ServiceError::TorrentNotFound);
+            assert_eq!(result, TrackerAPIError::TorrentNotFound);
         }
 
         #[tokio::test]
@@ -225,7 +265,7 @@ mod tests {
 
             let result = map_torrent_info_response(tracker_response.into()).await.unwrap_err();
 
-            assert_eq!(result, ServiceError::TorrentNotFound);
+            assert_eq!(result, TrackerAPIError::TorrentNotFound);
         }
 
         #[tokio::test]
@@ -266,9 +306,14 @@ mod tests {
 
             let tracker_response = Response::new(invalid_json_body_for_torrent_info);
 
-            let result = map_torrent_info_response(tracker_response.into()).await.unwrap_err();
+            let err = map_torrent_info_response(tracker_response.into()).await.unwrap_err();
 
-            assert_eq!(result, ServiceError::InternalServerError);
+            assert_eq!(
+                err,
+                TrackerAPIError::FailedToParseTrackerResponse {
+                    body: invalid_json_body_for_torrent_info.to_string()
+                }
+            );
         }
     }
 }

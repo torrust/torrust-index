@@ -6,6 +6,7 @@ use hyper::StatusCode;
 
 use crate::databases::database;
 use crate::models::torrent::MetadataError;
+use crate::tracker::service::TrackerAPIError;
 use crate::utils::parse_torrent::DecodeTorrentFileError;
 
 pub type ServiceResult<V> = Result<V, ServiceError>;
@@ -84,9 +85,6 @@ pub enum ServiceError {
     /// token invalid
     TokenInvalid,
 
-    #[display(fmt = "Torrent not found.")]
-    TorrentNotFound,
-
     #[display(fmt = "Uploaded torrent is not valid.")]
     InvalidTorrentFile,
 
@@ -120,9 +118,6 @@ pub enum ServiceError {
     #[display(fmt = "This torrent title has already been used.")]
     TorrentTitleAlreadyExists,
 
-    #[display(fmt = "Sorry, we have an error with our tracker connection.")]
-    TrackerOffline,
-
     #[display(fmt = "Could not whitelist torrent.")]
     WhitelistingError,
 
@@ -141,6 +136,9 @@ pub enum ServiceError {
     #[display(fmt = "Tag name cannot be empty.")]
     TagNameEmpty,
 
+    #[display(fmt = "Torrent not found.")]
+    TorrentNotFound,
+
     #[display(fmt = "Category not found.")]
     CategoryNotFound,
 
@@ -149,6 +147,19 @@ pub enum ServiceError {
 
     #[display(fmt = "Database error.")]
     DatabaseError,
+
+    // Tracker errors
+    #[display(fmt = "Sorry, we have an error with our tracker connection.")]
+    TrackerOffline,
+
+    #[display(fmt = "Tracker response error. The operation could not be performed.")]
+    TrackerResponseError,
+
+    #[display(fmt = "Tracker unknown response. Unexpected response from tracker. For example, if it can be parsed.")]
+    TrackerUnknownResponse,
+
+    #[display(fmt = "Torrent not found in tracker.")]
+    TorrentNotFoundInTracker,
 }
 
 impl From<sqlx::Error> for ServiceError {
@@ -228,6 +239,23 @@ impl From<DecodeTorrentFileError> for ServiceError {
     }
 }
 
+impl From<TrackerAPIError> for ServiceError {
+    fn from(e: TrackerAPIError) -> Self {
+        eprintln!("{e}");
+        match e {
+            TrackerAPIError::TrackerOffline => ServiceError::TrackerOffline,
+            TrackerAPIError::AddToWhitelistError
+            | TrackerAPIError::RemoveFromWhitelistError
+            | TrackerAPIError::RetrieveUserKeyError => ServiceError::TrackerResponseError,
+            TrackerAPIError::TorrentNotFound => ServiceError::TorrentNotFoundInTracker,
+            TrackerAPIError::MissingResponseBody | TrackerAPIError::FailedToParseTrackerResponse { body: _ } => {
+                ServiceError::TrackerUnknownResponse
+            }
+            TrackerAPIError::CannotSaveUserKey => ServiceError::DatabaseError,
+        }
+    }
+}
+
 #[must_use]
 pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
     #[allow(clippy::match_same_arms)]
@@ -276,6 +304,9 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::DatabaseError => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::CategoryNotFound => StatusCode::NOT_FOUND,
         ServiceError::TagNotFound => StatusCode::NOT_FOUND,
+        ServiceError::TrackerResponseError => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::TrackerUnknownResponse => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::TorrentNotFoundInTracker => StatusCode::NOT_FOUND,
     }
 }
 
