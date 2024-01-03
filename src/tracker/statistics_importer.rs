@@ -39,11 +39,13 @@ impl StatisticsImporter {
             let ret = self.import_torrent_statistics(torrent.torrent_id, &torrent.info_hash).await;
 
             if let Some(err) = ret.err() {
-                let message = format!(
-                    "Error updating torrent tracker stats for torrent with id {}: {:?}",
-                    torrent.torrent_id, err
-                );
-                error!(target: "statistics_importer", "{}", message);
+                if err != TrackerAPIError::TorrentNotFound {
+                    let message = format!(
+                        "Error updating torrent tracker stats for torrent. Torrent: id {}; infohash {}. Error: {:?}",
+                        torrent.torrent_id, torrent.info_hash, err
+                    );
+                    error!(target: "statistics_importer", "{}", message);
+                }
             }
         }
 
