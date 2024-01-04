@@ -165,7 +165,7 @@ impl Index {
         {
             // If the torrent can't be whitelisted somehow, remove the torrent from database
             drop(self.torrent_repository.delete(&torrent_id).await);
-            return Err(e);
+            return Err(e.into());
         }
 
         // Build response
@@ -304,7 +304,8 @@ impl Index {
         self.torrent_repository.delete(&torrent_listing.torrent_id).await?;
 
         // Remove info-hash from tracker whitelist
-        let _ = self
+        // todo: handle the error when the tracker is offline or not well configured.
+        let _unused = self
             .tracker_service
             .remove_info_hash_from_whitelist(info_hash.to_string())
             .await;
