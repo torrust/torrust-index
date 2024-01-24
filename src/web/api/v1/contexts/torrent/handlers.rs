@@ -23,6 +23,7 @@ use crate::services::torrent_file::generate_random_torrent;
 use crate::utils::parse_torrent;
 use crate::web::api::v1::auth::get_optional_logged_in_user;
 use crate::web::api::v1::extractors::bearer_token::Extract;
+use crate::web::api::v1::extractors::user_id::ExtractLoggedInUser;
 use crate::web::api::v1::responses::OkResponseData;
 use crate::web::api::v1::routes::API_VERSION_URL_PREFIX;
 
@@ -37,14 +38,9 @@ use crate::web::api::v1::routes::API_VERSION_URL_PREFIX;
 #[allow(clippy::unused_async)]
 pub async fn upload_torrent_handler(
     State(app_data): State<Arc<AppData>>,
-    Extract(maybe_bearer_token): Extract,
+    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
     multipart: Multipart,
 ) -> Response {
-    let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
-        Ok(user_id) => user_id,
-        Err(error) => return error.into_response(),
-    };
-
     let add_torrent_form = match build_add_torrent_request_from_payload(multipart).await {
         Ok(torrent_request) => torrent_request,
         Err(error) => return error.into_response(),
