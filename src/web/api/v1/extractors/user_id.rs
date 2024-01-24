@@ -1,24 +1,23 @@
 use std::sync::Arc;
 
-use axum::async_trait;
-use axum::extract::FromRequestParts;
+use async_trait::async_trait;
+use axum::extract::{FromRef, FromRequestParts};
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
-use tokio::sync::RwLock;
 
 use super::bearer_token;
-use crate::services;
-use crate::web::api::v1::auth::{self, Authentication};
+use crate::common::AppData;
+use crate::errors::ServiceError;
 
-pub struct ExtractLoggedInUser(pub Option<UserId>);
+pub struct ExtractLoggedInUser(pub UserId);
 
 #[derive(Deserialize, Debug)]
 pub struct UserId(i64);
 
 impl UserId {
     #[must_use]
-    pub fn value(&self) -> i64 {
+    pub fn value(self) -> i64 {
         self.0
     }
 }
@@ -26,6 +25,7 @@ impl UserId {
 #[async_trait]
 impl<S> FromRequestParts<S> for ExtractLoggedInUser
 where
+    Arc<AppData>: FromRef<S>,
     S: Send + Sync,
 {
     type Rejection = Response;
@@ -33,19 +33,39 @@ where
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let maybe_bearer_token = match bearer_token::Extract::from_request_parts(parts, state).await {
             Ok(maybe_bearer_token) => maybe_bearer_token.0,
-            Err(_) => None,
+            Err(_) => return Err(ServiceError::Unauthorized.into_response()),
         };
 
-        let bearer_token = services::authentication::JsonWebToken::new(Arc::new(crate::config::Configuration {
-            settings: RwLock::default(),
-            config_path: Option::default(),
-        }));
+        /*   let app_data = match axum::extract::State::from_request_parts(parts, state).await {
+            Ok(app_data) => Ok(app_data.0),
+            Err(_) => Err(ServiceError::Unauthorized),
+        }; */
 
-        let auth: Authentication = auth::Authentication::new(Arc::new(bearer_token));
+        let app_data = Arc::from_ref(state);
 
-        match auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
-            Ok(user_id) => Ok(ExtractLoggedInUser(Some(UserId(user_id)))),
-            Err(error) => return Err(error.into_response()),
+        /* match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
+            Ok(user_id) => ExtractLoggedInUser(UserId(user_id)),
+            Error(err) => return ServiceError::Unauthorized.into_response(),
+        } */
+
+        /*    let user_id =  ExtractLoggedInUser(UserId(app_data
+        .auth
+        .get_user_id_from_bearer_token(&maybe_bearer_token))
+        .await
+        .map_err(|e| {
+            dbg!(e);
+            ServiceError::Unauthorized
+        })? */
+        let user_id = app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await;
+
+        match user_id {
+            Ok(user_id) => Ok(ExtractLoggedInUser(UserId(user_id))),
+            Err(error) => Err(error.into_response()),
         }
+
+        /* match header {
+            Some(header_value) => Ok(Extract(Some(BearerToken(parse_token(header_value))))),
+            None => Ok(Extract(None)),
+        } */
     }
 }
