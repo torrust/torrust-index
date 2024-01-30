@@ -23,7 +23,7 @@ where
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let maybe_bearer_token = match bearer_token::Extract::from_request_parts(parts, state).await {
             Ok(maybe_bearer_token) => maybe_bearer_token.0,
-            Err(_) => return Err(ServiceError::Unauthorized.into_response()),
+            Err(_) => return Err(ServiceError::TokenNotFound.into_response()),
         };
 
         //Extracts the app state
@@ -31,7 +31,7 @@ where
 
         match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
             Ok(user_id) => Ok(ExtractLoggedInUser(user_id)),
-            Err(_) => Err(ServiceError::Unauthorized.into_response()),
+            Err(_) => Err(ServiceError::LoggedInUserNotFound.into_response()),
         }
     }
 }
