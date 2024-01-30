@@ -31,7 +31,7 @@ where
 
         match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
             Ok(user_id) => Ok(ExtractLoggedInUser(user_id)),
-            Err(error) => Err(error.into_response()),
+            Err(_) => Err(ServiceError::Unauthorized.into_response()),
         }
     }
 }
