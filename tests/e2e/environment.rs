@@ -82,7 +82,7 @@ impl TestEnv {
     /// Returns the server starting settings if the servers was already started.
     /// We do not know the settings until we start the server.
     pub fn server_settings(&self) -> Option<Settings> {
-        self.starting_settings.as_ref().cloned()
+        self.starting_settings.clone()
     }
 
     /// Provides the API server socket address.
