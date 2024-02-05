@@ -148,7 +148,7 @@ pub enum ServiceError {
     #[display(fmt = "Database error.")]
     DatabaseError,
 
-    #[display(fmt = "Please sign in!")]
+    #[display(fmt = "Authentication error, please sign in")]
     LoggedInUserNotFound,
 
     // Begin tracker errors
