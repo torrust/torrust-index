@@ -33,6 +33,10 @@ struct ImporterState {
     pub torrent_info_update_interval: u64,
 }
 
+/// # Panics
+///
+/// Will panic if it can't start the tracker statistics importer API
+#[must_use]
 pub fn start(
     importer_port: u16,
     torrent_info_update_interval: u64,
@@ -60,7 +64,7 @@ pub fn start(
 
             let addr = format!("{IMPORTER_API_IP}:{importer_port}");
 
-            info!("Tracker statistics importer API server listening on http://{}", addr);
+            info!("Tracker statistics importer API server listening on http://{}", addr); // # DevSkim: ignore DS137138
 
             axum::Server::bind(&addr.parse().unwrap())
                 .serve(app.into_make_service())
@@ -122,7 +126,7 @@ async fn heartbeat_handler(State(state): State<Arc<ImporterState>>) -> Json<Valu
 /// Send a heartbeat from the importer cronjob to the importer API.
 async fn send_heartbeat(importer_port: u16) -> Result<(), reqwest::Error> {
     let client = reqwest::Client::new();
-    let url = format!("http://{IMPORTER_API_IP}:{importer_port}/heartbeat");
+    let url = format!("http://{IMPORTER_API_IP}:{importer_port}/heartbeat"); // # DevSkim: ignore DS137138
 
     client.post(url).send().await?;
 

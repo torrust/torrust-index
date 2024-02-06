@@ -75,7 +75,7 @@ fn print_usage() {
 /// # Panics
 ///
 /// Panics if arguments cannot be parsed.
-pub async fn run_importer() {
+pub async fn run() {
     parse_args().expect("unable to parse command arguments");
     import().await;
 }

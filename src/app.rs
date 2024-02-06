@@ -159,7 +159,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
 
     // Start cronjob to import tracker torrent data and updating
     // seeders and leechers info.
-    let tracker_statistics_importer_handle = console::tracker_statistics_importer::start(
+    let tracker_statistics_importer_handle = console::cronjobs::tracker_statistics_importer::start(
         importer_port,
         importer_torrent_info_update_interval,
         &tracker_statistics_importer,
