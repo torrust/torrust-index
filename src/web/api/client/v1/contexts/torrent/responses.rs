@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub type Id = i64;
 pub type CategoryId = i64;
@@ -102,7 +102,7 @@ pub struct UploadedTorrentResponse {
     pub data: UploadedTorrent,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, Serialize, PartialEq, Debug)]
 pub struct UploadedTorrent {
     pub torrent_id: Id,
     pub info_hash: String,

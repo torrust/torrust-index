@@ -4,7 +4,7 @@ use serde::Serialize;
 use super::connection_info::ConnectionInfo;
 use super::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
 use super::contexts::tag::forms::{AddTagForm, DeleteTagForm};
-use super::contexts::torrent::forms::UpdateTorrentFrom;
+use super::contexts::torrent::forms::UpdateTorrentForm;
 use super::contexts::torrent::requests::InfoHash;
 use super::contexts::user::forms::{LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username};
 use super::http::{Query, ReqwestQuery};
@@ -119,7 +119,7 @@ impl Client {
         self.http_client.delete(&format!("/torrent/{info_hash}")).await
     }
 
-    pub async fn update_torrent(&self, info_hash: &InfoHash, update_torrent_form: UpdateTorrentFrom) -> TextResponse {
+    pub async fn update_torrent(&self, info_hash: &InfoHash, update_torrent_form: UpdateTorrentForm) -> TextResponse {
         self.http_client
             .put(&format!("/torrent/{info_hash}"), &update_torrent_form)
             .await

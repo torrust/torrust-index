@@ -4,7 +4,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize)]
-pub struct UpdateTorrentFrom {
+pub struct UpdateTorrentForm {
     pub title: Option<String>,
     pub description: Option<String>,
     pub category: Option<i64>,
@@ -28,9 +28,9 @@ pub struct BinaryFile {
 
 impl BinaryFile {
     /// # Panics
-    /// 
+    ///
     /// Will panic if:
-    /// 
+    ///
     /// - The path is not a file.
     /// - The path can't be converted into string.
     /// - The file can't be read.
@@ -40,6 +40,12 @@ impl BinaryFile {
             name: path.file_name().unwrap().to_owned().into_string().unwrap(),
             contents: fs::read(path).unwrap(),
         }
+    }
+
+    /// Build the binary file directly from the binary data provided.
+    #[must_use]
+    pub fn from_bytes(name: String, contents: Vec<u8>) -> Self {
+        BinaryFile { name, contents }
     }
 }
 
