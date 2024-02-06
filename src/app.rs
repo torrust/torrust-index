@@ -18,7 +18,7 @@ use crate::services::torrent::{
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
-use crate::web::api::v1::auth::Authentication;
+use crate::web::api::server::v1::auth::Authentication;
 use crate::web::api::Version;
 use crate::{console, mailer, tracker, web};
 

@@ -14,7 +14,7 @@ use crate::mailer;
 use crate::mailer::VerifyClaims;
 use crate::models::user::{UserCompact, UserId, UserProfile};
 use crate::utils::validation::validate_email_address;
-use crate::web::api::v1::contexts::user::forms::RegistrationForm;
+use crate::web::api::server::v1::contexts::user::forms::RegistrationForm;
 
 /// Since user email could be optional, we need a way to represent "no email"
 /// in the database. This function returns the string that should be used for

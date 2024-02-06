@@ -1,6 +1,6 @@
 // Text responses
 
-use torrust_index::web::api::v1::responses::ErrorResponseData;
+use torrust_index::web::api::server::v1::responses::ErrorResponseData;
 
 use super::responses::TextResponse;
 

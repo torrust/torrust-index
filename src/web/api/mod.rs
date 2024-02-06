@@ -4,7 +4,6 @@
 //!
 //! Refer to the [`v1`]) module for more information.
 pub mod server;
-pub mod v1;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
