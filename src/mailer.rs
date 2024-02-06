@@ -13,7 +13,7 @@ use tera::{try_get_value, Context, Tera};
 use crate::config::Configuration;
 use crate::errors::ServiceError;
 use crate::utils::clock;
-use crate::web::api::v1::routes::API_VERSION_URL_PREFIX;
+use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 
 lazy_static! {
     pub static ref TEMPLATES: Tera = {

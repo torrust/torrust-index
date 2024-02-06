@@ -3,8 +3,8 @@
 //! Currently, the API has only one version: `v1`.
 //!
 //! Refer to the [`v1`]) module for more information.
+pub mod client;
 pub mod server;
-pub mod v1;
 
 use std::net::SocketAddr;
 use std::sync::Arc;

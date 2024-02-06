@@ -6,7 +6,7 @@
 //! used with by the [Torrust Tracker Index Gui](https://github.com/torrust/torrust-index-gui).
 //!
 //! If you are looking for information on how to use the API, please see the
-//! [API v1](crate::web::api::v1) section of the documentation.
+//! [API v1](crate::web::api::server::v1) section of the documentation.
 //!
 //! # Table of contents
 //!
@@ -37,7 +37,7 @@
 //!
 //! From the end-user perspective the Torrust Tracker exposes three different services.
 //!
-//! - A REST [API](crate::web::api::v1)
+//! - A REST [API](crate::web::api::server::v1)
 //!
 //! From the administrator perspective, the Torrust Index exposes:
 //!

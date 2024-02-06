@@ -34,12 +34,14 @@ version = "3.0.0-alpha.3-develop"
 opt-level = 3
 
 [dependencies]
+anyhow = "1.0.79"
 argon2 = "0"
 async-trait = "0"
 axum = { version = "0", features = ["multipart"] }
 binascii = "0"
 bytes = "1"
 chrono = { version = "0", default-features = false, features = ["clock"] }
+clap = { version = "4.4.18", features = ["derive", "env"]}
 config = "0"
 derive_more = "0"
 email_address = "0"
@@ -53,6 +55,7 @@ lazy_static = "1.4.0"
 lettre = { version = "0", features = ["builder", "smtp-transport", "tokio1", "tokio1-native-tls", "tokio1-rustls-tls"] }
 log = "0"
 pbkdf2 = { version = "0", features = ["simple"] }
+rand = "0"
 rand_core = { version = "0", features = ["std"] }
 regex = "1"
 reqwest = { version = "0", features = ["json", "multipart"] }
@@ -76,7 +79,6 @@ urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
-rand = "0"
 tempfile = "3"
 uuid = { version = "1", features = ["v4"] }
 which = "5"
