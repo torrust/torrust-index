@@ -53,6 +53,7 @@ lazy_static = "1.4.0"
 lettre = { version = "0", features = ["builder", "smtp-transport", "tokio1", "tokio1-native-tls", "tokio1-rustls-tls"] }
 log = "0"
 pbkdf2 = { version = "0", features = ["simple"] }
+rand = "0"
 rand_core = { version = "0", features = ["std"] }
 regex = "1"
 reqwest = { version = "0", features = ["json", "multipart"] }
@@ -76,7 +77,6 @@ urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
-rand = "0"
 tempfile = "3"
 uuid = { version = "1", features = ["v4"] }
 which = "5"
