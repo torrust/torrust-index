@@ -1,8 +1,8 @@
 use log::{debug, LevelFilter};
 
 /// # Panics
-/// 
-/// 
+///
+///
 pub fn setup(level: LevelFilter) {
     if let Err(_err) = fern::Dispatch::new()
         .format(|out, message, record| {

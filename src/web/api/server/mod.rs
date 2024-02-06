@@ -6,10 +6,10 @@ use std::sync::Arc;
 use futures::Future;
 use log::info;
 use tokio::sync::oneshot::{self, Sender};
+use v1::routes::router;
 
 use super::{Running, ServerStartedMessage};
 use crate::common::AppData;
-use v1::routes::router;
 
 /// Starts the API server.
 ///

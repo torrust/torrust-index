@@ -14,7 +14,8 @@
 //!
 //! That command would upload 1000 random torrents to the Index using the user
 //! account admin with password 123456 and waiting 1 second between uploads.
-use std::{thread::sleep, time::Duration};
+use std::thread::sleep;
+use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
@@ -22,26 +23,15 @@ use log::{debug, info, LevelFilter};
 use text_colorizer::Colorize;
 use uuid::Uuid;
 
-use crate::{
-    console::commands::seeder::{
-        api::{login, upload_torrent},
-        logging,
-    },
-    services::torrent_file::generate_random_torrent,
-    utils::parse_torrent,
-    web::api::client::v1::{
-        client::Client,
-        contexts::{
-            torrent::{
-                forms::{BinaryFile, UploadTorrentMultipartForm},
-                responses::UploadedTorrent,
-            },
-            user::responses::LoggedInUserData,
-        },
-    },
-};
-
 use super::api::Error;
+use crate::console::commands::seeder::api::{login, upload_torrent};
+use crate::console::commands::seeder::logging;
+use crate::services::torrent_file::generate_random_torrent;
+use crate::utils::parse_torrent;
+use crate::web::api::client::v1::client::Client;
+use crate::web::api::client::v1::contexts::torrent::forms::{BinaryFile, UploadTorrentMultipartForm};
+use crate::web::api::client::v1::contexts::torrent::responses::UploadedTorrent;
+use crate::web::api::client::v1::contexts::user::responses::LoggedInUserData;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]

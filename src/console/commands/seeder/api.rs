@@ -1,3 +1,6 @@
+use log::debug;
+use thiserror::Error;
+
 use crate::web::api::client::v1::client::Client;
 use crate::web::api::client::v1::contexts::category::forms::AddCategoryForm;
 use crate::web::api::client::v1::contexts::category::responses::{ListItem, ListResponse};
@@ -6,9 +9,6 @@ use crate::web::api::client::v1::contexts::torrent::responses::{UploadedTorrent,
 use crate::web::api::client::v1::contexts::user::forms::LoginForm;
 use crate::web::api::client::v1::contexts::user::responses::{LoggedInUserData, SuccessfulLoginResponse};
 use crate::web::api::client::v1::responses::TextResponse;
-
-use log::debug;
-use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {

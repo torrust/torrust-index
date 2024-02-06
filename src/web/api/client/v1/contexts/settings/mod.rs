@@ -1,11 +1,12 @@
 pub mod responses;
 
+use serde::{Deserialize, Serialize};
+
 use crate::config::{
     Api as DomainApi, Auth as DomainAuth, Database as DomainDatabase, ImageCache as DomainImageCache, Mail as DomainMail,
     Network as DomainNetwork, TorrustIndex as DomainSettings, Tracker as DomainTracker,
     TrackerStatisticsImporter as DomainTrackerStatisticsImporter, Website as DomainWebsite,
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Settings {
