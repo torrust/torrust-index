@@ -148,6 +148,9 @@ pub enum ServiceError {
     #[display(fmt = "Database error.")]
     DatabaseError,
 
+    #[display(fmt = "Authentication error, please sign in")]
+    LoggedInUserNotFound,
+
     // Begin tracker errors
     #[display(fmt = "Sorry, we have an error with our tracker connection.")]
     TrackerOffline,
@@ -311,6 +314,7 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::TrackerUnknownResponse => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::TorrentNotFoundInTracker => StatusCode::NOT_FOUND,
         ServiceError::InvalidTrackerToken => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::LoggedInUserNotFound => StatusCode::UNAUTHORIZED,
     }
 }
 
