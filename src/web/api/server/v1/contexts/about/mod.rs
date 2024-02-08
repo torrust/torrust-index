@@ -35,7 +35,7 @@
 //!         <p>Hi! This is a running <a href="https://github.com/torrust/torrust-index">torrust-index</a>.</p>
 //!     </body>
 //!     <footer style="padding: 1.25em 0; border-top: dotted 1px;">
-//!         <a href="/v1/about/license">license</a>
+//!         <a href="v1/about/license">license</a>
 //!     </footer>
 //! </html>
 //! ```

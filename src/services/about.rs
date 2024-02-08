@@ -1,5 +1,4 @@
 //! Templates for "about" static pages.
-use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 
 #[must_use]
 pub fn index_page() -> String {
@@ -8,8 +7,7 @@ pub fn index_page() -> String {
 
 #[must_use]
 pub fn page() -> String {
-    format!(
-        r#"
+    r#"
     <html>
         <head>
             <title>About</title>
@@ -22,17 +20,16 @@ pub fn page() -> String {
             <p>Hi! This is a running <a href="https://github.com/torrust/torrust-index">torrust-index</a>.</p>
         </body>
         <footer style="padding: 1.25em 0;border-top: dotted 1px;">
-            <a href="/{API_VERSION_URL_PREFIX}/about/license">license</a>
+            <a href="./about/license">license</a>
         </footer>
     </html>
 "#
-    )
+    .to_string()
 }
 
 #[must_use]
 pub fn license_page() -> String {
-    format!(
-        r#"
+    r#"
     <html>
         <head>
             <title>Licensing</title>
@@ -55,9 +52,8 @@ pub fn license_page() -> String {
             <p>If you want to read more about all the licenses and how they apply please refer to the <a href="https://github.com/torrust/torrust-index/blob/develop/licensing/contributor_agreement_v01.md">contributor agreement</a>.</p>
         </body>
         <footer style="padding: 1.25em 0;border-top: dotted 1px;">
-            <a href="/{API_VERSION_URL_PREFIX}/about">about</a>
+            <a href="../about">about</a>
         </footer>
     </html>
-"#
-    )
+"#.to_string()
 }
