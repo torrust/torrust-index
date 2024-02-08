@@ -1,3 +1,4 @@
+//! Logging setup for the `seeder`.
 use log::{debug, LevelFilter};
 
 /// # Panics

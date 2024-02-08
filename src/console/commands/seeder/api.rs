@@ -1,3 +1,4 @@
+//! Action that a user can perform on a Index website.
 use log::debug;
 use thiserror::Error;
 

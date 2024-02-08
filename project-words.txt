@@ -92,6 +92,7 @@ upgrader
 Uragqm
 urlencoding
 uroot
+uuidgen
 Verstappen
 waivable
 webseeding

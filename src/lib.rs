@@ -231,7 +231,7 @@
 //! This console command allows you to manually import the tracker statistics.
 //!
 //! For more information about this command you can visit the documentation for
-//! the [`Import tracker statistics`](crate::console::commands::import_tracker_statistics) module.
+//! the [`Import tracker statistics`](crate::console::commands::tracker_statistics_importer) module.
 //!
 //! ## Upgrader
 //!
