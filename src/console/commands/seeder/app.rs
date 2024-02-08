@@ -1,19 +1,132 @@
-//! Program to upload random torrent to a live Index API.
+//! Console app to upload random torrents to a live Index API.
 //!
 //! Run with:
 //!
 //! ```text
-//! cargo run --bin seeder -- --api-base-url <API_BASE_URL> --number-of-torrents <NUMBER_OF_TORRENTS> --user <USER> --password <PASSWORD> --interval <INTERVAL>
+//! cargo run --bin seeder -- \
+//!   --api-base-url <API_BASE_URL> \
+//!   --number-of-torrents <NUMBER_OF_TORRENTS> \
+//!   --user <USER> \
+//!   --password <PASSWORD> \
+//!   --interval <INTERVAL>
 //! ```
 //!
 //! For example:
 //!
 //! ```text
-//! cargo run --bin seeder -- --api-base-url "localhost:3001" --number-of-torrents 1000 --user admin --password 12345678 --interval 0
+//! cargo run --bin seeder -- \
+//!   --api-base-url "localhost:3001" \
+//!   --number-of-torrents 1000 \
+//!   --user admin \
+//!   --password 12345678 \
+//!   --interval 0
 //! ```
 //!
 //! That command would upload 1000 random torrents to the Index using the user
 //! account admin with password 123456 and waiting 1 second between uploads.
+//!
+//! The random torrents generated are single-file torrents from a TXT file.
+//! All generated torrents used a UUID to identify the test torrent. The torrent
+//! is generated on the fly without needing to generate the contents file.
+//! However, if you like it, you can generate the contents and the torrent
+//! manually with the following commands:
+//!
+//! ```text
+//! cd /tmp
+//! mkdir test_torrents
+//! cd test_torrents
+//! uuidgen
+//! echo $'1fd827fb-29dc-47bd-b116-bf96f6466e65' > file-1fd827fb-29dc-47bd-b116-bf96f6466e65.txt
+//! imdl torrent create file-1fd827fb-29dc-47bd-b116-bf96f6466e65.txt
+//! imdl torrent show file-1fd827fb-29dc-47bd-b116-bf96f6466e65.txt.torrent
+//! ```
+//!
+//! That could be useful for testing purposes. For example, if you want to seed
+//! the torrent with a `BitTorrent` client.
+//!
+//! Let's explain each line:
+//!
+//! First, we need to generate the UUID:
+//!
+//! ```text
+//! uuidgen
+//! 1fd827fb-29dc-47bd-b116-bf96f6466e65
+//! ````
+//!
+//! Then, we need to create a text file and write the UUID into the file:
+//!
+//! ```text
+//! echo $'1fd827fb-29dc-47bd-b116-bf96f6466e65' > file-1fd827fb-29dc-47bd-b116-bf96f6466e65.txt
+//! ```
+//!
+//! Finally you can use a torrent creator like [Intermodal](https://github.com/casey/intermodal)
+//!  to generate the torrent file. You can use any `BitTorrent` client or other
+//! console tool.
+//!
+//! ```text
+//! imdl torrent create file-1fd827fb-29dc-47bd-b116-bf96f6466e65.txt
+//! $ imdl torrent create file-1fd827fb-29dc-47bd-b116-bf96f6466e65.txt
+//! [1/3] 🧿 Searching `file-1fd827fb-29dc-47bd-b116-bf96f6466e65.txt` for files…
+//! [2/3] 🧮 Hashing pieces…
+//! [3/3] 💾 Writing metainfo to `file-1fd827fb-29dc-47bd-b116-bf96f6466e65.txt.torrent`…
+//! ✨✨ Done! ✨✨
+//! ````
+//!
+//! The torrent meta file contains this information:
+//!
+//! ```text
+//! $ imdl torrent show file-1fd827fb-29dc-47bd-b116-bf96f6466e65.txt.torrent
+//!          Name  file-1fd827fb-29dc-47bd-b116-bf96f6466e65.txt
+//! Creation Date  2024-02-07 12:47:32 UTC
+//!    Created By  imdl/0.1.13
+//!     Info Hash  c8cf845e9771013b5c0e022cb1fc1feebdb24b66
+//!  Torrent Size  201 bytes
+//!  Content Size  37 bytes
+//!       Private  no
+//!    Piece Size  16 KiB
+//!   Piece Count  1
+//!    File Count  1
+//!         Files  file-1fd827fb-29dc-47bd-b116-bf96f6466e65.txt
+//!````
+//!
+//! The torrent generated manually contains this info:
+//!
+//! ```json
+//! {
+//!   "created by": "imdl/0.1.13",
+//!   "creation date": 1707304810,
+//!   "encoding": "UTF-8",
+//!     "info": {
+//!       "length": 37,
+//!       "name": "file-1fd827fb-29dc-47bd-b116-bf96f6466e65.txt",
+//!       "piece length": 16384,
+//!       "pieces": "<hex>E2 11 4F 69 79 50 1E CC F6 32 91 A5 12 FA D5 6B 49 20 12 D3</hex>"
+//!     }
+//!  }
+//! ```
+//!
+//! If you upload that torrent to the Index and you download it, then you
+//! get this torrent information:
+//!
+//! ```json
+//! {
+//!   "announce": "udp://tracker.torrust-demo.com:6969/k24qT2KgWFh9d5e1iHSJ9kOwfK45fH4V",
+//!   "announce-list": [
+//!     [
+//!       "udp://tracker.torrust-demo.com:6969/k24qT2KgWFh9d5e1iHSJ9kOwfK45fH4V"
+//!     ]
+//!   ],
+//!   "info": {
+//!     "length": 37,
+//!     "name": "file-1fd827fb-29dc-47bd-b116-bf96f6466e65.txt",
+//!     "piece length": 16384,
+//!     "pieces": "<hex>E2 11 4F 69 79 50 1E CC F6 32 91 A5 12 FA D5 6B 49 20 12 D3</hex>"
+//!   }
+//! }
+//! ```
+//!
+//! As you can see the `info` dictionary is exactly the same, which produces
+//! the same info-hash for the torrent.
 use std::thread::sleep;
 use std::time::Duration;
 

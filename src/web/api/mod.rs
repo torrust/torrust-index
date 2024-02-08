@@ -2,7 +2,10 @@
 //!
 //! Currently, the API has only one version: `v1`.
 //!
-//! Refer to the [`v1`]) module for more information.
+//! Refer to:
+//!
+//! - [`client::v1`]) module for more information about the API client.
+//! - [`server::v1`]) module for more information about the API server.
 pub mod client;
 pub mod server;
 
