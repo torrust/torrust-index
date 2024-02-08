@@ -53,7 +53,7 @@
 //! ## Prerequisites
 //!
 //! In order the run the index you will need a running torrust tracker. In the
-//! configuration you need to fill the `index` section with the following:
+//! configuration you need to fill the `tracker` section with the following:
 //!
 //! ```toml
 //! [tracker]
@@ -69,6 +69,16 @@
 //! You can follow the tracker installation instructions [here](https://docs.rs/torrust-tracker)
 //! or you can use the docker to run both the tracker and the index. Refer to the
 //! [Run with docker](#run-with-docker) section for more information.
+//!
+//! You will also need to install this dependency:
+//!
+//! ```text
+//! sudo apt-get install libssl-dev
+//! ```
+//!
+//! We needed because we are using native TLS support instead of [rustls](https://github.com/rustls/rustls).
+//!
+//! More info: <https://github.com/torrust/torrust-index/issues/463>.
 //!
 //! If you are using `SQLite3` as database driver, you will need to install the
 //! following dependency:
