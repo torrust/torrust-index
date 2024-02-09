@@ -1,5 +1,4 @@
 use reqwest::multipart;
-use serde::Serialize;
 
 use super::connection_info::ConnectionInfo;
 use super::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
@@ -7,8 +6,8 @@ use super::contexts::tag::forms::{AddTagForm, DeleteTagForm};
 use super::contexts::torrent::forms::UpdateTorrentForm;
 use super::contexts::torrent::requests::InfoHash;
 use super::contexts::user::forms::{LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username};
-use super::http::{Query, ReqwestQuery};
-use super::responses::{self, BinaryResponse, TextResponse};
+use super::http::{Http, Query};
+use super::responses::{self, TextResponse};
 
 /// API Client
 pub struct Client {
@@ -155,179 +154,5 @@ impl Client {
 
     pub async fn ban_user(&self, username: Username) -> TextResponse {
         self.http_client.delete(&format!("/user/ban/{}", &username.value)).await
-    }
-}
-
-/// Generic HTTP Client
-struct Http {
-    connection_info: ConnectionInfo,
-}
-
-impl Http {
-    pub fn new(connection_info: ConnectionInfo) -> Self {
-        Self { connection_info }
-    }
-
-    pub async fn get(&self, path: &str, params: Query) -> TextResponse {
-        let response = match &self.connection_info.token {
-            Some(token) => reqwest::Client::builder()
-                .build()
-                .unwrap()
-                .get(self.base_url(path).clone())
-                .query(&ReqwestQuery::from(params))
-                .bearer_auth(token)
-                .send()
-                .await
-                .unwrap(),
-            None => reqwest::Client::builder()
-                .build()
-                .unwrap()
-                .get(self.base_url(path).clone())
-                .query(&ReqwestQuery::from(params))
-                .send()
-                .await
-                .unwrap(),
-        };
-        TextResponse::from(response).await
-    }
-
-    pub async fn get_binary(&self, path: &str, params: Query) -> BinaryResponse {
-        let response = match &self.connection_info.token {
-            Some(token) => reqwest::Client::builder()
-                .build()
-                .unwrap()
-                .get(self.base_url(path).clone())
-                .query(&ReqwestQuery::from(params))
-                .bearer_auth(token)
-                .send()
-                .await
-                .unwrap(),
-            None => reqwest::Client::builder()
-                .build()
-                .unwrap()
-                .get(self.base_url(path).clone())
-                .query(&ReqwestQuery::from(params))
-                .send()
-                .await
-                .unwrap(),
-        };
-        // todo: If the response is a JSON, it returns the JSON body in a byte
-        //   array. This is not the expected behavior.
-        //  - Rename BinaryResponse to BinaryTorrentResponse
-        //  - Return an error if the response is not a bittorrent file
-        BinaryResponse::from(response).await
-    }
-
-    pub async fn inner_get(&self, path: &str) -> Result<reqwest::Response, reqwest::Error> {
-        reqwest::Client::builder()
-            .build()
-            .unwrap()
-            .get(self.base_url(path).clone())
-            .send()
-            .await
-    }
-
-    pub async fn post<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> TextResponse {
-        let response = match &self.connection_info.token {
-            Some(token) => reqwest::Client::new()
-                .post(self.base_url(path).clone())
-                .bearer_auth(token)
-                .json(&form)
-                .send()
-                .await
-                .unwrap(),
-            None => reqwest::Client::new()
-                .post(self.base_url(path).clone())
-                .json(&form)
-                .send()
-                .await
-                .unwrap(),
-        };
-        TextResponse::from(response).await
-    }
-
-    pub async fn post_multipart(&self, path: &str, form: multipart::Form) -> TextResponse {
-        let response = match &self.connection_info.token {
-            Some(token) => reqwest::Client::builder()
-                .build()
-                .unwrap()
-                .post(self.base_url(path).clone())
-                .multipart(form)
-                .bearer_auth(token)
-                .send()
-                .await
-                .expect("failed to send multipart request with token"),
-            None => reqwest::Client::builder()
-                .build()
-                .unwrap()
-                .post(self.base_url(path).clone())
-                .multipart(form)
-                .send()
-                .await
-                .expect("failed to send multipart request without token"),
-        };
-        TextResponse::from(response).await
-    }
-
-    pub async fn put<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> TextResponse {
-        let response = match &self.connection_info.token {
-            Some(token) => reqwest::Client::new()
-                .put(self.base_url(path).clone())
-                .bearer_auth(token)
-                .json(&form)
-                .send()
-                .await
-                .unwrap(),
-            None => reqwest::Client::new()
-                .put(self.base_url(path).clone())
-                .json(&form)
-                .send()
-                .await
-                .unwrap(),
-        };
-        TextResponse::from(response).await
-    }
-
-    async fn delete(&self, path: &str) -> TextResponse {
-        let response = match &self.connection_info.token {
-            Some(token) => reqwest::Client::new()
-                .delete(self.base_url(path).clone())
-                .bearer_auth(token)
-                .send()
-                .await
-                .unwrap(),
-            None => reqwest::Client::new()
-                .delete(self.base_url(path).clone())
-                .send()
-                .await
-                .unwrap(),
-        };
-        TextResponse::from(response).await
-    }
-
-    async fn delete_with_body<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> TextResponse {
-        let response = match &self.connection_info.token {
-            Some(token) => reqwest::Client::new()
-                .delete(self.base_url(path).clone())
-                .bearer_auth(token)
-                .json(&form)
-                .send()
-                .await
-                .unwrap(),
-            None => reqwest::Client::new()
-                .delete(self.base_url(path).clone())
-                .json(&form)
-                .send()
-                .await
-                .unwrap(),
-        };
-        TextResponse::from(response).await
-    }
-
-    fn base_url(&self, path: &str) -> String {
-        format!(
-            "http://{}{}{path}",
-            &self.connection_info.bind_address, &self.connection_info.base_path
-        )
     }
 }
