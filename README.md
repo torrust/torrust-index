@@ -93,13 +93,16 @@ _Optionally, you may choose to supply the entire configuration as an environment
 TORRUST_INDEX_CONFIG=$(cat "./storage/index/etc/index.toml") cargo run
 ```
 
-_For deployment, you __should__ override the `tracker_api_token` by using an environmental variable:_
+_For deployment, you __should__ override:
+
+- The `tracker_api_token` and the `index_auth_secret_key` by using environmental variables:_
 
 ```sh
 # Please use the secret that you generated for the torrust-tracker configuration.
 # Override secret in configuration using an environmental variable
 TORRUST_INDEX_CONFIG=$(cat "./storage/index/etc/index.toml") \
   TORRUST_INDEX_TRACKER_API_TOKEN=$(cat "./storage/tracker/lib/tracker_api_admin_token.secret") \
+  TORRUST_INDEX_AUTH_SECRET_KEY="MaxVerstappenWC2021" \
   cargo run
 ```
 

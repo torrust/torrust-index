@@ -14,6 +14,9 @@ const ENV_VAR_CONFIG: &str = "TORRUST_INDEX_E2E_CONFIG";
 /// Token needed to communicate with the Torrust Tracker
 const ENV_VAR_API_ADMIN_TOKEN: &str = "TORRUST_INDEX_E2E_TRACKER_API_TOKEN";
 
+/// Secret key used to encrypt and decrypt
+const ENV_VAR_AUTH_SECRET_KEY: &str = "TORRUST_INDEX_E2E_AUTH_SECRET_KEY";
+
 /// The `index.toml` file location.
 pub const ENV_VAR_PATH_CONFIG: &str = "TORRUST_INDEX_E2E_PATH_CONFIG";
 
@@ -48,6 +51,7 @@ pub fn initialize_configuration() -> Configuration {
         ENV_VAR_PATH_CONFIG.to_string(),
         DEFAULT_PATH_CONFIG.to_string(),
         ENV_VAR_API_ADMIN_TOKEN.to_string(),
+        ENV_VAR_AUTH_SECRET_KEY.to_string(),
     )
     .unwrap();
 
