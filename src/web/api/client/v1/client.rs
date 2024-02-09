@@ -15,8 +15,6 @@ pub struct Client {
 }
 
 impl Client {
-    // todo: forms in POST requests can be passed by reference.
-
     fn base_path() -> String {
         "/v1".to_string()
     }
