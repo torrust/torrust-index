@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use reqwest::multipart;
 use serde::Serialize;
 
@@ -158,16 +160,23 @@ impl Client {
 /// Generic HTTP Client
 struct Http {
     connection_info: ConnectionInfo,
+    /// The timeout is applied from when the request starts connecting until the
+    /// response body has finished.
+    timeout: Duration,
 }
 
 impl Http {
     pub fn new(connection_info: ConnectionInfo) -> Self {
-        Self { connection_info }
+        Self {
+            connection_info,
+            timeout: Duration::from_secs(5),
+        }
     }
 
     pub async fn get(&self, path: &str, params: Query) -> TextResponse {
         let response = match &self.connection_info.token {
             Some(token) => reqwest::Client::builder()
+                .timeout(self.timeout)
                 .build()
                 .unwrap()
                 .get(self.base_url(path).clone())
@@ -177,6 +186,7 @@ impl Http {
                 .await
                 .unwrap(),
             None => reqwest::Client::builder()
+                .timeout(self.timeout)
                 .build()
                 .unwrap()
                 .get(self.base_url(path).clone())
@@ -191,6 +201,7 @@ impl Http {
     pub async fn get_binary(&self, path: &str, params: Query) -> BinaryResponse {
         let response = match &self.connection_info.token {
             Some(token) => reqwest::Client::builder()
+                .timeout(self.timeout)
                 .build()
                 .unwrap()
                 .get(self.base_url(path).clone())
@@ -200,6 +211,7 @@ impl Http {
                 .await
                 .unwrap(),
             None => reqwest::Client::builder()
+                .timeout(self.timeout)
                 .build()
                 .unwrap()
                 .get(self.base_url(path).clone())
@@ -217,6 +229,7 @@ impl Http {
 
     pub async fn inner_get(&self, path: &str) -> Result<reqwest::Response, reqwest::Error> {
         reqwest::Client::builder()
+            .timeout(self.timeout)
             .build()
             .unwrap()
             .get(self.base_url(path).clone())
@@ -246,6 +259,7 @@ impl Http {
     pub async fn post_multipart(&self, path: &str, form: multipart::Form) -> TextResponse {
         let response = match &self.connection_info.token {
             Some(token) => reqwest::Client::builder()
+                .timeout(self.timeout)
                 .build()
                 .unwrap()
                 .post(self.base_url(path).clone())
@@ -255,6 +269,7 @@ impl Http {
                 .await
                 .expect("failed to send multipart request with token"),
             None => reqwest::Client::builder()
+                .timeout(self.timeout)
                 .build()
                 .unwrap()
                 .post(self.base_url(path).clone())
