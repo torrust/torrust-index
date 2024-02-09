@@ -20,6 +20,7 @@ pub const API_VERSION_URL_PREFIX: &str = "v1";
 #[allow(clippy::needless_pass_by_value)]
 pub fn router(app_data: Arc<AppData>) -> Router {
     // code-review: should we use plural for the resource prefix: `users`, `categories`, `tags`?
+    // Some endpoint are using plural (for instance, `get_categories`) and some singular.
     // See: https://stackoverflow.com/questions/6845772/should-i-use-singular-or-plural-name-convention-for-rest-resources
 
     let v1_api_routes = Router::new()

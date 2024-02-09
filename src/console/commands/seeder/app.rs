@@ -15,7 +15,7 @@
 //!
 //! ```text
 //! cargo run --bin seeder -- \
-//!   --api-base-url "localhost:3001" \
+//!   --api-base-url "http://localhost:3001" \
 //!   --number-of-torrents 1000 \
 //!   --user admin \
 //!   --password 12345678 \
@@ -127,12 +127,14 @@
 //!
 //! As you can see the `info` dictionary is exactly the same, which produces
 //! the same info-hash for the torrent.
+use std::str::FromStr;
 use std::thread::sleep;
 use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
 use log::{debug, info, LevelFilter};
+use reqwest::Url;
 use text_colorizer::Colorize;
 use uuid::Uuid;
 
@@ -173,9 +175,11 @@ pub async fn run() -> anyhow::Result<()> {
 
     let args = Args::parse();
 
-    let api_user = login_index_api(&args.api_base_url, &args.user, &args.password).await;
+    let api_url = Url::from_str(&args.api_base_url).context("failed to parse API base URL")?;
 
-    let api_client = Client::authenticated(&args.api_base_url, &api_user.token);
+    let api_user = login_index_api(&api_url, &args.user, &args.password).await;
+
+    let api_client = Client::authenticated(&api_url, &api_user.token);
 
     info!(target:"seeder", "Uploading { } random torrents to the Torrust Index with a { } seconds interval...", args.number_of_torrents.to_string().yellow(), args.interval.to_string().yellow());
 
@@ -202,7 +206,7 @@ pub async fn run() -> anyhow::Result<()> {
 }
 
 /// It logs in a user in the Index API.
-pub async fn login_index_api(api_url: &str, username: &str, password: &str) -> LoggedInUserData {
+pub async fn login_index_api(api_url: &Url, username: &str, password: &str) -> LoggedInUserData {
     let unauthenticated_client = Client::unauthenticated(api_url);
 
     info!(target:"seeder", "Trying to login with username: {} ...", username.yellow());

@@ -35,7 +35,13 @@ pub async fn upload_torrent(client: &Client, upload_torrent_form: UploadTorrentM
         add_category(client, &upload_torrent_form.category).await;
     }
 
-    let response = client.upload_torrent(upload_torrent_form.into()).await;
+    // todo: if we receive timeout error we should retry later. Otherwise we
+    // have to restart the seeder manually.
+
+    let response = client
+        .upload_torrent(upload_torrent_form.into())
+        .await
+        .expect("API should return a response");
 
     debug!(target:"seeder", "response: {}", response.status);
 
@@ -68,7 +74,8 @@ pub async fn login(client: &Client, username: &str, password: &str) -> LoggedInU
             login: username.to_owned(),
             password: password.to_owned(),
         })
-        .await;
+        .await
+        .expect("API should return a response");
 
     let res: SuccessfulLoginResponse = serde_json::from_str(&response.body).unwrap_or_else(|_| {
         panic!(
@@ -86,7 +93,7 @@ pub async fn login(client: &Client, username: &str, password: &str) -> LoggedInU
 ///
 /// Panics if the response body is not a valid JSON.
 pub async fn get_categories(client: &Client) -> Vec<ListItem> {
-    let response = client.get_categories().await;
+    let response = client.get_categories().await.expect("API should return a response");
 
     let res: ListResponse = serde_json::from_str(&response.body).unwrap();
 
@@ -94,6 +101,10 @@ pub async fn get_categories(client: &Client) -> Vec<ListItem> {
 }
 
 /// It adds a new category.
+///
+/// # Panics
+///
+/// Will panic if it doesn't get a response form the API.
 pub async fn add_category(client: &Client, name: &str) -> TextResponse {
     client
         .add_category(AddCategoryForm {
@@ -101,6 +112,7 @@ pub async fn add_category(client: &Client, name: &str) -> TextResponse {
             icon: None,
         })
         .await
+        .expect("API should return a response")
 }
 
 /// It checks if the category list contains the given category.
