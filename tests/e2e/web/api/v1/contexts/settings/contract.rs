@@ -61,7 +61,7 @@ async fn it_should_allow_admins_to_get_all_the_settings() {
 
     let res: AllSettingsResponse = serde_json::from_str(&response.body).unwrap();
 
-    assert_eq!(res.data, env.server_settings().unwrap());
+    assert_eq!(res.data, env.server_settings_masking_secrets().unwrap());
 
     assert_json_ok_response(&response);
 }

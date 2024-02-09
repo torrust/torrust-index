@@ -389,6 +389,13 @@ impl TorrustIndex {
     fn override_tracker_api_token(&mut self, tracker_api_token: &str) {
         self.tracker.override_tracker_api_token(tracker_api_token);
     }
+
+    pub fn remove_secrets(&mut self) {
+        self.tracker.token = "***".to_owned();
+        self.database.connect_url = "***".to_owned();
+        self.mail.password = "***".to_owned();
+        self.auth.secret_key = "***".to_owned();
+    }
 }
 
 /// The configuration service.

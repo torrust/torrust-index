@@ -85,6 +85,21 @@ impl TestEnv {
         self.starting_settings.clone()
     }
 
+    /// Returns the server starting settings if the servers was already started,
+    /// masking secrets with asterisks.
+    pub fn server_settings_masking_secrets(&self) -> Option<Settings> {
+        match self.starting_settings.clone() {
+            Some(mut settings) => {
+                settings.tracker.token = "***".to_owned();
+                settings.database.connect_url = "***".to_owned();
+                settings.mail.password = "***".to_owned();
+                settings.auth.secret_key = "***".to_owned();
+                Some(settings)
+            }
+            None => None,
+        }
+    }
+
     /// Provides the API server socket address.
     /// For example: `localhost:3001`.
     pub fn server_socket_addr(&self) -> Option<String> {
