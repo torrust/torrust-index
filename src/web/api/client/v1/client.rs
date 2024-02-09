@@ -1,4 +1,4 @@
-use reqwest::multipart;
+use reqwest::{multipart, Url};
 
 use super::connection_info::ConnectionInfo;
 use super::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
@@ -22,13 +22,13 @@ impl Client {
     }
 
     #[must_use]
-    pub fn unauthenticated(bind_address: &str) -> Self {
-        Self::new(ConnectionInfo::anonymous(bind_address, &Self::base_path()))
+    pub fn unauthenticated(base_url: &Url) -> Self {
+        Self::new(ConnectionInfo::anonymous(base_url, &Self::base_path()))
     }
 
     #[must_use]
-    pub fn authenticated(bind_address: &str, token: &str) -> Self {
-        Self::new(ConnectionInfo::new(bind_address, &Self::base_path(), token))
+    pub fn authenticated(base_url: &Url, token: &str) -> Self {
+        Self::new(ConnectionInfo::new(base_url, &Self::base_path(), token))
     }
 
     #[must_use]

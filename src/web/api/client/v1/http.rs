@@ -267,8 +267,8 @@ impl Http {
 
     fn base_url(&self, path: &str) -> String {
         format!(
-            "http://{}{}{path}",
-            &self.connection_info.bind_address, &self.connection_info.base_path
+            "{}://{}{}{path}",
+            &self.connection_info.scheme, &self.connection_info.bind_address, &self.connection_info.base_path
         )
     }
 }
