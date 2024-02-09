@@ -92,8 +92,6 @@ impl Client {
     ///
     /// Will panic if the request fails.    
     pub async fn get_tags(&self) -> TextResponse {
-        // code-review: some endpoint are using plural
-        // (for instance, `get_categories`) and some singular.
         self.http_client.get("/tags", Query::empty()).await.unwrap()
     }
 
