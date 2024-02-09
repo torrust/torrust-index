@@ -34,7 +34,30 @@ impl Service {
             return Err(ServiceError::Unauthorized);
         }
 
-        Ok(self.configuration.get_all().await)
+        let torrust_index_configuration = self.configuration.get_all().await;
+
+        Ok(torrust_index_configuration)
+    }
+
+    /// It gets all the settings making the secrets with asterisks.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if the user does not have the required permissions.
+    pub async fn get_all_masking_secrets(&self, user_id: &UserId) -> Result<TorrustIndex, ServiceError> {
+        let user = self.user_repository.get_compact(user_id).await?;
+
+        // Check if user is administrator
+        // todo: extract authorization service
+        if !user.administrator {
+            return Err(ServiceError::Unauthorized);
+        }
+
+        let mut torrust_index_configuration = self.configuration.get_all().await;
+
+        torrust_index_configuration.remove_secrets();
+
+        Ok(torrust_index_configuration)
     }
 
     /// It gets only the public settings.

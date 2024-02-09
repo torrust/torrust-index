@@ -22,7 +22,7 @@ pub async fn get_all_handler(State(app_data): State<Arc<AppData>>, Extract(maybe
         Err(error) => return error.into_response(),
     };
 
-    let all_settings = match app_data.settings_service.get_all(&user_id).await {
+    let all_settings = match app_data.settings_service.get_all_masking_secrets(&user_id).await {
         Ok(all_settings) => all_settings,
         Err(error) => return error.into_response(),
     };
