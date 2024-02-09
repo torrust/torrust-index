@@ -9,6 +9,17 @@ use super::contexts::user::forms::{LoginForm, RegistrationForm, TokenRenewalForm
 use super::http::{Http, Query};
 use super::responses::{self, TextResponse};
 
+#[derive(Debug)]
+pub enum Error {
+    HttpError(reqwest::Error),
+}
+
+impl From<reqwest::Error> for Error {
+    fn from(err: reqwest::Error) -> Self {
+        Error::HttpError(err)
+    }
+}
+
 /// API Client
 pub struct Client {
     http_client: Http,
@@ -44,197 +55,228 @@ impl Client {
 
     // Context: about
 
-    /// # Panics
+    /// # Errors
     ///
     /// Will panic if the request fails.
-    pub async fn about(&self) -> TextResponse {
-        self.http_client.get("/about", Query::empty()).await.unwrap()
+    pub async fn about(&self) -> Result<TextResponse, Error> {
+        self.http_client.get("/about", Query::empty()).await.map_err(Error::from)
     }
 
-    /// # Panics
+    /// # Errors
     ///
-    /// Will panic if the request fails.    
-    pub async fn license(&self) -> TextResponse {
-        self.http_client.get("/about/license", Query::empty()).await.unwrap()
+    /// Will panic if the request fails.  
+    pub async fn license(&self) -> Result<TextResponse, Error> {
+        self.http_client
+            .get("/about/license", Query::empty())
+            .await
+            .map_err(Error::from)
     }
 
     // Context: category
 
-    /// # Panics
+    /// # Errors
     ///
     /// Will panic if the request fails.
-    pub async fn get_categories(&self) -> TextResponse {
-        self.http_client.get("/category", Query::empty()).await.unwrap()
+    pub async fn get_categories(&self) -> Result<TextResponse, Error> {
+        self.http_client.get("/category", Query::empty()).await.map_err(Error::from)
     }
 
-    /// # Panics
+    /// # Errors
     ///
     /// Will panic if the request fails.
-    pub async fn add_category(&self, add_category_form: AddCategoryForm) -> TextResponse {
-        self.http_client.post("/category", &add_category_form).await.unwrap()
+    pub async fn add_category(&self, add_category_form: AddCategoryForm) -> Result<TextResponse, Error> {
+        self.http_client
+            .post("/category", &add_category_form)
+            .await
+            .map_err(Error::from)
     }
 
-    /// # Panics
+    /// # Errors
     ///
     /// Will panic if the request fails.
-    pub async fn delete_category(&self, delete_category_form: DeleteCategoryForm) -> TextResponse {
+    pub async fn delete_category(&self, delete_category_form: DeleteCategoryForm) -> Result<TextResponse, Error> {
         self.http_client
             .delete_with_body("/category", &delete_category_form)
             .await
-            .unwrap()
+            .map_err(Error::from)
     }
 
     // Context: tag
 
-    /// # Panics
+    /// # Errors
     ///
-    /// Will panic if the request fails.    
-    pub async fn get_tags(&self) -> TextResponse {
-        self.http_client.get("/tags", Query::empty()).await.unwrap()
+    /// Will panic if the request fails.  
+    pub async fn get_tags(&self) -> Result<TextResponse, Error> {
+        self.http_client.get("/tags", Query::empty()).await.map_err(Error::from)
     }
 
-    /// # Panics
-    ///
-    /// Will panic if the request fails.       
-    pub async fn add_tag(&self, add_tag_form: AddTagForm) -> TextResponse {
-        self.http_client.post("/tag", &add_tag_form).await.unwrap()
-    }
-
-    /// # Panics
+    /// # Errors
     ///
     /// Will panic if the request fails.   
-    pub async fn delete_tag(&self, delete_tag_form: DeleteTagForm) -> TextResponse {
-        self.http_client.delete_with_body("/tag", &delete_tag_form).await.unwrap()
+    pub async fn add_tag(&self, add_tag_form: AddTagForm) -> Result<TextResponse, Error> {
+        self.http_client.post("/tag", &add_tag_form).await.map_err(Error::from)
+    }
+
+    /// # Errors
+    ///
+    /// Will panic if the request fails.
+    pub async fn delete_tag(&self, delete_tag_form: DeleteTagForm) -> Result<TextResponse, Error> {
+        self.http_client
+            .delete_with_body("/tag", &delete_tag_form)
+            .await
+            .map_err(Error::from)
     }
 
     // Context: root
 
-    /// # Panics
+    /// # Errors
     ///
-    /// Will panic if the request fails.    
-    pub async fn root(&self) -> TextResponse {
-        self.http_client.get("", Query::empty()).await.unwrap()
+    /// Will panic if the request fails.   
+    pub async fn root(&self) -> Result<TextResponse, Error> {
+        self.http_client.get("", Query::empty()).await.map_err(Error::from)
     }
 
     // Context: settings
 
-    /// # Panics
-    ///
-    /// Will panic if the request fails.    
-    pub async fn get_public_settings(&self) -> TextResponse {
-        self.http_client.get("/settings/public", Query::empty()).await.unwrap()
-    }
-
-    /// # Panics
+    /// # Errors
     ///
     /// Will panic if the request fails.
-    pub async fn get_site_name(&self) -> TextResponse {
-        self.http_client.get("/settings/name", Query::empty()).await.unwrap()
+    pub async fn get_public_settings(&self) -> Result<TextResponse, Error> {
+        self.http_client
+            .get("/settings/public", Query::empty())
+            .await
+            .map_err(Error::from)
     }
 
-    /// # Panics
+    /// # Errors
     ///
     /// Will panic if the request fails.
-    pub async fn get_settings(&self) -> TextResponse {
-        self.http_client.get("/settings", Query::empty()).await.unwrap()
+    pub async fn get_site_name(&self) -> Result<TextResponse, Error> {
+        self.http_client
+            .get("/settings/name", Query::empty())
+            .await
+            .map_err(Error::from)
+    }
+
+    /// # Errors
+    ///
+    /// Will panic if the request fails.
+    pub async fn get_settings(&self) -> Result<TextResponse, Error> {
+        self.http_client.get("/settings", Query::empty()).await.map_err(Error::from)
     }
 
     // Context: torrent
 
-    /// # Panics
+    /// # Errors
     ///
     /// Will panic if the request fails.
-    pub async fn get_torrents(&self, params: Query) -> TextResponse {
-        self.http_client.get("/torrents", params).await.unwrap()
+    pub async fn get_torrents(&self, params: Query) -> Result<TextResponse, Error> {
+        self.http_client.get("/torrents", params).await.map_err(Error::from)
     }
 
-    /// # Panics
+    /// # Errors
     ///
-    /// Will panic if the request fails.    
-    pub async fn get_torrent(&self, info_hash: &InfoHash) -> TextResponse {
+    /// Will panic if the request fails.  
+    pub async fn get_torrent(&self, info_hash: &InfoHash) -> Result<TextResponse, Error> {
         self.http_client
             .get(&format!("/torrent/{info_hash}"), Query::empty())
             .await
-            .unwrap()
+            .map_err(Error::from)
     }
 
-    /// # Panics
+    /// # Errors
     ///
-    /// Will panic if the request fails.   
-    pub async fn delete_torrent(&self, info_hash: &InfoHash) -> TextResponse {
-        self.http_client.delete(&format!("/torrent/{info_hash}")).await.unwrap()
+    /// Will panic if the request fails.
+    pub async fn delete_torrent(&self, info_hash: &InfoHash) -> Result<TextResponse, Error> {
+        self.http_client
+            .delete(&format!("/torrent/{info_hash}"))
+            .await
+            .map_err(Error::from)
     }
 
-    /// # Panics
+    /// # Errors
     ///
-    /// Will panic if the request fails.   
-    pub async fn update_torrent(&self, info_hash: &InfoHash, update_torrent_form: UpdateTorrentForm) -> TextResponse {
+    /// Will panic if the request fails.
+    pub async fn update_torrent(
+        &self,
+        info_hash: &InfoHash,
+        update_torrent_form: UpdateTorrentForm,
+    ) -> Result<TextResponse, Error> {
         self.http_client
             .put(&format!("/torrent/{info_hash}"), &update_torrent_form)
             .await
-            .unwrap()
+            .map_err(Error::from)
     }
 
-    /// # Panics
+    /// # Errors
     ///
-    /// Will panic if the request fails.   
-    pub async fn upload_torrent(&self, form: multipart::Form) -> TextResponse {
-        self.http_client.post_multipart("/torrent/upload", form).await.unwrap()
+    /// Will panic if the request fails.
+    pub async fn upload_torrent(&self, form: multipart::Form) -> Result<TextResponse, Error> {
+        self.http_client
+            .post_multipart("/torrent/upload", form)
+            .await
+            .map_err(Error::from)
     }
 
-    /// # Panics
+    /// # Errors
     ///
-    /// Will panic if the request fails.   
-    pub async fn download_torrent(&self, info_hash: &InfoHash) -> responses::BinaryResponse {
+    /// Will panic if the request fails.
+    pub async fn download_torrent(&self, info_hash: &InfoHash) -> Result<responses::BinaryResponse, Error> {
         self.http_client
             .get_binary(&format!("/torrent/download/{info_hash}"), Query::empty())
             .await
-            .unwrap()
+            .map_err(Error::from)
     }
 
     // Context: user
 
-    /// # Panics
+    /// # Errors
     ///
-    /// Will panic if the request fails.   
-    pub async fn register_user(&self, registration_form: RegistrationForm) -> TextResponse {
-        self.http_client.post("/user/register", &registration_form).await.unwrap()
+    /// Will panic if the request fails.
+    pub async fn register_user(&self, registration_form: RegistrationForm) -> Result<TextResponse, Error> {
+        self.http_client
+            .post("/user/register", &registration_form)
+            .await
+            .map_err(Error::from)
     }
 
-    /// # Panics
+    /// # Errors
     ///
-    /// Will panic if the request fails.   
-    pub async fn login_user(&self, registration_form: LoginForm) -> TextResponse {
-        self.http_client.post("/user/login", &registration_form).await.unwrap()
+    /// Will panic if the request fails.
+    pub async fn login_user(&self, registration_form: LoginForm) -> Result<TextResponse, Error> {
+        self.http_client
+            .post("/user/login", &registration_form)
+            .await
+            .map_err(Error::from)
     }
 
-    /// # Panics
+    /// # Errors
     ///
-    /// Will panic if the request fails.   
-    pub async fn verify_token(&self, token_verification_form: TokenVerificationForm) -> TextResponse {
+    /// Will panic if the request fails.
+    pub async fn verify_token(&self, token_verification_form: TokenVerificationForm) -> Result<TextResponse, Error> {
         self.http_client
             .post("/user/token/verify", &token_verification_form)
             .await
-            .unwrap()
+            .map_err(Error::from)
     }
 
-    /// # Panics
+    /// # Errors
     ///
-    /// Will panic if the request fails.   
-    pub async fn renew_token(&self, token_verification_form: TokenRenewalForm) -> TextResponse {
+    /// Will panic if the request fails.
+    pub async fn renew_token(&self, token_verification_form: TokenRenewalForm) -> Result<TextResponse, Error> {
         self.http_client
             .post("/user/token/renew", &token_verification_form)
             .await
-            .unwrap()
+            .map_err(Error::from)
     }
 
-    /// # Panics
+    /// # Errors
     ///
-    /// Will panic if the request fails.   
-    pub async fn ban_user(&self, username: Username) -> TextResponse {
+    /// Will panic if the request fails.
+    pub async fn ban_user(&self, username: Username) -> Result<TextResponse, Error> {
         self.http_client
             .delete(&format!("/user/ban/{}", &username.value))
             .await
-            .unwrap()
+            .map_err(Error::from)
     }
 }
