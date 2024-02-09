@@ -1,11 +1,11 @@
+# Please override the following settings with environmental variable!
+# tracker::token   -> `TORRUST_INDEX_TRACKER_API_TOKEN`
+# auth::secret_key -> `TORRUST_INDEX_AUTH_SECRET_KEY`
+
 log_level = "info"
 
 [website]
 name = "Torrust"
-
-# Please override the tracker token setting the
-#    `TORRUST_INDEX_TRACKER_API_TOKEN`
-#                     environmental variable!
 
 [tracker]
 url = "udp://tracker:6969"

@@ -15,6 +15,7 @@ use torrust_index_located_error::{Located, LocatedError};
 pub struct Info {
     index_toml: String,
     tracker_api_token: Option<String>,
+    auth_secret_key: Option<String>,
 }
 
 impl Info {
@@ -24,8 +25,8 @@ impl Info {
     ///
     /// ```no_run
     /// # use torrust_index::config::Info;
-    /// # let (env_var_config, env_var_path_config, default_path_config, env_var_tracker_api_token) = ("".to_string(), "".to_string(), "".to_string(), "".to_string());
-    /// let result = Info::new(env_var_config, env_var_path_config, default_path_config, env_var_tracker_api_token);
+    /// # let (env_var_config, env_var_path_config, default_path_config, env_var_tracker_api_token, env_var_auth_secret_key) = ("".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string());
+    /// let result = Info::new(env_var_config, env_var_path_config, default_path_config, env_var_tracker_api_token, env_var_auth_secret_key);
     /// ```
     ///
     /// # Errors
@@ -38,6 +39,7 @@ impl Info {
         env_var_path_config: String,
         default_path_config: String,
         env_var_tracker_api_token: String,
+        env_var_auth_secret_key: String,
     ) -> Result<Self, Error> {
         let index_toml = if let Ok(index_toml) = env::var(&env_var_config) {
             println!("Loading configuration from env var {env_var_config} ...");
@@ -61,11 +63,14 @@ impl Info {
                 .parse()
                 .map_err(|_e: std::convert::Infallible| Error::Infallible)?
         };
+
         let tracker_api_token = env::var(env_var_tracker_api_token).ok();
+        let auth_secret_key = env::var(env_var_auth_secret_key).ok();
 
         Ok(Self {
             index_toml,
             tracker_api_token,
+            auth_secret_key,
         })
     }
 }
@@ -239,6 +244,12 @@ impl Default for Auth {
     }
 }
 
+impl Auth {
+    fn override_secret_key(&mut self, secret_key: &str) {
+        self.secret_key = secret_key.to_string();
+    }
+}
+
 /// Database configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Database {
@@ -390,6 +401,10 @@ impl TorrustIndex {
         self.tracker.override_tracker_api_token(tracker_api_token);
     }
 
+    fn override_auth_secret_key(&mut self, auth_secret_key: &str) {
+        self.auth.override_secret_key(auth_secret_key);
+    }
+
     pub fn remove_secrets(&mut self) {
         self.tracker.token = "***".to_owned();
         self.database.connect_url = "***".to_owned();
@@ -457,7 +472,10 @@ impl Configuration {
     /// Loads the configuration from the `Info` struct. The whole
     /// configuration in toml format is included in the `info.index_toml` string.
     ///
-    /// Optionally will override the tracker api token.
+    /// Optionally will override the:
+    ///
+    /// - Tracker api token.
+    /// - The auth secret key.
     ///
     /// # Errors
     ///
@@ -470,6 +488,10 @@ impl Configuration {
 
         if let Some(ref token) = info.tracker_api_token {
             index_config.override_tracker_api_token(token);
+        };
+
+        if let Some(ref secret_key) = info.auth_secret_key {
+            index_config.override_auth_secret_key(secret_key);
         };
 
         Ok(Configuration {
