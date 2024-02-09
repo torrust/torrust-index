@@ -57,14 +57,14 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn about(&self) -> Result<TextResponse, Error> {
         self.http_client.get("/about", Query::empty()).await.map_err(Error::from)
     }
 
     /// # Errors
     ///
-    /// Will panic if the request fails.  
+    /// Will return an error if the request fails.  
     pub async fn license(&self) -> Result<TextResponse, Error> {
         self.http_client
             .get("/about/license", Query::empty())
@@ -76,14 +76,14 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn get_categories(&self) -> Result<TextResponse, Error> {
         self.http_client.get("/category", Query::empty()).await.map_err(Error::from)
     }
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn add_category(&self, add_category_form: AddCategoryForm) -> Result<TextResponse, Error> {
         self.http_client
             .post("/category", &add_category_form)
@@ -93,7 +93,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn delete_category(&self, delete_category_form: DeleteCategoryForm) -> Result<TextResponse, Error> {
         self.http_client
             .delete_with_body("/category", &delete_category_form)
@@ -105,21 +105,21 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.  
+    /// Will return an error if the request fails.  
     pub async fn get_tags(&self) -> Result<TextResponse, Error> {
         self.http_client.get("/tags", Query::empty()).await.map_err(Error::from)
     }
 
     /// # Errors
     ///
-    /// Will panic if the request fails.   
+    /// Will return an error if the request fails.   
     pub async fn add_tag(&self, add_tag_form: AddTagForm) -> Result<TextResponse, Error> {
         self.http_client.post("/tag", &add_tag_form).await.map_err(Error::from)
     }
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn delete_tag(&self, delete_tag_form: DeleteTagForm) -> Result<TextResponse, Error> {
         self.http_client
             .delete_with_body("/tag", &delete_tag_form)
@@ -131,7 +131,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.   
+    /// Will return an error if the request fails.   
     pub async fn root(&self) -> Result<TextResponse, Error> {
         self.http_client.get("", Query::empty()).await.map_err(Error::from)
     }
@@ -140,7 +140,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn get_public_settings(&self) -> Result<TextResponse, Error> {
         self.http_client
             .get("/settings/public", Query::empty())
@@ -150,7 +150,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn get_site_name(&self) -> Result<TextResponse, Error> {
         self.http_client
             .get("/settings/name", Query::empty())
@@ -160,7 +160,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn get_settings(&self) -> Result<TextResponse, Error> {
         self.http_client.get("/settings", Query::empty()).await.map_err(Error::from)
     }
@@ -169,14 +169,14 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn get_torrents(&self, params: Query) -> Result<TextResponse, Error> {
         self.http_client.get("/torrents", params).await.map_err(Error::from)
     }
 
     /// # Errors
     ///
-    /// Will panic if the request fails.  
+    /// Will return an error if the request fails.  
     pub async fn get_torrent(&self, info_hash: &InfoHash) -> Result<TextResponse, Error> {
         self.http_client
             .get(&format!("/torrent/{info_hash}"), Query::empty())
@@ -186,7 +186,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn delete_torrent(&self, info_hash: &InfoHash) -> Result<TextResponse, Error> {
         self.http_client
             .delete(&format!("/torrent/{info_hash}"))
@@ -196,7 +196,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn update_torrent(
         &self,
         info_hash: &InfoHash,
@@ -210,7 +210,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn upload_torrent(&self, form: multipart::Form) -> Result<TextResponse, Error> {
         self.http_client
             .post_multipart("/torrent/upload", form)
@@ -220,7 +220,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn download_torrent(&self, info_hash: &InfoHash) -> Result<responses::BinaryResponse, Error> {
         self.http_client
             .get_binary(&format!("/torrent/download/{info_hash}"), Query::empty())
@@ -232,7 +232,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn register_user(&self, registration_form: RegistrationForm) -> Result<TextResponse, Error> {
         self.http_client
             .post("/user/register", &registration_form)
@@ -242,7 +242,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn login_user(&self, registration_form: LoginForm) -> Result<TextResponse, Error> {
         self.http_client
             .post("/user/login", &registration_form)
@@ -252,7 +252,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn verify_token(&self, token_verification_form: TokenVerificationForm) -> Result<TextResponse, Error> {
         self.http_client
             .post("/user/token/verify", &token_verification_form)
@@ -262,7 +262,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn renew_token(&self, token_verification_form: TokenRenewalForm) -> Result<TextResponse, Error> {
         self.http_client
             .post("/user/token/renew", &token_verification_form)
@@ -272,7 +272,7 @@ impl Client {
 
     /// # Errors
     ///
-    /// Will panic if the request fails.
+    /// Will return an error if the request fails.
     pub async fn ban_user(&self, username: Username) -> Result<TextResponse, Error> {
         self.http_client
             .delete(&format!("/user/ban/{}", &username.value))
