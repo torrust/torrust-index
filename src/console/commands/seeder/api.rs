@@ -35,6 +35,9 @@ pub async fn upload_torrent(client: &Client, upload_torrent_form: UploadTorrentM
         add_category(client, &upload_torrent_form.category).await;
     }
 
+    // todo: if we receive timeout error we should retry later. Otherwise we
+    // have to restart the seeder manually.
+
     let response = client
         .upload_torrent(upload_torrent_form.into())
         .await
