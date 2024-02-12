@@ -3,14 +3,19 @@ use std::env;
 use std::sync::Arc;
 
 use axum::extract::DefaultBodyLimit;
+use axum::http::{HeaderName, HeaderValue};
 use axum::response::Redirect;
 use axum::routing::get;
 use axum::{Json, Router};
+use hyper::Request;
 use serde_json::{json, Value};
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
+use tower_http::propagate_header::PropagateHeaderLayer;
+use tower_http::request_id::{MakeRequestId, RequestId, SetRequestIdLayer};
 use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
 use tracing::Level;
+use uuid::Uuid;
 
 use super::contexts::{about, category, proxy, settings, tag, torrent, user};
 use crate::bootstrap::config::ENV_VAR_CORS_PERMISSIVE;
@@ -57,6 +62,8 @@ pub fn router(app_data: Arc<AppData>) -> Router {
                 .on_request(DefaultOnRequest::new().level(Level::INFO))
                 .on_response(DefaultOnResponse::new().level(Level::INFO)),
         )
+        .layer(PropagateHeaderLayer::new(HeaderName::from_static("x-request-id")))
+        .layer(SetRequestIdLayer::x_request_id(RequestIdGenerator))
 }
 
 /// Endpoint for container health check.
@@ -66,4 +73,14 @@ async fn health_check_handler() -> Json<Value> {
 
 async fn redirect_to_about() -> Redirect {
     Redirect::permanent(&format!("/{API_VERSION_URL_PREFIX}/about"))
+}
+
+#[derive(Clone, Default)]
+struct RequestIdGenerator;
+
+impl MakeRequestId for RequestIdGenerator {
+    fn make_request_id<B>(&mut self, _request: &Request<B>) -> Option<RequestId> {
+        let id = HeaderValue::from_str(&Uuid::new_v4().to_string()).expect("UUID is a valid HTTP header value");
+        Some(RequestId::new(id))
+    }
 }
