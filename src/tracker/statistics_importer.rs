@@ -1,10 +1,14 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use log::{error, info};
+use text_colorizer::Colorize;
 
 use super::service::{Service, TorrentInfo, TrackerAPIError};
 use crate::config::Configuration;
 use crate::databases::database::{self, Database};
+
+const LOG_TARGET: &str = "Tracker Stats Importer";
 
 pub struct StatisticsImporter {
     database: Arc<Box<dyn Database>>,
@@ -30,11 +34,15 @@ impl StatisticsImporter {
     ///
     /// Will return an error if the database query failed.
     pub async fn import_all_torrents_statistics(&self) -> Result<(), database::Error> {
-        info!("Importing torrents statistics from tracker ...");
         let torrents = self.database.get_all_torrents_compact().await?;
 
+        info!(target: LOG_TARGET, "Importing {} torrents statistics from tracker {} ...", torrents.len().to_string().yellow(), self.tracker_url.yellow());
+
+        // Start the timer before the loop
+        let start_time = Instant::now();
+
         for torrent in torrents {
-            info!("Updating torrent {} ...", torrent.torrent_id);
+            info!(target: LOG_TARGET, "Importing torrent #{} ...", torrent.torrent_id.to_string().yellow());
 
             let ret = self.import_torrent_statistics(torrent.torrent_id, &torrent.info_hash).await;
 
@@ -48,6 +56,10 @@ impl StatisticsImporter {
                 }
             }
         }
+
+        let elapsed_time = start_time.elapsed();
+
+        info!(target: LOG_TARGET, "Statistics import completed in {:.2?}", elapsed_time);
 
         Ok(())
     }

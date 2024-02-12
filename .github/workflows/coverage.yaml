@@ -54,7 +54,7 @@ jobs:
         name: Install Tools
         uses: taiki-e/install-action@v2
         with:
-          tool: grcov
+          tool: cargo-llvm-cov, cargo-nextest, grcov
 
       - id: imdl
         name: Install Intermodal
