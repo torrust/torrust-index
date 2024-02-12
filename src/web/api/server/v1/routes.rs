@@ -9,6 +9,8 @@ use axum::{Json, Router};
 use serde_json::{json, Value};
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
+use tracing::Level;
 
 use super::contexts::{about, category, proxy, settings, tag, torrent, user};
 use crate::bootstrap::config::ENV_VAR_CORS_PERMISSIVE;
@@ -37,7 +39,7 @@ pub fn router(app_data: Arc<AppData>) -> Router {
 
     let router = Router::new()
         .route("/", get(redirect_to_about))
-        .route("/health_check", get(health_check_handler).with_state(app_data))
+        .route("/health_check", get(health_check_handler).with_state(app_data.clone()))
         .nest(&format!("/{API_VERSION_URL_PREFIX}"), v1_api_routes);
 
     let router = if env::var(ENV_VAR_CORS_PERMISSIVE).is_ok() {
@@ -46,7 +48,15 @@ pub fn router(app_data: Arc<AppData>) -> Router {
         router
     };
 
-    router.layer(DefaultBodyLimit::max(10_485_760)).layer(CompressionLayer::new())
+    router
+        .layer(DefaultBodyLimit::max(10_485_760))
+        .layer(CompressionLayer::new())
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+                .on_request(DefaultOnRequest::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+        )
 }
 
 /// Endpoint for container health check.
