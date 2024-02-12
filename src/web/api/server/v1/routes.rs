@@ -1,10 +1,11 @@
 //! Route initialization for the v1 API.
 use std::env;
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderName, HeaderValue};
-use axum::response::Redirect;
+use axum::response::{Redirect, Response};
 use axum::routing::get;
 use axum::{Json, Router};
 use hyper::Request;
@@ -13,8 +14,8 @@ use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::propagate_header::PropagateHeaderLayer;
 use tower_http::request_id::{MakeRequestId, RequestId, SetRequestIdLayer};
-use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
-use tracing::Level;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, TraceLayer};
+use tracing::{Level, Span};
 use uuid::Uuid;
 
 use super::contexts::{about, category, proxy, settings, tag, torrent, user};
@@ -56,14 +57,26 @@ pub fn router(app_data: Arc<AppData>) -> Router {
     router
         .layer(DefaultBodyLimit::max(10_485_760))
         .layer(CompressionLayer::new())
+        .layer(PropagateHeaderLayer::new(HeaderName::from_static("x-request-id")))
+        .layer(SetRequestIdLayer::x_request_id(RequestIdGenerator))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
                 .on_request(DefaultOnRequest::new().level(Level::INFO))
-                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+                .on_response(|response: &Response, latency: Duration, _span: &Span| {
+                    let status_code = response.status();
+                    let request_id = response
+                        .headers()
+                        .get("x-request-id")
+                        .map(|v| v.to_str().unwrap_or_default())
+                        .unwrap_or_default();
+                    let latency_ms = latency.as_millis();
+
+                    tracing::span!(
+                        target: "API",
+                        tracing::Level::INFO, "finished processing request", latency = %latency_ms, status = %status_code, request_id = %request_id);
+                }),
         )
-        .layer(PropagateHeaderLayer::new(HeaderName::from_static("x-request-id")))
-        .layer(SetRequestIdLayer::x_request_id(RequestIdGenerator))
 }
 
 /// Endpoint for container health check.
