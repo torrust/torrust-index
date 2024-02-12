@@ -111,12 +111,6 @@ jobs:
         name: Make Build Clean
         run: cargo clean
 
-      - id: tools
-        name: Install Tools
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-llvm-cov, cargo-nextest
-
       - id: imdl
         name: Install Intermodal
         run: cargo install imdl
@@ -128,10 +122,6 @@ jobs:
       - id: test
         name: Run Unit Tests
         run: cargo test --tests --benches --examples --workspace --all-targets --all-features
-
-      - id: coverage
-        name: Generate Coverage Report
-        run: cargo llvm-cov nextest --tests --benches --examples --workspace --all-targets --all-features
 
   integration:
     name: Integrations
@@ -152,7 +142,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.toolchain }}
-          components: llvm-tools-preview
 
       - id: cache
         name: Enable Job Cache
