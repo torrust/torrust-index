@@ -73,12 +73,16 @@ pub struct Service {
 }
 
 impl Service {
+    /// # Panics
+    ///
+    /// Will panic if it can't build a Tracker API client.
     pub async fn new(cfg: Arc<Configuration>, database: Arc<Box<dyn Database>>) -> Service {
         let settings = cfg.settings.read().await;
         let api_client = Client::new(ConnectionInfo::new(
             settings.tracker.api_url.clone(),
             settings.tracker.token.clone(),
-        ));
+        ))
+        .expect("a reqwest client should be provided");
         let token_valid_seconds = settings.tracker.token_valid_seconds;
         let tracker_url = settings.tracker.url.clone();
         drop(settings);
