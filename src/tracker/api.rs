@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use reqwest::{Error, Response};
 pub struct ConnectionInfo {
     /// The URL of the tracker. Eg: <https://tracker:7070> or <udp://tracker:6969>
@@ -15,6 +17,7 @@ impl ConnectionInfo {
 
 pub struct Client {
     pub connection_info: ConnectionInfo,
+    timeout: Duration,
     base_url: String,
 }
 
@@ -24,6 +27,7 @@ impl Client {
         let base_url = format!("{}/api/v1", connection_info.url);
         Self {
             connection_info,
+            timeout: Duration::from_secs(5),
             base_url,
         }
     }
@@ -36,7 +40,7 @@ impl Client {
     pub async fn whitelist_torrent(&self, info_hash: &str) -> Result<Response, Error> {
         let request_url = format!("{}/whitelist/{}", self.base_url, info_hash);
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder().timeout(self.timeout).build()?;
 
         let params = [("token", &self.connection_info.token)];
 
@@ -51,7 +55,7 @@ impl Client {
     pub async fn remove_torrent_from_whitelist(&self, info_hash: &str) -> Result<Response, Error> {
         let request_url = format!("{}/whitelist/{}", self.base_url, info_hash);
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder().timeout(self.timeout).build()?;
 
         let params = [("token", &self.connection_info.token)];
 
@@ -66,7 +70,7 @@ impl Client {
     pub async fn retrieve_new_tracker_key(&self, token_valid_seconds: u64) -> Result<Response, Error> {
         let request_url = format!("{}/key/{}", self.base_url, token_valid_seconds);
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder().timeout(self.timeout).build()?;
 
         let params = [("token", &self.connection_info.token)];
 
@@ -81,7 +85,7 @@ impl Client {
     pub async fn get_torrent_info(&self, info_hash: &str) -> Result<Response, Error> {
         let request_url = format!("{}/torrent/{}", self.base_url, info_hash);
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder().timeout(self.timeout).build()?;
 
         let params = [("token", &self.connection_info.token)];
 
