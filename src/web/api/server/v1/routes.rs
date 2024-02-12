@@ -57,8 +57,8 @@ pub fn router(app_data: Arc<AppData>) -> Router {
     router
         .layer(DefaultBodyLimit::max(10_485_760))
         .layer(CompressionLayer::new())
-        .layer(PropagateHeaderLayer::new(HeaderName::from_static("x-request-id")))
         .layer(SetRequestIdLayer::x_request_id(RequestIdGenerator))
+        .layer(PropagateHeaderLayer::new(HeaderName::from_static("x-request-id")))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
@@ -89,6 +89,7 @@ pub fn router(app_data: Arc<AppData>) -> Router {
                         tracing::Level::INFO, "response", latency = %latency_ms, status = %status_code, request_id = %request_id);
                 }),
         )
+        .layer(SetRequestIdLayer::x_request_id(RequestIdGenerator))
 }
 
 /// Endpoint for container health check.
