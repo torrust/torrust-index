@@ -68,8 +68,12 @@ jobs:
         name: Run Unit Tests
         run: cargo test --tests --benches --examples --workspace --all-targets --all-features
 
-      - id: coverage
-        name: Generate Coverage Report
+      - id: coverage-llvm
+        name: Generate Coverage Report with LLVM
+        run: cargo llvm-cov nextest --tests --benches --examples --workspace --all-targets --all-features        
+
+      - id: coverage-grcov
+        name: Generate Coverage Report with grcov
         uses: alekitto/grcov@v0.2
 
       - id: upload
