@@ -23,6 +23,7 @@ use crate::services::torrent_file::generate_random_torrent;
 use crate::utils::parse_torrent;
 use crate::web::api::server::v1::auth::get_optional_logged_in_user;
 use crate::web::api::server::v1::extractors::bearer_token::Extract;
+use crate::web::api::server::v1::extractors::user_id::ExtractLoggedInUser;
 use crate::web::api::server::v1::responses::OkResponseData;
 use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 
@@ -37,14 +38,9 @@ use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 #[allow(clippy::unused_async)]
 pub async fn upload_torrent_handler(
     State(app_data): State<Arc<AppData>>,
-    Extract(maybe_bearer_token): Extract,
+    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
     multipart: Multipart,
 ) -> Response {
-    let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
-        Ok(user_id) => user_id,
-        Err(error) => return error.into_response(),
-    };
-
     let add_torrent_form = match build_add_torrent_request_from_payload(multipart).await {
         Ok(torrent_request) => torrent_request,
         Err(error) => return error.into_response(),
@@ -220,17 +216,12 @@ async fn redirect_to_details_url_using_canonical_info_hash_if_needed(
 #[allow(clippy::unused_async)]
 pub async fn update_torrent_info_handler(
     State(app_data): State<Arc<AppData>>,
-    Extract(maybe_bearer_token): Extract,
+    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
     Path(info_hash): Path<InfoHashParam>,
     extract::Json(update_torrent_info_form): extract::Json<UpdateTorrentInfoForm>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
         return errors::Request::InvalidInfoHashParam.into_response();
-    };
-
-    let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
-        Ok(user_id) => user_id,
-        Err(error) => return error.into_response(),
     };
 
     match app_data
@@ -262,16 +253,11 @@ pub async fn update_torrent_info_handler(
 #[allow(clippy::unused_async)]
 pub async fn delete_torrent_handler(
     State(app_data): State<Arc<AppData>>,
-    Extract(maybe_bearer_token): Extract,
+    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
         return errors::Request::InvalidInfoHashParam.into_response();
-    };
-
-    let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
-        Ok(user_id) => user_id,
-        Err(error) => return error.into_response(),
     };
 
     match app_data.torrent_service.delete_torrent(&info_hash, &user_id).await {

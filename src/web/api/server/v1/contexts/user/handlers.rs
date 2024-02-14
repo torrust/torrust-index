@@ -10,7 +10,7 @@ use serde::Deserialize;
 use super::forms::{JsonWebToken, LoginForm, RegistrationForm};
 use super::responses::{self};
 use crate::common::AppData;
-use crate::web::api::server::v1::extractors::bearer_token::Extract;
+use crate::web::api::server::v1::extractors::user_id::ExtractLoggedInUser;
 use crate::web::api::server::v1::responses::OkResponseData;
 
 // Registration
@@ -135,14 +135,9 @@ pub async fn renew_token_handler(
 pub async fn ban_handler(
     State(app_data): State<Arc<AppData>>,
     Path(to_be_banned_username): Path<UsernameParam>,
-    Extract(maybe_bearer_token): Extract,
+    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
 ) -> Response {
     // todo: add reason and `date_expiry` parameters to request
-
-    let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
-        Ok(user_id) => user_id,
-        Err(error) => return error.into_response(),
-    };
 
     match app_data.ban_service.ban_user(&to_be_banned_username.0, &user_id).await {
         Ok(()) => Json(OkResponseData {

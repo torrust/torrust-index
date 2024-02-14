@@ -8,7 +8,7 @@ use axum::response::{IntoResponse, Json, Response};
 use super::forms::{AddTagForm, DeleteTagForm};
 use super::responses::{added_tag, deleted_tag};
 use crate::common::AppData;
-use crate::web::api::server::v1::extractors::bearer_token::Extract;
+use crate::web::api::server::v1::extractors::user_id::ExtractLoggedInUser;
 use crate::web::api::server::v1::responses::{self};
 
 /// It handles the request to get all the tags.
@@ -43,14 +43,9 @@ pub async fn get_all_handler(State(app_data): State<Arc<AppData>>) -> Response {
 #[allow(clippy::unused_async)]
 pub async fn add_handler(
     State(app_data): State<Arc<AppData>>,
-    Extract(maybe_bearer_token): Extract,
+    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
     extract::Json(add_tag_form): extract::Json<AddTagForm>,
 ) -> Response {
-    let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
-        Ok(user_id) => user_id,
-        Err(error) => return error.into_response(),
-    };
-
     match app_data.tag_service.add_tag(&add_tag_form.name, &user_id).await {
         Ok(_) => added_tag(&add_tag_form.name).into_response(),
         Err(error) => error.into_response(),
@@ -68,14 +63,9 @@ pub async fn add_handler(
 #[allow(clippy::unused_async)]
 pub async fn delete_handler(
     State(app_data): State<Arc<AppData>>,
-    Extract(maybe_bearer_token): Extract,
+    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
     extract::Json(delete_tag_form): extract::Json<DeleteTagForm>,
 ) -> Response {
-    let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
-        Ok(user_id) => user_id,
-        Err(error) => return error.into_response(),
-    };
-
     match app_data.tag_service.delete_tag(&delete_tag_form.tag_id, &user_id).await {
         Ok(()) => deleted_tag(delete_tag_form.tag_id).into_response(),
         Err(error) => error.into_response(),
