@@ -16,7 +16,10 @@ use crate::web::api::server::v1::responses;
 /// This function will return an error if the user does not have permission to
 /// view all the settings.
 #[allow(clippy::unused_async)]
-pub async fn get_all_handler(State(app_data): State<Arc<AppData>>,  ExtractLoggedInUser(user_id): ExtractLoggedInUser,) -> Response {
+pub async fn get_all_handler(
+    State(app_data): State<Arc<AppData>>,
+    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
+) -> Response {
     let all_settings = match app_data.settings_service.get_all_masking_secrets(&user_id).await {
         Ok(all_settings) => all_settings,
         Err(error) => return error.into_response(),
