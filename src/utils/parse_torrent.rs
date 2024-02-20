@@ -1,7 +1,7 @@
 use std::error;
 
 use derive_more::{Display, Error};
-use serde::{self, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_bencode::value::Value;
 use serde_bencode::{de, Error};
 use sha1::{Digest, Sha1};
