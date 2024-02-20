@@ -6,7 +6,7 @@ use axum::extract::State;
 use axum::response::{IntoResponse, Json, Response};
 
 use crate::common::AppData;
-use crate::web::api::server::v1::extractors::bearer_token::Extract;
+use crate::web::api::server::v1::extractors::user_id::ExtractLoggedInUser;
 use crate::web::api::server::v1::responses;
 
 /// Get all settings.
@@ -16,12 +16,10 @@ use crate::web::api::server::v1::responses;
 /// This function will return an error if the user does not have permission to
 /// view all the settings.
 #[allow(clippy::unused_async)]
-pub async fn get_all_handler(State(app_data): State<Arc<AppData>>, Extract(maybe_bearer_token): Extract) -> Response {
-    let user_id = match app_data.auth.get_user_id_from_bearer_token(&maybe_bearer_token).await {
-        Ok(user_id) => user_id,
-        Err(error) => return error.into_response(),
-    };
-
+pub async fn get_all_handler(
+    State(app_data): State<Arc<AppData>>,
+    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
+) -> Response {
     let all_settings = match app_data.settings_service.get_all_masking_secrets(&user_id).await {
         Ok(all_settings) => all_settings,
         Err(error) => return error.into_response(),
