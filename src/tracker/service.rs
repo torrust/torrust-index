@@ -109,7 +109,7 @@ impl Service {
 
         match maybe_response {
             Ok(response) => {
-                let status: StatusCode = response.status();
+                let status: StatusCode = map_status_code(response.status());
 
                 let body = response.text().await.map_err(|_| {
                     error!(target: "tracker-service", "response without body");
@@ -151,7 +151,7 @@ impl Service {
 
         match maybe_response {
             Ok(response) => {
-                let status: StatusCode = response.status();
+                let status: StatusCode = map_status_code(response.status());
 
                 let body = response.text().await.map_err(|_| {
                     error!(target: "tracker-service", "response without body");
@@ -218,7 +218,7 @@ impl Service {
 
         match maybe_response {
             Ok(response) => {
-                let status: StatusCode = response.status();
+                let status: StatusCode = map_status_code(response.status());
 
                 let body = response.text().await.map_err(|_| {
                     error!(target: "tracker-service", "response without body");
@@ -269,7 +269,7 @@ impl Service {
 
         match maybe_response {
             Ok(response) => {
-                let status: StatusCode = response.status();
+                let status: StatusCode = map_status_code(response.status());
 
                 let body = response.text().await.map_err(|_| {
                     error!(target: "tracker-service", "response without body");
@@ -321,4 +321,10 @@ impl Service {
     fn torrent_not_known_body() -> String {
         "\"torrent not known\"".to_string()
     }
+}
+
+/// Temporary patch to map `StatusCode` from crate `http` 0.2.11 to `http` v1.0.0
+/// until `reqwest` upgrades to hyper 1.0. See <https://github.com/seanmonstar/reqwest/issues/2039>
+fn map_status_code(status: reqwest::StatusCode) -> hyper::StatusCode {
+    StatusCode::from_u16(status.as_u16()).unwrap()
 }

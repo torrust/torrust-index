@@ -10,6 +10,7 @@
 //! The last heartbeat signal time is used to determine whether the cronjob was
 //! executed successfully or not. The API has a `health_check` endpoint which is
 //! used when the application is running in containers.
+use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
 use axum::extract::State;
@@ -18,6 +19,7 @@ use axum::{Json, Router};
 use chrono::{DateTime, Utc};
 use log::{error, info};
 use serde_json::{json, Value};
+use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 
 use crate::tracker::statistics_importer::StatisticsImporter;
@@ -66,10 +68,13 @@ pub fn start(
 
             info!("Tracker statistics importer API server listening on http://{}", addr); // # DevSkim: ignore DS137138
 
-            axum::Server::bind(&addr.parse().unwrap())
-                .serve(app.into_make_service())
+            let socket_addr: SocketAddr = addr.parse().expect("importer API to have a valid socket address");
+
+            let listener = TcpListener::bind(socket_addr)
                 .await
-                .unwrap();
+                .expect("importer API TCP listener to bind to socket address");
+
+            axum::serve(listener, app).await.unwrap();
         });
 
         // Start the Importer cronjob
