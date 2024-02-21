@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use axum::extract::{FromRef, FromRequestParts};
 use axum::http::request::Parts;
-use axum::response::{ Response};
+use axum::response::Response;
 
 use crate::common::AppData;
 use crate::models::user::UserId;
@@ -13,21 +13,21 @@ pub struct ExtractOptionalLoggedInUser(pub Option<UserId>);
 
 #[async_trait]
 impl<S> FromRequestParts<S> for ExtractOptionalLoggedInUser
-    where
-        Arc<AppData>: FromRef<S>,
-        S: Send + Sync,
+where
+    Arc<AppData>: FromRef<S>,
+    S: Send + Sync,
 {
     type Rejection = Response;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-       /* let maybe_bearer_token = match bearer_token::Extract::from_request_parts(parts, state).await {
+        /* let maybe_bearer_token = match bearer_token::Extract::from_request_parts(parts, state).await {
             Ok(maybe_bearer_token) => maybe_bearer_token.0,
             Err(_) => return Err(ServiceError::TokenNotFound.into_response()),
         }; */
 
-        let bearer_token = match  bearer_token::Extract::from_request_parts(parts, state).await {
-          Ok(bearer_token)  => bearer_token.0,
-            Err(_) => None
+        let bearer_token = match bearer_token::Extract::from_request_parts(parts, state).await {
+            Ok(bearer_token) => bearer_token.0,
+            Err(_) => None,
         };
 
         //Extracts the app state
