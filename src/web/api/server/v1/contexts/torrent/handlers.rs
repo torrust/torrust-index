@@ -21,8 +21,7 @@ use crate::models::torrent_tag::TagId;
 use crate::services::torrent::{AddTorrentRequest, ListingRequest};
 use crate::services::torrent_file::generate_random_torrent;
 use crate::utils::parse_torrent;
-use crate::web::api::server::v1::auth::get_optional_logged_in_user;
-use crate::web::api::server::v1::extractors::bearer_token::Extract;
+use crate::web::api::server::v1::extractors::optional_user_id::ExtractOptionalLoggedInUser;
 use crate::web::api::server::v1::extractors::user_id::ExtractLoggedInUser;
 use crate::web::api::server::v1::responses::OkResponseData;
 use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
@@ -69,7 +68,7 @@ impl InfoHashParam {
 #[allow(clippy::unused_async)]
 pub async fn download_torrent_handler(
     State(app_data): State<Arc<AppData>>,
-    Extract(maybe_bearer_token): Extract,
+    ExtractOptionalLoggedInUser(opt_user_id): ExtractOptionalLoggedInUser,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
@@ -82,11 +81,6 @@ pub async fn download_torrent_handler(
         debug!("Redirecting to URL with canonical info-hash");
         redirect_response
     } else {
-        let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
-            Ok(opt_user_id) => opt_user_id,
-            Err(error) => return error.into_response(),
-        };
-
         let torrent = match app_data.torrent_service.get_torrent(&info_hash, opt_user_id).await {
             Ok(torrent) => torrent,
             Err(error) => return error.into_response(),
@@ -156,7 +150,7 @@ pub async fn get_torrents_handler(State(app_data): State<Arc<AppData>>, Query(cr
 #[allow(clippy::unused_async)]
 pub async fn get_torrent_info_handler(
     State(app_data): State<Arc<AppData>>,
-    Extract(maybe_bearer_token): Extract,
+    ExtractOptionalLoggedInUser(opt_user_id): ExtractOptionalLoggedInUser,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
@@ -166,11 +160,6 @@ pub async fn get_torrent_info_handler(
     if let Some(redirect_response) = redirect_to_details_url_using_canonical_info_hash_if_needed(&app_data, &info_hash).await {
         redirect_response
     } else {
-        let opt_user_id = match get_optional_logged_in_user(maybe_bearer_token, app_data.clone()).await {
-            Ok(opt_user_id) => opt_user_id,
-            Err(error) => return error.into_response(),
-        };
-
         match app_data.torrent_service.get_torrent_info(&info_hash, opt_user_id).await {
             Ok(torrent_response) => Json(OkResponseData { data: torrent_response }).into_response(),
             Err(error) => error.into_response(),
