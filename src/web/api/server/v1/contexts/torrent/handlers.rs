@@ -301,7 +301,7 @@ pub async fn create_random_torrent_handler(State(_app_data): State<Arc<AppData>>
 ///
 /// - The text fields do not contain a valid UTF8 string.
 /// - The torrent file data is not valid because:
-///    - The content type is not `application/x-bittorrent`.
+///    - The content type is not `application/x-bittorrent` or `application/octet-stream`.
 ///    - The multipart content is invalid.
 ///    - The torrent file pieces key has a length that is not a multiple of 20.
 ///    - The binary data cannot be decoded as a torrent file.
@@ -350,7 +350,7 @@ async fn build_add_torrent_request_from_payload(mut payload: Multipart) -> Resul
             "torrent" => {
                 let content_type = field.content_type().unwrap();
 
-                if content_type != "application/x-bittorrent" {
+                if content_type != "application/x-bittorrent" && content_type != "application/octet-stream" {
                     return Err(errors::Request::InvalidFileType);
                 }
 
