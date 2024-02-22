@@ -21,7 +21,9 @@ pub enum Request {
     #[display(fmt = "torrent tags string is not a valid JSON.")]
     TagsArrayIsNotValidJson,
 
-    #[display(fmt = "upload torrent request header `content-type` should be `application/x-bittorrent`.")]
+    #[display(
+        fmt = "upload torrent request header `content-type` should be preferably `application/x-bittorrent` or `application/octet-stream`."
+    )]
     InvalidFileType,
 
     #[display(fmt = "cannot write uploaded torrent bytes (binary file) into memory.")]

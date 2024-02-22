@@ -54,12 +54,19 @@ impl BinaryResponse {
         }
     }
     pub fn is_a_bit_torrent_file(&self) -> bool {
-        self.is_ok() && self.is_bittorrent_content_type()
+        self.is_ok() && (self.is_bittorrent_content_type() || self.is_octet_stream_content_type())
     }
 
     pub fn is_bittorrent_content_type(&self) -> bool {
         if let Some(content_type) = &self.content_type {
             return content_type == "application/x-bittorrent";
+        }
+        false
+    }
+
+    pub fn is_octet_stream_content_type(&self) -> bool {
+        if let Some(content_type) = &self.content_type {
+            return content_type == "application/octet-stream";
         }
         false
     }
