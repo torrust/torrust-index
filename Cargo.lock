@@ -3268,6 +3268,7 @@ dependencies = [
  "tower-http",
  "trace",
  "tracing",
+ "url",
  "urlencoding",
  "uuid",
  "which",

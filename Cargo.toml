@@ -78,6 +78,7 @@ torrust-index-located-error = { version = "3.0.0-alpha.3-develop", path = "packa
 tower-http = { version = "0", features = ["compression-full", "cors", "trace", "propagate-header", "request-id"] }
 trace = "0.1.7"
 tracing = "0.1.40"
+url = "2.5.0"
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
 
