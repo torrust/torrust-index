@@ -6,7 +6,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use super::category::DbCategoryRepository;
 use super::user::DbUserRepository;
-use crate::config::Configuration;
+use crate::config::{Configuration, TrackerMode};
 use crate::databases::database::{Database, Error, Sorting};
 use crate::errors::ServiceError;
 use crate::models::category::CategoryId;
@@ -257,24 +257,18 @@ impl Index {
         let mut torrent = self.torrent_repository.get_by_info_hash(info_hash).await?;
 
         let tracker_url = self.get_tracker_url().await;
+        let tracker_mode = self.get_tracker_mode().await;
 
-        // Add personal tracker url or default tracker url
-        match opt_user_id {
-            Some(user_id) => {
-                let personal_announce_url = self
-                    .tracker_service
-                    .get_personal_announce_url(user_id)
-                    .await
-                    .unwrap_or(tracker_url);
-                torrent.announce = Some(personal_announce_url.clone());
-                if let Some(list) = &mut torrent.announce_list {
-                    let vec = vec![personal_announce_url];
-                    list.insert(0, vec);
-                }
-            }
-            None => {
-                torrent.announce = Some(tracker_url);
-            }
+        // code-review: should we remove all tracker URLs in the `announce_list`
+        // when the tracker is not open?
+
+        if tracker_mode.is_open() {
+            torrent.include_url_as_main_tracker(&tracker_url);
+        } else if let Some(authenticated_user_id) = opt_user_id {
+            let personal_announce_url = self.tracker_service.get_personal_announce_url(authenticated_user_id).await?;
+            torrent.include_url_as_main_tracker(&personal_announce_url);
+        } else {
+            torrent.include_url_as_main_tracker(&tracker_url);
         }
 
         Ok(torrent)
@@ -358,24 +352,28 @@ impl Index {
 
         // Add trackers
 
+        // code-review: duplicate logic. We have to check the same in the
+        // download torrent file endpoint. Here he have only one list of tracker
+        // like the `announce_list` in the torrent file.
+
         torrent_response.trackers = self.torrent_announce_url_repository.get_by_torrent_id(&torrent_id).await?;
 
         let tracker_url = self.get_tracker_url().await;
+        let tracker_mode = self.get_tracker_mode().await;
 
-        // add tracker url
-        match opt_user_id {
-            Some(user_id) => {
-                // if no user owned tracker key can be found, use default tracker url
-                let personal_announce_url = self
-                    .tracker_service
-                    .get_personal_announce_url(user_id)
-                    .await
-                    .unwrap_or(tracker_url);
-                // add personal tracker url to front of vec
-                torrent_response.trackers.insert(0, personal_announce_url);
-            }
-            None => {
-                torrent_response.trackers.insert(0, tracker_url);
+        if tracker_mode.is_open() {
+            torrent_response.include_url_as_main_tracker(&tracker_url);
+        } else {
+            // Add main tracker URL
+            match opt_user_id {
+                Some(user_id) => {
+                    let personal_announce_url = self.tracker_service.get_personal_announce_url(user_id).await?;
+
+                    torrent_response.include_url_as_main_tracker(&personal_announce_url);
+                }
+                None => {
+                    torrent_response.include_url_as_main_tracker(&tracker_url);
+                }
             }
         }
 
@@ -512,6 +510,11 @@ impl Index {
     async fn get_tracker_url(&self) -> String {
         let settings = self.configuration.settings.read().await;
         settings.tracker.url.clone()
+    }
+
+    async fn get_tracker_mode(&self) -> TrackerMode {
+        let settings = self.configuration.settings.read().await;
+        settings.tracker.mode.clone()
     }
 }
 

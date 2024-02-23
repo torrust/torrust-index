@@ -39,6 +39,8 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
 
     logging::setup(&log_level);
 
+    configuration.validate().await.expect("invalid configuration");
+
     let configuration = Arc::new(configuration);
 
     // Get configuration settings needed to build the app dependencies and
