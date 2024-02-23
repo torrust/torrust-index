@@ -367,14 +367,7 @@ impl Index {
             // Add main tracker URL
             match opt_user_id {
                 Some(user_id) => {
-                    // If no user owned tracker key can be found, use default tracker url
-                    // code-review: for downloading the torrent file it returns an error
-                    // instead of defaulting to the default tracker URL.
-                    let personal_announce_url = self
-                        .tracker_service
-                        .get_personal_announce_url(user_id)
-                        .await
-                        .unwrap_or(tracker_url);
+                    let personal_announce_url = self.tracker_service.get_personal_announce_url(user_id).await?;
 
                     torrent_response.include_url_as_main_tracker(&personal_announce_url);
                 }
