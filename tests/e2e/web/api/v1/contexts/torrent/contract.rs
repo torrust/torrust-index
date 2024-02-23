@@ -201,13 +201,12 @@ mod for_guests {
             // it adds the tracker with the personal announce url, if the user
             // is logged in. If the user is not logged in, it adds the default
             // tracker again, and it ends up with two trackers.
-            trackers: vec![tracker_url.clone(), tracker_url.clone()],
+            trackers: vec![tracker_url.clone()],
             magnet_link: format!(
                 // cspell:disable-next-line
-                "magnet:?xt=urn:btih:{}&dn={}&tr={}&tr={}",
+                "magnet:?xt=urn:btih:{}&dn={}&tr={}",
                 test_torrent.file_info.info_hash.to_lowercase(),
                 urlencoding::encode(&test_torrent.index_info.title),
-                encoded_tracker_url,
                 encoded_tracker_url
             ),
             tags: vec![],
