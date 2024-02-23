@@ -144,6 +144,13 @@ impl Default for TrackerMode {
     }
 }
 
+impl TrackerMode {
+    #[must_use]
+    pub fn is_open(&self) -> bool {
+        matches!(self, TrackerMode::Public | TrackerMode::Whitelisted)
+    }
+}
+
 /// Configuration for the associated tracker.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Tracker {

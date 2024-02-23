@@ -93,6 +93,15 @@ impl TorrentResponse {
             encoding: torrent_listing.encoding,
         }
     }
+
+    /// It adds the tracker URL in the first position of the tracker list.
+    pub fn include_url_as_main_tracker(&mut self, tracker_url: &str) {
+        // Remove any existing instances of tracker_url
+        self.trackers.retain(|tracker| tracker != tracker_url);
+
+        // Insert tracker_url at the first position
+        self.trackers.insert(0, tracker_url.to_owned());
+    }
 }
 
 #[allow(clippy::module_name_repetitions)]

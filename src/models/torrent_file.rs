@@ -93,9 +93,43 @@ impl Torrent {
         }
     }
 
+    /// Includes the tracker URL a the main tracker in the torrent.
+    ///
+    /// It will be the URL in the `announce` field and also the first URL in the
+    /// `announce_list`.
+    pub fn include_url_as_main_tracker(&mut self, tracker_url: &str) {
+        self.set_announce_to(tracker_url);
+        self.add_url_to_front_of_announce_list(tracker_url);
+    }
+
     /// Sets the announce url to the tracker url.
     pub fn set_announce_to(&mut self, tracker_url: &str) {
         self.announce = Some(tracker_url.to_owned());
+    }
+
+    /// Adds a new tracker URL to the front of the `announce_list`, removes duplicates,
+    /// and cleans up any empty inner lists.
+    ///
+    /// In practice, it's common for the `announce_list` to include the URL from
+    /// the `announce` field as one of its entries, often in the first tier,
+    /// to ensure that this primary tracker is always used. However, this is not
+    /// a strict requirement of the `BitTorrent` protocol; it's more of a
+    /// convention followed by some torrent creators for redundancy and to
+    /// ensure better availability of trackers.    
+    pub fn add_url_to_front_of_announce_list(&mut self, tracker_url: &str) {
+        if let Some(list) = &mut self.announce_list {
+            // Remove the tracker URL from existing lists
+            for inner_list in list.iter_mut() {
+                inner_list.retain(|url| url != tracker_url);
+            }
+
+            // Prepend a new vector containing the tracker_url
+            let vec = vec![tracker_url.to_owned()];
+            list.insert(0, vec);
+
+            // Remove any empty inner lists
+            list.retain(|inner_list| !inner_list.is_empty());
+        }
     }
 
     /// Removes all other trackers if the torrent is private.
