@@ -15,10 +15,7 @@ pub fn assert_expected_torrent_details(torrent: &TorrentDetails, expected_torren
         ("info_hash", torrent.info_hash == expected_torrent.info_hash),
         ("title", torrent.title == expected_torrent.title),
         ("description", torrent.description == expected_torrent.description),
-        (
-            "category.category_id",
-            torrent.category.category_id == expected_torrent.category.category_id,
-        ),
+        ("category.id", torrent.category.id == expected_torrent.category.id),
         ("category.name", torrent.category.name == expected_torrent.category.name),
         ("file_size", torrent.file_size == expected_torrent.file_size),
         ("seeders", torrent.seeders == expected_torrent.seeders),

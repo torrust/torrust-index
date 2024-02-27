@@ -182,7 +182,7 @@ mod for_guests {
             title: test_torrent.index_info.title.clone(),
             description: test_torrent.index_info.description,
             category: Category {
-                category_id: software_predefined_category_id(),
+                id: software_predefined_category_id(),
                 name: test_torrent.index_info.category,
                 num_torrents: 19, // Ignored in assertion
             },

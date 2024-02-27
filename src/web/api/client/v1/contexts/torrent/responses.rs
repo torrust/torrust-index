@@ -75,11 +75,9 @@ pub struct TorrentDetails {
     pub encoding: Option<String>,
 }
 
-#[allow(unknown_lints)]
-#[allow(clippy::struct_field_names)]
 #[derive(Deserialize, PartialEq, Debug)]
 pub struct Category {
-    pub category_id: CategoryId, // todo: rename to `id`
+    pub id: CategoryId,
     pub name: String,
     pub num_torrents: u64,
 }
