@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+use super::category::Category;
 use super::torrent::TorrentId;
-use crate::databases::database::Category;
+use crate::databases::database::Category as DatabaseCategory;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::TorrentFile;
 use crate::models::torrent_tag::TorrentTag;
@@ -70,14 +71,14 @@ pub struct TorrentResponse {
 
 impl TorrentResponse {
     #[must_use]
-    pub fn from_listing(torrent_listing: TorrentListing, category: Option<Category>) -> TorrentResponse {
+    pub fn from_listing(torrent_listing: TorrentListing, category: Option<DatabaseCategory>) -> TorrentResponse {
         TorrentResponse {
             torrent_id: torrent_listing.torrent_id,
             uploader: torrent_listing.uploader,
             info_hash: torrent_listing.info_hash,
             title: torrent_listing.title,
             description: torrent_listing.description,
-            category,
+            category: category.map(std::convert::Into::into),
             upload_date: torrent_listing.date_uploaded,
             file_size: torrent_listing.file_size,
             seeders: torrent_listing.seeders,
