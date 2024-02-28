@@ -62,7 +62,7 @@ pub enum ServiceError {
     #[display(fmt = "Username not available")]
     UsernameTaken,
 
-    #[display(fmt = "Username contains illegal characters")]
+    #[display(fmt = "Invalid username. Usernames must consist of 1-20 alphanumeric characters, dashes, or underscore")]
     UsernameInvalid,
 
     /// email is already taken
