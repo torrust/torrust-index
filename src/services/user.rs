@@ -12,7 +12,7 @@ use crate::databases::database::{Database, Error};
 use crate::errors::ServiceError;
 use crate::mailer;
 use crate::mailer::VerifyClaims;
-use crate::models::user::{UserCompact, UserId, UserProfile};
+use crate::models::user::{UserCompact, UserId, UserProfile, Username};
 use crate::utils::validation::validate_email_address;
 use crate::web::api::server::v1::contexts::user::forms::RegistrationForm;
 
@@ -68,6 +68,10 @@ impl RegistrationService {
     pub async fn register_user(&self, registration_form: &RegistrationForm, api_base_url: &str) -> Result<UserId, ServiceError> {
         info!("registering user: {}", registration_form.username);
 
+        let Ok(username) = registration_form.username.parse::<Username>() else {
+            return Err(ServiceError::UsernameInvalid);
+        };
+
         let settings = self.configuration.settings.read().await;
 
         let opt_email = match settings.auth.email_on_signup {
@@ -111,14 +115,10 @@ impl RegistrationService {
             .hash_password(registration_form.password.as_bytes(), &salt)?
             .to_string();
 
-        if registration_form.username.contains('@') {
-            return Err(ServiceError::UsernameInvalid);
-        }
-
         let user_id = self
             .user_repository
             .add(
-                &registration_form.username,
+                &username.to_string(),
                 &opt_email.clone().unwrap_or(no_email()),
                 &password_hash,
             )
