@@ -1,9 +1,10 @@
 /.coverage/
 /.env
+/.idea/
 /config.toml
 /data_v2.db*
 /data.db*
+/output/
 /storage/
 /target
 /uploads/
-/.idea/
