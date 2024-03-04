@@ -75,6 +75,7 @@ impl Torrent {
         torrent_files: &[TorrentFile],
         torrent_announce_urls: Vec<Vec<String>>,
         torrent_http_seed_urls: Vec<String>,
+        torrent_nodes: Vec<(String, i64)>,
     ) -> Self {
         let info_dict = TorrentInfoDictionary::with(
             &db_torrent.name,
@@ -88,7 +89,7 @@ impl Torrent {
         Self {
             info: info_dict,
             announce: None,
-            nodes: None,
+            nodes: if torrent_nodes.is_empty() { None } else { Some(torrent_nodes) },
             encoding: db_torrent.encoding.clone(),
             httpseeds: if torrent_http_seed_urls.is_empty() {
                 None
@@ -357,6 +358,12 @@ pub struct DbTorrentAnnounceUrl {
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DbTorrentHttpSeedUrl {
     pub seed_url: String,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DbTorrentNode {
+    pub node_ip: String,
+    pub node_port: i64,
 }
 
 #[cfg(test)]
