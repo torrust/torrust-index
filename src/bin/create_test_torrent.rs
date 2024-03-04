@@ -42,7 +42,7 @@ fn main() {
                 md5sum: None, // DevSkim: ignore DS126858
             }],
         ),
-        announce: None,
+        announce: Some("https://tracker.torrust-demo.com/announce".to_string()),
         nodes: Some(vec![("99.236.6.144".to_string(), 6881), ("91.109.195.156".to_string(), 1996)]),
         encoding: None,
         httpseeds: Some(vec!["https://seeder.torrust-demo.com/seed".to_string()]),
