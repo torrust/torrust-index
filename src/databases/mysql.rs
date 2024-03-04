@@ -13,7 +13,9 @@ use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
 use crate::models::torrent::{Metadata, TorrentListing};
-use crate::models::torrent_file::{DbTorrent, DbTorrentAnnounceUrl, DbTorrentFile, DbTorrentHttpSeedUrl, Torrent, TorrentFile};
+use crate::models::torrent_file::{
+    DbTorrent, DbTorrentAnnounceUrl, DbTorrentFile, DbTorrentHttpSeedUrl, DbTorrentNode, Torrent, TorrentFile,
+};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
@@ -606,6 +608,31 @@ impl Database for Mysql {
             return Err(e);
         }
 
+        // add nodes
+
+        let insert_torrent_nodes_result: Result<(), database::Error> = if let Some(nodes) = &torrent.nodes {
+            for node in nodes {
+                let () = query("INSERT INTO torrust_torrent_nodes (torrent_id, node_ip, node_port) VALUES (?, ?, ?)")
+                    .bind(torrent_id)
+                    .bind(node.0.clone())
+                    .bind(node.1)
+                    .execute(&mut *tx)
+                    .await
+                    .map(|_| ())
+                    .map_err(|_| database::Error::Error)?;
+            }
+
+            Ok(())
+        } else {
+            Ok(())
+        };
+
+        // rollback transaction on error
+        if let Err(e) = insert_torrent_nodes_result {
+            drop(tx.rollback().await);
+            return Err(e);
+        }
+
         // add tags
 
         for tag_id in &metadata.tags {
@@ -770,6 +797,15 @@ impl Database for Mysql {
             .fetch_all(&self.pool)
             .await
             .map(|v| v.iter().map(|a| a.seed_url.to_string()).collect())
+            .map_err(|_| database::Error::TorrentNotFound)
+    }
+
+    async fn get_torrent_nodes_from_id(&self, torrent_id: i64) -> Result<Vec<(String, i64)>, database::Error> {
+        query_as::<_, DbTorrentNode>("SELECT node_ip, node_port FROM torrust_torrent_nodes WHERE torrent_id = ?")
+            .bind(torrent_id)
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| v.iter().map(|a| (a.node_ip.to_string(), a.node_port)).collect())
             .map_err(|_| database::Error::TorrentNotFound)
     }
 

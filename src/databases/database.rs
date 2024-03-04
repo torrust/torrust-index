@@ -208,11 +208,14 @@ pub trait Database: Sync + Send {
 
         let torrent_http_seed_urls = self.get_torrent_http_seed_urls_from_id(db_torrent.torrent_id).await?;
 
+        let torrent_nodes = self.get_torrent_nodes_from_id(db_torrent.torrent_id).await?;
+
         Ok(Torrent::from_database(
             &db_torrent,
             &torrent_files,
             torrent_announce_urls,
             torrent_http_seed_urls,
+            torrent_nodes,
         ))
     }
 
@@ -226,11 +229,14 @@ pub trait Database: Sync + Send {
 
         let torrent_http_seed_urls = self.get_torrent_http_seed_urls_from_id(db_torrent.torrent_id).await?;
 
+        let torrent_nodes = self.get_torrent_nodes_from_id(db_torrent.torrent_id).await?;
+
         Ok(Torrent::from_database(
             &db_torrent,
             &torrent_files,
             torrent_announce_urls,
             torrent_http_seed_urls,
+            torrent_nodes,
         ))
     }
 
@@ -273,6 +279,9 @@ pub trait Database: Sync + Send {
 
     /// Get all torrent's HTTP seed urls as `Vec<Vec<String>>` from `torrent_id`.
     async fn get_torrent_http_seed_urls_from_id(&self, torrent_id: i64) -> Result<Vec<String>, Error>;
+
+    /// Get all torrent's nodes as `Vec<(String, i64)>` from `torrent_id`.
+    async fn get_torrent_nodes_from_id(&self, torrent_id: i64) -> Result<Vec<(String, i64)>, Error>;
 
     /// Get `TorrentListing` from `torrent_id`.
     async fn get_torrent_listing_from_id(&self, torrent_id: i64) -> Result<TorrentListing, Error>;
