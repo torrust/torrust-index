@@ -70,7 +70,12 @@ impl Torrent {
     /// This function will panic if the `torrent_info.pieces` is not a valid
     /// hex string.
     #[must_use]
-    pub fn from_database(db_torrent: &DbTorrent, torrent_files: &[TorrentFile], torrent_announce_urls: Vec<Vec<String>>) -> Self {
+    pub fn from_database(
+        db_torrent: &DbTorrent,
+        torrent_files: &[TorrentFile],
+        torrent_announce_urls: Vec<Vec<String>>,
+        torrent_http_seed_urls: Vec<String>,
+    ) -> Self {
         let info_dict = TorrentInfoDictionary::with(
             &db_torrent.name,
             db_torrent.piece_length,
@@ -85,7 +90,11 @@ impl Torrent {
             announce: None,
             nodes: None,
             encoding: db_torrent.encoding.clone(),
-            httpseeds: None,
+            httpseeds: if torrent_http_seed_urls.is_empty() {
+                None
+            } else {
+                Some(torrent_http_seed_urls)
+            },
             announce_list: Some(torrent_announce_urls),
             creation_date: db_torrent.creation_date,
             comment: db_torrent.comment.clone(),
@@ -343,6 +352,11 @@ pub struct DbTorrentFile {
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DbTorrentAnnounceUrl {
     pub tracker_url: String,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DbTorrentHttpSeedUrl {
+    pub seed_url: String,
 }
 
 #[cfg(test)]

@@ -13,7 +13,7 @@ use crate::models::category::CategoryId;
 use crate::models::info_hash::InfoHash;
 use crate::models::response::TorrentsResponse;
 use crate::models::torrent::{Metadata, TorrentListing};
-use crate::models::torrent_file::{DbTorrent, DbTorrentAnnounceUrl, DbTorrentFile, Torrent, TorrentFile};
+use crate::models::torrent_file::{DbTorrent, DbTorrentAnnounceUrl, DbTorrentFile, DbTorrentHttpSeedUrl, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
@@ -582,7 +582,31 @@ impl Database for Mysql {
             return Err(e);
         }
 
-        // Insert tags
+        // add HTTP seeds
+
+        let insert_torrent_http_seeds_result: Result<(), database::Error> = if let Some(http_seeds) = &torrent.httpseeds {
+            for seed_url in http_seeds {
+                let () = query("INSERT INTO torrust_torrent_http_seeds (torrent_id, seed_url) VALUES (?, ?)")
+                    .bind(torrent_id)
+                    .bind(seed_url)
+                    .execute(&mut *tx)
+                    .await
+                    .map(|_| ())
+                    .map_err(|_| database::Error::Error)?;
+            }
+
+            Ok(())
+        } else {
+            Ok(())
+        };
+
+        // rollback transaction on error
+        if let Err(e) = insert_torrent_http_seeds_result {
+            drop(tx.rollback().await);
+            return Err(e);
+        }
+
+        // add tags
 
         for tag_id in &metadata.tags {
             let insert_torrent_tag_result = query("INSERT INTO torrust_torrent_tag_links (torrent_id, tag_id) VALUES (?, ?)")
@@ -737,6 +761,15 @@ impl Database for Mysql {
             .fetch_all(&self.pool)
             .await
             .map(|v| v.iter().map(|a| vec![a.tracker_url.to_string()]).collect())
+            .map_err(|_| database::Error::TorrentNotFound)
+    }
+
+    async fn get_torrent_http_seed_urls_from_id(&self, torrent_id: i64) -> Result<Vec<String>, database::Error> {
+        query_as::<_, DbTorrentHttpSeedUrl>("SELECT seed_url FROM torrust_torrent_http_seeds WHERE torrent_id = ?")
+            .bind(torrent_id)
+            .fetch_all(&self.pool)
+            .await
+            .map(|v| v.iter().map(|a| a.seed_url.to_string()).collect())
             .map_err(|_| database::Error::TorrentNotFound)
     }
 
