@@ -1,0 +1,1 @@
+ALTER TABLE torrust_torrents CHANGE COLUMN root_hash is_bep_30 BOOLEAN NOT NULL DEFAULT FALSE;

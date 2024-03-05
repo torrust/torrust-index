@@ -1,3 +1,4 @@
+use log::error;
 use serde::{Deserialize, Serialize};
 use serde_bencode::ser;
 use serde_bytes::ByteBuf;
@@ -77,12 +78,31 @@ impl Torrent {
         torrent_http_seed_urls: Vec<String>,
         torrent_nodes: Vec<(String, i64)>,
     ) -> Self {
+        let pieces_or_root_hash = if db_torrent.is_bep_30 == 0 {
+            match &db_torrent.pieces {
+                Some(pieces) => pieces.clone(),
+                None => {
+                    error!("Invalid torrent #{}. Null `pieces` in database", db_torrent.torrent_id);
+                    String::new()
+                }
+            }
+        } else {
+            // A BEP-30 torrent
+            match &db_torrent.root_hash {
+                Some(root_hash) => root_hash.clone(),
+                None => {
+                    error!("Invalid torrent #{}. Null `root_hash` in database", db_torrent.torrent_id);
+                    String::new()
+                }
+            }
+        };
+
         let info_dict = TorrentInfoDictionary::with(
             &db_torrent.name,
             db_torrent.piece_length,
             db_torrent.private,
-            db_torrent.root_hash,
-            &db_torrent.pieces,
+            db_torrent.is_bep_30,
+            &pieces_or_root_hash,
             torrent_files,
         );
 
@@ -235,7 +255,14 @@ impl TorrentInfoDictionary {
     /// - The `pieces` field is not a valid hex string.
     /// - For single files torrents the `TorrentFile` path is empty.
     #[must_use]
-    pub fn with(name: &str, piece_length: i64, private: Option<u8>, root_hash: i64, pieces: &str, files: &[TorrentFile]) -> Self {
+    pub fn with(
+        name: &str,
+        piece_length: i64,
+        private: Option<u8>,
+        is_bep_30: i64,
+        pieces_or_root_hash: &str,
+        files: &[TorrentFile],
+    ) -> Self {
         let mut info_dict = Self {
             name: name.to_string(),
             pieces: None,
@@ -249,13 +276,13 @@ impl TorrentInfoDictionary {
             source: None,
         };
 
-        // a torrent file has a root hash or a pieces key, but not both.
-        if root_hash > 0 {
-            // If `root_hash` is true the `pieces` field contains the `root hash`
-            info_dict.root_hash = Some(pieces.to_owned());
-        } else {
-            let buffer = into_bytes(pieces).expect("variable `torrent_info.pieces` is not a valid hex string");
+        // BEP 30: <http://www.bittorrent.org/beps/bep_0030.html>.
+        // Torrent file can only hold a `pieces` key or a `root hash` key
+        if is_bep_30 == 0 {
+            let buffer = into_bytes(pieces_or_root_hash).expect("variable `torrent_info.pieces` is not a valid hex string");
             info_dict.pieces = Some(ByteBuf::from(buffer));
+        } else {
+            info_dict.root_hash = Some(pieces_or_root_hash.to_owned());
         }
 
         // either set the single file or the multiple files information
@@ -298,20 +325,20 @@ impl TorrentInfoDictionary {
         }
     }
 
-    /// It returns the root hash as a `i64` value.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the root hash cannot be converted into a
-    /// `i64` value.
+    /// torrent file can only hold a pieces key or a root hash key:
+    /// [BEP 39](http://www.bittorrent.org/beps/bep_0030.html)
     #[must_use]
-    pub fn get_root_hash_as_i64(&self) -> i64 {
+    pub fn get_root_hash_as_string(&self) -> String {
         match &self.root_hash {
-            None => 0i64,
-            Some(root_hash) => root_hash
-                .parse::<i64>()
-                .expect("variable `root_hash` cannot be converted into a `i64`"),
+            None => String::new(),
+            Some(root_hash) => root_hash.clone(),
         }
+    }
+
+    /// It returns true if the torrent is a BEP-30 torrent.
+    #[must_use]
+    pub fn is_bep_30(&self) -> bool {
+        self.root_hash.is_some()
     }
 
     #[must_use]
@@ -330,11 +357,12 @@ pub struct DbTorrent {
     pub torrent_id: i64,
     pub info_hash: String,
     pub name: String,
-    pub pieces: String,
+    pub pieces: Option<String>,
+    pub root_hash: Option<String>,
     pub piece_length: i64,
     #[serde(default)]
     pub private: Option<u8>,
-    pub root_hash: i64,
+    pub is_bep_30: i64,
     pub comment: Option<String>,
     pub creation_date: Option<i64>,
     pub created_by: Option<String>,
