@@ -14,7 +14,8 @@ pub struct CreateTorrentRequest {
     pub pieces: String,
     pub piece_length: i64,
     pub private: Option<u8>,
-    pub root_hash: i64, // True (1) if it's a BEP 30 torrent.
+    /// True (1) if it's a BEP 30 torrent.
+    pub is_bep_30: i64,
     pub files: Vec<TorrentFile>,
     // Other fields of the root level metainfo dictionary
     pub announce_urls: Vec<Vec<String>>,
@@ -58,7 +59,7 @@ impl CreateTorrentRequest {
             &self.name,
             self.piece_length,
             self.private,
-            self.root_hash,
+            self.is_bep_30,
             &self.pieces,
             &self.files,
         )
@@ -92,7 +93,7 @@ pub fn generate_random_torrent(id: Uuid) -> Torrent {
         pieces: sha1(&file_contents),
         piece_length: 16384,
         private: None,
-        root_hash: 0,
+        is_bep_30: 0,
         files: torrent_files,
         announce_urls: torrent_announce_urls,
         comment: None,

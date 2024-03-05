@@ -119,7 +119,7 @@ impl TorrentTester {
         } else {
             assert_eq!(imported_torrent.private, torrent_file.info.private);
         }
-        assert_eq!(imported_torrent.root_hash, torrent_file.info.get_root_hash_as_i64());
+        assert_eq!(imported_torrent.is_bep_30, torrent_file.info.get_root_hash_as_i64());
         assert_eq!(
             imported_torrent.date_uploaded,
             convert_timestamp_to_datetime(torrent.upload_date)

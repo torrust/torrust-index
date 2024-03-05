@@ -81,7 +81,7 @@ impl Torrent {
             &db_torrent.name,
             db_torrent.piece_length,
             db_torrent.private,
-            db_torrent.root_hash,
+            db_torrent.is_bep_30,
             &db_torrent.pieces,
             torrent_files,
         );
@@ -235,7 +235,7 @@ impl TorrentInfoDictionary {
     /// - The `pieces` field is not a valid hex string.
     /// - For single files torrents the `TorrentFile` path is empty.
     #[must_use]
-    pub fn with(name: &str, piece_length: i64, private: Option<u8>, root_hash: i64, pieces: &str, files: &[TorrentFile]) -> Self {
+    pub fn with(name: &str, piece_length: i64, private: Option<u8>, is_bep_30: i64, pieces: &str, files: &[TorrentFile]) -> Self {
         let mut info_dict = Self {
             name: name.to_string(),
             pieces: None,
@@ -250,8 +250,8 @@ impl TorrentInfoDictionary {
         };
 
         // a torrent file has a root hash or a pieces key, but not both.
-        if root_hash > 0 {
-            // If `root_hash` is true the `pieces` field contains the `root hash`
+        if is_bep_30 > 0 {
+            // If `is_bep_30` is true the `pieces` field contains the `root hash`
             info_dict.root_hash = Some(pieces.to_owned());
         } else {
             let buffer = into_bytes(pieces).expect("variable `torrent_info.pieces` is not a valid hex string");
@@ -334,7 +334,7 @@ pub struct DbTorrent {
     pub piece_length: i64,
     #[serde(default)]
     pub private: Option<u8>,
-    pub root_hash: i64,
+    pub is_bep_30: i64,
     pub comment: Option<String>,
     pub creation_date: Option<i64>,
     pub created_by: Option<String>,

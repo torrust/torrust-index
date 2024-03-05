@@ -438,8 +438,9 @@ impl Database for Mysql {
         // start db transaction
         let mut tx = conn.begin().await.map_err(|_| database::Error::Error)?;
 
-        // torrent file can only hold a pieces key or a root hash key: http://www.bittorrent.org/beps/bep_0030.html
-        let (pieces, root_hash): (String, bool) = if let Some(pieces) = &torrent.info.pieces {
+        // torrent file can only hold a `pieces` key or a `root hash` key
+        // BEP 30: http://www.bittorrent.org/beps/bep_0030.html
+        let (pieces, is_bep_30): (String, bool) = if let Some(pieces) = &torrent.info.pieces {
             (from_bytes(pieces.as_ref()), false)
         } else {
             let root_hash = torrent.info.root_hash.as_ref().ok_or(database::Error::Error)?;
@@ -457,7 +458,7 @@ impl Database for Mysql {
             pieces,
             piece_length,
             private,
-            root_hash,
+            is_bep_30,
             `source`,
             comment,
             date_uploaded,
@@ -474,7 +475,7 @@ impl Database for Mysql {
         .bind(pieces)
         .bind(torrent.info.piece_length)
         .bind(torrent.info.private)
-        .bind(root_hash)
+        .bind(is_bep_30)
         .bind(torrent.info.source.clone())
         .bind(torrent.comment.clone())
         .bind(torrent.creation_date)

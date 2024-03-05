@@ -26,7 +26,7 @@ pub struct TorrentRecordV2 {
     pub pieces: String,
     pub piece_length: i64,
     pub private: Option<u8>,
-    pub root_hash: i64,
+    pub is_bep_30: i64,
     pub date_uploaded: String,
 }
 
@@ -43,7 +43,7 @@ impl TorrentRecordV2 {
             pieces: torrent_info.get_pieces_as_string(),
             piece_length: torrent_info.piece_length,
             private: torrent_info.private,
-            root_hash: torrent_info.get_root_hash_as_i64(),
+            is_bep_30: torrent_info.get_root_hash_as_i64(),
             date_uploaded: convert_timestamp_to_datetime(torrent.upload_date),
         }
     }
@@ -196,7 +196,7 @@ impl SqliteDatabaseV2_0_0 {
                 pieces,
                 piece_length,
                 private,
-                root_hash,
+                is_bep_30,
                 date_uploaded
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
@@ -209,7 +209,7 @@ impl SqliteDatabaseV2_0_0 {
         .bind(torrent.pieces.clone())
         .bind(torrent.piece_length)
         .bind(torrent.private.unwrap_or(0))
-        .bind(torrent.root_hash)
+        .bind(torrent.is_bep_30)
         .bind(torrent.date_uploaded.clone())
         .execute(&self.pool)
         .await
