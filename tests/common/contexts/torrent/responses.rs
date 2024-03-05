@@ -72,6 +72,7 @@ pub struct TorrentDetails {
     pub creation_date: Option<i64>,
     pub created_by: Option<String>,
     pub encoding: Option<String>,
+    pub canonical_info_hash_group: Vec<String>,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
