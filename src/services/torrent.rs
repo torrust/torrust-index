@@ -209,6 +209,8 @@ impl Index {
             .await?;
 
         if !original_info_hashes.is_empty() {
+            // A previous torrent with the same canonical infohash has been uploaded before
+
             // Torrent with the same canonical infohash was already uploaded
             debug!("Canonical infohash found: {:?}", canonical_info_hash.to_hex_string());
 
@@ -216,7 +218,7 @@ impl Index {
                 // The exact original infohash was already uploaded
                 debug!("Original infohash found: {:?}", original_info_hash.to_hex_string());
 
-                return Err(ServiceError::InfoHashAlreadyExists);
+                return Err(ServiceError::OriginalInfoHashAlreadyExists);
             }
 
             // A new original infohash is being uploaded with a canonical infohash that already exists.
@@ -229,6 +231,7 @@ impl Index {
             return Err(ServiceError::CanonicalInfoHashAlreadyExists);
         }
 
+        // No other torrent with the same canonical infohash has been uploaded before
         Ok(())
     }
 

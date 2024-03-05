@@ -728,7 +728,7 @@ mod for_authenticated_users {
             let form: UploadTorrentMultipartForm = first_torrent_clone.index_info.into();
             let response = client.upload_torrent(form.into()).await;
 
-            assert_eq!(response.status, 400);
+            assert_eq!(response.status, 409);
         }
 
         #[tokio::test]
@@ -761,7 +761,7 @@ mod for_authenticated_users {
             let form: UploadTorrentMultipartForm = torrent_with_the_same_canonical_info_hash.index_info.into();
             let response = client.upload_torrent(form.into()).await;
 
-            assert_eq!(response.status, 400);
+            assert_eq!(response.status, 409);
         }
     }
 
