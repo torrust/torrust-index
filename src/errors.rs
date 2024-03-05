@@ -115,6 +115,9 @@ pub enum ServiceError {
     #[display(fmt = "A torrent with the same canonical infohash already exists in our database.")]
     CanonicalInfoHashAlreadyExists,
 
+    #[display(fmt = "A torrent with the same original infohash already exists in our database.")]
+    OriginalInfoHashAlreadyExists,
+
     #[display(fmt = "This torrent title has already been used.")]
     TorrentTitleAlreadyExists,
 
@@ -297,6 +300,7 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::Unauthorized => StatusCode::FORBIDDEN,
         ServiceError::InfoHashAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::CanonicalInfoHashAlreadyExists => StatusCode::BAD_REQUEST,
+        ServiceError::OriginalInfoHashAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::TorrentTitleAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::TrackerOffline => StatusCode::SERVICE_UNAVAILABLE,
         ServiceError::CategoryNameEmpty => StatusCode::BAD_REQUEST,
