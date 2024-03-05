@@ -1,4 +1,4 @@
-log_level = "debug"
+log_level = "info"
 
 [website]
 name = "Torrust"
