@@ -196,11 +196,6 @@ mod for_guests {
                 length: test_torrent.file_info.content_size,
                 md5sum: None,
             }],
-            // code-review: why is this duplicated? It seems that is adding the
-            // same tracker twice because first ti adds all trackers and then
-            // it adds the tracker with the personal announce url, if the user
-            // is logged in. If the user is not logged in, it adds the default
-            // tracker again, and it ends up with two trackers.
             trackers: vec![tracker_url.clone()],
             magnet_link: format!(
                 // cspell:disable-next-line
@@ -215,6 +210,7 @@ mod for_guests {
             creation_date: test_torrent.file_info.creation_date,
             created_by: test_torrent.file_info.created_by.clone(),
             encoding: test_torrent.file_info.encoding.clone(),
+            canonical_info_hash_group: vec![test_torrent.file_info.info_hash.to_lowercase()],
         };
 
         assert_expected_torrent_details(&torrent_details_response.data, &expected_torrent);

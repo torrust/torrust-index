@@ -328,82 +328,9 @@ impl Index {
     ) -> Result<TorrentResponse, ServiceError> {
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
 
-        let torrent_id = torrent_listing.torrent_id;
-
-        let category = match torrent_listing.category_id {
-            Some(category_id) => Some(self.category_repository.get_by_id(&category_id).await?),
-            None => None,
-        };
-
-        let mut torrent_response = TorrentResponse::from_listing(torrent_listing, category);
-
-        // Add files
-
-        torrent_response.files = self.torrent_file_repository.get_by_torrent_id(&torrent_id).await?;
-
-        if torrent_response.files.len() == 1 {
-            let torrent_info = self.torrent_info_repository.get_by_info_hash(info_hash).await?;
-
-            torrent_response
-                .files
-                .iter_mut()
-                .for_each(|v| v.path = vec![torrent_info.name.to_string()]);
-        }
-
-        // Add trackers
-
-        // code-review: duplicate logic. We have to check the same in the
-        // download torrent file endpoint. Here he have only one list of tracker
-        // like the `announce_list` in the torrent file.
-
-        torrent_response.trackers = self.torrent_announce_url_repository.get_by_torrent_id(&torrent_id).await?;
-
-        let tracker_url = self.get_tracker_url().await;
-        let tracker_mode = self.get_tracker_mode().await;
-
-        if tracker_mode.is_open() {
-            torrent_response.include_url_as_main_tracker(&tracker_url);
-        } else {
-            // Add main tracker URL
-            match opt_user_id {
-                Some(user_id) => {
-                    let personal_announce_url = self.tracker_service.get_personal_announce_url(user_id).await?;
-
-                    torrent_response.include_url_as_main_tracker(&personal_announce_url);
-                }
-                None => {
-                    torrent_response.include_url_as_main_tracker(&tracker_url);
-                }
-            }
-        }
-
-        // Add magnet link
-
-        // todo: extract a struct or function to build the magnet links
-        let mut magnet = format!(
-            "magnet:?xt=urn:btih:{}&dn={}",
-            torrent_response.info_hash,
-            urlencoding::encode(&torrent_response.title)
-        );
-
-        // Add trackers from torrent file to magnet link
-        for tracker in &torrent_response.trackers {
-            magnet.push_str(&format!("&tr={}", urlencoding::encode(tracker)));
-        }
-
-        torrent_response.magnet_link = magnet;
-
-        // Get realtime seeders and leechers
-        if let Ok(torrent_info) = self
-            .tracker_statistics_importer
-            .import_torrent_statistics(torrent_response.torrent_id, &torrent_response.info_hash)
-            .await
-        {
-            torrent_response.seeders = torrent_info.seeders;
-            torrent_response.leechers = torrent_info.leechers;
-        }
-
-        torrent_response.tags = self.torrent_tag_repository.get_tags_for_torrent(&torrent_id).await?;
+        let torrent_response = self
+            .build_full_torrent_response(torrent_listing, info_hash, opt_user_id)
+            .await?;
 
         Ok(torrent_response)
     }
@@ -497,12 +424,7 @@ impl Index {
             .one_torrent_by_torrent_id(&torrent_listing.torrent_id)
             .await?;
 
-        let category = match torrent_listing.category_id {
-            Some(category_id) => Some(self.category_repository.get_by_id(&category_id).await?),
-            None => None,
-        };
-
-        let torrent_response = TorrentResponse::from_listing(torrent_listing, category);
+        let torrent_response = self.build_short_torrent_response(torrent_listing, info_hash).await?;
 
         Ok(torrent_response)
     }
@@ -515,6 +437,109 @@ impl Index {
     async fn get_tracker_mode(&self) -> TrackerMode {
         let settings = self.configuration.settings.read().await;
         settings.tracker.mode.clone()
+    }
+
+    async fn build_short_torrent_response(
+        &self,
+        torrent_listing: TorrentListing,
+        info_hash: &InfoHash,
+    ) -> Result<TorrentResponse, ServiceError> {
+        let category = match torrent_listing.category_id {
+            Some(category_id) => Some(self.category_repository.get_by_id(&category_id).await?),
+            None => None,
+        };
+
+        let canonical_info_hash_group = self
+            .torrent_info_hash_repository
+            .get_canonical_info_hash_group(info_hash)
+            .await?;
+
+        Ok(TorrentResponse::from_listing(
+            torrent_listing,
+            category,
+            &canonical_info_hash_group,
+        ))
+    }
+
+    async fn build_full_torrent_response(
+        &self,
+        torrent_listing: TorrentListing,
+        info_hash: &InfoHash,
+        opt_user_id: Option<UserId>,
+    ) -> Result<TorrentResponse, ServiceError> {
+        let torrent_id: i64 = torrent_listing.torrent_id;
+
+        let mut torrent_response = self.build_short_torrent_response(torrent_listing, info_hash).await?;
+
+        // Add files
+
+        torrent_response.files = self.torrent_file_repository.get_by_torrent_id(&torrent_id).await?;
+
+        if torrent_response.files.len() == 1 {
+            let torrent_info = self.torrent_info_repository.get_by_info_hash(info_hash).await?;
+
+            torrent_response
+                .files
+                .iter_mut()
+                .for_each(|v| v.path = vec![torrent_info.name.to_string()]);
+        }
+
+        // Add trackers
+
+        // code-review: duplicate logic. We have to check the same in the
+        // download torrent file endpoint. Here he have only one list of tracker
+        // like the `announce_list` in the torrent file.
+
+        torrent_response.trackers = self.torrent_announce_url_repository.get_by_torrent_id(&torrent_id).await?;
+
+        let tracker_url = self.get_tracker_url().await;
+        let tracker_mode = self.get_tracker_mode().await;
+
+        if tracker_mode.is_open() {
+            torrent_response.include_url_as_main_tracker(&tracker_url);
+        } else {
+            // Add main tracker URL
+            match opt_user_id {
+                Some(user_id) => {
+                    let personal_announce_url = self.tracker_service.get_personal_announce_url(user_id).await?;
+
+                    torrent_response.include_url_as_main_tracker(&personal_announce_url);
+                }
+                None => {
+                    torrent_response.include_url_as_main_tracker(&tracker_url);
+                }
+            }
+        }
+
+        // Add magnet link
+
+        // todo: extract a struct or function to build the magnet links
+        let mut magnet = format!(
+            "magnet:?xt=urn:btih:{}&dn={}",
+            torrent_response.info_hash,
+            urlencoding::encode(&torrent_response.title)
+        );
+
+        // Add trackers from torrent file to magnet link
+        for tracker in &torrent_response.trackers {
+            magnet.push_str(&format!("&tr={}", urlencoding::encode(tracker)));
+        }
+
+        torrent_response.magnet_link = magnet;
+
+        // Get realtime seeders and leechers
+        if let Ok(torrent_info) = self
+            .tracker_statistics_importer
+            .import_torrent_statistics(torrent_response.torrent_id, &torrent_response.info_hash)
+            .await
+        {
+            torrent_response.seeders = torrent_info.seeders;
+            torrent_response.leechers = torrent_info.leechers;
+        }
+
+        torrent_response.tags = self.torrent_tag_repository.get_tags_for_torrent(&torrent_id).await?;
+
+        Ok(torrent_response)
     }
 }
 
@@ -579,6 +604,7 @@ pub struct DbTorrentInfoHash {
 /// This function returns the original infohashes of a canonical infohash.
 ///
 /// The relationship is 1 canonical infohash -> N original infohashes.
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct CanonicalInfoHashGroup {
     pub canonical_info_hash: InfoHash,
     /// The list of original infohashes associated to the canonical one.

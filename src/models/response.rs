@@ -6,6 +6,7 @@ use crate::databases::database::Category as DatabaseCategory;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::TorrentFile;
 use crate::models::torrent_tag::TorrentTag;
+use crate::services::torrent::CanonicalInfoHashGroup;
 
 pub enum OkResponses {
     TokenResponse(TokenResponse),
@@ -67,11 +68,16 @@ pub struct TorrentResponse {
     pub creation_date: Option<i64>,
     pub created_by: Option<String>,
     pub encoding: Option<String>,
+    pub canonical_info_hash_group: Vec<String>,
 }
 
 impl TorrentResponse {
     #[must_use]
-    pub fn from_listing(torrent_listing: TorrentListing, category: Option<DatabaseCategory>) -> TorrentResponse {
+    pub fn from_listing(
+        torrent_listing: TorrentListing,
+        category: Option<DatabaseCategory>,
+        canonical_info_hash_group: &CanonicalInfoHashGroup,
+    ) -> TorrentResponse {
         TorrentResponse {
             torrent_id: torrent_listing.torrent_id,
             uploader: torrent_listing.uploader,
@@ -92,6 +98,11 @@ impl TorrentResponse {
             creation_date: torrent_listing.creation_date,
             created_by: torrent_listing.created_by,
             encoding: torrent_listing.encoding,
+            canonical_info_hash_group: canonical_info_hash_group
+                .original_info_hashes
+                .iter()
+                .map(super::info_hash::InfoHash::to_hex_string)
+                .collect(),
         }
     }
 
