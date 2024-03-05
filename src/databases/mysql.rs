@@ -438,14 +438,17 @@ impl Database for Mysql {
         // start db transaction
         let mut tx = conn.begin().await.map_err(|_| database::Error::Error)?;
 
-        // torrent file can only hold a `pieces` key or a `root hash` key
-        // BEP 30: http://www.bittorrent.org/beps/bep_0030.html
-        let (pieces, is_bep_30): (String, bool) = if let Some(pieces) = &torrent.info.pieces {
-            (from_bytes(pieces.as_ref()), false)
-        } else {
-            let root_hash = torrent.info.root_hash.as_ref().ok_or(database::Error::Error)?;
-            (root_hash.to_string(), true)
-        };
+        // BEP 30: <http://www.bittorrent.org/beps/bep_0030.html>.
+        // Torrent file can only hold a `pieces` key or a `root hash` key
+        let is_bep_30 = !matches!(&torrent.info.pieces, Some(_pieces));
+
+        let pieces = torrent.info.pieces.as_ref().map(|pieces| from_bytes(pieces.as_ref()));
+
+        let root_hash = torrent
+            .info
+            .root_hash
+            .as_ref()
+            .map(|root_hash| from_bytes(root_hash.as_ref()));
 
         // add torrent
         let torrent_id = query(
@@ -456,6 +459,7 @@ impl Database for Mysql {
             size,
             name,
             pieces,
+            root_hash,
             piece_length,
             private,
             is_bep_30,
@@ -465,7 +469,7 @@ impl Database for Mysql {
             creation_date,
             created_by,
             `encoding`
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?, ?)",
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, ?, ?)",
         )
         .bind(uploader_id)
         .bind(metadata.category_id)
@@ -473,6 +477,7 @@ impl Database for Mysql {
         .bind(torrent.file_size())
         .bind(torrent.info.name.to_string())
         .bind(pieces)
+        .bind(root_hash)
         .bind(torrent.info.piece_length)
         .bind(torrent.info.private)
         .bind(is_bep_30)

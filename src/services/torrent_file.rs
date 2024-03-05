@@ -11,7 +11,7 @@ use crate::services::hasher::sha1;
 pub struct CreateTorrentRequest {
     // The `info` dictionary fields
     pub name: String,
-    pub pieces: String,
+    pub pieces_or_root_hash: String,
     pub piece_length: i64,
     pub private: Option<u8>,
     /// True (1) if it's a BEP 30 torrent.
@@ -60,7 +60,7 @@ impl CreateTorrentRequest {
             self.piece_length,
             self.private,
             self.is_bep_30,
-            &self.pieces,
+            &self.pieces_or_root_hash,
             &self.files,
         )
     }
@@ -90,7 +90,7 @@ pub fn generate_random_torrent(id: Uuid) -> Torrent {
 
     let create_torrent_req = CreateTorrentRequest {
         name: format!("file-{id}.txt"),
-        pieces: sha1(&file_contents),
+        pieces_or_root_hash: sha1(&file_contents),
         piece_length: 16384,
         private: None,
         is_bep_30: 0,

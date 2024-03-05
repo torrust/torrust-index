@@ -23,7 +23,8 @@ pub struct TorrentRecordV2 {
     pub info_hash: String,
     pub size: i64,
     pub name: String,
-    pub pieces: String,
+    pub pieces: Option<String>,
+    pub root_hash: Option<String>,
     pub piece_length: i64,
     pub private: Option<u8>,
     pub is_bep_30: i64,
@@ -40,10 +41,11 @@ impl TorrentRecordV2 {
             info_hash: torrent.info_hash.clone(),
             size: torrent.file_size,
             name: torrent_info.name.clone(),
-            pieces: torrent_info.get_pieces_as_string(),
+            pieces: Some(torrent_info.get_pieces_as_string()),
+            root_hash: Some(torrent_info.get_root_hash_as_string()),
             piece_length: torrent_info.piece_length,
             private: torrent_info.private,
-            is_bep_30: torrent_info.get_root_hash_as_i64(),
+            is_bep_30: i64::from(torrent_info.is_bep_30()),
             date_uploaded: convert_timestamp_to_datetime(torrent.upload_date),
         }
     }
