@@ -504,7 +504,7 @@ mod for_authenticated_users {
             let uploaded_torrent_response: UploadedTorrentResponse = serde_json::from_str(&response.body).unwrap();
 
             assert_eq!(
-                uploaded_torrent_response.data.info_hash.to_lowercase(),
+                uploaded_torrent_response.data.canonical_info_hash.to_lowercase(),
                 info_hash.to_lowercase()
             );
             assert!(response.is_json_and_ok());

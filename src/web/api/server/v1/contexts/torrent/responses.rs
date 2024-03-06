@@ -11,8 +11,8 @@ use crate::web::api::server::v1::responses::OkResponseData;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewTorrentResponseData {
     pub torrent_id: TorrentId,
+    pub canonical_info_hash: String,
     pub info_hash: String,
-    pub original_info_hash: String,
 }
 
 /// Response after successfully uploading a new torrent.
@@ -20,8 +20,8 @@ pub fn new_torrent_response(add_torrent_response: &AddTorrentResponse) -> Json<O
     Json(OkResponseData {
         data: NewTorrentResponseData {
             torrent_id: add_torrent_response.torrent_id,
+            canonical_info_hash: add_torrent_response.canonical_info_hash.clone(),
             info_hash: add_torrent_response.info_hash.clone(),
-            original_info_hash: add_torrent_response.original_info_hash.clone(),
         },
     })
 }

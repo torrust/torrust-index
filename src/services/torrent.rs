@@ -45,8 +45,8 @@ pub struct AddTorrentRequest {
 
 pub struct AddTorrentResponse {
     pub torrent_id: TorrentId,
+    pub canonical_info_hash: String,
     pub info_hash: String,
-    pub original_info_hash: String,
 }
 
 /// User request to generate a torrent listing.
@@ -172,8 +172,8 @@ impl Index {
 
         Ok(AddTorrentResponse {
             torrent_id,
-            info_hash: torrent.canonical_info_hash_hex(),
-            original_info_hash: original_info_hash.to_string(),
+            canonical_info_hash: torrent.canonical_info_hash_hex(),
+            info_hash: original_info_hash.to_string(),
         })
     }
 
