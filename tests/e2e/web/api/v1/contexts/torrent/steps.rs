@@ -50,7 +50,7 @@ pub async fn upload_test_torrent(client: &Client, test_torrent: &TestTorrent) ->
     }
 
     let uploaded_torrent_response: UploadedTorrentResponse = serde_json::from_str(&response.body).unwrap();
-    let canonical_info_hash_hex = uploaded_torrent_response.data.info_hash.to_lowercase();
+    let canonical_info_hash_hex = uploaded_torrent_response.data.canonical_info_hash.to_lowercase();
 
     let canonical_info_hash = InfoHash::from_str(&canonical_info_hash_hex)
         .unwrap_or_else(|_| panic!("Invalid info-hash in database: {canonical_info_hash_hex}"));
