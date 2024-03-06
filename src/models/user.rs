@@ -23,6 +23,13 @@ pub struct UserAuthentication {
 }
 
 #[allow(clippy::module_name_repetitions)]
+#[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
+pub struct UserAuthorization {
+    pub user_id: UserId,
+    pub administrator: bool,
+}
+
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct UserProfile {
     pub user_id: UserId,
