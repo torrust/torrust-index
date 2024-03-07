@@ -34,7 +34,7 @@ pub fn router(app_data: Arc<AppData>) -> Router {
         .route("/", get(redirect_to_about))
         .nest("/user", user::routes::router(app_data.clone()))
         .nest("/about", about::routes::router(app_data.clone()))
-        .nest("/category", category::routes::router(app_data.clone()))
+        .nest("/category", category::routes::router(&app_data.clone()))
         .nest("/tag", tag::routes::router_for_single_resources(app_data.clone()))
         .nest("/tags", tag::routes::router_for_multiple_resources(app_data.clone()))
         .nest("/settings", settings::routes::router(app_data.clone()))

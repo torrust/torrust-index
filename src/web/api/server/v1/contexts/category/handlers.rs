@@ -4,10 +4,12 @@ use std::sync::Arc;
 
 use axum::extract::{self, State};
 use axum::response::{IntoResponse, Json, Response};
+use axum::Extension;
 
 use super::forms::{AddCategoryForm, DeleteCategoryForm};
 use super::responses::{added_category, deleted_category, Category};
 use crate::common::AppData;
+use crate::services::category::DbCategoryRepository;
 use crate::web::api::server::v1::extractors::user_id::ExtractLoggedInUser;
 use crate::web::api::server::v1::responses::{self};
 
@@ -25,8 +27,8 @@ use crate::web::api::server::v1::responses::{self};
 ///
 /// It returns an error if there is a database error.
 #[allow(clippy::unused_async)]
-pub async fn get_all_handler(State(app_data): State<Arc<AppData>>) -> Response {
-    match app_data.category_repository.get_all().await {
+pub async fn get_all_handler(Extension(category_repository): Extension<Arc<DbCategoryRepository>>) -> Response {
+    match category_repository.get_all().await {
         Ok(categories) => {
             let categories: Vec<Category> = categories.into_iter().map(Category::from).collect();
             Json(responses::OkResponseData { data: categories }).into_response()

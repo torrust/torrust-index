@@ -4,15 +4,16 @@
 use std::sync::Arc;
 
 use axum::routing::{delete, get, post};
-use axum::Router;
+use axum::{Extension, Router};
 
 use super::handlers::{add_handler, delete_handler, get_all_handler};
 use crate::common::AppData;
 
 /// Routes for the [`category`](crate::web::api::server::v1::contexts::category) API context.
-pub fn router(app_data: Arc<AppData>) -> Router {
+pub fn router(app_data: &Arc<AppData>) -> Router {
     Router::new()
-        .route("/", get(get_all_handler).with_state(app_data.clone()))
+        .route("/", get(get_all_handler))
         .route("/", post(add_handler).with_state(app_data.clone()))
-        .route("/", delete(delete_handler).with_state(app_data))
+        .route("/", delete(delete_handler).with_state(app_data.clone()))
+        .layer(Extension(app_data.category_repository.clone()))
 }
