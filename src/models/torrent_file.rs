@@ -291,7 +291,7 @@ impl TorrentInfoDictionary {
                 .first()
                 .expect("vector `torrent_files` should have at least one element");
 
-            info_dict.md5sum = torrent_file.md5sum.clone();
+            info_dict.md5sum.clone_from(&torrent_file.md5sum); // DevSkim: ignore DS126858
 
             info_dict.length = Some(torrent_file.length);
 
