@@ -238,7 +238,7 @@ mod for_guests {
 
         // Upload the first torrent
         let mut first_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 01");
-        first_torrent.index_info.title = title.clone();
+        first_torrent.index_info.title.clone_from(&title);
 
         let first_torrent_canonical_info_hash = upload_test_torrent(&client, &first_torrent)
             .await
@@ -376,7 +376,7 @@ mod for_guests {
 
         // Upload the first torrent
         let mut first_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 01");
-        first_torrent.index_info.title = title.clone();
+        first_torrent.index_info.title.clone_from(&title);
 
         let first_torrent_canonical_info_hash = upload_test_torrent(&client, &first_torrent)
             .await

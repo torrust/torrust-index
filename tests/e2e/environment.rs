@@ -90,10 +90,10 @@ impl TestEnv {
     pub fn server_settings_masking_secrets(&self) -> Option<Settings> {
         match self.starting_settings.clone() {
             Some(mut settings) => {
-                settings.tracker.token = "***".to_owned();
-                settings.database.connect_url = "***".to_owned();
-                settings.mail.password = "***".to_owned();
-                settings.auth.secret_key = "***".to_owned();
+                "***".clone_into(&mut settings.tracker.token);
+                "***".clone_into(&mut settings.database.connect_url);
+                "***".clone_into(&mut settings.mail.password);
+                "***".clone_into(&mut settings.auth.secret_key);
                 Some(settings)
             }
             None => None,
