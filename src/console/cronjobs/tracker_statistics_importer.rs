@@ -17,12 +17,14 @@ use axum::extract::State;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use chrono::{DateTime, Utc};
-use log::{error, info};
+use log::{debug, error, info};
 use serde_json::{json, Value};
+use text_colorizer::Colorize;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 
 use crate::tracker::statistics_importer::StatisticsImporter;
+use crate::utils::clock::seconds_ago_utc;
 
 const IMPORTER_API_IP: &str = "127.0.0.1";
 
@@ -41,7 +43,7 @@ struct ImporterState {
 #[must_use]
 pub fn start(
     importer_port: u16,
-    torrent_info_update_interval: u64,
+    torrent_stats_update_interval: u64,
     tracker_statistics_importer: &Arc<StatisticsImporter>,
 ) -> JoinHandle<()> {
     let weak_tracker_statistics_importer = Arc::downgrade(tracker_statistics_importer);
@@ -54,7 +56,7 @@ pub fn start(
         let _importer_api_handle = tokio::spawn(async move {
             let import_state = Arc::new(ImporterState {
                 last_heartbeat: Arc::new(Mutex::new(Utc::now())),
-                torrent_info_update_interval,
+                torrent_info_update_interval: torrent_stats_update_interval,
             });
 
             let app = Router::new()
@@ -81,25 +83,47 @@ pub fn start(
 
         info!("Tracker statistics importer cronjob starting ...");
 
-        let interval = std::time::Duration::from_secs(torrent_info_update_interval);
-        let mut interval = tokio::time::interval(interval);
+        let execution_interval_in_milliseconds = 100;
+        let execution_interval_duration = std::time::Duration::from_millis(execution_interval_in_milliseconds);
+        let mut execution_interval = tokio::time::interval(execution_interval_duration);
 
-        interval.tick().await; // first tick is immediate...
+        execution_interval.tick().await; // first tick is immediate...
+
+        info!("Running tracker statistics importer every {execution_interval_in_milliseconds} milliseconds ...");
 
         loop {
-            interval.tick().await;
-
-            info!("Running tracker statistics importer ...");
-
             if let Err(e) = send_heartbeat(importer_port).await {
                 error!("Failed to send heartbeat from importer cronjob: {}", e);
             }
 
-            if let Some(tracker) = weak_tracker_statistics_importer.upgrade() {
-                drop(tracker.import_all_torrents_statistics().await);
+            if let Some(statistics_importer) = weak_tracker_statistics_importer.upgrade() {
+                let one_interval_ago = seconds_ago_utc(
+                    torrent_stats_update_interval
+                        .try_into()
+                        .expect("update interval should be a positive integer"),
+                );
+                let limit = 50;
+
+                debug!(
+                    "Importing torrents statistics not updated since {} limited to a maximum of {} torrents ...",
+                    one_interval_ago.to_string().yellow(),
+                    limit.to_string().yellow()
+                );
+
+                match statistics_importer
+                    .import_torrents_statistics_not_updated_since(one_interval_ago, limit)
+                    .await
+                {
+                    Ok(()) => {}
+                    Err(e) => error!("Failed to import statistics: {:?}", e),
+                }
+
+                drop(statistics_importer);
             } else {
                 break;
             }
+
+            execution_interval.tick().await;
         }
     })
 }

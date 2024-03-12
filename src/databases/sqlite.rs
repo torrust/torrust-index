@@ -2,7 +2,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{query, query_as, Acquire, ConnectOptions, SqlitePool};
 
@@ -20,7 +20,7 @@ use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
 use crate::services::torrent::{CanonicalInfoHashGroup, DbTorrentInfoHash};
-use crate::utils::clock::{self, datetime_now};
+use crate::utils::clock::{self, datetime_now, DATETIME_FORMAT};
 use crate::utils::hex::from_bytes;
 
 pub struct Sqlite {
@@ -874,6 +874,27 @@ impl Database for Sqlite {
             .fetch_all(&self.pool)
             .await
             .map_err(|_| database::Error::Error)
+    }
+
+    async fn get_torrents_with_stats_not_updated_since(
+        &self,
+        datetime: DateTime<Utc>,
+        limit: i64,
+    ) -> Result<Vec<TorrentCompact>, database::Error> {
+        query_as::<_, TorrentCompact>(
+            "SELECT tt.torrent_id, tt.info_hash
+             FROM torrust_torrents tt
+             LEFT JOIN torrust_torrent_tracker_stats tts ON tt.torrent_id = tts.torrent_id
+             WHERE tts.updated_at < ? OR tts.updated_at IS NULL
+             ORDER BY tts.updated_at ASC
+             LIMIT ?
+        ",
+        )
+        .bind(datetime.format(DATETIME_FORMAT).to_string())
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|_| database::Error::Error)
     }
 
     async fn update_torrent_title(&self, torrent_id: i64, title: &str) -> Result<(), database::Error> {
