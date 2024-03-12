@@ -20,7 +20,7 @@ use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
 use crate::services::torrent::{CanonicalInfoHashGroup, DbTorrentInfoHash};
-use crate::utils::clock;
+use crate::utils::clock::{self, datetime_now};
 use crate::utils::hex::from_bytes;
 
 pub struct Sqlite {
@@ -1047,11 +1047,12 @@ impl Database for Sqlite {
         seeders: i64,
         leechers: i64,
     ) -> Result<(), database::Error> {
-        query("REPLACE INTO torrust_torrent_tracker_stats (torrent_id, tracker_url, seeders, leechers) VALUES ($1, $2, $3, $4)")
+        query("REPLACE INTO torrust_torrent_tracker_stats (torrent_id, tracker_url, seeders, leechers, updated_at) VALUES ($1, $2, $3, $4, $5)")
             .bind(torrent_id)
             .bind(tracker_url)
             .bind(seeders)
             .bind(leechers)
+            .bind(datetime_now())
             .execute(&self.pool)
             .await
             .map(|_| ())
