@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::databases::mysql::Mysql;
@@ -291,6 +291,13 @@ pub trait Database: Sync + Send {
 
     /// Get all torrents as `Vec<TorrentCompact>`.
     async fn get_all_torrents_compact(&self) -> Result<Vec<TorrentCompact>, Error>;
+
+    /// Get torrents whose stats have not been imported from the tracker at least since a given datetime.
+    async fn get_torrents_with_stats_not_updated_since(
+        &self,
+        datetime: DateTime<Utc>,
+        limit: i64,
+    ) -> Result<Vec<TorrentCompact>, Error>;
 
     /// Update a torrent's title with `torrent_id` and `title`.
     async fn update_torrent_title(&self, torrent_id: i64, title: &str) -> Result<(), Error>;
