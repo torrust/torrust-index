@@ -83,6 +83,15 @@ pub fn start(
 
         info!("Tracker statistics importer cronjob starting ...");
 
+        // code-review: we set an execution interval to avoid intense polling to
+        // the database. If we remove the interval we would be constantly
+        // queering if there are torrent stats pending to update, unless there
+        // are torrents to update. Maybe we should only sleep for 100 milliseconds
+        // if we did not update any torrents in the latest execution.
+        // With this current limit we can only import 50 torrent stats every 100
+        // milliseconds which is 500 torrents per second (1800000 torrents per hour).
+        // If the tracker can handle a request in 100 milliseconds.
+
         let execution_interval_in_milliseconds = 100;
         let execution_interval_duration = std::time::Duration::from_millis(execution_interval_in_milliseconds);
         let mut execution_interval = tokio::time::interval(execution_interval_duration);

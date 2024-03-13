@@ -58,6 +58,7 @@ impl StatisticsImporter {
                         torrent.torrent_id, torrent.info_hash, err
                     );
                     error!(target: "statistics_importer", "{}", message);
+                    // todo: return a service error that can be a tracker API error or a database error.
                 }
             }
         }
@@ -92,28 +93,47 @@ impl StatisticsImporter {
 
         info!(target: LOG_TARGET, "Importing {} torrents statistics from tracker {} ...", torrents.len().to_string().yellow(), self.tracker_url.yellow());
 
-        // Start the timer before the loop
-        let start_time = Instant::now();
+        // Import stats for all torrents in one request
+
+        let info_hashes: Vec<String> = torrents.iter().map(|t| t.info_hash.clone()).collect();
+
+        let torrent_info_vec = match self.tracker_service.get_torrents_info(&info_hashes).await {
+            Ok(torrents_info) => torrents_info,
+            Err(err) => {
+                let message = format!("Error getting torrents tracker stats. Error: {err:?}");
+                error!(target: LOG_TARGET, "{}", message);
+                // todo: return a service error that can be a tracker API error or a database error.
+                return Ok(());
+            }
+        };
+
+        // Update stats for all torrents
 
         for torrent in torrents {
-            info!(target: LOG_TARGET, "Importing torrent #{} statistics ...", torrent.torrent_id.to_string().yellow());
-
-            let ret = self.import_torrent_statistics(torrent.torrent_id, &torrent.info_hash).await;
-
-            if let Some(err) = ret.err() {
-                if err != TrackerAPIError::TorrentNotFound {
-                    let message = format!(
-                        "Error updating torrent tracker stats for torrent. Torrent: id {}; infohash {}. Error: {:?}",
-                        torrent.torrent_id, torrent.info_hash, err
+            match torrent_info_vec.iter().find(|t| t.info_hash == torrent.info_hash) {
+                None => {
+                    // No stats for this torrent in the tracker
+                    drop(
+                        self.database
+                            .update_tracker_info(torrent.torrent_id, &self.tracker_url, 0, 0)
+                            .await,
                     );
-                    error!(target: LOG_TARGET, "{}", message);
+                }
+                Some(torrent_info) => {
+                    // Update torrent stats for this tracker
+                    drop(
+                        self.database
+                            .update_tracker_info(
+                                torrent.torrent_id,
+                                &self.tracker_url,
+                                torrent_info.seeders,
+                                torrent_info.leechers,
+                            )
+                            .await,
+                    );
                 }
             }
         }
-
-        let elapsed_time = start_time.elapsed();
-
-        info!(target: LOG_TARGET, "Statistics import completed in {:.2?}", elapsed_time);
 
         Ok(())
     }

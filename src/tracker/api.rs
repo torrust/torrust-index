@@ -15,6 +15,8 @@ impl ConnectionInfo {
     }
 }
 
+const TOKEN_PARAM_NAME: &str = "token";
+
 pub struct Client {
     pub connection_info: ConnectionInfo,
     api_base_url: String,
@@ -29,7 +31,7 @@ impl Client {
     pub fn new(connection_info: ConnectionInfo) -> Result<Self, Error> {
         let base_url = format!("{}/api/v1", connection_info.url);
         let client = reqwest::Client::builder().timeout(Duration::from_secs(5)).build()?;
-        let token_param = [("token".to_string(), connection_info.token.to_string())];
+        let token_param = [(TOKEN_PARAM_NAME.to_string(), connection_info.token.to_string())];
 
         Ok(Self {
             connection_info,
@@ -72,7 +74,7 @@ impl Client {
         self.client.post(request_url).query(&self.token_param).send().await
     }
 
-    /// Retrieve the info for a torrent.
+    /// Retrieve the info for one torrent.
     ///
     /// # Errors
     ///
@@ -81,5 +83,24 @@ impl Client {
         let request_url = format!("{}/torrent/{}", self.api_base_url, info_hash);
 
         self.client.get(request_url).query(&self.token_param).send().await
+    }
+
+    /// Retrieve the info for multiple torrents at the same time.
+    ///
+    /// # Errors
+    ///
+    /// Will return an error if the HTTP request fails.
+    pub async fn get_torrents_info(&self, info_hashes: &[String]) -> Result<Response, Error> {
+        let request_url = format!("{}/torrents", self.api_base_url);
+
+        let mut query_params: Vec<(String, String)> = Vec::with_capacity(info_hashes.len() + 1);
+
+        query_params.push((TOKEN_PARAM_NAME.to_string(), self.connection_info.token.clone()));
+
+        for info_hash in info_hashes {
+            query_params.push(("info_hash".to_string(), info_hash.clone()));
+        }
+
+        self.client.get(request_url).query(&query_params).send().await
     }
 }
