@@ -9,6 +9,7 @@ use crate::common::AppData;
 use crate::config::Configuration;
 use crate::databases::database;
 use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
+use crate::services::authorization::{AuthorizationService, DbUserAuthorizationRepository};
 use crate::services::category::{self, DbCategoryRepository};
 use crate::services::tag::{self, DbTagRepository};
 use crate::services::torrent::{
@@ -72,6 +73,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let tag_repository = Arc::new(DbTagRepository::new(database.clone()));
     let user_repository = Arc::new(DbUserRepository::new(database.clone()));
     let user_authentication_repository = Arc::new(DbUserAuthenticationRepository::new(database.clone()));
+    let user_authorization_repository = Arc::new(DbUserAuthorizationRepository::new(database.clone()));
     let user_profile_repository = Arc::new(DbUserProfileRepository::new(database.clone()));
     let torrent_repository = Arc::new(DbTorrentRepository::new(database.clone()));
     let canonical_info_hash_group_repository = Arc::new(DbCanonicalInfoHashGroupRepository::new(database.clone()));
@@ -83,15 +85,19 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let banned_user_list = Arc::new(DbBannedUserList::new(database.clone()));
 
     // Services
+    let authorization_service = Arc::new(AuthorizationService::new(user_authorization_repository.clone()));
     let tracker_service = Arc::new(tracker::service::Service::new(configuration.clone(), database.clone()).await);
     let tracker_statistics_importer =
         Arc::new(StatisticsImporter::new(configuration.clone(), tracker_service.clone(), database.clone()).await);
     let mailer_service = Arc::new(mailer::Service::new(configuration.clone()).await);
     let image_cache_service: Arc<ImageCacheService> = Arc::new(ImageCacheService::new(configuration.clone()).await);
-    let category_service = Arc::new(category::Service::new(category_repository.clone(), user_repository.clone()));
-    let tag_service = Arc::new(tag::Service::new(tag_repository.clone(), user_repository.clone()));
+    let category_service = Arc::new(category::Service::new(
+        category_repository.clone(),
+        authorization_service.clone(),
+    ));
+    let tag_service = Arc::new(tag::Service::new(tag_repository.clone(), authorization_service.clone()));
     let proxy_service = Arc::new(proxy::Service::new(image_cache_service.clone(), user_repository.clone()));
-    let settings_service = Arc::new(settings::Service::new(configuration.clone(), user_repository.clone()));
+    let settings_service = Arc::new(settings::Service::new(configuration.clone(), authorization_service.clone()));
     let torrent_index = Arc::new(torrent::Index::new(
         configuration.clone(),
         tracker_statistics_importer.clone(),
@@ -133,6 +139,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         json_web_token.clone(),
         auth.clone(),
         authentication_service,
+        authorization_service,
         tracker_service.clone(),
         tracker_statistics_importer.clone(),
         mailer_service,
@@ -141,6 +148,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         tag_repository,
         user_repository,
         user_authentication_repository,
+        user_authorization_repository,
         user_profile_repository,
         torrent_repository,
         canonical_info_hash_group_repository,

@@ -4,6 +4,7 @@ use crate::cache::image::manager::ImageCacheService;
 use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
+use crate::services::authorization::{AuthorizationService, DbUserAuthorizationRepository};
 use crate::services::category::{self, DbCategoryRepository};
 use crate::services::tag::{self, DbTagRepository};
 use crate::services::torrent::{
@@ -23,6 +24,7 @@ pub struct AppData {
     pub json_web_token: Arc<JsonWebToken>,
     pub auth: Arc<Authentication>,
     pub authentication_service: Arc<Service>,
+    pub authorization_service: Arc<AuthorizationService>,
     pub tracker_service: Arc<tracker::service::Service>,
     pub tracker_statistics_importer: Arc<StatisticsImporter>,
     pub mailer: Arc<mailer::Service>,
@@ -32,6 +34,7 @@ pub struct AppData {
     pub tag_repository: Arc<DbTagRepository>,
     pub user_repository: Arc<DbUserRepository>,
     pub user_authentication_repository: Arc<DbUserAuthenticationRepository>,
+    pub user_authorization_repository: Arc<DbUserAuthorizationRepository>,
     pub user_profile_repository: Arc<DbUserProfileRepository>,
     pub torrent_repository: Arc<DbTorrentRepository>,
     pub torrent_info_hash_repository: Arc<DbCanonicalInfoHashGroupRepository>,
@@ -59,6 +62,7 @@ impl AppData {
         json_web_token: Arc<JsonWebToken>,
         auth: Arc<Authentication>,
         authentication_service: Arc<Service>,
+        authorization_service: Arc<AuthorizationService>,
         tracker_service: Arc<tracker::service::Service>,
         tracker_statistics_importer: Arc<StatisticsImporter>,
         mailer: Arc<mailer::Service>,
@@ -68,6 +72,7 @@ impl AppData {
         tag_repository: Arc<DbTagRepository>,
         user_repository: Arc<DbUserRepository>,
         user_authentication_repository: Arc<DbUserAuthenticationRepository>,
+        user_authorization_repository: Arc<DbUserAuthorizationRepository>,
         user_profile_repository: Arc<DbUserProfileRepository>,
         torrent_repository: Arc<DbTorrentRepository>,
         torrent_info_hash_repository: Arc<DbCanonicalInfoHashGroupRepository>,
@@ -92,6 +97,7 @@ impl AppData {
             json_web_token,
             auth,
             authentication_service,
+            authorization_service,
             tracker_service,
             tracker_statistics_importer,
             mailer,
@@ -101,6 +107,7 @@ impl AppData {
             tag_repository,
             user_repository,
             user_authentication_repository,
+            user_authorization_repository,
             user_profile_repository,
             torrent_repository,
             torrent_info_hash_repository,
