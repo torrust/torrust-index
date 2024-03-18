@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 
 pub const DATETIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
@@ -14,9 +14,15 @@ pub fn now() -> u64 {
 }
 
 /// Returns the datetime some seconds ago.
+///
+/// # Panics
+///
+/// The function panics if the number of seconds passed as a parameter
+/// are more than `i64::MAX` / `1_000` or less than `-i64::MAX` / `1_000`.
 #[must_use]
 pub fn seconds_ago_utc(seconds: i64) -> DateTime<chrono::Utc> {
-    Utc::now() - Duration::seconds(seconds)
+    Utc::now()
+        - TimeDelta::try_seconds(seconds).expect("seconds should be more than i64::MAX / 1_000 or less than -i64::MAX / 1_000")
 }
 
 /// Returns the current time in database format.

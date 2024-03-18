@@ -1,6 +1,6 @@
 #![allow(clippy::missing_errors_doc)]
 
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqlitePoolOptions, SqliteQueryResult};
 use sqlx::{query, query_as, SqlitePool};
@@ -61,11 +61,10 @@ pub fn convert_timestamp_to_datetime(timestamp: i64) -> String {
     // The expected format in database is: 2022-11-04 09:53:57
     // MySQL uses a DATETIME column and SQLite uses a TEXT column.
 
-    let naive_datetime = NaiveDateTime::from_timestamp_opt(timestamp, 0).expect("Overflow of i64 seconds, very future!");
-    let datetime_again: DateTime<Utc> = DateTime::from_naive_utc_and_offset(naive_datetime, Utc);
+    let datetime = DateTime::from_timestamp(timestamp, 0).expect("Overflow of i64 seconds, very future!");
 
     // Format without timezone
-    datetime_again.format("%Y-%m-%d %H:%M:%S").to_string()
+    datetime.format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
 pub struct SqliteDatabaseV2_0_0 {
