@@ -1,32 +1,42 @@
-/*
-
-
- let user_compact = self.user_repository.get_compact(&user_profile.user_id).await?;
-
-
-*/
 use std::sync::Arc;
 
 use crate::databases::database::{Database, Error};
+use crate::errors::ServiceError;
 use crate::models::user::{UserAuthorization, UserId};
-use crate::services::user::DbUserRepository;
-pub struct Service {
-    user_repository: Arc<DbUserRepository>,
+
+pub struct AuthorizationService {
+    user_authorization_repository: Arc<DbUserAuthorizationRepository>,
 }
 
-impl Service {
-    pub fn new(user_repository: Arc<DbUserRepository>) -> Self {
-        Self { user_repository }
+impl AuthorizationService {
+    pub fn new(user_authorization_repository: Arc<DbUserAuthorizationRepository>) -> Self {
+        Self {
+            user_authorization_repository,
+        }
     }
 
-    // Check user exists in database
-    /* pub async fn user_exists_in_database(&self, user_id: &UserId) ->  {
-        let user_authorization = self.
-    } */
+    pub async fn authorize_user(&self, user_id: UserId, admin_required: bool) -> Result<(), ServiceError> {
+        // Checks if the user exists in the database
+        let authorization_info = self
+            .user_authorization_repository
+            .get_user_authorization_from_id(&user_id)
+            .await?;
 
-    // Check if the user has a role with enough privilages
+        //If admin privilages are required, it checks if the user is an admin
+        if admin_required {
+            return self.authorize_admin_user(authorization_info).await;
+        } else {
+            Ok(())
+        }
+    }
 
-    //Delete token from localStorage if user does not exist - FRONTEND
+    async fn authorize_admin_user(&self, user_authorization_info: UserAuthorization) -> Result<(), ServiceError> {
+        if user_authorization_info.administrator {
+            Ok(())
+        } else {
+            Err(ServiceError::Unauthorized)
+        }
+    }
 }
 
 pub struct DbUserAuthorizationRepository {
