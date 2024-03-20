@@ -9,7 +9,7 @@ use crate::common::AppData;
 use crate::config::Configuration;
 use crate::databases::database;
 use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
-use crate::services::authorization::{AuthorizationService, DbUserAuthorizationRepository};
+use crate::services::authorization::{AuthorizeService, DbUserAuthorizationRepository};
 use crate::services::category::{self, DbCategoryRepository};
 use crate::services::tag::{self, DbTagRepository};
 use crate::services::torrent::{
@@ -85,7 +85,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let banned_user_list = Arc::new(DbBannedUserList::new(database.clone()));
 
     // Services
-    let authorization_service = Arc::new(AuthorizationService::new(user_authorization_repository.clone()));
+    let authorization_service = Arc::new(AuthorizeService::new(user_authorization_repository.clone()));
     let tracker_service = Arc::new(tracker::service::Service::new(configuration.clone(), database.clone()).await);
     let tracker_statistics_importer =
         Arc::new(StatisticsImporter::new(configuration.clone(), tracker_service.clone(), database.clone()).await);

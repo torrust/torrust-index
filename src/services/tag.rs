@@ -1,7 +1,7 @@
 //! Tag service.
 use std::sync::Arc;
 
-use super::authorization::AuthorizationService;
+use super::authorization::AuthorizeService;
 use crate::databases::database::{Database, Error as DatabaseError, Error};
 use crate::errors::ServiceError;
 use crate::models::torrent_tag::{TagId, TorrentTag};
@@ -9,12 +9,12 @@ use crate::models::user::UserId;
 
 pub struct Service {
     tag_repository: Arc<DbTagRepository>,
-    authorization_service: Arc<AuthorizationService>,
+    authorization_service: Arc<AuthorizeService>,
 }
 
 impl Service {
     #[must_use]
-    pub fn new(tag_repository: Arc<DbTagRepository>, authorization_service: Arc<AuthorizationService>) -> Service {
+    pub fn new(tag_repository: Arc<DbTagRepository>, authorization_service: Arc<AuthorizeService>) -> Service {
         Service {
             tag_repository,
             authorization_service,

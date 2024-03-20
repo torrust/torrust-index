@@ -4,7 +4,7 @@ use crate::cache::image::manager::ImageCacheService;
 use crate::config::Configuration;
 use crate::databases::database::Database;
 use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
-use crate::services::authorization::{AuthorizationService, DbUserAuthorizationRepository};
+use crate::services::authorization::{AuthorizeService, DbUserAuthorizationRepository};
 use crate::services::category::{self, DbCategoryRepository};
 use crate::services::tag::{self, DbTagRepository};
 use crate::services::torrent::{
@@ -24,7 +24,7 @@ pub struct AppData {
     pub json_web_token: Arc<JsonWebToken>,
     pub auth: Arc<Authentication>,
     pub authentication_service: Arc<Service>,
-    pub authorization_service: Arc<AuthorizationService>,
+    pub authorization_service: Arc<AuthorizeService>,
     pub tracker_service: Arc<tracker::service::Service>,
     pub tracker_statistics_importer: Arc<StatisticsImporter>,
     pub mailer: Arc<mailer::Service>,
@@ -62,7 +62,7 @@ impl AppData {
         json_web_token: Arc<JsonWebToken>,
         auth: Arc<Authentication>,
         authentication_service: Arc<Service>,
-        authorization_service: Arc<AuthorizationService>,
+        authorization_service: Arc<AuthorizeService>,
         tracker_service: Arc<tracker::service::Service>,
         tracker_statistics_importer: Arc<StatisticsImporter>,
         mailer: Arc<mailer::Service>,
