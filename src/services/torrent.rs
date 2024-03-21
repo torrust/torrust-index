@@ -5,7 +5,6 @@ use log::debug;
 use serde_derive::{Deserialize, Serialize};
 
 use super::category::DbCategoryRepository;
-use super::user::DbUserRepository;
 use crate::config::{Configuration, TrackerMode};
 use crate::databases::database::{Database, Error, Sorting};
 use crate::errors::ServiceError;
@@ -16,6 +15,7 @@ use crate::models::torrent::{Metadata, TorrentId, TorrentListing};
 use crate::models::torrent_file::{DbTorrent, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::user::UserId;
+use crate::services::user::Repository;
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::utils::parse_torrent::decode_and_validate_torrent_file;
 use crate::{tracker, AsCSV};
@@ -24,7 +24,7 @@ pub struct Index {
     configuration: Arc<Configuration>,
     tracker_statistics_importer: Arc<StatisticsImporter>,
     tracker_service: Arc<tracker::service::Service>,
-    user_repository: Arc<DbUserRepository>,
+    user_repository: Arc<Box<dyn Repository>>,
     category_repository: Arc<DbCategoryRepository>,
     torrent_repository: Arc<DbTorrentRepository>,
     torrent_info_hash_repository: Arc<DbCanonicalInfoHashGroupRepository>,
@@ -80,7 +80,7 @@ impl Index {
         configuration: Arc<Configuration>,
         tracker_statistics_importer: Arc<StatisticsImporter>,
         tracker_service: Arc<tracker::service::Service>,
-        user_repository: Arc<DbUserRepository>,
+        user_repository: Arc<Box<dyn Repository>>,
         category_repository: Arc<DbCategoryRepository>,
         torrent_repository: Arc<DbTorrentRepository>,
         torrent_info_hash_repository: Arc<DbCanonicalInfoHashGroupRepository>,

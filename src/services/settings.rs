@@ -1,19 +1,19 @@
 //! Settings service.
 use std::sync::Arc;
 
-use super::user::DbUserRepository;
 use crate::config::{Configuration, ConfigurationPublic, TorrustIndex};
 use crate::errors::ServiceError;
 use crate::models::user::UserId;
+use crate::services::user::Repository;
 
 pub struct Service {
     configuration: Arc<Configuration>,
-    user_repository: Arc<DbUserRepository>,
+    user_repository: Arc<Box<dyn Repository>>,
 }
 
 impl Service {
     #[must_use]
-    pub fn new(configuration: Arc<Configuration>, user_repository: Arc<DbUserRepository>) -> Service {
+    pub fn new(configuration: Arc<Configuration>, user_repository: Arc<Box<dyn Repository>>) -> Service {
         Service {
             configuration,
             user_repository,

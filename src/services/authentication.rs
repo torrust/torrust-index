@@ -5,17 +5,18 @@ use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use pbkdf2::Pbkdf2;
 
-use super::user::{DbUserProfileRepository, DbUserRepository};
+use super::user::DbUserProfileRepository;
 use crate::config::Configuration;
 use crate::databases::database::{Database, Error};
 use crate::errors::ServiceError;
 use crate::models::user::{UserAuthentication, UserClaims, UserCompact, UserId};
+use crate::services::user::Repository;
 use crate::utils::clock;
 
 pub struct Service {
     configuration: Arc<Configuration>,
     json_web_token: Arc<JsonWebToken>,
-    user_repository: Arc<DbUserRepository>,
+    user_repository: Arc<Box<dyn Repository>>,
     user_profile_repository: Arc<DbUserProfileRepository>,
     user_authentication_repository: Arc<DbUserAuthenticationRepository>,
 }
@@ -24,7 +25,7 @@ impl Service {
     pub fn new(
         configuration: Arc<Configuration>,
         json_web_token: Arc<JsonWebToken>,
-        user_repository: Arc<DbUserRepository>,
+        user_repository: Arc<Box<dyn Repository>>,
         user_profile_repository: Arc<DbUserProfileRepository>,
         user_authentication_repository: Arc<DbUserAuthenticationRepository>,
     ) -> Self {

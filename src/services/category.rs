@@ -1,23 +1,30 @@
 //! Category service.
 use std::sync::Arc;
 
-use super::user::DbUserRepository;
+use super::authorization::{self, ACTION};
 use crate::databases::database::{Category, Database, Error as DatabaseError};
 use crate::errors::ServiceError;
 use crate::models::category::CategoryId;
 use crate::models::user::UserId;
+use crate::services::user::Repository;
 
 pub struct Service {
     category_repository: Arc<DbCategoryRepository>,
-    user_repository: Arc<DbUserRepository>,
+    user_repository: Arc<Box<dyn Repository>>,
+    authorization_service: Arc<authorization::Service>,
 }
 
 impl Service {
     #[must_use]
-    pub fn new(category_repository: Arc<DbCategoryRepository>, user_repository: Arc<DbUserRepository>) -> Service {
+    pub fn new(
+        category_repository: Arc<DbCategoryRepository>,
+        user_repository: Arc<Box<dyn Repository>>,
+        authorization_service: Arc<authorization::Service>,
+    ) -> Service {
         Service {
             category_repository,
             user_repository,
+            authorization_service,
         }
     }
 
@@ -32,13 +39,17 @@ impl Service {
     /// * The category already exists.
     /// * There is a database error.
     pub async fn add_category(&self, category_name: &str, user_id: &UserId) -> Result<i64, ServiceError> {
-        let user = self.user_repository.get_compact(user_id).await?;
+        /*let user = self.user_repository.get_compact(user_id).await?;
 
         // Check if user is administrator
         // todo: extract authorization service
         if !user.administrator {
             return Err(ServiceError::Unauthorized);
-        }
+        }*/
+
+        self.authorization_service
+            .authorize(ACTION::AddCategory, Some(*user_id))
+            .await?;
 
         let trimmed_name = category_name.trim();
 
