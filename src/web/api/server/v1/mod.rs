@@ -5,6 +5,7 @@
 //! Refer to the [`contexts`] module for more
 //! information.
 pub mod auth;
+pub mod authorization;
 pub mod contexts;
 pub mod extractors;
 pub mod responses;
