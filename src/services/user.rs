@@ -3,8 +3,10 @@ use std::sync::Arc;
 
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
+use async_trait::async_trait;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use log::{debug, info};
+use mockall::automock;
 use pbkdf2::password_hash::rand_core::OsRng;
 
 use crate::config::{Configuration, EmailOnSignup};
@@ -26,7 +28,7 @@ fn no_email() -> String {
 pub struct RegistrationService {
     configuration: Arc<Configuration>,
     mailer: Arc<mailer::Service>,
-    user_repository: Arc<DbUserRepository>,
+    user_repository: Arc<Box<dyn Repository>>,
     user_profile_repository: Arc<DbUserProfileRepository>,
 }
 
@@ -35,7 +37,7 @@ impl RegistrationService {
     pub fn new(
         configuration: Arc<Configuration>,
         mailer: Arc<mailer::Service>,
-        user_repository: Arc<DbUserRepository>,
+        user_repository: Arc<Box<dyn Repository>>,
         user_profile_repository: Arc<DbUserProfileRepository>,
     ) -> Self {
         Self {
@@ -184,7 +186,7 @@ impl RegistrationService {
 }
 
 pub struct BanService {
-    user_repository: Arc<DbUserRepository>,
+    user_repository: Arc<Box<dyn Repository>>,
     user_profile_repository: Arc<DbUserProfileRepository>,
     banned_user_list: Arc<DbBannedUserList>,
 }
@@ -192,7 +194,7 @@ pub struct BanService {
 impl BanService {
     #[must_use]
     pub fn new(
-        user_repository: Arc<DbUserRepository>,
+        user_repository: Arc<Box<dyn Repository>>,
         user_profile_repository: Arc<DbUserProfileRepository>,
         banned_user_list: Arc<DbBannedUserList>,
     ) -> Self {
@@ -233,6 +235,15 @@ impl BanService {
     }
 }
 
+#[automock]
+#[async_trait]
+pub trait Repository: Sync + Send {
+    async fn get_compact(&self, user_id: &UserId) -> Result<UserCompact, ServiceError>;
+    async fn grant_admin_role(&self, user_id: &UserId) -> Result<(), Error>;
+    async fn delete(&self, user_id: &UserId) -> Result<(), Error>;
+    async fn add(&self, username: &str, email: &str, password_hash: &str) -> Result<UserId, Error>;
+}
+
 pub struct DbUserRepository {
     database: Arc<Box<dyn Database>>,
 }
@@ -242,13 +253,16 @@ impl DbUserRepository {
     pub fn new(database: Arc<Box<dyn Database>>) -> Self {
         Self { database }
     }
+}
 
+#[async_trait]
+impl Repository for DbUserRepository {
     /// It returns the compact user.
     ///
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn get_compact(&self, user_id: &UserId) -> Result<UserCompact, ServiceError> {
+    async fn get_compact(&self, user_id: &UserId) -> Result<UserCompact, ServiceError> {
         // todo: persistence layer should have its own errors instead of
         // returning a `ServiceError`.
         self.database
@@ -262,7 +276,7 @@ impl DbUserRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn grant_admin_role(&self, user_id: &UserId) -> Result<(), Error> {
+    async fn grant_admin_role(&self, user_id: &UserId) -> Result<(), Error> {
         self.database.grant_admin_role(*user_id).await
     }
 
@@ -271,7 +285,7 @@ impl DbUserRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn delete(&self, user_id: &UserId) -> Result<(), Error> {
+    async fn delete(&self, user_id: &UserId) -> Result<(), Error> {
         self.database.delete_user(*user_id).await
     }
 
@@ -280,7 +294,7 @@ impl DbUserRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn add(&self, username: &str, email: &str, password_hash: &str) -> Result<UserId, Error> {
+    async fn add(&self, username: &str, email: &str, password_hash: &str) -> Result<UserId, Error> {
         self.database.insert_user_and_get_id(username, email, password_hash).await
     }
 }

@@ -1,23 +1,23 @@
 //! Tag service.
 use std::sync::Arc;
 
-use super::authorization::AuthorizeService;
 use crate::databases::database::{Database, Error as DatabaseError, Error};
 use crate::errors::ServiceError;
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::user::UserId;
+use crate::services::user::Repository;
 
 pub struct Service {
     tag_repository: Arc<DbTagRepository>,
-    authorization_service: Arc<AuthorizeService>,
+    user_repository: Arc<Box<dyn Repository>>,
 }
 
 impl Service {
     #[must_use]
-    pub fn new(tag_repository: Arc<DbTagRepository>, authorization_service: Arc<AuthorizeService>) -> Service {
+    pub fn new(tag_repository: Arc<DbTagRepository>, user_repository: Arc<Box<dyn Repository>>) -> Service {
         Service {
             tag_repository,
-            authorization_service,
+            user_repository,
         }
     }
 
@@ -30,7 +30,13 @@ impl Service {
     /// * The user does not have the required permissions.
     /// * There is a database error.
     pub async fn add_tag(&self, tag_name: &str, user_id: &UserId) -> Result<TagId, ServiceError> {
-        self.authorization_service.authorize_user(*user_id, true).await?;
+        let user = self.user_repository.get_compact(user_id).await?;
+
+        // Check if user is administrator
+        // todo: extract authorization service
+        if !user.administrator {
+            return Err(ServiceError::Unauthorized);
+        }
 
         let trimmed_name = tag_name.trim();
 
@@ -56,7 +62,13 @@ impl Service {
     /// * The user does not have the required permissions.
     /// * There is a database error.
     pub async fn delete_tag(&self, tag_id: &TagId, user_id: &UserId) -> Result<(), ServiceError> {
-        self.authorization_service.authorize_user(*user_id, true).await?;
+        let user = self.user_repository.get_compact(user_id).await?;
+
+        // Check if user is administrator
+        // todo: extract authorization service
+        if !user.administrator {
+            return Err(ServiceError::Unauthorized);
+        }
 
         match self.tag_repository.delete(tag_id).await {
             Ok(()) => Ok(()),

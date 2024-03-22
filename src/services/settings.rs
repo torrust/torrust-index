@@ -1,22 +1,22 @@
 //! Settings service.
 use std::sync::Arc;
 
-use super::authorization::AuthorizeService;
 use crate::config::{Configuration, ConfigurationPublic, TorrustIndex};
 use crate::errors::ServiceError;
 use crate::models::user::UserId;
+use crate::services::user::Repository;
 
 pub struct Service {
     configuration: Arc<Configuration>,
-    authorization_service: Arc<AuthorizeService>,
+    user_repository: Arc<Box<dyn Repository>>,
 }
 
 impl Service {
     #[must_use]
-    pub fn new(configuration: Arc<Configuration>, authorization_service: Arc<AuthorizeService>) -> Service {
+    pub fn new(configuration: Arc<Configuration>, user_repository: Arc<Box<dyn Repository>>) -> Service {
         Service {
             configuration,
-            authorization_service,
+            user_repository,
         }
     }
 
@@ -26,7 +26,13 @@ impl Service {
     ///
     /// It returns an error if the user does not have the required permissions.
     pub async fn get_all(&self, user_id: &UserId) -> Result<TorrustIndex, ServiceError> {
-        self.authorization_service.authorize_user(*user_id, true).await?;
+        let user = self.user_repository.get_compact(user_id).await?;
+
+        // Check if user is administrator
+        // todo: extract authorization service
+        if !user.administrator {
+            return Err(ServiceError::Unauthorized);
+        }
 
         let torrust_index_configuration = self.configuration.get_all().await;
 
@@ -39,7 +45,13 @@ impl Service {
     ///
     /// It returns an error if the user does not have the required permissions.
     pub async fn get_all_masking_secrets(&self, user_id: &UserId) -> Result<TorrustIndex, ServiceError> {
-        self.authorization_service.authorize_user(*user_id, true).await?;
+        let user = self.user_repository.get_compact(user_id).await?;
+
+        // Check if user is administrator
+        // todo: extract authorization service
+        if !user.administrator {
+            return Err(ServiceError::Unauthorized);
+        }
 
         let mut torrust_index_configuration = self.configuration.get_all().await;
 
