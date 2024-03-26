@@ -49,4 +49,24 @@ impl Service {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use std::io::Error;
+    use std::sync::Arc;
+
+    use crate::errors::ServiceError;
+    use crate::services::authorization::{Service, ACTION};
+    use crate::services::user::MockRepository;
+
+    #[test]
+    fn a_guest_user_should_not_be_able_to_add_tags() {
+        //let mock_user_repository = MockRepository::new();
+        //let service = Service::new(Arc::new::Box::new::r#dyn(mock_user_repository));
+        /*  let maybe_user_id = None;
+        let service = Service::new(Arc::new(Box::new(MockRepository::new())));
+        service.authorize(ACTION::AddCategory, maybe_user_id) */
+        /* //assert_eq!(
+            service.authorize(ACTION::AddCategory, maybe_user_id).,
+            ServiceError::Unauthorized
+        ); */
+    }
+}
