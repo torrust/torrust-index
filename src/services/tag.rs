@@ -1,20 +1,20 @@
 //! Tag service.
 use std::sync::Arc;
 
-use super::user::DbUserRepository;
 use crate::databases::database::{Database, Error as DatabaseError, Error};
 use crate::errors::ServiceError;
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::user::UserId;
+use crate::services::user::Repository;
 
 pub struct Service {
     tag_repository: Arc<DbTagRepository>,
-    user_repository: Arc<DbUserRepository>,
+    user_repository: Arc<Box<dyn Repository>>,
 }
 
 impl Service {
     #[must_use]
-    pub fn new(tag_repository: Arc<DbTagRepository>, user_repository: Arc<DbUserRepository>) -> Service {
+    pub fn new(tag_repository: Arc<DbTagRepository>, user_repository: Arc<Box<dyn Repository>>) -> Service {
         Service {
             tag_repository,
             user_repository,

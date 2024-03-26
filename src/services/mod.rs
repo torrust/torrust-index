@@ -1,6 +1,7 @@
 //! App services.
 pub mod about;
 pub mod authentication;
+pub mod authorization;
 pub mod category;
 pub mod hasher;
 pub mod proxy;
