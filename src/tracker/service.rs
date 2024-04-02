@@ -49,6 +49,14 @@ pub struct TorrentInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct TorrentBasicInfo {
+    pub info_hash: String,
+    pub seeders: i64,
+    pub completed: i64,
+    pub leechers: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Peer {
     pub peer_id: Option<PeerId>,
     pub peer_addr: Option<String>,
@@ -251,6 +259,54 @@ impl Service {
                     }
                     _ => {
                         error!(target: "tracker-service", "get torrent info unhandled response: status {status}, body: {body}");
+                        Err(TrackerAPIError::UnexpectedResponseStatus)
+                    }
+                }
+            }
+            Err(_) => Err(TrackerAPIError::TrackerOffline),
+        }
+    }
+
+    /// Get torrent info from tracker in batches.
+    ///
+    /// # Errors
+    ///
+    /// Will return an error if the HTTP request to get torrent info fails or
+    /// if the response cannot be parsed.
+    pub async fn get_torrents_info(&self, info_hashes: &[String]) -> Result<Vec<TorrentBasicInfo>, TrackerAPIError> {
+        debug!(target: "tracker-service", "get torrents info");
+
+        let maybe_response = self.api_client.get_torrents_info(info_hashes).await;
+
+        debug!(target: "tracker-service", "get torrents info response result: {:?}", maybe_response);
+
+        match maybe_response {
+            Ok(response) => {
+                let status: StatusCode = map_status_code(response.status());
+
+                let body = response.text().await.map_err(|_| {
+                    error!(target: "tracker-service", "response without body");
+                    TrackerAPIError::MissingResponseBody
+                })?;
+
+                match status {
+                    StatusCode::OK => serde_json::from_str(&body).map_err(|e| {
+                        error!(
+                            target: "tracker-service", "Failed to parse torrents info from tracker response. Body: {}, Error: {}",
+                            body, e
+                        );
+                        TrackerAPIError::FailedToParseTrackerResponse { body }
+                    }),
+                    StatusCode::INTERNAL_SERVER_ERROR => {
+                        if body == Self::invalid_token_body() {
+                            Err(TrackerAPIError::InvalidToken)
+                        } else {
+                            error!(target: "tracker-service", "get torrents info 500 response: status {status}, body: {body}");
+                            Err(TrackerAPIError::InternalServerError)
+                        }
+                    }
+                    _ => {
+                        error!(target: "tracker-service", "get torrents info unhandled response: status {status}, body: {body}");
                         Err(TrackerAPIError::UnexpectedResponseStatus)
                     }
                 }

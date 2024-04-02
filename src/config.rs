@@ -430,10 +430,10 @@ impl TorrustIndex {
     }
 
     pub fn remove_secrets(&mut self) {
-        self.tracker.token = "***".to_owned();
-        self.database.connect_url = "***".to_owned();
-        self.mail.password = "***".to_owned();
-        self.auth.secret_key = "***".to_owned();
+        "***".clone_into(&mut self.tracker.token);
+        "***".clone_into(&mut self.database.connect_url);
+        "***".clone_into(&mut self.mail.password);
+        "***".clone_into(&mut self.auth.secret_key);
     }
 }
 

@@ -2,7 +2,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions};
 use sqlx::{query, query_as, Acquire, ConnectOptions, MySqlPool};
 
@@ -20,7 +20,7 @@ use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
 use crate::services::torrent::{CanonicalInfoHashGroup, DbTorrentInfoHash};
-use crate::utils::clock;
+use crate::utils::clock::{self, datetime_now, DATETIME_FORMAT};
 use crate::utils::hex::from_bytes;
 
 pub struct Mysql {
@@ -884,6 +884,27 @@ impl Database for Mysql {
             .map_err(|_| database::Error::Error)
     }
 
+    async fn get_torrents_with_stats_not_updated_since(
+        &self,
+        datetime: DateTime<Utc>,
+        limit: i64,
+    ) -> Result<Vec<TorrentCompact>, database::Error> {
+        query_as::<_, TorrentCompact>(
+            "SELECT tt.torrent_id, tt.info_hash
+             FROM torrust_torrents tt
+             LEFT JOIN torrust_torrent_tracker_stats tts ON tt.torrent_id = tts.torrent_id
+             WHERE tts.updated_at < ? OR tts.updated_at IS NULL
+             ORDER BY tts.updated_at ASC
+             LIMIT ?
+        ",
+        )
+        .bind(datetime.format(DATETIME_FORMAT).to_string())
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|_| database::Error::Error)
+    }
+
     async fn update_torrent_title(&self, torrent_id: i64, title: &str) -> Result<(), database::Error> {
         query("UPDATE torrust_torrent_info SET title = ? WHERE torrent_id = ?")
             .bind(title)
@@ -1055,11 +1076,12 @@ impl Database for Mysql {
         seeders: i64,
         leechers: i64,
     ) -> Result<(), database::Error> {
-        query("REPLACE INTO torrust_torrent_tracker_stats (torrent_id, tracker_url, seeders, leechers) VALUES (?, ?, ?, ?)")
+        query("REPLACE INTO torrust_torrent_tracker_stats (torrent_id, tracker_url, seeders, leechers, updated_at) VALUES (?, ?, ?, ?, ?)")
             .bind(torrent_id)
             .bind(tracker_url)
             .bind(seeders)
             .bind(leechers)
+            .bind(datetime_now())
             .execute(&self.pool)
             .await
             .map(|_| ())
