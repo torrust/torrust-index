@@ -60,7 +60,7 @@ rand = "0"
 rand_core = { version = "0", features = ["std"] }
 regex = "1"
 reqwest = { version = "0", features = ["json", "multipart"] }
-rustversion = "1.0.14"
+rustversion = "1.0.15"
 serde = { version = "1", features = ["rc"] }
 serde_bencode = "0"
 serde_bytes = "0"
