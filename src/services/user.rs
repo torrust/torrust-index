@@ -6,6 +6,7 @@ use argon2::{Argon2, PasswordHasher};
 use async_trait::async_trait;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use log::{debug, info};
+#[cfg(test)]
 use mockall::automock;
 use pbkdf2::password_hash::rand_core::OsRng;
 
@@ -235,7 +236,7 @@ impl BanService {
     }
 }
 
-#[automock]
+#[cfg_attr(test, automock)]
 #[async_trait]
 pub trait Repository: Sync + Send {
     async fn get_compact(&self, user_id: &UserId) -> Result<UserCompact, ServiceError>;
