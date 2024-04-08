@@ -40,6 +40,7 @@ impl From<TorrentIndexInfo> for UploadTorrentMultipartForm {
 }
 
 /// Torrent that has been added to the index.
+#[allow(dead_code)]
 pub struct TorrentListedInIndex {
     pub torrent_id: Id,
     pub title: String,
