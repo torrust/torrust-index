@@ -1,10 +1,12 @@
 use serde::Deserialize;
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct AddedUserResponse {
     pub data: NewUserData,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct NewUserData {
     pub user_id: i64,

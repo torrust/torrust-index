@@ -8,6 +8,7 @@ use serde::Deserialize;
 use which::which;
 
 /// Attributes parsed from a torrent file.
+#[allow(dead_code)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct TorrentFileInfo {
     pub name: String,
