@@ -8,6 +8,10 @@ use crate::models::user::{UserCompact, UserId};
 pub enum ACTION {
     AddCategory,
     DeleteCategory,
+    GetSettings,
+    GetSettingsSecret,
+    AddTag,
+    DeleteTag,
 }
 
 pub struct Service {
@@ -28,7 +32,12 @@ impl Service {
     /// - The user is not authorized to perform the action.
     pub async fn authorize(&self, action: ACTION, maybe_user_id: Option<UserId>) -> Result<(), ServiceError> {
         match action {
-            ACTION::AddCategory | ACTION::DeleteCategory => match maybe_user_id {
+            ACTION::AddCategory
+            | ACTION::DeleteCategory
+            | ACTION::GetSettings
+            | ACTION::GetSettingsSecret
+            | ACTION::AddTag
+            | ACTION::DeleteTag => match maybe_user_id {
                 Some(user_id) => {
                     let user = self.get_user(user_id).await?;
 

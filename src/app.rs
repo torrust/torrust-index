@@ -91,12 +91,11 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let image_cache_service: Arc<ImageCacheService> = Arc::new(ImageCacheService::new(configuration.clone()).await);
     let category_service = Arc::new(category::Service::new(
         category_repository.clone(),
-        user_repository.clone(),
         authorization_service.clone(),
     ));
-    let tag_service = Arc::new(tag::Service::new(tag_repository.clone(), user_repository.clone()));
+    let tag_service = Arc::new(tag::Service::new(tag_repository.clone(), authorization_service.clone()));
     let proxy_service = Arc::new(proxy::Service::new(image_cache_service.clone(), user_repository.clone()));
-    let settings_service = Arc::new(settings::Service::new(configuration.clone(), user_repository.clone()));
+    let settings_service = Arc::new(settings::Service::new(configuration.clone(), authorization_service.clone()));
     let torrent_index = Arc::new(torrent::Index::new(
         configuration.clone(),
         tracker_statistics_importer.clone(),
