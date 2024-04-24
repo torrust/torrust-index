@@ -83,16 +83,28 @@ pub fn start(
 
         info!("Tracker statistics importer cronjob starting ...");
 
-        // code-review: we set an execution interval to avoid intense polling to
-        // the database. If we remove the interval we would be constantly
-        // queering if there are torrent stats pending to update, unless there
-        // are torrents to update. Maybe we should only sleep for 100 milliseconds
-        // if we did not update any torrents in the latest execution.
-        // With this current limit we can only import 50 torrent stats every 100
-        // milliseconds which is 500 torrents per second (1800000 torrents per hour).
-        // If the tracker can handle a request in 100 milliseconds.
+        // code-review:
+        //
+        // We set an execution interval to avoid intense polling to the
+        // database. If we remove the interval we would be constantly queering
+        // if there are torrent stats pending to update, unless there are
+        // torrents to update. Maybe we should only sleep for 100 milliseconds
+        // if we did not update any torrents in the latest execution. With this
+        // current limit we can only import 50 torrent stats every 2000 seconds,
+        // which is 500 torrents per second (1800000 torrents per hour).
+        //
+        // | Interval (secs) | Number of torrents imported per hour |
+        // ------------------|--------------------------------------|
+        // |           1 sec |               50 * (3600/1) = 180000 |
+        // |           2 sec |               50 * (3600/2) =  90000 |
+        // |           3 sec |               50 * (3600/3) =  60000 |
+        // |           4 sec |               50 * (3600/4) =  45000 |
+        // |           5 sec |               50 * (3600/5) =  36000 |
+        //
+        // The `execution_interval_in_milliseconds` could be a config option in
+        // the future.
 
-        let execution_interval_in_milliseconds = 100;
+        let execution_interval_in_milliseconds = 2000;
         let execution_interval_duration = std::time::Duration::from_millis(execution_interval_in_milliseconds);
         let mut execution_interval = tokio::time::interval(execution_interval_duration);
 
