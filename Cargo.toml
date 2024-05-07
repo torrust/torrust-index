@@ -34,7 +34,7 @@ version = "3.0.0-alpha.3-develop"
 opt-level = 3
 
 [dependencies]
-anyhow = "1.0.81"
+anyhow = "1.0.83"
 argon2 = "0"
 async-trait = "0"
 axum = { version = "0", features = ["multipart"] }
