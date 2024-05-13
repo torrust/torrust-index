@@ -15,8 +15,8 @@ use crate::services::torrent::{
     DbCanonicalInfoHashGroupRepository, DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository,
     DbTorrentListingGenerator, DbTorrentRepository, DbTorrentTagRepository,
 };
-use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
-use crate::services::{proxy, settings, torrent};
+use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository, Repository};
+use crate::services::{authorization, proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::web::api::server::v1::auth::Authentication;
 use crate::web::api::Version;
@@ -70,7 +70,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     // Repositories
     let category_repository = Arc::new(DbCategoryRepository::new(database.clone()));
     let tag_repository = Arc::new(DbTagRepository::new(database.clone()));
-    let user_repository = Arc::new(DbUserRepository::new(database.clone()));
+    let user_repository: Arc<Box<dyn Repository>> = Arc::new(Box::new(DbUserRepository::new(database.clone())));
     let user_authentication_repository = Arc::new(DbUserAuthenticationRepository::new(database.clone()));
     let user_profile_repository = Arc::new(DbUserProfileRepository::new(database.clone()));
     let torrent_repository = Arc::new(DbTorrentRepository::new(database.clone()));
@@ -83,15 +83,19 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let banned_user_list = Arc::new(DbBannedUserList::new(database.clone()));
 
     // Services
+    let authorization_service = Arc::new(authorization::Service::new(user_repository.clone()));
     let tracker_service = Arc::new(tracker::service::Service::new(configuration.clone(), database.clone()).await);
     let tracker_statistics_importer =
         Arc::new(StatisticsImporter::new(configuration.clone(), tracker_service.clone(), database.clone()).await);
     let mailer_service = Arc::new(mailer::Service::new(configuration.clone()).await);
     let image_cache_service: Arc<ImageCacheService> = Arc::new(ImageCacheService::new(configuration.clone()).await);
-    let category_service = Arc::new(category::Service::new(category_repository.clone(), user_repository.clone()));
-    let tag_service = Arc::new(tag::Service::new(tag_repository.clone(), user_repository.clone()));
+    let category_service = Arc::new(category::Service::new(
+        category_repository.clone(),
+        authorization_service.clone(),
+    ));
+    let tag_service = Arc::new(tag::Service::new(tag_repository.clone(), authorization_service.clone()));
     let proxy_service = Arc::new(proxy::Service::new(image_cache_service.clone(), user_repository.clone()));
-    let settings_service = Arc::new(settings::Service::new(configuration.clone(), user_repository.clone()));
+    let settings_service = Arc::new(settings::Service::new(configuration.clone(), authorization_service.clone()));
     let torrent_index = Arc::new(torrent::Index::new(
         configuration.clone(),
         tracker_statistics_importer.clone(),

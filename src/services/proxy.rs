@@ -10,18 +10,18 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 
-use super::user::DbUserRepository;
 use crate::cache::image::manager::{Error, ImageCacheService};
 use crate::models::user::UserId;
+use crate::services::user::Repository;
 
 pub struct Service {
     image_cache_service: Arc<ImageCacheService>,
-    user_repository: Arc<DbUserRepository>,
+    user_repository: Arc<Box<dyn Repository>>,
 }
 
 impl Service {
     #[must_use]
-    pub fn new(image_cache_service: Arc<ImageCacheService>, user_repository: Arc<DbUserRepository>) -> Self {
+    pub fn new(image_cache_service: Arc<ImageCacheService>, user_repository: Arc<Box<dyn Repository>>) -> Self {
         Self {
             image_cache_service,
             user_repository,

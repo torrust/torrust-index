@@ -18,7 +18,7 @@ use crate::models::torrent_file::{
 };
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
-use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
+use crate::models::user::{User, UserAuthentication, UserAuthorization, UserCompact, UserId, UserProfile};
 use crate::services::torrent::{CanonicalInfoHashGroup, DbTorrentInfoHash};
 use crate::utils::clock::{self, datetime_now, DATETIME_FORMAT};
 use crate::utils::hex::from_bytes;
@@ -123,6 +123,14 @@ impl Database for Mysql {
 
     async fn get_user_authentication_from_id(&self, user_id: UserId) -> Result<UserAuthentication, database::Error> {
         query_as::<_, UserAuthentication>("SELECT * FROM torrust_user_authentication WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|_| database::Error::UserNotFound)
+    }
+
+    async fn get_user_authorization_from_id(&self, user_id: UserId) -> Result<UserAuthorization, database::Error> {
+        query_as::<_, UserAuthorization>("SELECT user_id, administrator FROM torrust_users WHERE user_id = ?")
             .bind(user_id)
             .fetch_one(&self.pool)
             .await
