@@ -30,10 +30,6 @@ ssl_cert_path = "/var/lib/torrust/tracker/tls/localhost.crt"
 ssl_enabled = false
 ssl_key_path = "/var/lib/torrust/tracker/tls/localhost.key"
 
-# Please override the admin token setting the
-#    `TORRUST_TRACKER_API_ADMIN_TOKEN`
-#                     environmental variable!
-
 [http_api.access_tokens]
 admin = "MyAccessToken"
 

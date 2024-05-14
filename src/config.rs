@@ -81,7 +81,7 @@ impl Info {
 pub enum Error {
     /// Unable to load the configuration from the environment variable.
     /// This error only occurs if there is no configuration file and the
-    /// `TORRUST_TRACKER_CONFIG` environment variable is not set.
+    /// `TORRUST_TRACKER_CONFIG_TOML` environment variable is not set.
     #[error("Unable to load from Environmental Variable: {source}")]
     UnableToLoadFromEnvironmentVariable {
         source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
