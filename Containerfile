@@ -98,7 +98,7 @@ RUN ["/busybox/cp", "-sp", "/busybox/sh","/busybox/cat","/busybox/ls","/busybox/
 COPY --from=gcc --chmod=0555 /usr/local/bin/su-exec /bin/su-exec
 
 ARG TORRUST_INDEX_PATH_CONFIG="/etc/torrust/index/index.toml"
-ARG TORRUST_INDEX_DATABASE_DRIVER="sqlite3"
+ARG TORRUST_INDEX_DATABASE_DRIVER="Sqlite3"
 ARG USER_ID=1000
 ARG API_PORT=3001
 ARG IMPORTER_API_PORT=3002
