@@ -13,4 +13,4 @@ USER_ID=${USER_ID:-1000} \
     TORRUST_TRACKER_DATABASE="e2e_testing_sqlite3" \
     TORRUST_TRACKER_CONFIG_OVERRIDE_DB_DRIVER="Sqlite3" \
     TORRUST_TRACKER_CONFIG_OVERRIDE_HTTP_API__ACCESS_TOKENS__ADMIN="MyAccessToken" \
-    docker compose up --detach --pull  always --remove-orphans
+    docker compose up --detach --pull always --remove-orphans
