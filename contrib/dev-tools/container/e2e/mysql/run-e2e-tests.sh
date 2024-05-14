@@ -17,7 +17,7 @@ export TORRUST_TRACKER_DATABASE="e2e_testing_sqlite3"
 # It's needed by some tests to generate and parse test torrent files.
 cargo install imdl || exit 1
 
-# Install app (no docker) that will run the test suite against the E2E testing 
+# Install app (no docker) that will run the test suite against the E2E testing
 # environment (in docker).
 cp .env.local .env || exit 1
 
@@ -30,7 +30,7 @@ echo "Running E2E tests using MySQL ..."
 # Wait for conatiners to be healthy
 ./contrib/dev-tools/container/functions/wait_for_container_to_be_healthy.sh torrust-mysql-1 10 3 || exit 1
 ./contrib/dev-tools/container/functions/wait_for_container_to_be_healthy.sh torrust-tracker-1 10 3 || exit 1
-./contrib/dev-tools/container/functions/wait_for_container_to_be_healthy.sh  torrust-index-1 10 3 || exit 1
+./contrib/dev-tools/container/functions/wait_for_container_to_be_healthy.sh torrust-index-1 10 3 || exit 1
 
 # Just to make sure that everything is up and running
 docker ps
@@ -42,8 +42,11 @@ docker ps
 TORRUST_INDEX_E2E_SHARED=true \
     TORRUST_INDEX_E2E_PATH_CONFIG="./share/default/config/index.e2e.container.mysql.toml" \
     TORRUST_INDEX_E2E_DB_CONNECT_URL="mysql://root:root_secret_password@localhost:3306/torrust_index_e2e_testing" \
-    cargo test \
-    || { ./contrib/dev-tools/container/e2e/mysql/e2e-env-down.sh; exit 1; }
+    cargo test ||
+    {
+        ./contrib/dev-tools/container/e2e/mysql/e2e-env-down.sh
+        exit 1
+    }
 
 # Stop E2E testing environment
 ./contrib/dev-tools/container/e2e/mysql/e2e-env-down.sh || exit 1
