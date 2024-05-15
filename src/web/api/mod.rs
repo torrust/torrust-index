@@ -30,12 +30,6 @@ pub struct Running {
     pub api_server: Option<JoinHandle<Result<(), std::io::Error>>>,
 }
 
-#[must_use]
-#[derive(Debug)]
-pub struct ServerStartedMessage {
-    pub socket_addr: SocketAddr,
-}
-
 /// Starts the API server.
 #[must_use]
 pub async fn start(app_data: Arc<AppData>, net_ip: &str, net_port: u16, implementation: &Version) -> api::Running {

@@ -1,15 +1,20 @@
+pub mod custom_axum;
+pub mod signals;
 pub mod v1;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use axum_server::Handle;
 use log::info;
-use tokio::net::TcpListener;
-use tokio::sync::oneshot::{self, Sender};
+use tokio::sync::oneshot::{Receiver, Sender};
 use v1::routes::router;
 
-use super::{Running, ServerStartedMessage};
+use self::signals::{Halted, Started};
+use super::Running;
 use crate::common::AppData;
+use crate::web::api::server::custom_axum::TimeoutAcceptor;
+use crate::web::api::server::signals::graceful_shutdown;
 
 /// Starts the API server.
 ///
@@ -21,13 +26,14 @@ pub async fn start(app_data: Arc<AppData>, net_ip: &str, net_port: u16) -> Runni
         .parse()
         .expect("API server socket address to be valid.");
 
-    let (tx, rx) = oneshot::channel::<ServerStartedMessage>();
+    let (tx_start, rx) = tokio::sync::oneshot::channel::<Started>();
+    let (_tx_halt, rx_halt) = tokio::sync::oneshot::channel::<Halted>();
 
     // Run the API server
     let join_handle = tokio::spawn(async move {
         info!("Starting API server with net config: {} ...", config_socket_addr);
 
-        start_server(config_socket_addr, app_data.clone(), tx).await;
+        start_server(config_socket_addr, app_data.clone(), tx_start, rx_halt).await;
 
         info!("API server stopped");
 
@@ -46,27 +52,34 @@ pub async fn start(app_data: Arc<AppData>, net_ip: &str, net_port: u16) -> Runni
     }
 }
 
-async fn start_server(config_socket_addr: SocketAddr, app_data: Arc<AppData>, tx: Sender<ServerStartedMessage>) {
-    let tcp_listener = TcpListener::bind(config_socket_addr)
-        .await
-        .expect("tcp listener to bind to a socket address");
+async fn start_server(
+    config_socket_addr: SocketAddr,
+    app_data: Arc<AppData>,
+    tx_start: Sender<Started>,
+    rx_halt: Receiver<Halted>,
+) {
+    let router = router(app_data);
+    let socket = std::net::TcpListener::bind(config_socket_addr).expect("Could not bind tcp_listener to address.");
+    let address = socket.local_addr().expect("Could not get local_addr from tcp_listener.");
 
-    let bound_addr = tcp_listener
-        .local_addr()
-        .expect("tcp listener to be bound to a socket address.");
+    let handle = Handle::new();
 
-    info!("API server listening on http://{}", bound_addr); // # DevSkim: ignore DS137138
+    tokio::task::spawn(graceful_shutdown(
+        handle.clone(),
+        rx_halt,
+        format!("Shutting down API server on socket address: {address}"),
+    ));
 
-    let app = router(app_data);
+    info!("API server listening on http://{}", address); // # DevSkim: ignore DS137138
 
-    tx.send(ServerStartedMessage { socket_addr: bound_addr })
+    tx_start
+        .send(Started { socket_addr: address })
         .expect("the API server should not be dropped");
 
-    axum::serve(tcp_listener, app.into_make_service_with_connect_info::<SocketAddr>())
-        .with_graceful_shutdown(async move {
-            tokio::signal::ctrl_c().await.expect("Failed to listen to shutdown signal.");
-            info!("Stopping API server on http://{} ...", bound_addr); // # DevSkim: ignore DS137138
-        })
+    custom_axum::from_tcp_with_timeouts(socket)
+        .handle(handle)
+        .acceptor(TimeoutAcceptor)
+        .serve(router.into_make_service_with_connect_info::<std::net::SocketAddr>())
         .await
         .expect("API server should be running");
 }
