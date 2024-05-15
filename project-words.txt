@@ -8,6 +8,7 @@ Benoit
 binascii
 btih
 buildx
+camino
 chrono
 clippy
 codecov

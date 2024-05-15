@@ -40,6 +40,7 @@ axum = { version = "0", features = ["multipart"] }
 axum-server = { version = "0", features = ["tls-rustls"] }
 binascii = "0"
 bytes = "1"
+camino = { version = "1.1.6", features = ["serde"] }
 chrono = { version = "0", default-features = false, features = ["clock"] }
 clap = { version = "4.5.4", features = ["derive", "env"] }
 config = "0"
@@ -65,11 +66,12 @@ rand_core = { version = "0", features = ["std"] }
 regex = "1"
 reqwest = { version = "0", features = ["json", "multipart"] }
 rustversion = "1.0.14"
-serde = { version = "1", features = ["rc"] }
+serde = { version = "1", features = ["derive", "rc"] }
 serde_bencode = "0"
 serde_bytes = "0"
 serde_derive = "1"
 serde_json = "1"
+serde_with = "3.8.1"
 sha-1 = "0"
 sqlx = { version = "0", features = ["migrate", "mysql", "runtime-tokio-native-tls", "sqlite", "time"] }
 tera = { version = "1", default-features = false }
