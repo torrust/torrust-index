@@ -29,7 +29,6 @@ repository = "https://github.com/torrust/torrust-tracker"
 rust-version = "1.72"
 version = "3.0.0-alpha.3-develop"
 
-
 [profile.dev.package.sqlx-macros]
 opt-level = 3
 
@@ -41,7 +40,7 @@ axum = { version = "0", features = ["multipart"] }
 binascii = "0"
 bytes = "1"
 chrono = { version = "0", default-features = false, features = ["clock"] }
-clap = { version = "4.5.4", features = ["derive", "env"]}
+clap = { version = "4.5.4", features = ["derive", "env"] }
 config = "0"
 derive_more = "0"
 email_address = "0"
@@ -75,7 +74,7 @@ thiserror = "1"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "0"
 torrust-index-located-error = { version = "3.0.0-alpha.3-develop", path = "packages/located-error" }
-tower-http = { version = "0", features = ["compression-full", "cors", "trace", "propagate-header", "request-id"] }
+tower-http = { version = "0", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
 trace = "0.1.7"
 tracing = "0.1.40"
 url = "2.5.0"
