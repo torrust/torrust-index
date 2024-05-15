@@ -18,13 +18,15 @@ use crate::services::torrent::{
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
+use crate::web::api::server::signals::Halted;
 use crate::web::api::server::v1::auth::Authentication;
 use crate::web::api::Version;
 use crate::{console, mailer, tracker, web};
 
 pub struct Running {
     pub api_socket_addr: SocketAddr,
-    pub api_server: Option<JoinHandle<std::result::Result<(), std::io::Error>>>,
+    pub api_server: JoinHandle<std::result::Result<(), std::io::Error>>,
+    pub api_server_halt_task: tokio::sync::oneshot::Sender<Halted>,
     pub tracker_data_importer_handle: tokio::task::JoinHandle<()>,
 }
 
@@ -56,6 +58,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     // From [net] config
     let net_ip = "0.0.0.0".to_string();
     let net_port = settings.net.port;
+    let opt_net_tsl = settings.net.tsl.clone();
 
     // IMPORTANT: drop settings before starting server to avoid read locks that
     // leads to requests hanging.
@@ -168,12 +171,13 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     );
 
     // Start API server
-    let running_api = web::api::start(app_data, &net_ip, net_port, api_version).await;
+    let running_api = web::api::start(app_data, &net_ip, net_port, opt_net_tsl, api_version).await;
 
     // Full running application
     Running {
         api_socket_addr: running_api.socket_addr,
-        api_server: running_api.api_server,
+        api_server: running_api.task,
+        api_server_halt_task: running_api.halt_task,
         tracker_data_importer_handle: tracker_statistics_importer_handle,
     }
 }

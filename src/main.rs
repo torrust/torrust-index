@@ -10,7 +10,9 @@ async fn main() -> Result<(), std::io::Error> {
 
     let app = app::run(configuration, &api_version).await;
 
+    assert!(!app.api_server_halt_task.is_closed(), "Halt channel should be open");
+
     match api_version {
-        Version::V1 => app.api_server.unwrap().await.expect("the API server was dropped"),
+        Version::V1 => app.api_server.await.expect("the API server was dropped"),
     }
 }
