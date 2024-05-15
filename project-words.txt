@@ -25,6 +25,7 @@ Dont
 dotless
 dtolnay
 elif
+Eray
 grcov
 Grünwald
 hasher
@@ -39,6 +40,7 @@ indexmap
 infohash
 Intermodal
 jsonwebtoken
+Karatay
 leechers
 Leechers
 LEECHERS
@@ -59,6 +61,7 @@ oneshot
 openbittorrent
 opentrackr
 ppassword
+programatik
 proxied
 rapppid
 reqwest
