@@ -3,9 +3,11 @@ use std::path::Path;
 use std::sync::Arc;
 use std::{env, fs};
 
+use camino::Utf8PathBuf;
 use config::{Config, ConfigError, File, FileFormat};
 use log::warn;
 use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, NoneAsEmptyString};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use torrust_index_located_error::{Located, LocatedError};
@@ -216,6 +218,8 @@ pub struct Network {
     /// The base URL for the API. For example: `http://localhost`.
     /// If not set, the base URL will be inferred from the request.
     pub base_url: Option<String>,
+    /// TSL configuration.
+    pub tsl: Option<Tsl>,
 }
 
 impl Default for Network {
@@ -223,6 +227,7 @@ impl Default for Network {
         Self {
             port: 3001,
             base_url: None,
+            tsl: None,
         }
     }
 }
@@ -391,6 +396,31 @@ impl Default for ImageCache {
             user_quota_period_seconds: 3600,
             user_quota_bytes: 64_000_000,
         }
+    }
+}
+
+#[serde_as]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Default)]
+pub struct Tsl {
+    /// Path to the SSL certificate file.
+    #[serde_as(as = "NoneAsEmptyString")]
+    #[serde(default = "Tsl::default_ssl_cert_path")]
+    pub ssl_cert_path: Option<Utf8PathBuf>,
+    /// Path to the SSL key file.
+    #[serde_as(as = "NoneAsEmptyString")]
+    #[serde(default = "Tsl::default_ssl_key_path")]
+    pub ssl_key_path: Option<Utf8PathBuf>,
+}
+
+impl Tsl {
+    #[allow(clippy::unnecessary_wraps)]
+    fn default_ssl_cert_path() -> Option<Utf8PathBuf> {
+        Some(Utf8PathBuf::new())
+    }
+
+    #[allow(clippy::unnecessary_wraps)]
+    fn default_ssl_key_path() -> Option<Utf8PathBuf> {
+        Some(Utf8PathBuf::new())
     }
 }
 

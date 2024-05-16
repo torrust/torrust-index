@@ -54,7 +54,7 @@ impl AppStarter {
             .expect("the app starter should not be dropped");
 
             match api_version {
-                Version::V1 => app.api_server.unwrap().await,
+                Version::V1 => app.api_server.await,
             }
         });
 
