@@ -13,6 +13,7 @@ url = "udp://localhost:6969"
 [net]
 port = 3001
 
+# Uncomment if you want to enable TSL for development
 #[net.tsl]
 #ssl_cert_path = "./storage/index/lib/tls/localhost.crt"
 #ssl_key_path = "./storage/index/lib/tls/localhost.key"
