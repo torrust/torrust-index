@@ -82,7 +82,7 @@
 //! ```
 //! **Resource**
 //!
-//! Refer to the [`TorrustIndex`](crate::config::TorrustIndex)
+//! Refer to the [`TorrustIndex`](crate::config::Settings)
 //! struct for more information about the response attributes.
 //!
 //! # Update all settings
@@ -110,7 +110,7 @@
 //!
 //! **Resource**
 //!
-//! Refer to the [`TorrustIndex`](crate::config::TorrustIndex)
+//! Refer to the [`TorrustIndex`](crate::config::Settings)
 //! struct for more information about the response attributes.
 //!
 //! # Get site name

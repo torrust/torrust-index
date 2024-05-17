@@ -13,7 +13,7 @@ use tokio::sync::RwLock;
 use torrust_index_located_error::{Located, LocatedError};
 use url::{ParseError, Url};
 
-pub type TorrustIndex = v1::Settings;
+pub type Settings = v1::Settings;
 pub type Api = v1::api::Api;
 pub type Auth = v1::auth::Auth;
 pub type Database = v1::database::Database;
@@ -225,13 +225,13 @@ impl Tsl {
 #[derive(Debug)]
 pub struct Configuration {
     /// The state of the configuration.
-    pub settings: RwLock<TorrustIndex>,
+    pub settings: RwLock<Settings>,
 }
 
 impl Default for Configuration {
     fn default() -> Configuration {
         Configuration {
-            settings: RwLock::new(TorrustIndex::default()),
+            settings: RwLock::new(Settings::default()),
         }
     }
 }
@@ -252,22 +252,22 @@ impl Configuration {
         let config_builder = Config::builder()
             .add_source(File::from_str(&info.index_toml, FileFormat::Toml))
             .build()?;
-        let mut index_config: TorrustIndex = config_builder.try_deserialize()?;
+        let mut settings: Settings = config_builder.try_deserialize()?;
 
         if let Some(ref token) = info.tracker_api_token {
-            index_config.override_tracker_api_token(token);
+            settings.override_tracker_api_token(token);
         };
 
         if let Some(ref secret_key) = info.auth_secret_key {
-            index_config.override_auth_secret_key(secret_key);
+            settings.override_auth_secret_key(secret_key);
         };
 
         Ok(Configuration {
-            settings: RwLock::new(index_config),
+            settings: RwLock::new(settings),
         })
     }
 
-    pub async fn get_all(&self) -> TorrustIndex {
+    pub async fn get_all(&self) -> Settings {
         let settings_lock = self.settings.read().await;
 
         settings_lock.clone()

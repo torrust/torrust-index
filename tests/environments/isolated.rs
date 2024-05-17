@@ -46,7 +46,7 @@ impl TestEnv {
 
     /// Provides the whole server configuration.
     #[must_use]
-    pub fn server_configuration(&self) -> config::TorrustIndex {
+    pub fn server_configuration(&self) -> config::Settings {
         self.app_starter.server_configuration()
     }
 
@@ -69,10 +69,10 @@ impl Default for TestEnv {
 }
 
 /// Provides a configuration with ephemeral data for testing.
-fn ephemeral(temp_dir: &TempDir) -> config::TorrustIndex {
-    let mut configuration = config::TorrustIndex {
+fn ephemeral(temp_dir: &TempDir) -> config::Settings {
+    let mut configuration = config::Settings {
         log_level: Some("off".to_owned()), // Change to `debug` for tests debugging
-        ..config::TorrustIndex::default()
+        ..config::Settings::default()
     };
 
     // Ephemeral API port

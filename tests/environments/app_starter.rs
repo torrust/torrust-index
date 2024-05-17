@@ -9,7 +9,7 @@ use torrust_index::{app, config};
 
 /// It launches the app and provides a way to stop it.
 pub struct AppStarter {
-    configuration: config::TorrustIndex,
+    configuration: config::Settings,
     /// The application binary state (started or not):
     ///  - `None`: if the app is not started,
     ///  - `RunningState`: if the app was started.
@@ -18,7 +18,7 @@ pub struct AppStarter {
 
 impl AppStarter {
     #[must_use]
-    pub fn with_custom_configuration(configuration: config::TorrustIndex) -> Self {
+    pub fn with_custom_configuration(configuration: config::Settings) -> Self {
         Self {
             configuration,
             running_state: None,
@@ -78,7 +78,7 @@ impl AppStarter {
     }
 
     #[must_use]
-    pub fn server_configuration(&self) -> config::TorrustIndex {
+    pub fn server_configuration(&self) -> config::Settings {
         self.configuration.clone()
     }
 
