@@ -123,7 +123,7 @@ impl From<ConfigError> for Error {
 }
 
 /// Information displayed to the user in the website.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Website {
     /// The name of the website.
     pub name: String,
@@ -139,7 +139,7 @@ impl Default for Website {
 
 /// See `TrackerMode` in [`torrust-tracker-primitives`](https://docs.rs/torrust-tracker-primitives)
 /// crate for more information.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TrackerMode {
     // todo: use https://crates.io/crates/torrust-tracker-primitives
     /// Will track every new info hash and serve every peer.
@@ -171,7 +171,7 @@ impl TrackerMode {
 }
 
 /// Configuration for the associated tracker.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Tracker {
     /// Connection string for the tracker. For example: `udp://TRACKER_IP:6969`.
     pub url: String,
@@ -211,7 +211,7 @@ impl Default for Tracker {
 pub const FREE_PORT: u16 = 0;
 
 /// The the base URL for the API.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Network {
     /// The port to listen on. Default to `3001`.
     pub port: u16,
@@ -233,7 +233,7 @@ impl Default for Network {
 }
 
 /// Whether the email is required on signup or not.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum EmailOnSignup {
     /// The email is required on signup.
     Required,
@@ -250,7 +250,7 @@ impl Default for EmailOnSignup {
 }
 
 /// Authentication options.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Auth {
     /// Whether or not to require an email on signup.
     pub email_on_signup: EmailOnSignup,
@@ -280,7 +280,7 @@ impl Auth {
 }
 
 /// Database configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Database {
     /// The connection string for the database. For example: `sqlite://data.db?mode=rwc`.
     pub connect_url: String,
@@ -295,7 +295,7 @@ impl Default for Database {
 }
 
 /// SMTP configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Mail {
     /// Whether or not to enable email verification on signup.
     pub email_verification_enabled: bool,
@@ -335,7 +335,7 @@ impl Default for Mail {
 /// proxy. The proxy will not download new images if the user has reached the
 /// quota.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ImageCache {
     /// Maximum time in seconds to wait for downloading the image form the original source.
     pub max_request_timeout_ms: u64,
@@ -352,7 +352,7 @@ pub struct ImageCache {
 }
 
 /// Core configuration for the API
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Api {
     /// The default page size for torrent lists.
     pub default_torrent_page_size: u8,
@@ -370,7 +370,7 @@ impl Default for Api {
 }
 
 /// Configuration for the tracker statistics importer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TrackerStatisticsImporter {
     /// The interval in seconds to get statistics from the tracker.
     pub torrent_info_update_interval: u64,
@@ -425,7 +425,7 @@ impl Tsl {
 }
 
 /// The whole configuration for the index.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TorrustIndex {
     /// Logging level. Possible values are: `Off`, `Error`, `Warn`, `Info`,
     /// `Debug` and `Trace`. Default is `Info`.
@@ -637,10 +637,253 @@ fn parse_url(url_str: &str) -> Result<Url, url::ParseError> {
 
 /// The public index configuration.
 /// There is an endpoint to get this configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ConfigurationPublic {
     website_name: String,
     tracker_url: String,
     tracker_mode: TrackerMode,
     email_on_signup: EmailOnSignup,
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::config::{Configuration, ConfigurationPublic, Info};
+
+    #[cfg(test)]
+    fn default_config_toml() -> String {
+        let config = r#"[website]
+                                name = "Torrust"
+
+                                [tracker]
+                                url = "udp://localhost:6969"
+                                mode = "Public"
+                                api_url = "http://localhost:1212"
+                                token = "MyAccessToken"
+                                token_valid_seconds = 7257600
+
+                                [net]
+                                port = 3001
+
+                                [auth]
+                                email_on_signup = "Optional"
+                                min_password_length = 6
+                                max_password_length = 64
+                                secret_key = "MaxVerstappenWC2021"
+
+                                [database]
+                                connect_url = "sqlite://data.db?mode=rwc"
+
+                                [mail]
+                                email_verification_enabled = false
+                                from = "example@email.com"
+                                reply_to = "noreply@email.com"
+                                username = ""
+                                password = ""
+                                server = ""
+                                port = 25
+
+                                [image_cache]
+                                max_request_timeout_ms = 1000
+                                capacity = 128000000
+                                entry_size_limit = 4000000
+                                user_quota_period_seconds = 3600
+                                user_quota_bytes = 64000000
+
+                                [api]
+                                default_torrent_page_size = 10
+                                max_torrent_page_size = 30
+
+                                [tracker_statistics_importer]
+                                torrent_info_update_interval = 3600
+                                port = 3002
+        "#
+        .lines()
+        .map(str::trim_start)
+        .collect::<Vec<&str>>()
+        .join("\n");
+        config
+    }
+
+    #[tokio::test]
+    async fn configuration_should_build_settings_with_default_values() {
+        let configuration = Configuration::default().get_all().await;
+
+        let toml = toml::to_string(&configuration).expect("Could not encode TOML value for configuration");
+
+        assert_eq!(toml, default_config_toml());
+    }
+
+    #[tokio::test]
+    async fn configuration_should_return_all_settings() {
+        let configuration = Configuration::default().get_all().await;
+
+        let toml = toml::to_string(&configuration).expect("Could not encode TOML value for configuration");
+
+        assert_eq!(toml, default_config_toml());
+    }
+
+    #[tokio::test]
+    async fn configuration_should_return_only_public_settings() {
+        let configuration = Configuration::default();
+        let all_settings = configuration.get_all().await;
+
+        assert_eq!(
+            configuration.get_public().await,
+            ConfigurationPublic {
+                website_name: all_settings.website.name,
+                tracker_url: all_settings.tracker.url,
+                tracker_mode: all_settings.tracker.mode,
+                email_on_signup: all_settings.auth.email_on_signup,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn configuration_should_return_the_site_name() {
+        let configuration = Configuration::default();
+        assert_eq!(configuration.get_site_name().await, "Torrust".to_string());
+    }
+
+    #[tokio::test]
+    async fn configuration_should_return_the_api_base_url() {
+        let configuration = Configuration::default();
+        assert_eq!(configuration.get_api_base_url().await, None);
+
+        let mut settings_lock = configuration.settings.write().await;
+        settings_lock.net.base_url = Some("http://localhost".to_string());
+        drop(settings_lock);
+
+        assert_eq!(configuration.get_api_base_url().await, Some("http://localhost".to_string()));
+    }
+
+    #[tokio::test]
+    async fn configuration_could_be_saved_in_a_toml_config_file() {
+        use std::{env, fs};
+
+        use uuid::Uuid;
+
+        // Build temp config file path
+        let temp_directory = env::temp_dir();
+        let temp_file = temp_directory.join(format!("test_config_{}.toml", Uuid::new_v4()));
+
+        // Convert to argument type for Configuration::save_to_file
+        let config_file_path = temp_file;
+        let path = config_file_path.to_string_lossy().to_string();
+
+        let default_configuration = Configuration::default();
+
+        default_configuration.save_to_file(&path).await;
+
+        let contents = fs::read_to_string(&path).expect("written toml configuration file should be read");
+
+        assert_eq!(contents, default_config_toml());
+    }
+
+    #[tokio::test]
+    async fn configuration_could_be_loaded_from_a_toml_config_file() {
+        use std::{env, fs};
+
+        use uuid::Uuid;
+
+        // Build temp config file path
+        let temp_directory = env::temp_dir();
+        let temp_file = temp_directory.join(format!("test_config_{}.toml", Uuid::new_v4()));
+
+        let default_configuration = Configuration::default();
+
+        // Serialize the default configuration to TOML string
+        let toml_string = toml::to_string(&default_configuration.get_all().await).unwrap();
+
+        // Write the TOML string to the file
+        fs::write(&temp_file, toml_string).expect("Failed to write default configuration to a temp toml file");
+
+        // Convert to argument type for Configuration::save_to_file
+        let config_file_path = temp_file;
+        let path = config_file_path.to_string_lossy().to_string();
+
+        let configuration = Configuration::load_from_file(&path)
+            .await
+            .expect("Failed to load configuration from toml file");
+
+        assert_eq!(configuration.get_all().await, Configuration::default().get_all().await);
+    }
+
+    #[tokio::test]
+    async fn configuration_could_be_loaded_from_a_toml_string() {
+        let info = Info {
+            index_toml: default_config_toml(),
+            tracker_api_token: None,
+            auth_secret_key: None,
+        };
+
+        let configuration = Configuration::load(&info).expect("Failed to load configuration from info");
+
+        assert_eq!(configuration.get_all().await, Configuration::default().get_all().await);
+    }
+
+    #[tokio::test]
+    async fn configuration_should_allow_to_override_the_tracker_api_token_provided_in_the_toml_file() {
+        let info = Info {
+            index_toml: default_config_toml(),
+            tracker_api_token: Some("OVERRIDDEN API TOKEN".to_string()),
+            auth_secret_key: None,
+        };
+
+        let configuration = Configuration::load(&info).expect("Failed to load configuration from info");
+
+        assert_eq!(
+            configuration.get_all().await.tracker.token,
+            "OVERRIDDEN API TOKEN".to_string()
+        );
+    }
+
+    #[tokio::test]
+    async fn configuration_should_allow_to_override_the_authentication_secret_key_provided_in_the_toml_file() {
+        let info = Info {
+            index_toml: default_config_toml(),
+            tracker_api_token: None,
+            auth_secret_key: Some("OVERRIDDEN AUTH SECRET KEY".to_string()),
+        };
+
+        let configuration = Configuration::load(&info).expect("Failed to load configuration from info");
+
+        assert_eq!(
+            configuration.get_all().await.auth.secret_key,
+            "OVERRIDDEN AUTH SECRET KEY".to_string()
+        );
+    }
+
+    mod syntax_checks {
+        // todo: use rich types in configuration structs for basic syntax checks.
+
+        use crate::config::Configuration;
+
+        #[tokio::test]
+        async fn tracker_url_should_be_a_valid_url() {
+            let configuration = Configuration::default();
+
+            let mut settings_lock = configuration.settings.write().await;
+            settings_lock.tracker.url = "INVALID URL".to_string();
+            drop(settings_lock);
+
+            assert!(configuration.validate().await.is_err());
+        }
+    }
+
+    mod semantic_validation {
+        use crate::config::{Configuration, TrackerMode};
+
+        #[tokio::test]
+        async fn udp_trackers_in_close_mode_are_not_supported() {
+            let configuration = Configuration::default();
+
+            let mut settings_lock = configuration.settings.write().await;
+            settings_lock.tracker.mode = TrackerMode::Private;
+            settings_lock.tracker.url = "udp://localhost:6969".to_string();
+            drop(settings_lock);
+
+            assert!(configuration.validate().await.is_err());
+        }
+    }
 }
