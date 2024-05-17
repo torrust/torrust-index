@@ -226,16 +226,12 @@ impl Tsl {
 pub struct Configuration {
     /// The state of the configuration.
     pub settings: RwLock<TorrustIndex>,
-    /// The path to the configuration file. This is `None` if the configuration
-    /// was loaded from the environment.
-    pub config_path: Option<String>,
 }
 
 impl Default for Configuration {
     fn default() -> Configuration {
         Configuration {
             settings: RwLock::new(TorrustIndex::default()),
-            config_path: None,
         }
     }
 }
@@ -268,7 +264,6 @@ impl Configuration {
 
         Ok(Configuration {
             settings: RwLock::new(index_config),
-            config_path: None,
         })
     }
 

@@ -33,12 +33,8 @@ impl TestEnv {
         let temp_dir = TempDir::new().expect("failed to create a temporary directory");
 
         let configuration = ephemeral(&temp_dir);
-        // Even if we load the configuration from the environment variable, we
-        // still need to provide a path to save the configuration when the
-        // configuration is updated via the `POST /settings` endpoints.
-        let config_path = format!("{}/config.toml", temp_dir.path().to_string_lossy());
 
-        let app_starter = AppStarter::with_custom_configuration(configuration, Some(config_path));
+        let app_starter = AppStarter::with_custom_configuration(configuration);
 
         Self { app_starter, temp_dir }
     }
