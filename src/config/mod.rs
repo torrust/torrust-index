@@ -1,17 +1,29 @@
 //! Configuration for the application.
-use std::path::Path;
+pub mod v1;
+
 use std::sync::Arc;
 use std::{env, fs};
 
 use camino::Utf8PathBuf;
 use config::{Config, ConfigError, File, FileFormat};
-use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use torrust_index_located_error::{Located, LocatedError};
 use url::{ParseError, Url};
+
+pub type TorrustIndex = v1::TorrustIndex;
+pub type Api = v1::api::Api;
+pub type Auth = v1::auth::Auth;
+pub type Database = v1::database::Database;
+pub type ImageCache = v1::image_cache::ImageCache;
+pub type Mail = v1::mail::Mail;
+pub type Network = v1::net::Network;
+pub type TrackerStatisticsImporter = v1::tracker_statistics_importer::TrackerStatisticsImporter;
+pub type Tracker = v1::tracker::Tracker;
+pub type Website = v1::website::Website;
+pub type EmailOnSignup = v1::auth::EmailOnSignup;
 
 /// Information required for loading config
 #[derive(Debug, Default, Clone)]
@@ -122,32 +134,41 @@ impl From<ConfigError> for Error {
     }
 }
 
-/// Information displayed to the user in the website.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Website {
-    /// The name of the website.
-    pub name: String,
-}
+/* todo:
 
-impl Default for Website {
-    fn default() -> Self {
-        Self {
-            name: "Torrust".to_string(),
-        }
-    }
-}
+Use https://crates.io/crates/torrust-tracker-primitives for TrackerMode.
+
+Enum variants (Index -> Tracker):
+
+- `Public`             -> `Public`
+- `Private`            -> `Private`
+- `Whitelisted`        -> `Listed`
+- `PrivateWhitelisted` -> `PrivateListed`
+
+Enum serialized values (Index -> Tracker):
+
+- `Public`             -> `public`
+- `Private`            -> `private`
+- `Whitelisted`        -> `listed`
+- `PrivateWhitelisted` -> `private_listed`
+
+It's a breaking change for the toml config file en the API.
+
+*/
 
 /// See `TrackerMode` in [`torrust-tracker-primitives`](https://docs.rs/torrust-tracker-primitives)
 /// crate for more information.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TrackerMode {
-    // todo: use https://crates.io/crates/torrust-tracker-primitives
     /// Will track every new info hash and serve every peer.
     Public,
+
     /// Will only serve authenticated peers.
     Private,
+
     /// Will only track whitelisted info hashes.
     Whitelisted,
+
     /// Will only track whitelisted info hashes and serve authenticated peers.
     PrivateWhitelisted,
 }
@@ -170,234 +191,10 @@ impl TrackerMode {
     }
 }
 
-/// Configuration for the associated tracker.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Tracker {
-    /// Connection string for the tracker. For example: `udp://TRACKER_IP:6969`.
-    pub url: String,
-    /// The mode of the tracker. For example: `Public`.
-    /// See `TrackerMode` in [`torrust-tracker-primitives`](https://docs.rs/torrust-tracker-primitives)
-    /// crate for more information.
-    pub mode: TrackerMode,
-    /// The url of the tracker API. For example: `http://localhost:1212`.
-    pub api_url: String,
-    /// The token used to authenticate with the tracker API.
-    pub token: String,
-    /// The amount of seconds the token is valid.
-    pub token_valid_seconds: u64,
-}
-
-impl Tracker {
-    fn override_tracker_api_token(&mut self, tracker_api_token: &str) {
-        self.token = tracker_api_token.to_string();
-    }
-}
-
-impl Default for Tracker {
-    fn default() -> Self {
-        Self {
-            url: "udp://localhost:6969".to_string(),
-            mode: TrackerMode::default(),
-            api_url: "http://localhost:1212".to_string(),
-            token: "MyAccessToken".to_string(),
-            token_valid_seconds: 7_257_600,
-        }
-    }
-}
-
 /// Port number representing that the OS will choose one randomly from the available ports.
 ///
 /// It's the port number `0`
 pub const FREE_PORT: u16 = 0;
-
-/// The the base URL for the API.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Network {
-    /// The port to listen on. Default to `3001`.
-    pub port: u16,
-    /// The base URL for the API. For example: `http://localhost`.
-    /// If not set, the base URL will be inferred from the request.
-    pub base_url: Option<String>,
-    /// TSL configuration.
-    pub tsl: Option<Tsl>,
-}
-
-impl Default for Network {
-    fn default() -> Self {
-        Self {
-            port: 3001,
-            base_url: None,
-            tsl: None,
-        }
-    }
-}
-
-/// Whether the email is required on signup or not.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum EmailOnSignup {
-    /// The email is required on signup.
-    Required,
-    /// The email is optional on signup.
-    Optional,
-    /// The email is not allowed on signup. It will only be ignored if provided.
-    None, // code-review: rename to `Ignored`?
-}
-
-impl Default for EmailOnSignup {
-    fn default() -> Self {
-        Self::Optional
-    }
-}
-
-/// Authentication options.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Auth {
-    /// Whether or not to require an email on signup.
-    pub email_on_signup: EmailOnSignup,
-    /// The minimum password length.
-    pub min_password_length: usize,
-    /// The maximum password length.
-    pub max_password_length: usize,
-    /// The secret key used to sign JWT tokens.
-    pub secret_key: String,
-}
-
-impl Default for Auth {
-    fn default() -> Self {
-        Self {
-            email_on_signup: EmailOnSignup::default(),
-            min_password_length: 6,
-            max_password_length: 64,
-            secret_key: "MaxVerstappenWC2021".to_string(),
-        }
-    }
-}
-
-impl Auth {
-    fn override_secret_key(&mut self, secret_key: &str) {
-        self.secret_key = secret_key.to_string();
-    }
-}
-
-/// Database configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Database {
-    /// The connection string for the database. For example: `sqlite://data.db?mode=rwc`.
-    pub connect_url: String,
-}
-
-impl Default for Database {
-    fn default() -> Self {
-        Self {
-            connect_url: "sqlite://data.db?mode=rwc".to_string(),
-        }
-    }
-}
-
-/// SMTP configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Mail {
-    /// Whether or not to enable email verification on signup.
-    pub email_verification_enabled: bool,
-    /// The email address to send emails from.
-    pub from: String,
-    /// The email address to reply to.
-    pub reply_to: String,
-    /// The username to use for SMTP authentication.
-    pub username: String,
-    /// The password to use for SMTP authentication.
-    pub password: String,
-    /// The SMTP server to use.
-    pub server: String,
-    /// The SMTP port to use.
-    pub port: u16,
-}
-
-impl Default for Mail {
-    fn default() -> Self {
-        Self {
-            email_verification_enabled: false,
-            from: "example@email.com".to_string(),
-            reply_to: "noreply@email.com".to_string(),
-            username: String::default(),
-            password: String::default(),
-            server: String::default(),
-            port: 25,
-        }
-    }
-}
-
-/// Configuration for the image proxy cache.
-///
-/// Users have a cache quota per period. For example: 100MB per day.
-/// When users are navigating the site, they will be downloading images that are
-/// embedded in the torrent description. These images will be cached in the
-/// proxy. The proxy will not download new images if the user has reached the
-/// quota.
-#[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ImageCache {
-    /// Maximum time in seconds to wait for downloading the image form the original source.
-    pub max_request_timeout_ms: u64,
-    /// Cache size in bytes.
-    pub capacity: usize,
-    /// Maximum size in bytes for a single image.
-    pub entry_size_limit: usize,
-    /// Users have a cache quota per period. For example: 100MB per day.
-    /// This is the period in seconds (1 day in seconds).
-    pub user_quota_period_seconds: u64,
-    /// Users have a cache quota per period. For example: 100MB per day.
-    /// This is the maximum size in bytes (100MB in bytes).    
-    pub user_quota_bytes: usize,
-}
-
-/// Core configuration for the API
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Api {
-    /// The default page size for torrent lists.
-    pub default_torrent_page_size: u8,
-    /// The maximum page size for torrent lists.
-    pub max_torrent_page_size: u8,
-}
-
-impl Default for Api {
-    fn default() -> Self {
-        Self {
-            default_torrent_page_size: 10,
-            max_torrent_page_size: 30,
-        }
-    }
-}
-
-/// Configuration for the tracker statistics importer.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TrackerStatisticsImporter {
-    /// The interval in seconds to get statistics from the tracker.
-    pub torrent_info_update_interval: u64,
-    /// The port the Importer API is listening on. Default to `3002`.
-    pub port: u16,
-}
-
-impl Default for TrackerStatisticsImporter {
-    fn default() -> Self {
-        Self {
-            torrent_info_update_interval: 3600,
-            port: 3002,
-        }
-    }
-}
-
-impl Default for ImageCache {
-    fn default() -> Self {
-        Self {
-            max_request_timeout_ms: 1000,
-            capacity: 128_000_000,
-            entry_size_limit: 4_000_000,
-            user_quota_period_seconds: 3600,
-            user_quota_bytes: 64_000_000,
-        }
-    }
-}
 
 #[serde_as]
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone, Default)]
@@ -424,49 +221,6 @@ impl Tsl {
     }
 }
 
-/// The whole configuration for the index.
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TorrustIndex {
-    /// Logging level. Possible values are: `Off`, `Error`, `Warn`, `Info`,
-    /// `Debug` and `Trace`. Default is `Info`.
-    pub log_level: Option<String>,
-    /// The website customizable values.
-    pub website: Website,
-    /// The tracker configuration.
-    pub tracker: Tracker,
-    /// The network configuration.
-    pub net: Network,
-    /// The authentication configuration.
-    pub auth: Auth,
-    /// The database configuration.
-    pub database: Database,
-    /// The SMTP configuration.
-    pub mail: Mail,
-    /// The image proxy cache configuration.
-    pub image_cache: ImageCache,
-    /// The API configuration.
-    pub api: Api,
-    /// The tracker statistics importer job configuration.
-    pub tracker_statistics_importer: TrackerStatisticsImporter,
-}
-
-impl TorrustIndex {
-    fn override_tracker_api_token(&mut self, tracker_api_token: &str) {
-        self.tracker.override_tracker_api_token(tracker_api_token);
-    }
-
-    fn override_auth_secret_key(&mut self, auth_secret_key: &str) {
-        self.auth.override_secret_key(auth_secret_key);
-    }
-
-    pub fn remove_secrets(&mut self) {
-        "***".clone_into(&mut self.tracker.token);
-        "***".clone_into(&mut self.database.connect_url);
-        "***".clone_into(&mut self.mail.password);
-        "***".clone_into(&mut self.auth.secret_key);
-    }
-}
-
 /// The configuration service.
 #[derive(Debug)]
 pub struct Configuration {
@@ -487,42 +241,6 @@ impl Default for Configuration {
 }
 
 impl Configuration {
-    /// Loads the configuration from the configuration file.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error no configuration in the `CONFIG_PATH` exists, and a new file is is created.
-    /// This function will return an error if the `config` is not a valid `TorrustConfig` document.
-    pub async fn load_from_file(config_path: &str) -> Result<Configuration, ConfigError> {
-        let config_builder = Config::builder();
-
-        #[allow(unused_assignments)]
-        let mut config = Config::default();
-
-        if Path::new(config_path).exists() {
-            config = config_builder.add_source(File::with_name(config_path)).build()?;
-        } else {
-            warn!("No config file found. Creating default config file ...");
-
-            let config = Configuration::default();
-            let () = config.save_to_file(config_path).await;
-
-            return Err(ConfigError::Message(format!(
-                "No config file found. Created default config file in {config_path}. Edit the file and start the application."
-            )));
-        }
-
-        let torrust_config: TorrustIndex = match config.try_deserialize() {
-            Ok(data) => Ok(data),
-            Err(e) => Err(ConfigError::Message(format!("Errors while processing config: {e}."))),
-        }?;
-
-        Ok(Configuration {
-            settings: RwLock::new(torrust_config),
-            config_path: Some(config_path.to_string()),
-        })
-    }
-
     /// Loads the configuration from the `Info` struct. The whole
     /// configuration in toml format is included in the `info.index_toml` string.
     ///
@@ -552,21 +270,6 @@ impl Configuration {
             settings: RwLock::new(index_config),
             config_path: None,
         })
-    }
-
-    /// Returns the save to file of this [`Configuration`].
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if it can't write to the file.
-    pub async fn save_to_file(&self, config_path: &str) {
-        let settings = self.settings.read().await;
-
-        let toml_string = toml::to_string(&*settings).expect("Could not encode TOML value");
-
-        drop(settings);
-
-        fs::write(config_path, toml_string).expect("Could not write to file!");
     }
 
     pub async fn get_all(&self) -> TorrustIndex {
@@ -755,58 +458,6 @@ mod tests {
         drop(settings_lock);
 
         assert_eq!(configuration.get_api_base_url().await, Some("http://localhost".to_string()));
-    }
-
-    #[tokio::test]
-    async fn configuration_could_be_saved_in_a_toml_config_file() {
-        use std::{env, fs};
-
-        use uuid::Uuid;
-
-        // Build temp config file path
-        let temp_directory = env::temp_dir();
-        let temp_file = temp_directory.join(format!("test_config_{}.toml", Uuid::new_v4()));
-
-        // Convert to argument type for Configuration::save_to_file
-        let config_file_path = temp_file;
-        let path = config_file_path.to_string_lossy().to_string();
-
-        let default_configuration = Configuration::default();
-
-        default_configuration.save_to_file(&path).await;
-
-        let contents = fs::read_to_string(&path).expect("written toml configuration file should be read");
-
-        assert_eq!(contents, default_config_toml());
-    }
-
-    #[tokio::test]
-    async fn configuration_could_be_loaded_from_a_toml_config_file() {
-        use std::{env, fs};
-
-        use uuid::Uuid;
-
-        // Build temp config file path
-        let temp_directory = env::temp_dir();
-        let temp_file = temp_directory.join(format!("test_config_{}.toml", Uuid::new_v4()));
-
-        let default_configuration = Configuration::default();
-
-        // Serialize the default configuration to TOML string
-        let toml_string = toml::to_string(&default_configuration.get_all().await).unwrap();
-
-        // Write the TOML string to the file
-        fs::write(&temp_file, toml_string).expect("Failed to write default configuration to a temp toml file");
-
-        // Convert to argument type for Configuration::save_to_file
-        let config_file_path = temp_file;
-        let path = config_file_path.to_string_lossy().to_string();
-
-        let configuration = Configuration::load_from_file(&path)
-            .await
-            .expect("Failed to load configuration from toml file");
-
-        assert_eq!(configuration.get_all().await, Configuration::default().get_all().await);
     }
 
     #[tokio::test]
