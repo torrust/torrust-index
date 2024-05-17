@@ -134,17 +134,41 @@ impl From<ConfigError> for Error {
     }
 }
 
+/* todo:
+
+Use https://crates.io/crates/torrust-tracker-primitives for TrackerMode.
+
+Enum variants (Index -> Tracker):
+
+- `Public`             -> `Public`
+- `Private`            -> `Private`
+- `Whitelisted`        -> `Listed`
+- `PrivateWhitelisted` -> `PrivateListed`
+
+Enum serialized values (Index -> Tracker):
+
+- `Public`             -> `public`
+- `Private`            -> `private`
+- `Whitelisted`        -> `listed`
+- `PrivateWhitelisted` -> `private_listed`
+
+It's a breaking change for the toml config file en the API.
+
+*/
+
 /// See `TrackerMode` in [`torrust-tracker-primitives`](https://docs.rs/torrust-tracker-primitives)
 /// crate for more information.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TrackerMode {
-    // todo: use https://crates.io/crates/torrust-tracker-primitives
     /// Will track every new info hash and serve every peer.
     Public,
+
     /// Will only serve authenticated peers.
     Private,
+
     /// Will only track whitelisted info hashes.
     Whitelisted,
+
     /// Will only track whitelisted info hashes and serve authenticated peers.
     PrivateWhitelisted,
 }
