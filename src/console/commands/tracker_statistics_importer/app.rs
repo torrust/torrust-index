@@ -84,7 +84,7 @@ pub async fn run() {
 ///
 /// # Panics
 ///
-/// Panics if `Configuration::load_from_file` has any error.
+/// Panics if it can't connect to the database.
 pub async fn import() {
     println!("Importing statistics from linked tracker ...");
 

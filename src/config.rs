@@ -1,11 +1,9 @@
 //! Configuration for the application.
-use std::path::Path;
 use std::sync::Arc;
 use std::{env, fs};
 
 use camino::Utf8PathBuf;
 use config::{Config, ConfigError, File, FileFormat};
-use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
 use thiserror::Error;
@@ -487,42 +485,6 @@ impl Default for Configuration {
 }
 
 impl Configuration {
-    /// Loads the configuration from the configuration file.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error no configuration in the `CONFIG_PATH` exists, and a new file is is created.
-    /// This function will return an error if the `config` is not a valid `TorrustConfig` document.
-    pub async fn load_from_file(config_path: &str) -> Result<Configuration, ConfigError> {
-        let config_builder = Config::builder();
-
-        #[allow(unused_assignments)]
-        let mut config = Config::default();
-
-        if Path::new(config_path).exists() {
-            config = config_builder.add_source(File::with_name(config_path)).build()?;
-        } else {
-            warn!("No config file found. Creating default config file ...");
-
-            let config = Configuration::default();
-            let () = config.save_to_file(config_path).await;
-
-            return Err(ConfigError::Message(format!(
-                "No config file found. Created default config file in {config_path}. Edit the file and start the application."
-            )));
-        }
-
-        let torrust_config: TorrustIndex = match config.try_deserialize() {
-            Ok(data) => Ok(data),
-            Err(e) => Err(ConfigError::Message(format!("Errors while processing config: {e}."))),
-        }?;
-
-        Ok(Configuration {
-            settings: RwLock::new(torrust_config),
-            config_path: Some(config_path.to_string()),
-        })
-    }
-
     /// Loads the configuration from the `Info` struct. The whole
     /// configuration in toml format is included in the `info.index_toml` string.
     ///
@@ -552,21 +514,6 @@ impl Configuration {
             settings: RwLock::new(index_config),
             config_path: None,
         })
-    }
-
-    /// Returns the save to file of this [`Configuration`].
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if it can't write to the file.
-    pub async fn save_to_file(&self, config_path: &str) {
-        let settings = self.settings.read().await;
-
-        let toml_string = toml::to_string(&*settings).expect("Could not encode TOML value");
-
-        drop(settings);
-
-        fs::write(config_path, toml_string).expect("Could not write to file!");
     }
 
     pub async fn get_all(&self) -> TorrustIndex {
@@ -755,58 +702,6 @@ mod tests {
         drop(settings_lock);
 
         assert_eq!(configuration.get_api_base_url().await, Some("http://localhost".to_string()));
-    }
-
-    #[tokio::test]
-    async fn configuration_could_be_saved_in_a_toml_config_file() {
-        use std::{env, fs};
-
-        use uuid::Uuid;
-
-        // Build temp config file path
-        let temp_directory = env::temp_dir();
-        let temp_file = temp_directory.join(format!("test_config_{}.toml", Uuid::new_v4()));
-
-        // Convert to argument type for Configuration::save_to_file
-        let config_file_path = temp_file;
-        let path = config_file_path.to_string_lossy().to_string();
-
-        let default_configuration = Configuration::default();
-
-        default_configuration.save_to_file(&path).await;
-
-        let contents = fs::read_to_string(&path).expect("written toml configuration file should be read");
-
-        assert_eq!(contents, default_config_toml());
-    }
-
-    #[tokio::test]
-    async fn configuration_could_be_loaded_from_a_toml_config_file() {
-        use std::{env, fs};
-
-        use uuid::Uuid;
-
-        // Build temp config file path
-        let temp_directory = env::temp_dir();
-        let temp_file = temp_directory.join(format!("test_config_{}.toml", Uuid::new_v4()));
-
-        let default_configuration = Configuration::default();
-
-        // Serialize the default configuration to TOML string
-        let toml_string = toml::to_string(&default_configuration.get_all().await).unwrap();
-
-        // Write the TOML string to the file
-        fs::write(&temp_file, toml_string).expect("Failed to write default configuration to a temp toml file");
-
-        // Convert to argument type for Configuration::save_to_file
-        let config_file_path = temp_file;
-        let path = config_file_path.to_string_lossy().to_string();
-
-        let configuration = Configuration::load_from_file(&path)
-            .await
-            .expect("Failed to load configuration from toml file");
-
-        assert_eq!(configuration.get_all().await, Configuration::default().get_all().await);
     }
 
     #[tokio::test]
