@@ -13,7 +13,7 @@ use tokio::sync::RwLock;
 use torrust_index_located_error::{Located, LocatedError};
 use url::{ParseError, Url};
 
-pub type TorrustIndex = v1::TorrustIndex;
+pub type TorrustIndex = v1::Settings;
 pub type Api = v1::api::Api;
 pub type Auth = v1::auth::Auth;
 pub type Database = v1::database::Database;
