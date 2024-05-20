@@ -19,6 +19,7 @@ use self::net::Network;
 use self::tracker::Tracker;
 use self::tracker_statistics_importer::TrackerStatisticsImporter;
 use self::website::Website;
+use super::validator::{ValidationError, Validator};
 
 /// The whole configuration for the index.
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
@@ -60,5 +61,11 @@ impl Settings {
         "***".clone_into(&mut self.database.connect_url);
         "***".clone_into(&mut self.mail.password);
         "***".clone_into(&mut self.auth.secret_key);
+    }
+}
+
+impl Validator for Settings {
+    fn validate(&self) -> Result<(), ValidationError> {
+        self.tracker.validate()
     }
 }

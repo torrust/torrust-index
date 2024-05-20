@@ -1,5 +1,6 @@
 //! Configuration for the application.
 pub mod v1;
+pub mod validator;
 
 use std::sync::Arc;
 use std::{env, fs};
@@ -11,7 +12,7 @@ use serde_with::{serde_as, NoneAsEmptyString};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use torrust_index_located_error::{Located, LocatedError};
-use url::{ParseError, Url};
+use url::Url;
 
 pub type Settings = v1::Settings;
 pub type Api = v1::api::Api;
@@ -112,26 +113,6 @@ pub enum Error {
 
     #[error("The error for errors that can never happen.")]
     Infallible,
-}
-
-/// Errors that can occur validating the configuration.
-#[derive(Error, Debug)]
-pub enum ValidationError {
-    /// Unable to load the configuration from the configuration file.
-    #[error("Invalid tracker URL: {source}")]
-    InvalidTrackerUrl { source: LocatedError<'static, ParseError> },
-
-    #[error("UDP private trackers are not supported. URL schemes for private tracker URLs must be HTTP ot HTTPS")]
-    UdpTrackersInPrivateModeNotSupported,
-}
-
-impl From<ConfigError> for Error {
-    #[track_caller]
-    fn from(err: ConfigError) -> Self {
-        Self::ConfigError {
-            source: Located(err).into(),
-        }
-    }
 }
 
 /* todo:
@@ -295,42 +276,15 @@ impl Configuration {
 
         settings_lock.net.base_url.clone()
     }
-
-    /// # Errors
-    ///
-    /// Will return an error if the configuration is invalid.
-    pub async fn validate(&self) -> Result<(), ValidationError> {
-        self.validate_tracker_config().await
-    }
-
-    /// # Errors
-    ///
-    /// Will return an error if the `tracker` configuration section is invalid.    
-    pub async fn validate_tracker_config(&self) -> Result<(), ValidationError> {
-        let settings_lock = self.settings.read().await;
-
-        let tracker_mode = settings_lock.tracker.mode.clone();
-        let tracker_url = settings_lock.tracker.url.clone();
-
-        let tracker_url = match parse_url(&tracker_url) {
-            Ok(url) => url,
-            Err(err) => {
-                return Err(ValidationError::InvalidTrackerUrl {
-                    source: Located(err).into(),
-                })
-            }
-        };
-
-        if tracker_mode.is_close() && (tracker_url.scheme() != "http" && tracker_url.scheme() != "https") {
-            return Err(ValidationError::UdpTrackersInPrivateModeNotSupported);
-        }
-
-        Ok(())
-    }
 }
 
-fn parse_url(url_str: &str) -> Result<Url, url::ParseError> {
-    Url::parse(url_str)
+impl From<ConfigError> for Error {
+    #[track_caller]
+    fn from(err: ConfigError) -> Self {
+        Self::ConfigError {
+            source: Located(err).into(),
+        }
+    }
 }
 
 /// The public index configuration.
@@ -341,6 +295,10 @@ pub struct ConfigurationPublic {
     tracker_url: String,
     tracker_mode: TrackerMode,
     email_on_signup: EmailOnSignup,
+}
+
+fn parse_url(url_str: &str) -> Result<Url, url::ParseError> {
+    Url::parse(url_str)
 }
 
 #[cfg(test)]
@@ -503,6 +461,7 @@ mod tests {
     mod syntax_checks {
         // todo: use rich types in configuration structs for basic syntax checks.
 
+        use crate::config::validator::Validator;
         use crate::config::Configuration;
 
         #[tokio::test]
@@ -511,13 +470,13 @@ mod tests {
 
             let mut settings_lock = configuration.settings.write().await;
             settings_lock.tracker.url = "INVALID URL".to_string();
-            drop(settings_lock);
 
-            assert!(configuration.validate().await.is_err());
+            assert!(settings_lock.validate().is_err());
         }
     }
 
     mod semantic_validation {
+        use crate::config::validator::Validator;
         use crate::config::{Configuration, TrackerMode};
 
         #[tokio::test]
@@ -527,9 +486,8 @@ mod tests {
             let mut settings_lock = configuration.settings.write().await;
             settings_lock.tracker.mode = TrackerMode::Private;
             settings_lock.tracker.url = "udp://localhost:6969".to_string();
-            drop(settings_lock);
 
-            assert!(configuration.validate().await.is_err());
+            assert!(settings_lock.validate().is_err());
         }
     }
 }
