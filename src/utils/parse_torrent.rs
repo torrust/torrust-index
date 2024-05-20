@@ -115,32 +115,36 @@ pub fn calculate_info_hash(bytes: &[u8]) -> Result<InfoHash, DecodeTorrentFileEr
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::str::FromStr;
 
     use crate::models::info_hash::InfoHash;
 
     #[test]
     fn it_should_calculate_the_original_info_hash_using_all_fields_in_the_info_key_dictionary() {
-        let torrent_path = Path::new(
+        let root_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let torrent_relative_path = Path::new(
             // cspell:disable-next-line
             "tests/fixtures/torrents/6c690018c5786dbbb00161f62b0712d69296df97_with_custom_info_dict_key.torrent",
         );
+        let torrent_path = root_dir.join(torrent_relative_path);
 
         let original_info_hash = super::calculate_info_hash(&std::fs::read(torrent_path).unwrap()).unwrap();
 
         assert_eq!(
             original_info_hash,
-            InfoHash::from_str("6c690018c5786dbbb00161f62b0712d69296df97").unwrap()
+            InfoHash::from_str("6c690018c5786dbbb00161f62b0712d69296df97").unwrap() // DevSkim: ignore DS173237
         );
     }
 
     #[test]
     fn it_should_calculate_the_new_info_hash_ignoring_non_standard_fields_in_the_info_key_dictionary() {
-        let torrent_path = Path::new(
+        let root_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let torrent_relative_path = Path::new(
             // cspell:disable-next-line
             "tests/fixtures/torrents/6c690018c5786dbbb00161f62b0712d69296df97_with_custom_info_dict_key.torrent",
         );
+        let torrent_path = root_dir.join(torrent_relative_path);
 
         let torrent = super::decode_torrent(&std::fs::read(torrent_path).unwrap()).unwrap();
 
@@ -148,7 +152,7 @@ mod tests {
         // but the infohash of the info dictionary without the custom keys.
         assert_eq!(
             torrent.canonical_info_hash_hex(),
-            "8aa01a4c816332045ffec83247ccbc654547fedf".to_string()
+            "8aa01a4c816332045ffec83247ccbc654547fedf".to_string() // DevSkim: ignore DS173237
         );
     }
 }
