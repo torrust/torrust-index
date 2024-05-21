@@ -16,8 +16,10 @@ impl TestEnv {
     pub async fn running() -> Self {
         let env = Self::default();
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
-        let is_running = client.server_is_running().await;
-        assert!(is_running, "Test server is not running on {}", env.authority);
+        match client.server_is_running().await {
+            Ok(()) => {}
+            Err(err) => panic!("Test server is not running on {}. Error: {err}", env.authority),
+        }
         env
     }
 

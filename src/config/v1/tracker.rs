@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use torrust_index_located_error::Located;
 
-use crate::config::TrackerMode;
+use super::{ValidationError, Validator};
+use crate::config::{parse_url, TrackerMode};
 
 /// Configuration for the associated tracker.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -22,6 +24,28 @@ pub struct Tracker {
 impl Tracker {
     pub fn override_tracker_api_token(&mut self, tracker_api_token: &str) {
         self.token = tracker_api_token.to_string();
+    }
+}
+
+impl Validator for Tracker {
+    fn validate(&self) -> Result<(), ValidationError> {
+        let tracker_mode = self.mode.clone();
+        let tracker_url = self.url.clone();
+
+        let tracker_url = match parse_url(&tracker_url) {
+            Ok(url) => url,
+            Err(err) => {
+                return Err(ValidationError::InvalidTrackerUrl {
+                    source: Located(err).into(),
+                })
+            }
+        };
+
+        if tracker_mode.is_close() && (tracker_url.scheme() != "http" && tracker_url.scheme() != "https") {
+            return Err(ValidationError::UdpTrackersInPrivateModeNotSupported);
+        }
+
+        Ok(())
     }
 }
 

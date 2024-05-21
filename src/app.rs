@@ -6,6 +6,7 @@ use tokio::task::JoinHandle;
 use crate::bootstrap::logging;
 use crate::cache::image::manager::ImageCacheService;
 use crate::common::AppData;
+use crate::config::validator::Validator;
 use crate::config::Configuration;
 use crate::databases::database;
 use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
@@ -41,14 +42,14 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
 
     logging::setup(&log_level);
 
-    configuration.validate().await.expect("invalid configuration");
-
     let configuration = Arc::new(configuration);
 
     // Get configuration settings needed to build the app dependencies and
     // services: main API server and tracker torrents importer.
 
     let settings = configuration.settings.read().await;
+
+    settings.validate().expect("invalid settings");
 
     // From [database] config
     let database_connect_url = settings.database.connect_url.clone();

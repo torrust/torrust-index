@@ -1,19 +1,23 @@
 //! Configuration for the application.
 pub mod v1;
+pub mod validator;
 
+use std::env;
 use std::sync::Arc;
-use std::{env, fs};
 
 use camino::Utf8PathBuf;
-use config::{Config, ConfigError, File, FileFormat};
+use figment::providers::{Env, Format, Serialized, Toml};
+use figment::Figment;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
 use thiserror::Error;
 use tokio::sync::RwLock;
-use torrust_index_located_error::{Located, LocatedError};
-use url::{ParseError, Url};
+use torrust_index_located_error::LocatedError;
+use url::Url;
 
-pub type TorrustIndex = v1::TorrustIndex;
+use crate::web::api::server::DynError;
+
+pub type Settings = v1::Settings;
 pub type Api = v1::api::Api;
 pub type Auth = v1::auth::Auth;
 pub type Database = v1::database::Database;
@@ -25,10 +29,16 @@ pub type Tracker = v1::tracker::Tracker;
 pub type Website = v1::website::Website;
 pub type EmailOnSignup = v1::auth::EmailOnSignup;
 
+/// Prefix for env vars that overwrite configuration options.
+const CONFIG_OVERRIDE_PREFIX: &str = "TORRUST_INDEX_CONFIG_OVERRIDE_";
+/// Path separator in env var names for nested values in configuration.
+const CONFIG_OVERRIDE_SEPARATOR: &str = "__";
+
 /// Information required for loading config
 #[derive(Debug, Default, Clone)]
 pub struct Info {
-    index_toml: String,
+    config_toml: Option<String>,
+    config_toml_path: String,
     tracker_api_token: Option<String>,
     auth_secret_key: Option<String>,
 }
@@ -50,40 +60,33 @@ impl Info {
     ///
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(
-        env_var_config: String,
-        env_var_path_config: String,
-        default_path_config: String,
+        env_var_config_toml: String,
+        env_var_config_toml_path: String,
+        default_config_toml_path: String,
         env_var_tracker_api_token: String,
         env_var_auth_secret_key: String,
     ) -> Result<Self, Error> {
-        let index_toml = if let Ok(index_toml) = env::var(&env_var_config) {
-            println!("Loading configuration from env var {env_var_config} ...");
-
-            index_toml
+        let config_toml = if let Ok(config_toml) = env::var(env_var_config_toml) {
+            println!("Loading configuration from environment variable {config_toml} ...");
+            Some(config_toml)
         } else {
-            let config_path = if let Ok(config_path) = env::var(env_var_path_config) {
-                println!("Loading configuration file: `{config_path}` ...");
+            None
+        };
 
-                config_path
-            } else {
-                println!("Loading default configuration file: `{default_path_config}` ...");
-
-                default_path_config
-            };
-
-            fs::read_to_string(config_path)
-                .map_err(|e| Error::UnableToLoadFromConfigFile {
-                    source: (Arc::new(e) as Arc<dyn std::error::Error + Send + Sync>).into(),
-                })?
-                .parse()
-                .map_err(|_e: std::convert::Infallible| Error::Infallible)?
+        let config_toml_path = if let Ok(config_toml_path) = env::var(env_var_config_toml_path) {
+            println!("Loading configuration from file: `{config_toml_path}` ...");
+            config_toml_path
+        } else {
+            println!("Loading configuration from default configuration file: `{default_config_toml_path}` ...");
+            default_config_toml_path
         };
 
         let tracker_api_token = env::var(env_var_tracker_api_token).ok();
         let auth_secret_key = env::var(env_var_auth_secret_key).ok();
 
         Ok(Self {
-            index_toml,
+            config_toml,
+            config_toml_path,
             tracker_api_token,
             auth_secret_key,
         })
@@ -95,7 +98,7 @@ impl Info {
 pub enum Error {
     /// Unable to load the configuration from the environment variable.
     /// This error only occurs if there is no configuration file and the
-    /// `TORRUST_TRACKER_CONFIG_TOML` environment variable is not set.
+    /// `TORRUST_INDEX_CONFIG_TOML` environment variable is not set.
     #[error("Unable to load from Environmental Variable: {source}")]
     UnableToLoadFromEnvironmentVariable {
         source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
@@ -108,28 +111,19 @@ pub enum Error {
 
     /// Unable to load the configuration from the configuration file.
     #[error("Failed processing the configuration: {source}")]
-    ConfigError { source: LocatedError<'static, ConfigError> },
+    ConfigError {
+        source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
+    },
 
     #[error("The error for errors that can never happen.")]
     Infallible,
 }
 
-/// Errors that can occur validating the configuration.
-#[derive(Error, Debug)]
-pub enum ValidationError {
-    /// Unable to load the configuration from the configuration file.
-    #[error("Invalid tracker URL: {source}")]
-    InvalidTrackerUrl { source: LocatedError<'static, ParseError> },
-
-    #[error("UDP private trackers are not supported. URL schemes for private tracker URLs must be HTTP ot HTTPS")]
-    UdpTrackersInPrivateModeNotSupported,
-}
-
-impl From<ConfigError> for Error {
+impl From<figment::Error> for Error {
     #[track_caller]
-    fn from(err: ConfigError) -> Self {
+    fn from(err: figment::Error) -> Self {
         Self::ConfigError {
-            source: Located(err).into(),
+            source: (Arc::new(err) as DynError).into(),
         }
     }
 }
@@ -225,23 +219,32 @@ impl Tsl {
 #[derive(Debug)]
 pub struct Configuration {
     /// The state of the configuration.
-    pub settings: RwLock<TorrustIndex>,
-    /// The path to the configuration file. This is `None` if the configuration
-    /// was loaded from the environment.
-    pub config_path: Option<String>,
+    pub settings: RwLock<Settings>,
 }
 
 impl Default for Configuration {
     fn default() -> Configuration {
         Configuration {
-            settings: RwLock::new(TorrustIndex::default()),
-            config_path: None,
+            settings: RwLock::new(Settings::default()),
         }
     }
 }
 
 impl Configuration {
-    /// Loads the configuration from the `Info` struct. The whole
+    /// Loads the configuration from the `Info` struct.
+    ///
+    /// # Errors
+    ///
+    /// Will return `Err` if the environment variable does not exist or has a bad configuration.
+    pub fn load(info: &Info) -> Result<Configuration, Error> {
+        let settings = Self::load_settings(info)?;
+
+        Ok(Configuration {
+            settings: RwLock::new(settings),
+        })
+    }
+
+    /// Loads the settings from the `Info` struct. The whole
     /// configuration in toml format is included in the `info.index_toml` string.
     ///
     /// Optionally will override the:
@@ -252,27 +255,36 @@ impl Configuration {
     /// # Errors
     ///
     /// Will return `Err` if the environment variable does not exist or has a bad configuration.
-    pub fn load(info: &Info) -> Result<Configuration, Error> {
-        let config_builder = Config::builder()
-            .add_source(File::from_str(&info.index_toml, FileFormat::Toml))
-            .build()?;
-        let mut index_config: TorrustIndex = config_builder.try_deserialize()?;
+    pub fn load_settings(info: &Info) -> Result<Settings, Error> {
+        let figment = if let Some(config_toml) = &info.config_toml {
+            // Config in env var has priority over config file path
+            Figment::from(Serialized::defaults(Settings::default()))
+                .merge(Toml::string(config_toml))
+                .merge(Env::prefixed(CONFIG_OVERRIDE_PREFIX).split(CONFIG_OVERRIDE_SEPARATOR))
+        } else {
+            Figment::from(Serialized::defaults(Settings::default()))
+                .merge(Toml::file(&info.config_toml_path))
+                .merge(Env::prefixed(CONFIG_OVERRIDE_PREFIX).split(CONFIG_OVERRIDE_SEPARATOR))
+        };
+
+        //println!("figment: {figment:#?}");
+
+        let mut settings: Settings = figment.extract()?;
 
         if let Some(ref token) = info.tracker_api_token {
-            index_config.override_tracker_api_token(token);
+            // todo: remove when using only Figment env var name: `TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN`
+            settings.override_tracker_api_token(token);
         };
 
         if let Some(ref secret_key) = info.auth_secret_key {
-            index_config.override_auth_secret_key(secret_key);
+            // todo: remove when using only Figment env var name: `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__SECRET_KEY`
+            settings.override_auth_secret_key(secret_key);
         };
 
-        Ok(Configuration {
-            settings: RwLock::new(index_config),
-            config_path: None,
-        })
+        Ok(settings)
     }
 
-    pub async fn get_all(&self) -> TorrustIndex {
+    pub async fn get_all(&self) -> Settings {
         let settings_lock = self.settings.read().await;
 
         settings_lock.clone()
@@ -300,42 +312,6 @@ impl Configuration {
 
         settings_lock.net.base_url.clone()
     }
-
-    /// # Errors
-    ///
-    /// Will return an error if the configuration is invalid.
-    pub async fn validate(&self) -> Result<(), ValidationError> {
-        self.validate_tracker_config().await
-    }
-
-    /// # Errors
-    ///
-    /// Will return an error if the `tracker` configuration section is invalid.    
-    pub async fn validate_tracker_config(&self) -> Result<(), ValidationError> {
-        let settings_lock = self.settings.read().await;
-
-        let tracker_mode = settings_lock.tracker.mode.clone();
-        let tracker_url = settings_lock.tracker.url.clone();
-
-        let tracker_url = match parse_url(&tracker_url) {
-            Ok(url) => url,
-            Err(err) => {
-                return Err(ValidationError::InvalidTrackerUrl {
-                    source: Located(err).into(),
-                })
-            }
-        };
-
-        if tracker_mode.is_close() && (tracker_url.scheme() != "http" && tracker_url.scheme() != "https") {
-            return Err(ValidationError::UdpTrackersInPrivateModeNotSupported);
-        }
-
-        Ok(())
-    }
-}
-
-fn parse_url(url_str: &str) -> Result<Url, url::ParseError> {
-    Url::parse(url_str)
 }
 
 /// The public index configuration.
@@ -348,10 +324,14 @@ pub struct ConfigurationPublic {
     email_on_signup: EmailOnSignup,
 }
 
+fn parse_url(url_str: &str) -> Result<Url, url::ParseError> {
+    Url::parse(url_str)
+}
+
 #[cfg(test)]
 mod tests {
 
-    use crate::config::{Configuration, ConfigurationPublic, Info};
+    use crate::config::{Configuration, ConfigurationPublic, Info, Settings};
 
     #[cfg(test)]
     fn default_config_toml() -> String {
@@ -462,21 +442,30 @@ mod tests {
 
     #[tokio::test]
     async fn configuration_could_be_loaded_from_a_toml_string() {
-        let info = Info {
-            index_toml: default_config_toml(),
-            tracker_api_token: None,
-            auth_secret_key: None,
-        };
+        figment::Jail::expect_with(|jail| {
+            jail.create_dir("templates")?;
+            jail.create_file("templates/verify.html", "EMAIL TEMPLATE")?;
 
-        let configuration = Configuration::load(&info).expect("Failed to load configuration from info");
+            let info = Info {
+                config_toml: Some(default_config_toml()),
+                config_toml_path: String::new(),
+                tracker_api_token: None,
+                auth_secret_key: None,
+            };
 
-        assert_eq!(configuration.get_all().await, Configuration::default().get_all().await);
+            let settings = Configuration::load_settings(&info).expect("Failed to load configuration from info");
+
+            assert_eq!(settings, Settings::default());
+
+            Ok(())
+        });
     }
 
     #[tokio::test]
-    async fn configuration_should_allow_to_override_the_tracker_api_token_provided_in_the_toml_file() {
+    async fn configuration_should_allow_to_override_the_tracker_api_token_provided_in_the_toml_file_deprecated() {
         let info = Info {
-            index_toml: default_config_toml(),
+            config_toml: Some(default_config_toml()),
+            config_toml_path: String::new(),
             tracker_api_token: Some("OVERRIDDEN API TOKEN".to_string()),
             auth_secret_key: None,
         };
@@ -490,9 +479,33 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn configuration_should_allow_to_override_the_authentication_secret_key_provided_in_the_toml_file() {
+    async fn configuration_should_allow_to_override_the_tracker_api_token_provided_in_the_toml_file() {
+        figment::Jail::expect_with(|jail| {
+            jail.create_dir("templates")?;
+            jail.create_file("templates/verify.html", "EMAIL TEMPLATE")?;
+
+            jail.set_env("TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN", "OVERRIDDEN API TOKEN");
+
+            let info = Info {
+                config_toml: Some(default_config_toml()),
+                config_toml_path: String::new(),
+                tracker_api_token: None,
+                auth_secret_key: None,
+            };
+
+            let settings = Configuration::load_settings(&info).expect("Could not load configuration from file");
+
+            assert_eq!(settings.tracker.token, "OVERRIDDEN API TOKEN".to_string());
+
+            Ok(())
+        });
+    }
+
+    #[tokio::test]
+    async fn configuration_should_allow_to_override_the_authentication_secret_key_provided_in_the_toml_file_deprecated() {
         let info = Info {
-            index_toml: default_config_toml(),
+            config_toml: Some(default_config_toml()),
+            config_toml_path: String::new(),
             tracker_api_token: None,
             auth_secret_key: Some("OVERRIDDEN AUTH SECRET KEY".to_string()),
         };
@@ -505,9 +518,33 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn configuration_should_allow_to_override_the_authentication_secret_key_provided_in_the_toml_file() {
+        figment::Jail::expect_with(|jail| {
+            jail.create_dir("templates")?;
+            jail.create_file("templates/verify.html", "EMAIL TEMPLATE")?;
+
+            jail.set_env("TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__SECRET_KEY", "OVERRIDDEN AUTH SECRET KEY");
+
+            let info = Info {
+                config_toml: Some(default_config_toml()),
+                config_toml_path: String::new(),
+                tracker_api_token: None,
+                auth_secret_key: None,
+            };
+
+            let settings = Configuration::load_settings(&info).expect("Could not load configuration from file");
+
+            assert_eq!(settings.auth.secret_key, "OVERRIDDEN AUTH SECRET KEY".to_string());
+
+            Ok(())
+        });
+    }
+
     mod syntax_checks {
         // todo: use rich types in configuration structs for basic syntax checks.
 
+        use crate::config::validator::Validator;
         use crate::config::Configuration;
 
         #[tokio::test]
@@ -516,13 +553,13 @@ mod tests {
 
             let mut settings_lock = configuration.settings.write().await;
             settings_lock.tracker.url = "INVALID URL".to_string();
-            drop(settings_lock);
 
-            assert!(configuration.validate().await.is_err());
+            assert!(settings_lock.validate().is_err());
         }
     }
 
     mod semantic_validation {
+        use crate::config::validator::Validator;
         use crate::config::{Configuration, TrackerMode};
 
         #[tokio::test]
@@ -532,9 +569,8 @@ mod tests {
             let mut settings_lock = configuration.settings.write().await;
             settings_lock.tracker.mode = TrackerMode::Private;
             settings_lock.tracker.url = "udp://localhost:6969".to_string();
-            drop(settings_lock);
 
-            assert!(configuration.validate().await.is_err());
+            assert!(settings_lock.validate().is_err());
         }
     }
 }

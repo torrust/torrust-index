@@ -19,10 +19,11 @@ use self::net::Network;
 use self::tracker::Tracker;
 use self::tracker_statistics_importer::TrackerStatisticsImporter;
 use self::website::Website;
+use super::validator::{ValidationError, Validator};
 
 /// The whole configuration for the index.
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
-pub struct TorrustIndex {
+pub struct Settings {
     /// Logging level. Possible values are: `Off`, `Error`, `Warn`, `Info`,
     /// `Debug` and `Trace`. Default is `Info`.
     pub log_level: Option<String>,
@@ -46,7 +47,7 @@ pub struct TorrustIndex {
     pub tracker_statistics_importer: TrackerStatisticsImporter,
 }
 
-impl TorrustIndex {
+impl Settings {
     pub fn override_tracker_api_token(&mut self, tracker_api_token: &str) {
         self.tracker.override_tracker_api_token(tracker_api_token);
     }
@@ -60,5 +61,11 @@ impl TorrustIndex {
         "***".clone_into(&mut self.database.connect_url);
         "***".clone_into(&mut self.mail.password);
         "***".clone_into(&mut self.auth.secret_key);
+    }
+}
+
+impl Validator for Settings {
+    fn validate(&self) -> Result<(), ValidationError> {
+        self.tracker.validate()
     }
 }

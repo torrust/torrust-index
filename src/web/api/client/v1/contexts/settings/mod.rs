@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{
     Api as DomainApi, Auth as DomainAuth, Database as DomainDatabase, ImageCache as DomainImageCache, Mail as DomainMail,
-    Network as DomainNetwork, TorrustIndex as DomainSettings, Tracker as DomainTracker,
+    Network as DomainNetwork, Settings as DomainSettings, Tracker as DomainTracker,
     TrackerStatisticsImporter as DomainTrackerStatisticsImporter, Website as DomainWebsite,
 };
 

@@ -33,12 +33,8 @@ impl TestEnv {
         let temp_dir = TempDir::new().expect("failed to create a temporary directory");
 
         let configuration = ephemeral(&temp_dir);
-        // Even if we load the configuration from the environment variable, we
-        // still need to provide a path to save the configuration when the
-        // configuration is updated via the `POST /settings` endpoints.
-        let config_path = format!("{}/config.toml", temp_dir.path().to_string_lossy());
 
-        let app_starter = AppStarter::with_custom_configuration(configuration, Some(config_path));
+        let app_starter = AppStarter::with_custom_configuration(configuration);
 
         Self { app_starter, temp_dir }
     }
@@ -50,7 +46,7 @@ impl TestEnv {
 
     /// Provides the whole server configuration.
     #[must_use]
-    pub fn server_configuration(&self) -> config::TorrustIndex {
+    pub fn server_configuration(&self) -> config::Settings {
         self.app_starter.server_configuration()
     }
 
@@ -73,10 +69,10 @@ impl Default for TestEnv {
 }
 
 /// Provides a configuration with ephemeral data for testing.
-fn ephemeral(temp_dir: &TempDir) -> config::TorrustIndex {
-    let mut configuration = config::TorrustIndex {
+fn ephemeral(temp_dir: &TempDir) -> config::Settings {
+    let mut configuration = config::Settings {
         log_level: Some("off".to_owned()), // Change to `debug` for tests debugging
-        ..config::TorrustIndex::default()
+        ..config::Settings::default()
     };
 
     // Ephemeral API port
