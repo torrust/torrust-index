@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use reqwest::multipart;
+use reqwest::{multipart, Error};
 use serde::Serialize;
 
 use super::connection_info::ConnectionInfo;
@@ -39,9 +39,12 @@ impl Client {
     }
 
     /// It checks if the server is running.
-    pub async fn server_is_running(&self) -> bool {
+    pub async fn server_is_running(&self) -> Result<(), Error> {
         let response = self.http_client.inner_get("").await;
-        response.is_ok()
+        match response {
+            Ok(_) => Ok(()),
+            Err(err) => Err(err),
+        }
     }
 
     // Context: about
