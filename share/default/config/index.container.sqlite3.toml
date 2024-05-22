@@ -4,7 +4,7 @@ log_level = "info"
 name = "Torrust"
 
 # Please override the tracker token setting the
-#    `TORRUST_INDEX_TRACKER_API_TOKEN`
+#    `TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN`
 #                     environmental variable!
 
 [tracker]

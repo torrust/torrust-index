@@ -97,13 +97,13 @@ FROM gcr.io/distroless/cc-debian12:debug as runtime
 RUN ["/busybox/cp", "-sp", "/busybox/sh","/busybox/cat","/busybox/ls","/busybox/env", "/bin/"]
 COPY --from=gcc --chmod=0555 /usr/local/bin/su-exec /bin/su-exec
 
-ARG TORRUST_INDEX_PATH_CONFIG="/etc/torrust/index/index.toml"
+ARG TORRUST_INDEX_CONFIG_TOML_PATH="/etc/torrust/index/index.toml"
 ARG TORRUST_INDEX_DATABASE_DRIVER="Sqlite3"
 ARG USER_ID=1000
 ARG API_PORT=3001
 ARG IMPORTER_API_PORT=3002
 
-ENV TORRUST_INDEX_PATH_CONFIG=${TORRUST_INDEX_PATH_CONFIG}
+ENV TORRUST_INDEX_CONFIG_TOML_PATH=${TORRUST_INDEX_CONFIG_TOML_PATH}
 ENV TORRUST_INDEX_DATABASE_DRIVER=${TORRUST_INDEX_DATABASE_DRIVER}
 ENV USER_ID=${USER_ID}
 ENV API_PORT=${API_PORT}

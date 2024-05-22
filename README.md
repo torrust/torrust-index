@@ -83,14 +83,14 @@ cp ./share/default/config/index.development.sqlite3.toml ./storage/index/etc/ind
 vim ./storage/index/etc/index.toml
 
 # Run the index with the updated configuration:
-TORRUST_INDEX_PATH_CONFIG="./storage/index/etc/index.toml" cargo run
+TORRUST_INDEX_CONFIG_TOML_PATH="./storage/index/etc/index.toml" cargo run
 ```
 
 _Optionally, you may choose to supply the entire configuration as an environmental variable:_
 
 ```sh
 # Use a configuration supplied on an environmental variable:
-TORRUST_INDEX_CONFIG=$(cat "./storage/index/etc/index.toml") cargo run
+TORRUST_INDEX_CONFIG_TOML=$(cat "./storage/index/etc/index.toml") cargo run
 ```
 
 _For deployment, you __should__ override:
@@ -100,9 +100,9 @@ _For deployment, you __should__ override:
 ```sh
 # Please use the secret that you generated for the torrust-tracker configuration.
 # Override secret in configuration using an environmental variable
-TORRUST_INDEX_CONFIG=$(cat "./storage/index/etc/index.toml") \
-  TORRUST_INDEX_TRACKER_API_TOKEN=$(cat "./storage/tracker/lib/tracker_api_admin_token.secret") \
-  TORRUST_INDEX_AUTH_SECRET_KEY="MaxVerstappenWC2021" \
+TORRUST_INDEX_CONFIG_TOML=$(cat "./storage/index/etc/index.toml") \
+  TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN=$(cat "./storage/tracker/lib/tracker_api_admin_token.secret") \
+  TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__SECRET_KEY="MaxVerstappenWC2021" \
   cargo run
 ```
 
