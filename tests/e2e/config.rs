@@ -5,7 +5,6 @@
 
 // Environment variables
 
-use torrust_index::bootstrap::config::{ENV_VAR_API_ADMIN_TOKEN, ENV_VAR_AUTH_SECRET_KEY, ENV_VAR_CONFIG, ENV_VAR_PATH_CONFIG};
 use torrust_index::config::{Configuration, Info};
 
 // Default values
@@ -34,14 +33,7 @@ pub const ENV_VAR_DB_CONNECT_URL: &str = "TORRUST_INDEX_E2E_DB_CONNECT_URL";
 /// `./index.toml` file or the env var `TORRUST_INDEX_CONFIG`.
 #[must_use]
 pub fn initialize_configuration() -> Configuration {
-    let info = Info::new(
-        ENV_VAR_CONFIG.to_string(),
-        ENV_VAR_PATH_CONFIG.to_string(),
-        DEFAULT_PATH_CONFIG.to_string(),
-        ENV_VAR_API_ADMIN_TOKEN.to_string(),
-        ENV_VAR_AUTH_SECRET_KEY.to_string(),
-    )
-    .unwrap();
+    let info = Info::new(DEFAULT_PATH_CONFIG.to_string()).unwrap();
 
     Configuration::load(&info).unwrap()
 }

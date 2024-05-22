@@ -6,19 +6,6 @@
 
 use crate::config::{Configuration, Info};
 
-/// The whole `index.toml` file content. It has priority over the config file.
-/// Even if the file is not on the default path.
-pub const ENV_VAR_CONFIG: &str = "TORRUST_INDEX_CONFIG";
-
-/// Token needed to communicate with the Torrust Tracker
-pub const ENV_VAR_API_ADMIN_TOKEN: &str = "TORRUST_INDEX_TRACKER_API_TOKEN";
-
-/// Secret key used to encrypt and decrypt
-pub const ENV_VAR_AUTH_SECRET_KEY: &str = "TORRUST_INDEX_AUTH_SECRET_KEY";
-
-/// The `index.toml` file location.
-pub const ENV_VAR_PATH_CONFIG: &str = "TORRUST_INDEX_PATH_CONFIG";
-
 // Default values
 pub const DEFAULT_PATH_CONFIG: &str = "./share/default/config/index.development.sqlite3.toml";
 
@@ -42,14 +29,7 @@ pub const ENV_VAR_CORS_PERMISSIVE: &str = "TORRUST_INDEX_API_CORS_PERMISSIVE";
 /// `./index.toml` file or the env var `TORRUST_INDEX_CONFIG`.
 #[must_use]
 pub fn initialize_configuration() -> Configuration {
-    let info = Info::new(
-        ENV_VAR_CONFIG.to_string(),
-        ENV_VAR_PATH_CONFIG.to_string(),
-        DEFAULT_PATH_CONFIG.to_string(),
-        ENV_VAR_API_ADMIN_TOKEN.to_string(),
-        ENV_VAR_AUTH_SECRET_KEY.to_string(),
-    )
-    .unwrap();
+    let info = Info::new(DEFAULT_PATH_CONFIG.to_string()).unwrap();
 
     Configuration::load(&info).unwrap()
 }

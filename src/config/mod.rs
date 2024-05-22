@@ -31,8 +31,22 @@ pub type EmailOnSignup = v1::auth::EmailOnSignup;
 
 /// Prefix for env vars that overwrite configuration options.
 const CONFIG_OVERRIDE_PREFIX: &str = "TORRUST_INDEX_CONFIG_OVERRIDE_";
+
 /// Path separator in env var names for nested values in configuration.
 const CONFIG_OVERRIDE_SEPARATOR: &str = "__";
+
+/// The whole `index.toml` file content. It has priority over the config file.
+/// Even if the file is not on the default path.
+pub const ENV_VAR_CONFIG: &str = "TORRUST_INDEX_CONFIG";
+
+/// Token needed to communicate with the Torrust Tracker
+pub const ENV_VAR_API_ADMIN_TOKEN: &str = "TORRUST_INDEX_TRACKER_API_TOKEN";
+
+/// Secret key used to encrypt and decrypt
+pub const ENV_VAR_AUTH_SECRET_KEY: &str = "TORRUST_INDEX_AUTH_SECRET_KEY";
+
+/// The `index.toml` file location.
+pub const ENV_VAR_PATH_CONFIG: &str = "TORRUST_INDEX_PATH_CONFIG";
 
 /// Information required for loading config
 #[derive(Debug, Default, Clone)]
@@ -44,28 +58,19 @@ pub struct Info {
 }
 
 impl Info {
-    /// Build Configuration Info
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # use torrust_index::config::Info;
-    /// # let (env_var_config, env_var_path_config, default_path_config, env_var_tracker_api_token, env_var_auth_secret_key) = ("".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string());
-    /// let result = Info::new(env_var_config, env_var_path_config, default_path_config, env_var_tracker_api_token, env_var_auth_secret_key);
-    /// ```
+    /// Build configuration Info.
     ///
     /// # Errors
     ///
     /// Will return `Err` if unable to obtain a configuration.
     ///
     #[allow(clippy::needless_pass_by_value)]
-    pub fn new(
-        env_var_config_toml: String,
-        env_var_config_toml_path: String,
-        default_config_toml_path: String,
-        env_var_tracker_api_token: String,
-        env_var_auth_secret_key: String,
-    ) -> Result<Self, Error> {
+    pub fn new(default_config_toml_path: String) -> Result<Self, Error> {
+        let env_var_config_toml = ENV_VAR_CONFIG.to_string();
+        let env_var_config_toml_path = ENV_VAR_PATH_CONFIG.to_string();
+        let env_var_tracker_api_token = ENV_VAR_API_ADMIN_TOKEN.to_string();
+        let env_var_auth_secret_key = ENV_VAR_AUTH_SECRET_KEY.to_string();
+
         let config_toml = if let Ok(config_toml) = env::var(env_var_config_toml) {
             println!("Loading configuration from environment variable {config_toml} ...");
             Some(config_toml)
