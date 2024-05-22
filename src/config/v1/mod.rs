@@ -11,7 +11,7 @@ pub mod website;
 use serde::{Deserialize, Serialize};
 
 use self::api::Api;
-use self::auth::Auth;
+use self::auth::{Auth, SecretKey};
 use self::database::Database;
 use self::image_cache::ImageCache;
 use self::mail::Mail;
@@ -60,7 +60,7 @@ impl Settings {
         "***".clone_into(&mut self.tracker.token);
         "***".clone_into(&mut self.database.connect_url);
         "***".clone_into(&mut self.mail.password);
-        "***".clone_into(&mut self.auth.secret_key);
+        self.auth.secret_key = SecretKey::new("***");
     }
 }
 

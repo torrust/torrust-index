@@ -338,6 +338,7 @@ fn parse_url(url_str: &str) -> Result<Url, url::ParseError> {
 #[cfg(test)]
 mod tests {
 
+    use crate::config::v1::auth::SecretKey;
     use crate::config::{Configuration, ConfigurationPublic, Info, Settings};
 
     #[cfg(test)]
@@ -521,7 +522,7 @@ mod tests {
 
         assert_eq!(
             configuration.get_all().await.auth.secret_key,
-            "OVERRIDDEN AUTH SECRET KEY".to_string()
+            SecretKey::new("OVERRIDDEN AUTH SECRET KEY")
         );
     }
 
@@ -542,7 +543,7 @@ mod tests {
 
             let settings = Configuration::load_settings(&info).expect("Could not load configuration from file");
 
-            assert_eq!(settings.auth.secret_key, "OVERRIDDEN AUTH SECRET KEY".to_string());
+            assert_eq!(settings.auth.secret_key, SecretKey::new("OVERRIDDEN AUTH SECRET KEY"));
 
             Ok(())
         });

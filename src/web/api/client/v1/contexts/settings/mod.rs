@@ -135,7 +135,7 @@ impl From<DomainAuth> for Auth {
             email_on_signup: format!("{:?}", auth.email_on_signup),
             min_password_length: auth.min_password_length,
             max_password_length: auth.max_password_length,
-            secret_key: auth.secret_key,
+            secret_key: auth.secret_key.to_string(),
         }
     }
 }
