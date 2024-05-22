@@ -9,16 +9,16 @@ use torrust_index::config::{Configuration, Info};
 
 /// The whole `index.toml` file content. It has priority over the config file.
 /// Even if the file is not on the default path.
-const ENV_VAR_CONFIG: &str = "TORRUST_INDEX_E2E_CONFIG";
+const ENV_VAR_CONFIG: &str = "TORRUST_INDEX_CONFIG";
 
 /// Token needed to communicate with the Torrust Tracker
-const ENV_VAR_API_ADMIN_TOKEN: &str = "TORRUST_INDEX_E2E_TRACKER_API_TOKEN";
+const ENV_VAR_API_ADMIN_TOKEN: &str = "TORRUST_INDEX_TRACKER_API_TOKEN";
 
 /// Secret key used to encrypt and decrypt
-const ENV_VAR_AUTH_SECRET_KEY: &str = "TORRUST_INDEX_E2E_AUTH_SECRET_KEY";
+const ENV_VAR_AUTH_SECRET_KEY: &str = "TORRUST_INDEX_AUTH_SECRET_KEY";
 
 /// The `index.toml` file location.
-pub const ENV_VAR_PATH_CONFIG: &str = "TORRUST_INDEX_E2E_PATH_CONFIG";
+pub const ENV_VAR_PATH_CONFIG: &str = "TORRUST_INDEX_PATH_CONFIG";
 
 // Default values
 pub const DEFAULT_PATH_CONFIG: &str = "./share/default/config/index.development.sqlite3.toml";
@@ -34,7 +34,7 @@ pub const ENV_VAR_DB_CONNECT_URL: &str = "TORRUST_INDEX_E2E_DB_CONNECT_URL";
 /// There are two methods to inject the configuration:
 ///
 /// 1. By using a config file: `index.toml`.
-/// 2. Environment variable: `TORRUST_INDEX_E2E_CONFIG`. The variable contains the same contents as the `index.toml` file.
+/// 2. Environment variable: `TORRUST_INDEX_CONFIG`. The variable contains the same contents as the `index.toml` file.
 ///
 /// Environment variable has priority over the config file.
 ///
