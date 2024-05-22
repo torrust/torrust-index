@@ -40,7 +40,7 @@ docker ps
 
 # Run E2E tests with shared app instance
 TORRUST_INDEX_E2E_SHARED=true \
-    TORRUST_INDEX_PATH_CONFIG="./share/default/config/index.e2e.container.mysql.toml" \
+    TORRUST_INDEX_CONFIG_TOML_PATH="./share/default/config/index.e2e.container.mysql.toml" \
     TORRUST_INDEX_E2E_DB_CONNECT_URL="mysql://root:root_secret_password@localhost:3306/torrust_index_e2e_testing" \
     cargo test ||
     {

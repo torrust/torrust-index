@@ -147,11 +147,11 @@ Environmental variables are loaded through the `--env`, in the format `--env VAR
 
 The following environmental variables can be set:
 
-- `TORRUST_INDEX_PATH_CONFIG` - The in-container path to the index configuration file, (default: `"/etc/torrust/index/index.toml"`).
-- `TORRUST_INDEX_TRACKER_API_TOKEN` - Override of the admin token. If set, this value overrides any value set in the config.
-- `TORRUST_INDEX_AUTH_SECRET_KEY` - Override of the auth secret key. If set, this value overrides any value set in the config.
+- `TORRUST_INDEX_CONFIG_TOML_PATH` - The in-container path to the index configuration file, (default: `"/etc/torrust/index/index.toml"`).
+- `TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN` - Override of the admin token. If set, this value overrides any value set in the config.
+- `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__SECRET_KEY` - Override of the auth secret key. If set, this value overrides any value set in the config.
 - `TORRUST_INDEX_DATABASE_DRIVER` - The database type used for the container, (options: `sqlite3`, `mysql`, default `sqlite3`). Please Note: This dose not override the database configuration within the `.toml` config file.
-- `TORRUST_INDEX_CONFIG` - Load config from this environmental variable instead from a file, (i.e: `TORRUST_INDEX_CONFIG=$(cat index-index.toml)`).
+- `TORRUST_INDEX_CONFIG_TOML` - Load config from this environmental variable instead from a file, (i.e: `TORRUST_INDEX_CONFIG_TOML=$(cat index-index.toml)`).
 - `USER_ID` - The user id for the runtime crated `torrust` user. Please Note: This user id should match the ownership of the host-mapped volumes, (default `1000`).
 - `API_PORT` - The port for the index API. This should match the port used in the configuration, (default `3001`).
 
@@ -201,8 +201,8 @@ mkdir -p ./storage/index/lib/ ./storage/index/log/ ./storage/index/etc/
 
 ## Run Torrust Index Container Image
 docker run -it \
-    --env TORRUST_INDEX_TRACKER_API_TOKEN="MySecretToken" \
-    --env TORRUST_INDEX_AUTH_SECRET_KEY="MaxVerstappenWC2021" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MySecretToken" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__SECRET_KEY="MaxVerstappenWC2021" \
     --env USER_ID="$(id -u)" \
     --publish 0.0.0.0:3001:3001/tcp \
     --volume ./storage/index/lib:/var/lib/torrust/index:Z \
@@ -222,7 +222,7 @@ mkdir -p ./storage/index/lib/ ./storage/index/log/ ./storage/index/etc/
 
 ## Run Torrust Index Container Image
 podman run -it \
-    --env TORRUST_INDEX_TRACKER_API_TOKEN="MySecretToken" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MySecretToken" \
     --env USER_ID="$(id -u)" \
     --publish 0.0.0.0:3001:3001/tcp \
     --volume ./storage/index/lib:/var/lib/torrust/index:Z \

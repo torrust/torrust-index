@@ -37,16 +37,18 @@ const CONFIG_OVERRIDE_SEPARATOR: &str = "__";
 
 /// The whole `index.toml` file content. It has priority over the config file.
 /// Even if the file is not on the default path.
-pub const ENV_VAR_CONFIG: &str = "TORRUST_INDEX_CONFIG";
-
-/// Token needed to communicate with the Torrust Tracker
-pub const ENV_VAR_API_ADMIN_TOKEN: &str = "TORRUST_INDEX_TRACKER_API_TOKEN";
-
-/// Secret key used to encrypt and decrypt
-pub const ENV_VAR_AUTH_SECRET_KEY: &str = "TORRUST_INDEX_AUTH_SECRET_KEY";
+pub const ENV_VAR_CONFIG_TOML: &str = "TORRUST_INDEX_CONFIG_TOML";
 
 /// The `index.toml` file location.
-pub const ENV_VAR_PATH_CONFIG: &str = "TORRUST_INDEX_PATH_CONFIG";
+pub const ENV_VAR_CONFIG_TOML_PATH: &str = "TORRUST_INDEX_CONFIG_TOML_PATH";
+
+/// Token needed to communicate with the Torrust Tracker.
+/// Deprecated. Use `TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN`.
+pub const ENV_VAR_TRACKER_API_ADMIN_TOKEN: &str = "TORRUST_INDEX_TRACKER_API_TOKEN";
+
+/// Secret key used to encrypt and decrypt
+/// Deprecated. Use `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__SECRET_KEY`.
+pub const ENV_VAR_AUTH_SECRET_KEY: &str = "TORRUST_INDEX_AUTH_SECRET_KEY";
 
 /// Information required for loading config
 #[derive(Debug, Default, Clone)]
@@ -66,9 +68,9 @@ impl Info {
     ///
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(default_config_toml_path: String) -> Result<Self, Error> {
-        let env_var_config_toml = ENV_VAR_CONFIG.to_string();
-        let env_var_config_toml_path = ENV_VAR_PATH_CONFIG.to_string();
-        let env_var_tracker_api_token = ENV_VAR_API_ADMIN_TOKEN.to_string();
+        let env_var_config_toml = ENV_VAR_CONFIG_TOML.to_string();
+        let env_var_config_toml_path = ENV_VAR_CONFIG_TOML_PATH.to_string();
+        let env_var_tracker_api_admin_token = ENV_VAR_TRACKER_API_ADMIN_TOKEN.to_string();
         let env_var_auth_secret_key = ENV_VAR_AUTH_SECRET_KEY.to_string();
 
         let config_toml = if let Ok(config_toml) = env::var(env_var_config_toml) {
@@ -86,7 +88,7 @@ impl Info {
             default_config_toml_path
         };
 
-        let tracker_api_token = env::var(env_var_tracker_api_token).ok();
+        let tracker_api_token = env::var(env_var_tracker_api_admin_token).ok();
         let auth_secret_key = env::var(env_var_auth_secret_key).ok();
 
         Ok(Self {
