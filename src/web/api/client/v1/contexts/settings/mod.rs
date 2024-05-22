@@ -143,7 +143,7 @@ impl From<DomainAuth> for Auth {
 impl From<DomainDatabase> for Database {
     fn from(database: DomainDatabase) -> Self {
         Self {
-            connect_url: database.connect_url,
+            connect_url: database.connect_url.to_string(),
         }
     }
 }

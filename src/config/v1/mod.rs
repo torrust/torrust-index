@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use self::api::Api;
 use self::auth::{Auth, SecretKey};
-use self::database::Database;
+use self::database::{ConnectOptions, Database};
 use self::image_cache::ImageCache;
 use self::mail::Mail;
 use self::net::Network;
@@ -58,7 +58,7 @@ impl Settings {
 
     pub fn remove_secrets(&mut self) {
         "***".clone_into(&mut self.tracker.token);
-        "***".clone_into(&mut self.database.connect_url);
+        self.database.connect_url = ConnectOptions::new("***");
         "***".clone_into(&mut self.mail.password);
         self.auth.secret_key = SecretKey::new("***");
     }

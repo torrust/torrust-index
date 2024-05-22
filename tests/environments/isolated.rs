@@ -1,5 +1,6 @@
 use tempfile::TempDir;
 use torrust_index::config;
+use torrust_index::config::v1::database::ConnectOptions;
 use torrust_index::config::FREE_PORT;
 use torrust_index::web::api::Version;
 
@@ -82,7 +83,8 @@ fn ephemeral(temp_dir: &TempDir) -> config::Settings {
     configuration.tracker_statistics_importer.port = FREE_PORT;
 
     // Ephemeral SQLite database
-    configuration.database.connect_url = format!("sqlite://{}?mode=rwc", random_database_file_path_in(temp_dir));
+    configuration.database.connect_url =
+        ConnectOptions::new(&format!("sqlite://{}?mode=rwc", random_database_file_path_in(temp_dir)));
 
     configuration
 }

@@ -52,7 +52,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     settings.validate().expect("invalid settings");
 
     // From [database] config
-    let database_connect_url = settings.database.connect_url.clone();
+    let database_connect_url = settings.database.connect_url.clone().to_string();
     // From [importer] config
     let importer_torrent_info_update_interval = settings.tracker_statistics_importer.torrent_info_update_interval;
     let importer_port = settings.tracker_statistics_importer.port;
