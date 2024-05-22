@@ -152,8 +152,8 @@ impl From<DomainMail> for Mail {
     fn from(mail: DomainMail) -> Self {
         Self {
             email_verification_enabled: mail.email_verification_enabled,
-            from: mail.from,
-            reply_to: mail.reply_to,
+            from: mail.from.to_string(),
+            reply_to: mail.reply_to.to_string(),
             username: mail.username,
             password: mail.password,
             server: mail.server,

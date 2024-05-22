@@ -121,8 +121,8 @@ impl Service {
         let settings = self.cfg.settings.read().await;
 
         Message::builder()
-            .from(settings.mail.from.parse().unwrap())
-            .reply_to(settings.mail.reply_to.parse().unwrap())
+            .from(settings.mail.from.clone())
+            .reply_to(settings.mail.reply_to.clone())
             .to(to.parse().unwrap())
     }
 
