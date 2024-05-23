@@ -92,7 +92,7 @@ tower = { version = "0.4", features = ["timeout"] }
 tower-http = { version = "0", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
 trace = "0.1.7"
 tracing = "0.1.40"
-url = "2.5.0"
+url = { version = "2.5.0", features = ["serde"] }
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
 
