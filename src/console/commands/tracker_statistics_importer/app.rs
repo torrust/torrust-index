@@ -16,11 +16,11 @@
 //! Statistics are also imported:
 //!
 //! - Periodically by the importer job. The importer job is executed every hour
-//! by default. See [`TrackerStatisticsImporter`](crate::config::TrackerStatisticsImporter)
-//! for more details.
+//!   by default. See [`TrackerStatisticsImporter`](crate::config::TrackerStatisticsImporter)
+//!   for more details.
 //! - When a new torrent is added.
 //! - When the API returns data about a torrent statistics are collected from
-//! the tracker in real time.
+//!   the tracker in real time.
 use std::env;
 use std::sync::Arc;
 
