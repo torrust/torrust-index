@@ -88,8 +88,8 @@
 //! ```
 //!
 //! > **NOTICE**: those are the commands for `Ubuntu`. If you are using a
-//! different OS, you will need to install the equivalent packages. Please
-//! refer to the documentation of your OS.
+//! > different OS, you will need to install the equivalent packages. Please
+//! > refer to the documentation of your OS.
 //!
 //! With the default configuration you will need to create the `storage` directory:
 //!
@@ -154,7 +154,7 @@
 //! > **WARNING**: The `.env` file is also used by docker-compose.
 //!
 //! > **NOTICE**: Refer to the [sqlx-cli](https://github.com/launchbadge/sqlx/tree/main/sqlx-cli)
-//! documentation for other commands to create new migrations or run them.
+//! > documentation for other commands to create new migrations or run them.
 //!
 //! > **NOTICE**: You can run the index with [tmux](https://github.com/tmux/tmux/wiki) with `tmux new -s torrust-index`.
 //!

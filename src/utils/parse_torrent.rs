@@ -94,9 +94,9 @@ struct ParsedInfoDictFromMetainfoFile {
 /// This function will return an error if:
 ///
 /// - The torrent file is not a valid bencoded torrent file containing an `info`
-///  dictionary key.
+///   dictionary key.
 /// - The original torrent info-hash cannot be bencoded from the parsed `info`
-/// dictionary is not a valid bencoded dictionary.
+///   dictionary is not a valid bencoded dictionary.
 pub fn calculate_info_hash(bytes: &[u8]) -> Result<InfoHash, DecodeTorrentFileError> {
     // Extract the info dictionary
     let metainfo: ParsedInfoDictFromMetainfoFile =
