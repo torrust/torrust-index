@@ -103,7 +103,7 @@ pub async fn import() {
     eprintln!("Tracker url: {}", tracker_url.green());
 
     let database = Arc::new(
-        database::connect(&settings.database.connect_url.to_string())
+        database::connect(settings.database.connect_url.as_ref())
             .await
             .expect("unable to connect to db"),
     );

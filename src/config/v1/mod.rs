@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use self::api::Api;
 use self::auth::{Auth, SecretKey};
-use self::database::{ConnectOptions, Database};
+use self::database::Database;
 use self::image_cache::ImageCache;
 use self::mail::Mail;
 use self::net::Network;
@@ -58,7 +58,9 @@ impl Settings {
 
     pub fn remove_secrets(&mut self) {
         "***".clone_into(&mut self.tracker.token);
-        self.database.connect_url = ConnectOptions::new("***");
+        if let Some(_password) = self.database.connect_url.password() {
+            let _ = self.database.connect_url.set_password(Some("***"));
+        }
         "***".clone_into(&mut self.mail.password);
         self.auth.secret_key = SecretKey::new("***");
     }

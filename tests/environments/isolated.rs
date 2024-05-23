@@ -1,8 +1,8 @@
 use tempfile::TempDir;
 use torrust_index::config;
-use torrust_index::config::v1::database::ConnectOptions;
 use torrust_index::config::FREE_PORT;
 use torrust_index::web::api::Version;
+use url::Url;
 
 use super::app_starter::AppStarter;
 use crate::common::random;
@@ -84,7 +84,7 @@ fn ephemeral(temp_dir: &TempDir) -> config::Settings {
 
     // Ephemeral SQLite database
     configuration.database.connect_url =
-        ConnectOptions::new(&format!("sqlite://{}?mode=rwc", random_database_file_path_in(temp_dir)));
+        Url::parse(&format!("sqlite://{}?mode=rwc", random_database_file_path_in(temp_dir))).unwrap();
 
     configuration
 }
