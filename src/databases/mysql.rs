@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions};
 use sqlx::{query, query_as, Acquire, ConnectOptions, MySqlPool};
+use url::Url;
 
 use super::database::TABLES_TO_TRUNCATE;
 use crate::databases::database;
@@ -1072,13 +1073,13 @@ impl Database for Mysql {
     async fn update_tracker_info(
         &self,
         torrent_id: i64,
-        tracker_url: &str,
+        tracker_url: &Url,
         seeders: i64,
         leechers: i64,
     ) -> Result<(), database::Error> {
         query("REPLACE INTO torrust_torrent_tracker_stats (torrent_id, tracker_url, seeders, leechers, updated_at) VALUES (?, ?, ?, ?, ?)")
             .bind(torrent_id)
-            .bind(tracker_url)
+            .bind(tracker_url.to_string())
             .bind(seeders)
             .bind(leechers)
             .bind(datetime_now())

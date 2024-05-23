@@ -161,7 +161,7 @@ pub enum ServiceError {
     #[display(fmt = "Tracker response error. The operation could not be performed.")]
     TrackerResponseError,
 
-    #[display(fmt = "Tracker unknown response. Unexpected response from tracker. For example, if it can be parsed.")]
+    #[display(fmt = "Tracker unknown response. Unexpected response from tracker. For example, if it can't be parsed.")]
     TrackerUnknownResponse,
 
     #[display(fmt = "Torrent not found in tracker.")]
@@ -253,8 +253,8 @@ impl From<TrackerAPIError> for ServiceError {
     fn from(e: TrackerAPIError) -> Self {
         eprintln!("{e}");
         match e {
-            TrackerAPIError::TrackerOffline => ServiceError::TrackerOffline,
-            TrackerAPIError::InternalServerError => ServiceError::TrackerResponseError,
+            TrackerAPIError::TrackerOffline { error: _ } => ServiceError::TrackerOffline,
+            TrackerAPIError::InternalServerError | TrackerAPIError::NotFound => ServiceError::TrackerResponseError,
             TrackerAPIError::TorrentNotFound => ServiceError::TorrentNotFoundInTracker,
             TrackerAPIError::UnexpectedResponseStatus
             | TrackerAPIError::MissingResponseBody

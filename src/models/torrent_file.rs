@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_bencode::ser;
 use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
+use url::Url;
 
 use super::info_hash::InfoHash;
 use crate::utils::hex::{from_bytes, into_bytes};
@@ -127,14 +128,14 @@ impl Torrent {
     ///
     /// It will be the URL in the `announce` field and also the first URL in the
     /// `announce_list`.
-    pub fn include_url_as_main_tracker(&mut self, tracker_url: &str) {
+    pub fn include_url_as_main_tracker(&mut self, tracker_url: &Url) {
         self.set_announce_to(tracker_url);
         self.add_url_to_front_of_announce_list(tracker_url);
     }
 
     /// Sets the announce url to the tracker url.
-    pub fn set_announce_to(&mut self, tracker_url: &str) {
-        self.announce = Some(tracker_url.to_owned());
+    pub fn set_announce_to(&mut self, tracker_url: &Url) {
+        self.announce = Some(tracker_url.to_owned().to_string());
     }
 
     /// Adds a new tracker URL to the front of the `announce_list`, removes duplicates,
@@ -146,15 +147,15 @@ impl Torrent {
     /// a strict requirement of the `BitTorrent` protocol; it's more of a
     /// convention followed by some torrent creators for redundancy and to
     /// ensure better availability of trackers.    
-    pub fn add_url_to_front_of_announce_list(&mut self, tracker_url: &str) {
+    pub fn add_url_to_front_of_announce_list(&mut self, tracker_url: &Url) {
         if let Some(list) = &mut self.announce_list {
             // Remove the tracker URL from existing lists
             for inner_list in list.iter_mut() {
-                inner_list.retain(|url| url != tracker_url);
+                inner_list.retain(|url| *url != tracker_url.to_string());
             }
 
             // Prepend a new vector containing the tracker_url
-            let vec = vec![tracker_url.to_owned()];
+            let vec = vec![tracker_url.to_owned().to_string()];
             list.insert(0, vec);
 
             // Remove any empty inner lists

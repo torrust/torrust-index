@@ -1,7 +1,9 @@
 pub mod responses;
 
 use serde::{Deserialize, Serialize};
+use url::Url;
 
+use crate::config::v1::tracker::ApiToken;
 use crate::config::{
     Api as DomainApi, Auth as DomainAuth, Database as DomainDatabase, ImageCache as DomainImageCache, Mail as DomainMail,
     Network as DomainNetwork, Settings as DomainSettings, Tracker as DomainTracker,
@@ -28,10 +30,10 @@ pub struct Website {
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Tracker {
-    pub url: String,
+    pub url: Url,
     pub mode: String,
-    pub api_url: String,
-    pub token: String,
+    pub api_url: Url,
+    pub token: ApiToken,
     pub token_valid_seconds: u64,
 }
 

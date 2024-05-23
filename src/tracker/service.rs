@@ -4,6 +4,7 @@ use derive_more::{Display, Error};
 use hyper::StatusCode;
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 use super::api::{Client, ConnectionInfo};
 use crate::config::Configuration;
@@ -14,14 +15,17 @@ use crate::models::user::UserId;
 #[derive(Debug, Display, PartialEq, Eq, Error)]
 #[allow(dead_code)]
 pub enum TrackerAPIError {
-    #[display(fmt = "Error with tracker connection.")]
-    TrackerOffline,
+    #[display(fmt = "Error with tracker request: {error}.")]
+    TrackerOffline { error: String },
 
     #[display(fmt = "Invalid token for tracker API. Check the tracker token in settings.")]
     InvalidToken,
 
     #[display(fmt = "Tracker returned an internal server error.")]
     InternalServerError,
+
+    #[display(fmt = "Tracker returned a not found error.")]
+    NotFound,
 
     #[display(fmt = "Tracker returned an unexpected response status.")]
     UnexpectedResponseStatus,
@@ -77,7 +81,7 @@ pub struct Service {
     database: Arc<Box<dyn Database>>,
     api_client: Client,
     token_valid_seconds: u64,
-    tracker_url: String,
+    tracker_url: Url,
 }
 
 impl Service {
@@ -88,7 +92,7 @@ impl Service {
         let settings = cfg.settings.read().await;
         let api_client = Client::new(ConnectionInfo::new(
             settings.tracker.api_url.clone(),
-            settings.tracker.token.clone(),
+            settings.tracker.token.clone().to_string(),
         ))
         .expect("a reqwest client should be provided");
         let token_valid_seconds = settings.tracker.token_valid_seconds;
@@ -140,7 +144,7 @@ impl Service {
                     }
                 }
             }
-            Err(_) => Err(TrackerAPIError::TrackerOffline),
+            Err(err) => Err(TrackerAPIError::TrackerOffline { error: err.to_string() }),
         }
     }
 
@@ -182,7 +186,7 @@ impl Service {
                     }
                 }
             }
-            Err(_) => Err(TrackerAPIError::TrackerOffline),
+            Err(err) => Err(TrackerAPIError::TrackerOffline { error: err.to_string() }),
         }
     }
 
@@ -197,7 +201,7 @@ impl Service {
     ///
     /// Will return an error if the HTTP request to get generated a new
     /// user tracker key failed.
-    pub async fn get_personal_announce_url(&self, user_id: UserId) -> Result<String, TrackerAPIError> {
+    pub async fn get_personal_announce_url(&self, user_id: UserId) -> Result<Url, TrackerAPIError> {
         debug!(target: "tracker-service", "get personal announce url for user: {user_id}");
 
         let tracker_key = self.database.get_user_tracker_key(user_id).await;
@@ -206,7 +210,7 @@ impl Service {
             Some(tracker_key) => Ok(self.announce_url_with_key(&tracker_key)),
             None => match self.retrieve_new_tracker_key(user_id).await {
                 Ok(new_tracker_key) => Ok(self.announce_url_with_key(&new_tracker_key)),
-                Err(_) => Err(TrackerAPIError::TrackerOffline),
+                Err(err) => Err(TrackerAPIError::TrackerOffline { error: err.to_string() }),
             },
         }
     }
@@ -263,7 +267,7 @@ impl Service {
                     }
                 }
             }
-            Err(_) => Err(TrackerAPIError::TrackerOffline),
+            Err(err) => Err(TrackerAPIError::TrackerOffline { error: err.to_string() }),
         }
     }
 
@@ -283,6 +287,7 @@ impl Service {
         match maybe_response {
             Ok(response) => {
                 let status: StatusCode = map_status_code(response.status());
+                let url = response.url().clone();
 
                 let body = response.text().await.map_err(|_| {
                     error!(target: "tracker-service", "response without body");
@@ -305,13 +310,17 @@ impl Service {
                             Err(TrackerAPIError::InternalServerError)
                         }
                     }
+                    StatusCode::NOT_FOUND => {
+                        error!(target: "tracker-service", "get torrents info 404 response: url {url}");
+                        Err(TrackerAPIError::NotFound)
+                    }
                     _ => {
                         error!(target: "tracker-service", "get torrents info unhandled response: status {status}, body: {body}");
                         Err(TrackerAPIError::UnexpectedResponseStatus)
                     }
                 }
             }
-            Err(_) => Err(TrackerAPIError::TrackerOffline),
+            Err(err) => Err(TrackerAPIError::TrackerOffline { error: err.to_string() }),
         }
     }
 
@@ -360,14 +369,14 @@ impl Service {
                     }
                 }
             }
-            Err(_) => Err(TrackerAPIError::TrackerOffline),
+            Err(err) => Err(TrackerAPIError::TrackerOffline { error: err.to_string() }),
         }
     }
 
     /// It builds the announce url appending the user tracker key.
     /// Eg: <https://tracker:7070/USER_TRACKER_KEY>
-    fn announce_url_with_key(&self, tracker_key: &TrackerKey) -> String {
-        format!("{}/{}", self.tracker_url, tracker_key.key)
+    fn announce_url_with_key(&self, tracker_key: &TrackerKey) -> Url {
+        Url::parse(&format!("{}/{}", self.tracker_url, tracker_key.key)).unwrap()
     }
 
     fn invalid_token_body() -> String {

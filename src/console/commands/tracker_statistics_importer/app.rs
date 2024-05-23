@@ -100,7 +100,7 @@ pub async fn import() {
 
     let tracker_url = settings.tracker.url.clone();
 
-    eprintln!("Tracker url: {}", tracker_url.green());
+    eprintln!("Tracker url: {}", tracker_url.to_string().green());
 
     let database = Arc::new(
         database::connect(settings.database.connect_url.as_ref())

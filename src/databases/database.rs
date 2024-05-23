@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 use crate::databases::mysql::Mysql;
 use crate::databases::sqlite::Sqlite;
@@ -336,7 +337,7 @@ pub trait Database: Sync + Send {
     async fn get_tags_for_torrent_id(&self, torrent_id: i64) -> Result<Vec<TorrentTag>, Error>;
 
     /// Update the seeders and leechers info for a torrent with `torrent_id`, `tracker_url`, `seeders` and `leechers`.
-    async fn update_tracker_info(&self, torrent_id: i64, tracker_url: &str, seeders: i64, leechers: i64) -> Result<(), Error>;
+    async fn update_tracker_info(&self, torrent_id: i64, tracker_url: &Url, seeders: i64, leechers: i64) -> Result<(), Error>;
 
     /// Delete a torrent with `torrent_id`.
     async fn delete_torrent(&self, torrent_id: i64) -> Result<(), Error>;

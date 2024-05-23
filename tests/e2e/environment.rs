@@ -1,5 +1,6 @@
 use std::env;
 
+use torrust_index::config::v1::tracker::ApiToken;
 use torrust_index::web::api::Version;
 use url::Url;
 
@@ -98,9 +99,12 @@ impl TestEnv {
                     settings.database.connect_url = connect_url.to_string();
                 }
 
-                "***".clone_into(&mut settings.tracker.token);
+                settings.tracker.token = ApiToken::new("***");
+
                 "***".clone_into(&mut settings.mail.password);
+
                 "***".clone_into(&mut settings.auth.secret_key);
+
                 Some(settings)
             }
             None => None,

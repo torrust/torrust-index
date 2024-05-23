@@ -21,15 +21,26 @@ impl Client {
     // todo: forms in POST requests can be passed by reference.
 
     fn base_path() -> String {
-        "/v1".to_string()
+        "v1".to_string()
+    }
+
+    /// Remove last '/' char in the address if present.
+    ///
+    /// For example: <https://localhost/> to <https://localhost/>.
+    fn base_url(bind_address: &str) -> String {
+        let mut url = bind_address.to_owned();
+        if url.ends_with('/') {
+            url.pop();
+        }
+        url
     }
 
     pub fn unauthenticated(bind_address: &str) -> Self {
-        Self::new(ConnectionInfo::anonymous(bind_address, &Self::base_path()))
+        Self::new(ConnectionInfo::anonymous(&Self::base_url(bind_address), &Self::base_path()))
     }
 
     pub fn authenticated(bind_address: &str, token: &str) -> Self {
-        Self::new(ConnectionInfo::new(bind_address, &Self::base_path(), token))
+        Self::new(ConnectionInfo::new(&Self::base_url(bind_address), &Self::base_path(), token))
     }
 
     pub fn new(connection_info: ConnectionInfo) -> Self {
@@ -340,9 +351,13 @@ impl Http {
     }
 
     fn base_url(&self, path: &str) -> String {
-        format!(
-            "http://{}{}{path}",
+        let url = format!(
+            "http://{}/{}{path}", // DevSkim: ignore DS137138
             &self.connection_info.bind_address, &self.connection_info.base_path
-        )
+        );
+
+        println!("URL: {url}");
+
+        url
     }
 }

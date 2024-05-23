@@ -1,11 +1,13 @@
 pub mod responses;
 
 use serde::{Deserialize, Serialize};
+use torrust_index::config::v1::tracker::ApiToken;
 use torrust_index::config::{
     Api as DomainApi, Auth as DomainAuth, Database as DomainDatabase, ImageCache as DomainImageCache, Mail as DomainMail,
     Network as DomainNetwork, Settings as DomainSettings, Tracker as DomainTracker,
     TrackerStatisticsImporter as DomainTrackerStatisticsImporter, Website as DomainWebsite,
 };
+use url::Url;
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Settings {
@@ -27,10 +29,10 @@ pub struct Website {
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Tracker {
-    pub url: String,
+    pub url: Url,
     pub mode: String,
-    pub api_url: String,
-    pub token: String,
+    pub api_url: Url,
+    pub token: ApiToken,
     pub token_valid_seconds: u64,
 }
 
