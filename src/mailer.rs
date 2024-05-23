@@ -141,10 +141,10 @@ impl Service {
 
         let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(key)).unwrap();
 
-        let mut base_url = &base_url.to_string();
-        if let Some(cfg_base_url) = &settings.net.base_url {
-            base_url = cfg_base_url;
-        }
+        let base_url = match &settings.net.base_url {
+            Some(url) => url.to_string(),
+            None => base_url.to_string(),
+        };
 
         format!("{base_url}/{API_VERSION_URL_PREFIX}/user/email/verify/{token}")
     }

@@ -316,8 +316,7 @@ impl Configuration {
 
     pub async fn get_api_base_url(&self) -> Option<String> {
         let settings_lock = self.settings.read().await;
-
-        settings_lock.net.base_url.clone()
+        settings_lock.net.base_url.as_ref().map(std::string::ToString::to_string)
     }
 }
 
@@ -337,6 +336,8 @@ fn parse_url(url_str: &str) -> Result<Url, url::ParseError> {
 
 #[cfg(test)]
 mod tests {
+
+    use url::Url;
 
     use crate::config::v1::auth::SecretKey;
     use crate::config::{Configuration, ConfigurationPublic, Info, Settings};
@@ -442,10 +443,10 @@ mod tests {
         assert_eq!(configuration.get_api_base_url().await, None);
 
         let mut settings_lock = configuration.settings.write().await;
-        settings_lock.net.base_url = Some("http://localhost".to_string());
+        settings_lock.net.base_url = Some(Url::parse("http://localhost").unwrap());
         drop(settings_lock);
 
-        assert_eq!(configuration.get_api_base_url().await, Some("http://localhost".to_string()));
+        assert_eq!(configuration.get_api_base_url().await, Some("http://localhost/".to_string()));
     }
 
     #[tokio::test]

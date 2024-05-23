@@ -124,7 +124,7 @@ impl From<DomainNetwork> for Network {
     fn from(net: DomainNetwork) -> Self {
         Self {
             port: net.port,
-            base_url: net.base_url,
+            base_url: net.base_url.map(|url_without_port| url_without_port.to_string()),
         }
     }
 }

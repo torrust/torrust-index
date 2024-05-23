@@ -123,7 +123,7 @@ impl From<DomainNetwork> for Network {
     fn from(net: DomainNetwork) -> Self {
         Self {
             port: net.port,
-            base_url: net.base_url,
+            base_url: net.base_url.as_ref().map(std::string::ToString::to_string),
         }
     }
 }
