@@ -6,14 +6,15 @@
 //! - `Info`
 //! - `Debug`
 //! - `Trace`
-use std::str::FromStr;
 use std::sync::Once;
 
 use log::{info, LevelFilter};
 
+use crate::config::v1::LogLevel;
+
 static INIT: Once = Once::new();
 
-pub fn setup(log_level: &Option<String>) {
+pub fn setup(log_level: &Option<LogLevel>) {
     let level = config_level_or_default(log_level);
 
     if level == log::LevelFilter::Off {
@@ -25,10 +26,17 @@ pub fn setup(log_level: &Option<String>) {
     });
 }
 
-fn config_level_or_default(log_level: &Option<String>) -> LevelFilter {
+fn config_level_or_default(log_level: &Option<LogLevel>) -> LevelFilter {
     match log_level {
         None => log::LevelFilter::Info,
-        Some(level) => LevelFilter::from_str(level).unwrap(),
+        Some(level) => match level {
+            LogLevel::Off => LevelFilter::Off,
+            LogLevel::Error => LevelFilter::Error,
+            LogLevel::Warn => LevelFilter::Warn,
+            LogLevel::Info => LevelFilter::Info,
+            LogLevel::Debug => LevelFilter::Debug,
+            LogLevel::Trace => LevelFilter::Trace,
+        },
     }
 }
 

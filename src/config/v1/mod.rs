@@ -26,7 +26,7 @@ use super::validator::{ValidationError, Validator};
 pub struct Settings {
     /// Logging level. Possible values are: `Off`, `Error`, `Warn`, `Info`,
     /// `Debug` and `Trace`. Default is `Info`.
-    pub log_level: Option<String>,
+    pub log_level: Option<LogLevel>,
     /// The website customizable values.
     pub website: Website,
     /// The tracker configuration.
@@ -70,4 +70,21 @@ impl Validator for Settings {
     fn validate(&self) -> Result<(), ValidationError> {
         self.tracker.validate()
     }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+    /// A level lower than all log levels.
+    Off,
+    /// Corresponds to the `Error` log level.
+    Error,
+    /// Corresponds to the `Warn` log level.
+    Warn,
+    /// Corresponds to the `Info` log level.
+    Info,
+    /// Corresponds to the `Debug` log level.
+    Debug,
+    /// Corresponds to the `Trace` log level.
+    Trace,
 }
