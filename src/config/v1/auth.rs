@@ -6,12 +6,16 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Auth {
     /// Whether or not to require an email on signup.
+    #[serde(default = "EmailOnSignup::default")]
     pub email_on_signup: EmailOnSignup,
     /// The minimum password length.
+    #[serde(default = "Auth::default_min_password_length")]
     pub min_password_length: usize,
     /// The maximum password length.
+    #[serde(default = "Auth::default_max_password_length")]
     pub max_password_length: usize,
     /// The secret key used to sign JWT tokens.
+    #[serde(default = "Auth::default_secret_key")]
     pub secret_key: SecretKey,
 }
 
@@ -19,9 +23,9 @@ impl Default for Auth {
     fn default() -> Self {
         Self {
             email_on_signup: EmailOnSignup::default(),
-            min_password_length: 6,
-            max_password_length: 64,
-            secret_key: SecretKey::new("MaxVerstappenWC2021"),
+            min_password_length: Self::default_min_password_length(),
+            max_password_length: Self::default_max_password_length(),
+            secret_key: Self::default_secret_key(),
         }
     }
 }
@@ -29,6 +33,18 @@ impl Default for Auth {
 impl Auth {
     pub fn override_secret_key(&mut self, secret_key: &str) {
         self.secret_key = SecretKey::new(secret_key);
+    }
+
+    fn default_min_password_length() -> usize {
+        6
+    }
+
+    fn default_max_password_length() -> usize {
+        64
+    }
+
+    fn default_secret_key() -> SecretKey {
+        SecretKey::new("MaxVerstappenWC2021")
     }
 }
 

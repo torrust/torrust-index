@@ -12,20 +12,37 @@ use crate::config::Tsl;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Network {
     /// The port to listen on. Default to `3001`.
+    #[serde(default = "Network::default_port")]
     pub port: u16,
     /// The base URL for the API. For example: `http://localhost`.
     /// If not set, the base URL will be inferred from the request.
+    #[serde(default = "Network::default_base_url")]
     pub base_url: Option<Url>,
     /// TSL configuration.
+    #[serde(default = "Network::default_tsl")]
     pub tsl: Option<Tsl>,
 }
 
 impl Default for Network {
     fn default() -> Self {
         Self {
-            port: 3001,
-            base_url: None,
-            tsl: None,
+            port: Self::default_port(),
+            base_url: Self::default_base_url(),
+            tsl: Self::default_tsl(),
         }
+    }
+}
+
+impl Network {
+    fn default_port() -> u16 {
+        3001
+    }
+
+    fn default_base_url() -> Option<Url> {
+        None
+    }
+
+    fn default_tsl() -> Option<Tsl> {
+        None
     }
 }

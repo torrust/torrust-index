@@ -10,23 +10,22 @@ use crate::config::TrackerMode;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Tracker {
     /// Connection string for the tracker. For example: `udp://TRACKER_IP:6969`.
+    #[serde(default = "Tracker::default_url")]
     pub url: Url,
     /// The mode of the tracker. For example: `Public`.
     /// See `TrackerMode` in [`torrust-tracker-primitives`](https://docs.rs/torrust-tracker-primitives)
     /// crate for more information.
+    #[serde(default = "Tracker::default_mode")]
     pub mode: TrackerMode,
     /// The url of the tracker API. For example: `http://localhost:1212/`.
+    #[serde(default = "Tracker::default_api_url")]
     pub api_url: Url,
     /// The token used to authenticate with the tracker API.
+    #[serde(default = "Tracker::default_token")]
     pub token: ApiToken,
     /// The amount of seconds the tracker API token is valid.
+    #[serde(default = "Tracker::default_token_valid_seconds")]
     pub token_valid_seconds: u64,
-}
-
-impl Tracker {
-    pub fn override_tracker_api_token(&mut self, tracker_api_token: &ApiToken) {
-        self.token = tracker_api_token.clone();
-    }
 }
 
 impl Validator for Tracker {
@@ -45,12 +44,38 @@ impl Validator for Tracker {
 impl Default for Tracker {
     fn default() -> Self {
         Self {
-            url: Url::parse("udp://localhost:6969").unwrap(),
-            mode: TrackerMode::default(),
-            api_url: Url::parse("http://localhost:1212/").unwrap(),
-            token: ApiToken::new("MyAccessToken"),
-            token_valid_seconds: 7_257_600,
+            url: Self::default_url(),
+            mode: Self::default_mode(),
+            api_url: Self::default_api_url(),
+            token: Self::default_token(),
+            token_valid_seconds: Self::default_token_valid_seconds(),
         }
+    }
+}
+
+impl Tracker {
+    pub fn override_tracker_api_token(&mut self, tracker_api_token: &ApiToken) {
+        self.token = tracker_api_token.clone();
+    }
+
+    fn default_url() -> Url {
+        Url::parse("udp://localhost:6969").unwrap()
+    }
+
+    fn default_mode() -> TrackerMode {
+        TrackerMode::default()
+    }
+
+    fn default_api_url() -> Url {
+        Url::parse("http://localhost:1212/").unwrap()
+    }
+
+    fn default_token() -> ApiToken {
+        ApiToken::new("MyAccessToken")
+    }
+
+    fn default_token_valid_seconds() -> u64 {
+        7_257_600
     }
 }
 

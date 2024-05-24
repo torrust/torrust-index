@@ -4,13 +4,20 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Website {
     /// The name of the website.
+    #[serde(default = "Website::default_name")]
     pub name: String,
 }
 
 impl Default for Website {
     fn default() -> Self {
         Self {
-            name: "Torrust".to_string(),
+            name: Self::default_name(),
         }
+    }
+}
+
+impl Website {
+    fn default_name() -> String {
+        "Torrust".to_string()
     }
 }
