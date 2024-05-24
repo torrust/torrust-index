@@ -1492,11 +1492,14 @@ dependencies = [
  "quoted_printable",
  "rustls 0.23.7",
  "rustls-pemfile",
+ "serde",
+ "serde_json",
  "socket2",
  "tokio",
  "tokio-native-tls",
  "tokio-rustls 0.26.0",
  "url",
+ "uuid",
  "webpki-roots",
 ]
 
@@ -3612,6 +3615,7 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 use super::category::Category;
 use super::torrent::TorrentId;
@@ -107,12 +108,12 @@ impl TorrentResponse {
     }
 
     /// It adds the tracker URL in the first position of the tracker list.
-    pub fn include_url_as_main_tracker(&mut self, tracker_url: &str) {
+    pub fn include_url_as_main_tracker(&mut self, tracker_url: &Url) {
         // Remove any existing instances of tracker_url
-        self.trackers.retain(|tracker| tracker != tracker_url);
+        self.trackers.retain(|tracker| *tracker != tracker_url.to_string());
 
         // Insert tracker_url at the first position
-        self.trackers.insert(0, tracker_url.to_owned());
+        self.trackers.insert(0, tracker_url.to_owned().to_string());
     }
 }
 

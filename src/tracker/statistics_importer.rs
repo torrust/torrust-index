@@ -4,6 +4,7 @@ use std::time::Instant;
 use chrono::{DateTime, Utc};
 use log::{debug, error, info};
 use text_colorizer::Colorize;
+use url::Url;
 
 use super::service::{Service, TorrentInfo, TrackerAPIError};
 use crate::config::Configuration;
@@ -14,7 +15,7 @@ const LOG_TARGET: &str = "Tracker Stats Importer";
 pub struct StatisticsImporter {
     database: Arc<Box<dyn Database>>,
     tracker_service: Arc<Service>,
-    tracker_url: String,
+    tracker_url: Url,
 }
 
 impl StatisticsImporter {
@@ -41,7 +42,7 @@ impl StatisticsImporter {
             return Ok(());
         }
 
-        info!(target: LOG_TARGET, "Importing {} torrents statistics from tracker {} ...", torrents.len().to_string().yellow(), self.tracker_url.yellow());
+        info!(target: LOG_TARGET, "Importing {} torrents statistics from tracker {} ...", torrents.len().to_string().yellow(), self.tracker_url.to_string().yellow());
 
         // Start the timer before the loop
         let start_time = Instant::now();
@@ -91,7 +92,7 @@ impl StatisticsImporter {
             return Ok(());
         }
 
-        info!(target: LOG_TARGET, "Importing {} torrents statistics from tracker {} ...", torrents.len().to_string().yellow(), self.tracker_url.yellow());
+        info!(target: LOG_TARGET, "Importing {} torrents statistics from tracker {} ...", torrents.len().to_string().yellow(), self.tracker_url.to_string().yellow());
 
         // Import stats for all torrents in one request
 

@@ -172,7 +172,7 @@ mod for_guests {
 
         let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
 
-        let tracker_url = env.server_settings().unwrap().tracker.url;
+        let tracker_url = env.server_settings().unwrap().tracker.url.to_string();
         let encoded_tracker_url = urlencoding::encode(&tracker_url);
 
         let expected_torrent = TorrentDetails {
@@ -194,9 +194,9 @@ mod for_guests {
                 path: vec![test_torrent.file_info.files[0].clone()],
                 // Using one file torrent for testing: content_size = first file size
                 length: test_torrent.file_info.content_size,
-                md5sum: None,
+                md5sum: None, // DevSkim: ignore DS126858
             }],
-            trackers: vec![tracker_url.clone()],
+            trackers: vec![tracker_url.clone().to_string()],
             magnet_link: format!(
                 // cspell:disable-next-line
                 "magnet:?xt=urn:btih:{}&dn={}&tr={}",

@@ -1,7 +1,9 @@
 pub mod responses;
 
 use serde::{Deserialize, Serialize};
+use url::Url;
 
+use crate::config::v1::tracker::ApiToken;
 use crate::config::{
     Api as DomainApi, Auth as DomainAuth, Database as DomainDatabase, ImageCache as DomainImageCache, Mail as DomainMail,
     Network as DomainNetwork, Settings as DomainSettings, Tracker as DomainTracker,
@@ -28,10 +30,10 @@ pub struct Website {
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Tracker {
-    pub url: String,
+    pub url: Url,
     pub mode: String,
-    pub api_url: String,
-    pub token: String,
+    pub api_url: Url,
+    pub token: ApiToken,
     pub token_valid_seconds: u64,
 }
 
@@ -124,7 +126,7 @@ impl From<DomainNetwork> for Network {
     fn from(net: DomainNetwork) -> Self {
         Self {
             port: net.port,
-            base_url: net.base_url,
+            base_url: net.base_url.map(|url_without_port| url_without_port.to_string()),
         }
     }
 }
@@ -135,7 +137,7 @@ impl From<DomainAuth> for Auth {
             email_on_signup: format!("{:?}", auth.email_on_signup),
             min_password_length: auth.min_password_length,
             max_password_length: auth.max_password_length,
-            secret_key: auth.secret_key,
+            secret_key: auth.secret_key.to_string(),
         }
     }
 }
@@ -143,7 +145,7 @@ impl From<DomainAuth> for Auth {
 impl From<DomainDatabase> for Database {
     fn from(database: DomainDatabase) -> Self {
         Self {
-            connect_url: database.connect_url,
+            connect_url: database.connect_url.to_string(),
         }
     }
 }
@@ -152,8 +154,8 @@ impl From<DomainMail> for Mail {
     fn from(mail: DomainMail) -> Self {
         Self {
             email_verification_enabled: mail.email_verification_enabled,
-            from: mail.from,
-            reply_to: mail.reply_to,
+            from: mail.from.to_string(),
+            reply_to: mail.reply_to.to_string(),
             username: mail.username,
             password: mail.password,
             server: mail.server,

@@ -89,7 +89,7 @@ impl AppStarter {
 
     #[must_use]
     pub fn database_connect_url(&self) -> String {
-        self.configuration.database.connect_url.clone()
+        self.configuration.database.connect_url.clone().to_string()
     }
 }
 

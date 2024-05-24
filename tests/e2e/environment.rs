@@ -1,6 +1,8 @@
 use std::env;
 
+use torrust_index::config::v1::tracker::ApiToken;
 use torrust_index::web::api::Version;
+use url::Url;
 
 use super::config::{initialize_configuration, ENV_VAR_DB_CONNECT_URL, ENV_VAR_INDEX_SHARED};
 use crate::common::contexts::settings::Settings;
@@ -90,10 +92,19 @@ impl TestEnv {
     pub fn server_settings_masking_secrets(&self) -> Option<Settings> {
         match self.starting_settings.clone() {
             Some(mut settings) => {
-                "***".clone_into(&mut settings.tracker.token);
-                "***".clone_into(&mut settings.database.connect_url);
+                // Mask password in DB connect URL if present
+                let mut connect_url = Url::parse(&settings.database.connect_url).expect("valid database connect URL");
+                if let Some(_password) = connect_url.password() {
+                    let _ = connect_url.set_password(Some("***"));
+                    settings.database.connect_url = connect_url.to_string();
+                }
+
+                settings.tracker.token = ApiToken::new("***");
+
                 "***".clone_into(&mut settings.mail.password);
+
                 "***".clone_into(&mut settings.auth.secret_key);
+
                 Some(settings)
             }
             None => None,

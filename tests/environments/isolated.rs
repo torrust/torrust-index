@@ -1,7 +1,9 @@
 use tempfile::TempDir;
 use torrust_index::config;
+use torrust_index::config::v1::LogLevel;
 use torrust_index::config::FREE_PORT;
 use torrust_index::web::api::Version;
+use url::Url;
 
 use super::app_starter::AppStarter;
 use crate::common::random;
@@ -71,7 +73,7 @@ impl Default for TestEnv {
 /// Provides a configuration with ephemeral data for testing.
 fn ephemeral(temp_dir: &TempDir) -> config::Settings {
     let mut configuration = config::Settings {
-        log_level: Some("off".to_owned()), // Change to `debug` for tests debugging
+        log_level: Some(LogLevel::Off), // Change to `debug` for tests debugging
         ..config::Settings::default()
     };
 
@@ -82,7 +84,8 @@ fn ephemeral(temp_dir: &TempDir) -> config::Settings {
     configuration.tracker_statistics_importer.port = FREE_PORT;
 
     // Ephemeral SQLite database
-    configuration.database.connect_url = format!("sqlite://{}?mode=rwc", random_database_file_path_in(temp_dir));
+    configuration.database.connect_url =
+        Url::parse(&format!("sqlite://{}?mode=rwc", random_database_file_path_in(temp_dir))).unwrap();
 
     configuration
 }

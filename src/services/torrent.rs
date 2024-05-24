@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use log::debug;
 use serde_derive::{Deserialize, Serialize};
+use url::Url;
 
 use super::category::DbCategoryRepository;
 use super::user::DbUserRepository;
@@ -432,7 +433,7 @@ impl Index {
         Ok(torrent_response)
     }
 
-    async fn get_tracker_url(&self) -> String {
+    async fn get_tracker_url(&self) -> Url {
         let settings = self.configuration.settings.read().await;
         settings.tracker.url.clone()
     }

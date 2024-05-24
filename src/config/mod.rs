@@ -15,6 +15,7 @@ use tokio::sync::RwLock;
 use torrust_index_located_error::LocatedError;
 use url::Url;
 
+use self::v1::tracker::ApiToken;
 use crate::web::api::server::DynError;
 
 pub type Settings = v1::Settings;
@@ -55,7 +56,7 @@ pub const ENV_VAR_AUTH_SECRET_KEY: &str = "TORRUST_INDEX_AUTH_SECRET_KEY";
 pub struct Info {
     config_toml: Option<String>,
     config_toml_path: String,
-    tracker_api_token: Option<String>,
+    tracker_api_token: Option<ApiToken>,
     auth_secret_key: Option<String>,
 }
 
@@ -88,7 +89,10 @@ impl Info {
             default_config_toml_path
         };
 
-        let tracker_api_token = env::var(env_var_tracker_api_admin_token).ok();
+        let tracker_api_token = env::var(env_var_tracker_api_admin_token)
+            .ok()
+            .map(|token| ApiToken::new(&token));
+
         let auth_secret_key = env::var(env_var_auth_secret_key).ok();
 
         Ok(Self {
@@ -316,8 +320,7 @@ impl Configuration {
 
     pub async fn get_api_base_url(&self) -> Option<String> {
         let settings_lock = self.settings.read().await;
-
-        settings_lock.net.base_url.clone()
+        settings_lock.net.base_url.as_ref().map(std::string::ToString::to_string)
     }
 }
 
@@ -326,18 +329,18 @@ impl Configuration {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ConfigurationPublic {
     website_name: String,
-    tracker_url: String,
+    tracker_url: Url,
     tracker_mode: TrackerMode,
     email_on_signup: EmailOnSignup,
-}
-
-fn parse_url(url_str: &str) -> Result<Url, url::ParseError> {
-    Url::parse(url_str)
 }
 
 #[cfg(test)]
 mod tests {
 
+    use url::Url;
+
+    use crate::config::v1::auth::SecretKey;
+    use crate::config::v1::tracker::ApiToken;
     use crate::config::{Configuration, ConfigurationPublic, Info, Settings};
 
     #[cfg(test)]
@@ -348,7 +351,7 @@ mod tests {
                                 [tracker]
                                 url = "udp://localhost:6969"
                                 mode = "Public"
-                                api_url = "http://localhost:1212"
+                                api_url = "http://localhost:1212/"
                                 token = "MyAccessToken"
                                 token_valid_seconds = 7257600
 
@@ -441,10 +444,10 @@ mod tests {
         assert_eq!(configuration.get_api_base_url().await, None);
 
         let mut settings_lock = configuration.settings.write().await;
-        settings_lock.net.base_url = Some("http://localhost".to_string());
+        settings_lock.net.base_url = Some(Url::parse("http://localhost").unwrap());
         drop(settings_lock);
 
-        assert_eq!(configuration.get_api_base_url().await, Some("http://localhost".to_string()));
+        assert_eq!(configuration.get_api_base_url().await, Some("http://localhost/".to_string()));
     }
 
     #[tokio::test]
@@ -473,7 +476,7 @@ mod tests {
         let info = Info {
             config_toml: Some(default_config_toml()),
             config_toml_path: String::new(),
-            tracker_api_token: Some("OVERRIDDEN API TOKEN".to_string()),
+            tracker_api_token: Some(ApiToken::new("OVERRIDDEN API TOKEN")),
             auth_secret_key: None,
         };
 
@@ -481,7 +484,7 @@ mod tests {
 
         assert_eq!(
             configuration.get_all().await.tracker.token,
-            "OVERRIDDEN API TOKEN".to_string()
+            ApiToken::new("OVERRIDDEN API TOKEN")
         );
     }
 
@@ -502,7 +505,7 @@ mod tests {
 
             let settings = Configuration::load_settings(&info).expect("Could not load configuration from file");
 
-            assert_eq!(settings.tracker.token, "OVERRIDDEN API TOKEN".to_string());
+            assert_eq!(settings.tracker.token, ApiToken::new("OVERRIDDEN API TOKEN"));
 
             Ok(())
         });
@@ -521,7 +524,7 @@ mod tests {
 
         assert_eq!(
             configuration.get_all().await.auth.secret_key,
-            "OVERRIDDEN AUTH SECRET KEY".to_string()
+            SecretKey::new("OVERRIDDEN AUTH SECRET KEY")
         );
     }
 
@@ -542,30 +545,15 @@ mod tests {
 
             let settings = Configuration::load_settings(&info).expect("Could not load configuration from file");
 
-            assert_eq!(settings.auth.secret_key, "OVERRIDDEN AUTH SECRET KEY".to_string());
+            assert_eq!(settings.auth.secret_key, SecretKey::new("OVERRIDDEN AUTH SECRET KEY"));
 
             Ok(())
         });
     }
 
-    mod syntax_checks {
-        // todo: use rich types in configuration structs for basic syntax checks.
-
-        use crate::config::validator::Validator;
-        use crate::config::Configuration;
-
-        #[tokio::test]
-        async fn tracker_url_should_be_a_valid_url() {
-            let configuration = Configuration::default();
-
-            let mut settings_lock = configuration.settings.write().await;
-            settings_lock.tracker.url = "INVALID URL".to_string();
-
-            assert!(settings_lock.validate().is_err());
-        }
-    }
-
     mod semantic_validation {
+        use url::Url;
+
         use crate::config::validator::Validator;
         use crate::config::{Configuration, TrackerMode};
 
@@ -575,7 +563,7 @@ mod tests {
 
             let mut settings_lock = configuration.settings.write().await;
             settings_lock.tracker.mode = TrackerMode::Private;
-            settings_lock.tracker.url = "udp://localhost:6969".to_string();
+            settings_lock.tracker.url = Url::parse("udp://localhost:6969").unwrap();
 
             assert!(settings_lock.validate().is_err());
         }

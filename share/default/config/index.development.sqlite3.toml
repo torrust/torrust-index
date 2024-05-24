@@ -4,7 +4,7 @@ log_level = "info"
 name = "Torrust"
 
 [tracker]
-api_url = "http://localhost:1212"
+api_url = "http://localhost:1212/"
 mode = "Public"
 token = "MyAccessToken"
 token_valid_seconds = 7257600

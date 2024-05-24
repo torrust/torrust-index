@@ -11,12 +11,12 @@ pub mod website;
 use serde::{Deserialize, Serialize};
 
 use self::api::Api;
-use self::auth::Auth;
+use self::auth::{Auth, SecretKey};
 use self::database::Database;
 use self::image_cache::ImageCache;
 use self::mail::Mail;
 use self::net::Network;
-use self::tracker::Tracker;
+use self::tracker::{ApiToken, Tracker};
 use self::tracker_statistics_importer::TrackerStatisticsImporter;
 use self::website::Website;
 use super::validator::{ValidationError, Validator};
@@ -26,7 +26,7 @@ use super::validator::{ValidationError, Validator};
 pub struct Settings {
     /// Logging level. Possible values are: `Off`, `Error`, `Warn`, `Info`,
     /// `Debug` and `Trace`. Default is `Info`.
-    pub log_level: Option<String>,
+    pub log_level: Option<LogLevel>,
     /// The website customizable values.
     pub website: Website,
     /// The tracker configuration.
@@ -48,7 +48,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn override_tracker_api_token(&mut self, tracker_api_token: &str) {
+    pub fn override_tracker_api_token(&mut self, tracker_api_token: &ApiToken) {
         self.tracker.override_tracker_api_token(tracker_api_token);
     }
 
@@ -57,10 +57,12 @@ impl Settings {
     }
 
     pub fn remove_secrets(&mut self) {
-        "***".clone_into(&mut self.tracker.token);
-        "***".clone_into(&mut self.database.connect_url);
+        self.tracker.token = ApiToken::new("***");
+        if let Some(_password) = self.database.connect_url.password() {
+            let _ = self.database.connect_url.set_password(Some("***"));
+        }
         "***".clone_into(&mut self.mail.password);
-        "***".clone_into(&mut self.auth.secret_key);
+        self.auth.secret_key = SecretKey::new("***");
     }
 }
 
@@ -68,4 +70,21 @@ impl Validator for Settings {
     fn validate(&self) -> Result<(), ValidationError> {
         self.tracker.validate()
     }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+    /// A level lower than all log levels.
+    Off,
+    /// Corresponds to the `Error` log level.
+    Error,
+    /// Corresponds to the `Warn` log level.
+    Warn,
+    /// Corresponds to the `Info` log level.
+    Info,
+    /// Corresponds to the `Debug` log level.
+    Debug,
+    /// Corresponds to the `Trace` log level.
+    Trace,
 }
