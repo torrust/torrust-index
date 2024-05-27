@@ -15,7 +15,6 @@ use tokio::sync::RwLock;
 use torrust_index_located_error::LocatedError;
 use url::Url;
 
-use self::v1::tracker::ApiToken;
 use crate::web::api::server::DynError;
 
 pub type Settings = v1::Settings;
@@ -43,21 +42,11 @@ pub const ENV_VAR_CONFIG_TOML: &str = "TORRUST_INDEX_CONFIG_TOML";
 /// The `index.toml` file location.
 pub const ENV_VAR_CONFIG_TOML_PATH: &str = "TORRUST_INDEX_CONFIG_TOML_PATH";
 
-/// Token needed to communicate with the Torrust Tracker.
-/// Deprecated. Use `TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN`.
-pub const ENV_VAR_TRACKER_API_ADMIN_TOKEN: &str = "TORRUST_INDEX_TRACKER_API_TOKEN";
-
-/// Secret key used to encrypt and decrypt
-/// Deprecated. Use `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__SECRET_KEY`.
-pub const ENV_VAR_AUTH_SECRET_KEY: &str = "TORRUST_INDEX_AUTH_SECRET_KEY";
-
 /// Information required for loading config
 #[derive(Debug, Default, Clone)]
 pub struct Info {
     config_toml: Option<String>,
     config_toml_path: String,
-    tracker_api_token: Option<ApiToken>,
-    auth_secret_key: Option<String>,
 }
 
 impl Info {
@@ -71,8 +60,6 @@ impl Info {
     pub fn new(default_config_toml_path: String) -> Result<Self, Error> {
         let env_var_config_toml = ENV_VAR_CONFIG_TOML.to_string();
         let env_var_config_toml_path = ENV_VAR_CONFIG_TOML_PATH.to_string();
-        let env_var_tracker_api_admin_token = ENV_VAR_TRACKER_API_ADMIN_TOKEN.to_string();
-        let env_var_auth_secret_key = ENV_VAR_AUTH_SECRET_KEY.to_string();
 
         let config_toml = if let Ok(config_toml) = env::var(env_var_config_toml) {
             println!("Loading configuration from environment variable {config_toml} ...");
@@ -89,17 +76,9 @@ impl Info {
             default_config_toml_path
         };
 
-        let tracker_api_token = env::var(env_var_tracker_api_admin_token)
-            .ok()
-            .map(|token| ApiToken::new(&token));
-
-        let auth_secret_key = env::var(env_var_auth_secret_key).ok();
-
         Ok(Self {
             config_toml,
             config_toml_path,
-            tracker_api_token,
-            auth_secret_key,
         })
     }
 }
@@ -278,19 +257,7 @@ impl Configuration {
                 .merge(Env::prefixed(CONFIG_OVERRIDE_PREFIX).split(CONFIG_OVERRIDE_SEPARATOR))
         };
 
-        //println!("figment: {figment:#?}");
-
-        let mut settings: Settings = figment.extract()?;
-
-        if let Some(ref token) = info.tracker_api_token {
-            // todo: remove when using only Figment env var name: `TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN`
-            settings.override_tracker_api_token(token);
-        };
-
-        if let Some(ref secret_key) = info.auth_secret_key {
-            // todo: remove when using only Figment env var name: `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__SECRET_KEY`
-            settings.override_auth_secret_key(secret_key);
-        };
+        let settings: Settings = figment.extract()?;
 
         Ok(settings)
     }
@@ -459,8 +426,6 @@ mod tests {
             let info = Info {
                 config_toml: Some(default_config_toml()),
                 config_toml_path: String::new(),
-                tracker_api_token: None,
-                auth_secret_key: None,
             };
 
             let settings = Configuration::load_settings(&info).expect("Failed to load configuration from info");
@@ -469,23 +434,6 @@ mod tests {
 
             Ok(())
         });
-    }
-
-    #[tokio::test]
-    async fn configuration_should_allow_to_override_the_tracker_api_token_provided_in_the_toml_file_deprecated() {
-        let info = Info {
-            config_toml: Some(default_config_toml()),
-            config_toml_path: String::new(),
-            tracker_api_token: Some(ApiToken::new("OVERRIDDEN API TOKEN")),
-            auth_secret_key: None,
-        };
-
-        let configuration = Configuration::load(&info).expect("Failed to load configuration from info");
-
-        assert_eq!(
-            configuration.get_all().await.tracker.token,
-            ApiToken::new("OVERRIDDEN API TOKEN")
-        );
     }
 
     #[tokio::test]
@@ -499,8 +447,6 @@ mod tests {
             let info = Info {
                 config_toml: Some(default_config_toml()),
                 config_toml_path: String::new(),
-                tracker_api_token: None,
-                auth_secret_key: None,
             };
 
             let settings = Configuration::load_settings(&info).expect("Could not load configuration from file");
@@ -509,23 +455,6 @@ mod tests {
 
             Ok(())
         });
-    }
-
-    #[tokio::test]
-    async fn configuration_should_allow_to_override_the_authentication_secret_key_provided_in_the_toml_file_deprecated() {
-        let info = Info {
-            config_toml: Some(default_config_toml()),
-            config_toml_path: String::new(),
-            tracker_api_token: None,
-            auth_secret_key: Some("OVERRIDDEN AUTH SECRET KEY".to_string()),
-        };
-
-        let configuration = Configuration::load(&info).expect("Failed to load configuration from info");
-
-        assert_eq!(
-            configuration.get_all().await.auth.secret_key,
-            SecretKey::new("OVERRIDDEN AUTH SECRET KEY")
-        );
     }
 
     #[tokio::test]
@@ -539,8 +468,6 @@ mod tests {
             let info = Info {
                 config_toml: Some(default_config_toml()),
                 config_toml_path: String::new(),
-                tracker_api_token: None,
-                auth_secret_key: None,
             };
 
             let settings = Configuration::load_settings(&info).expect("Could not load configuration from file");
