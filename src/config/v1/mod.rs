@@ -58,14 +58,6 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn override_tracker_api_token(&mut self, tracker_api_token: &ApiToken) {
-        self.tracker.override_tracker_api_token(tracker_api_token);
-    }
-
-    pub fn override_auth_secret_key(&mut self, auth_secret_key: &str) {
-        self.auth.override_secret_key(auth_secret_key);
-    }
-
     pub fn remove_secrets(&mut self) {
         self.tracker.token = ApiToken::new("***");
         if let Some(_password) = self.database.connect_url.password() {
