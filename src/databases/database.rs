@@ -11,7 +11,7 @@ use crate::models::torrent::{Metadata, TorrentListing};
 use crate::models::torrent_file::{DbTorrent, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
-use crate::models::user::{User, UserAuthentication, UserAuthorization, UserCompact, UserId, UserProfile};
+use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
 use crate::services::torrent::CanonicalInfoHashGroup;
 
 /// Database tables to be truncated when upgrading from v1.0.0 to v2.0.0.
@@ -135,9 +135,6 @@ pub trait Database: Sync + Send {
 
     /// Get `UserAuthentication` from `user_id`.
     async fn get_user_authentication_from_id(&self, user_id: UserId) -> Result<UserAuthentication, Error>;
-
-    /// Get `UserAuthorization` from `user_id`.
-    async fn get_user_authorization_from_id(&self, user_id: UserId) -> Result<UserAuthorization, Error>;
 
     /// Get `UserProfile` from `username`.
     async fn get_user_profile_from_username(&self, username: &str) -> Result<UserProfile, Error>;
