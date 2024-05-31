@@ -10,11 +10,12 @@ use crate::services::torrent::{
     DbCanonicalInfoHashGroupRepository, DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository,
     DbTorrentListingGenerator, DbTorrentRepository, DbTorrentTagRepository,
 };
-use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
+use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, Repository};
 use crate::services::{proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::web::api::server::v1::auth::Authentication;
 use crate::{mailer, tracker};
+
 pub type Username = String;
 
 pub struct AppData {
@@ -30,7 +31,7 @@ pub struct AppData {
     // Repositories
     pub category_repository: Arc<DbCategoryRepository>,
     pub tag_repository: Arc<DbTagRepository>,
-    pub user_repository: Arc<DbUserRepository>,
+    pub user_repository: Arc<Box<dyn Repository>>,
     pub user_authentication_repository: Arc<DbUserAuthenticationRepository>,
     pub user_profile_repository: Arc<DbUserProfileRepository>,
     pub torrent_repository: Arc<DbTorrentRepository>,
@@ -66,7 +67,7 @@ impl AppData {
         // Repositories
         category_repository: Arc<DbCategoryRepository>,
         tag_repository: Arc<DbTagRepository>,
-        user_repository: Arc<DbUserRepository>,
+        user_repository: Arc<Box<dyn Repository>>,
         user_authentication_repository: Arc<DbUserAuthenticationRepository>,
         user_profile_repository: Arc<DbUserProfileRepository>,
         torrent_repository: Arc<DbTorrentRepository>,
