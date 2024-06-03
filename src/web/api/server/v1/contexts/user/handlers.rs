@@ -7,9 +7,10 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 
-use super::forms::{JsonWebToken, LoginForm, RegistrationForm};
+use super::forms::{ChangePasswordForm, JsonWebToken, LoginForm, RegistrationForm};
 use super::responses::{self};
 use crate::common::AppData;
+use crate::errors::ServiceError;
 use crate::web::api::server::v1::extractors::user_id::ExtractLoggedInUser;
 use crate::web::api::server::v1::responses::OkResponseData;
 
@@ -121,6 +122,24 @@ pub async fn renew_token_handler(
         Ok((token, user_compact)) => responses::renewed_token(token, user_compact).into_response(),
         Err(error) => error.into_response(),
     }
+}
+
+/// It changes the user's password.
+///
+/// # Errors
+///
+/// It returns an error if:
+///
+/// - The user account is not found.
+#[allow(clippy::unused_async)]
+pub async fn change_password_handler(
+    State(_app_data): State<Arc<AppData>>,
+    extract::Json(change_password_form): extract::Json<ChangePasswordForm>,
+) -> Response {
+
+    println!("change pass form: {change_password_form:#?}");
+
+    ServiceError::AccountNotFound.into_response()
 }
 
 /// It bans a user from the index.

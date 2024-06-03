@@ -22,3 +22,12 @@ pub struct LoginForm {
 pub struct JsonWebToken {
     pub token: String, // // todo: rename to `encoded` or `value`
 }
+
+// Profile
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ChangePasswordForm {
+    pub password: String,
+    pub new_password: String,
+    pub confirm_password: String,
+}
