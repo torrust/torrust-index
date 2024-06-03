@@ -114,6 +114,23 @@ impl Database for Mysql {
         }
     }
 
+    /// Change user's password.
+    async fn change_user_password(&self, user_id: i64, new_password: &str) -> Result<(), database::Error> {
+        query("UPDATE torrust_user_authentication SET password_hash = ? WHERE user_id = ?")
+            .bind(new_password)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|_| database::Error::Error)
+            .and_then(|v| {
+                if v.rows_affected() > 0 {
+                    Ok(())
+                } else {
+                    Err(database::Error::UserNotFound)
+                }
+            })
+    }
+
     async fn get_user_from_id(&self, user_id: i64) -> Result<User, database::Error> {
         query_as::<_, User>("SELECT * FROM torrust_users WHERE user_id = ?")
             .bind(user_id)

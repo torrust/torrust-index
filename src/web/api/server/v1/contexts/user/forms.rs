@@ -27,7 +27,7 @@ pub struct JsonWebToken {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ChangePasswordForm {
+    pub current_password: String,
     pub password: String,
-    pub new_password: String,
     pub confirm_password: String,
 }

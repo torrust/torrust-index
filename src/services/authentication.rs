@@ -183,6 +183,15 @@ impl DbUserAuthenticationRepository {
     pub async fn get_user_authentication_from_id(&self, user_id: &UserId) -> Result<UserAuthentication, Error> {
         self.database.get_user_authentication_from_id(*user_id).await
     }
+
+    /// It changes the user's password.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn change_password(&self, user_id: UserId, password_hash: &str) -> Result<(), Error> {
+        self.database.change_user_password(user_id, password_hash).await
+    }    
 }
 
 /// Verify if the user supplied and the database supplied passwords match

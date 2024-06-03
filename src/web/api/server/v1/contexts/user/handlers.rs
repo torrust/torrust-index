@@ -10,7 +10,6 @@ use serde::Deserialize;
 use super::forms::{ChangePasswordForm, JsonWebToken, LoginForm, RegistrationForm};
 use super::responses::{self};
 use crate::common::AppData;
-use crate::errors::ServiceError;
 use crate::web::api::server::v1::extractors::user_id::ExtractLoggedInUser;
 use crate::web::api::server::v1::responses::OkResponseData;
 
@@ -133,13 +132,17 @@ pub async fn renew_token_handler(
 /// - The user account is not found.
 #[allow(clippy::unused_async)]
 pub async fn change_password_handler(
-    State(_app_data): State<Arc<AppData>>,
+    State(app_data): State<Arc<AppData>>,
+    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
     extract::Json(change_password_form): extract::Json<ChangePasswordForm>,
 ) -> Response {
-
-    println!("change pass form: {change_password_form:#?}");
-
-    ServiceError::AccountNotFound.into_response()
+    match app_data.profile_service.change_password(user_id, &change_password_form).await {
+        Ok(()) => Json(OkResponseData {
+            data: format!("Password changed for user with ID: {user_id}"),
+        })
+        .into_response(),
+        Err(error) => error.into_response(),
+    }
 }
 
 /// It bans a user from the index.

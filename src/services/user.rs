@@ -10,6 +10,7 @@ use log::{debug, info};
 use mockall::automock;
 use pbkdf2::password_hash::rand_core::OsRng;
 
+use super::authentication::DbUserAuthenticationRepository;
 use crate::config::{Configuration, EmailOnSignup};
 use crate::databases::database::{Database, Error};
 use crate::errors::ServiceError;
@@ -17,7 +18,7 @@ use crate::mailer;
 use crate::mailer::VerifyClaims;
 use crate::models::user::{UserCompact, UserId, UserProfile, Username};
 use crate::utils::validation::validate_email_address;
-use crate::web::api::server::v1::contexts::user::forms::RegistrationForm;
+use crate::web::api::server::v1::contexts::user::forms::{ChangePasswordForm, RegistrationForm};
 
 /// Since user email could be optional, we need a way to represent "no email"
 /// in the database. This function returns the string that should be used for
@@ -183,6 +184,70 @@ impl RegistrationService {
         };
 
         Ok(true)
+    }
+}
+
+pub struct ProfileService {
+    configuration: Arc<Configuration>,
+    user_authentication_repository: Arc<DbUserAuthenticationRepository>,
+}
+
+impl ProfileService {
+    #[must_use]
+    pub fn new(configuration: Arc<Configuration>, user_repository: Arc<DbUserAuthenticationRepository>) -> Self {
+        Self {
+            configuration,
+            user_authentication_repository: user_repository,
+        }
+    }
+
+    /// It registers a new user.
+    ///
+    /// # Errors
+    ///
+    /// This function will return a:
+    ///
+    /// * `ServiceError::PasswordsDontMatch` if the supplied passwords do not match.
+    /// * `ServiceError::PasswordTooShort` if the supplied password is too short.
+    /// * `ServiceError::PasswordTooLong` if the supplied password is too long.
+    /// * An error if unable to successfully hash the password.
+    /// * An error if unable to change the password in the database.
+    pub async fn change_password(&self, user_id: UserId, change_password_form: &ChangePasswordForm) -> Result<(), ServiceError> {
+        info!("changing user password for user ID: {user_id}");
+
+        let settings = self.configuration.settings.read().await;
+
+        // todo:
+        //   - Validate current password
+        //   - Remove duplicate code for password validation and hashing
+
+        if change_password_form.password != change_password_form.confirm_password {
+            return Err(ServiceError::PasswordsDontMatch);
+        }
+
+        let password_length = change_password_form.password.len();
+
+        if password_length <= settings.auth.min_password_length {
+            return Err(ServiceError::PasswordTooShort);
+        }
+
+        if password_length >= settings.auth.max_password_length {
+            return Err(ServiceError::PasswordTooLong);
+        }
+
+        let salt = SaltString::generate(&mut OsRng);
+
+        // Argon2 with default params (Argon2id v19)
+        let argon2 = Argon2::default();
+
+        // Hash password to PHC string ($argon2id$v=19$...)
+        let new_password_hash = argon2
+            .hash_password(change_password_form.password.as_bytes(), &salt)?
+            .to_string();
+
+        self.user_authentication_repository.change_password(user_id, &new_password_hash).await?;
+
+        Ok(())
     }
 }
 

@@ -131,6 +131,9 @@ pub trait Database: Sync + Send {
     /// Add new user and return the newly inserted `user_id`.
     async fn insert_user_and_get_id(&self, username: &str, email: &str, password: &str) -> Result<UserId, Error>;
 
+    /// Change user's password.
+    async fn change_user_password(&self, user_id: i64, new_password: &str) -> Result<(), Error>;
+
     /// Get `User` from `user_id`.
     async fn get_user_from_id(&self, user_id: i64) -> Result<User, Error>;
 
