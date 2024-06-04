@@ -8,7 +8,9 @@ use super::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
 use super::contexts::tag::forms::{AddTagForm, DeleteTagForm};
 use super::contexts::torrent::forms::UpdateTorrentFrom;
 use super::contexts::torrent::requests::InfoHash;
-use super::contexts::user::forms::{LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username};
+use super::contexts::user::forms::{
+    ChangePasswordForm, LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username,
+};
 use super::http::{Query, ReqwestQuery};
 use super::responses::{self, BinaryResponse, TextResponse};
 
@@ -156,6 +158,12 @@ impl Client {
 
     pub async fn login_user(&self, registration_form: LoginForm) -> TextResponse {
         self.http_client.post("/user/login", &registration_form).await
+    }
+
+    pub async fn change_password(&self, username: Username, change_password_form: ChangePasswordForm) -> TextResponse {
+        self.http_client
+            .post(&format!("/user/{}/change-password", &username.value), &change_password_form)
+            .await
     }
 
     pub async fn verify_token(&self, token_verification_form: TokenVerificationForm) -> TextResponse {
@@ -351,13 +359,9 @@ impl Http {
     }
 
     fn base_url(&self, path: &str) -> String {
-        let url = format!(
+        format!(
             "http://{}/{}{path}", // DevSkim: ignore DS137138
             &self.connection_info.bind_address, &self.connection_info.base_path
-        );
-
-        println!("URL: {url}");
-
-        url
+        )
     }
 }

@@ -12,13 +12,13 @@ pub fn assert_added_user_response(response: &TextResponse) {
     assert_json_ok_response(response);
 }
 
-pub fn assert_successful_login_response(response: &TextResponse, registered_user: &RegistrationForm) {
+pub fn assert_successful_login_response(response: &TextResponse, username: &str) {
     let successful_login_response: SuccessfulLoginResponse = serde_json::from_str(&response.body)
         .unwrap_or_else(|_| panic!("response {:#?} should be a SuccessfulLoginResponse", response.body));
 
     let logged_in_user = successful_login_response.data;
 
-    assert_eq!(logged_in_user.username, registered_user.username);
+    assert_eq!(logged_in_user.username, username);
 
     assert_json_ok_response(response);
 }

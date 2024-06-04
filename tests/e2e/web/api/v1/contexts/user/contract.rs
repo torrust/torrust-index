@@ -58,7 +58,10 @@ mod authentication {
     use crate::common::contexts::user::asserts::{
         assert_successful_login_response, assert_token_renewal_response, assert_token_verified_response,
     };
-    use crate::common::contexts::user::forms::{LoginForm, TokenRenewalForm, TokenVerificationForm};
+    use crate::common::contexts::user::fixtures::{DEFAULT_PASSWORD, VALID_PASSWORD};
+    use crate::common::contexts::user::forms::{
+        ChangePasswordForm, LoginForm, TokenRenewalForm, TokenVerificationForm, Username,
+    };
     use crate::e2e::environment::TestEnv;
     use crate::e2e::web::api::v1::contexts::user::steps::{new_logged_in_user, new_registered_user};
 
@@ -78,7 +81,41 @@ mod authentication {
             })
             .await;
 
-        assert_successful_login_response(&response, &registered_user);
+        assert_successful_login_response(&response, &registered_user.username);
+    }
+
+    #[tokio::test]
+    async fn it_should_allow_logged_in_users_to_change_their_passwords() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
+
+        let logged_in_user = new_logged_in_user(&env).await;
+
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_user.token);
+
+        let new_password = VALID_PASSWORD.to_string();
+
+        let response = client
+            .change_password(
+                Username::new(logged_in_user.username.clone()),
+                ChangePasswordForm {
+                    current_password: DEFAULT_PASSWORD.to_string(),
+                    password: new_password.clone(),
+                    confirm_password: new_password.clone(),
+                },
+            )
+            .await;
+
+        assert_eq!(response.status, 200);
+
+        let response = client
+            .login_user(LoginForm {
+                login: logged_in_user.username.clone(),
+                password: new_password,
+            })
+            .await;
+
+        assert_successful_login_response(&response, &logged_in_user.username);
     }
 
     #[tokio::test]
