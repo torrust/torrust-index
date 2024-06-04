@@ -1,22 +1,22 @@
 //! Settings service.
 use std::sync::Arc;
 
-use super::user::DbUserRepository;
+use super::authorization::{self, ACTION};
 use crate::config::{Configuration, ConfigurationPublic, Settings};
 use crate::errors::ServiceError;
 use crate::models::user::UserId;
 
 pub struct Service {
     configuration: Arc<Configuration>,
-    user_repository: Arc<DbUserRepository>,
+    authorization_service: Arc<authorization::Service>,
 }
 
 impl Service {
     #[must_use]
-    pub fn new(configuration: Arc<Configuration>, user_repository: Arc<DbUserRepository>) -> Service {
+    pub fn new(configuration: Arc<Configuration>, authorization_service: Arc<authorization::Service>) -> Service {
         Service {
             configuration,
-            user_repository,
+            authorization_service,
         }
     }
 
@@ -26,13 +26,9 @@ impl Service {
     ///
     /// It returns an error if the user does not have the required permissions.
     pub async fn get_all(&self, user_id: &UserId) -> Result<Settings, ServiceError> {
-        let user = self.user_repository.get_compact(user_id).await?;
-
-        // Check if user is administrator
-        // todo: extract authorization service
-        if !user.administrator {
-            return Err(ServiceError::Unauthorized);
-        }
+        self.authorization_service
+            .authorize(ACTION::GetSettings, Some(*user_id))
+            .await?;
 
         let torrust_index_configuration = self.configuration.get_all().await;
 
@@ -45,13 +41,9 @@ impl Service {
     ///
     /// It returns an error if the user does not have the required permissions.
     pub async fn get_all_masking_secrets(&self, user_id: &UserId) -> Result<Settings, ServiceError> {
-        let user = self.user_repository.get_compact(user_id).await?;
-
-        // Check if user is administrator
-        // todo: extract authorization service
-        if !user.administrator {
-            return Err(ServiceError::Unauthorized);
-        }
+        self.authorization_service
+            .authorize(ACTION::GetSettingsSecret, Some(*user_id))
+            .await?;
 
         let mut torrust_index_configuration = self.configuration.get_all().await;
 
