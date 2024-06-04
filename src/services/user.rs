@@ -95,29 +95,18 @@ impl RegistrationService {
             }
         }
 
-        if registration_form.password != registration_form.confirm_password {
-            return Err(ServiceError::PasswordsDontMatch);
-        }
+        let password_constraints = PasswordConstraints {
+            min_password_length: settings.auth.min_password_length,
+            max_password_length: settings.auth.max_password_length,
+        };
 
-        let password_length = registration_form.password.len();
+        validate_password(
+            &registration_form.password,
+            &registration_form.confirm_password,
+            &password_constraints,
+        )?;
 
-        if password_length <= settings.auth.min_password_length {
-            return Err(ServiceError::PasswordTooShort);
-        }
-
-        if password_length >= settings.auth.max_password_length {
-            return Err(ServiceError::PasswordTooLong);
-        }
-
-        let salt = SaltString::generate(&mut OsRng);
-
-        // Argon2 with default params (Argon2id v19)
-        let argon2 = Argon2::default();
-
-        // Hash password to PHC string ($argon2id$v=19$...)
-        let password_hash = argon2
-            .hash_password(registration_form.password.as_bytes(), &salt)?
-            .to_string();
+        let password_hash = hash_password(&registration_form.password)?;
 
         let user_id = self
             .user_repository
@@ -217,35 +206,24 @@ impl ProfileService {
 
         let settings = self.configuration.settings.read().await;
 
-        // todo:
-        //   - Validate current password
-        //   - Remove duplicate code for password validation and hashing
+        // todo: guard that current password matches the one provided in change password form
 
-        if change_password_form.password != change_password_form.confirm_password {
-            return Err(ServiceError::PasswordsDontMatch);
-        }
+        let password_constraints = PasswordConstraints {
+            min_password_length: settings.auth.min_password_length,
+            max_password_length: settings.auth.max_password_length,
+        };
 
-        let password_length = change_password_form.password.len();
+        validate_password(
+            &change_password_form.password,
+            &change_password_form.confirm_password,
+            &password_constraints,
+        )?;
 
-        if password_length <= settings.auth.min_password_length {
-            return Err(ServiceError::PasswordTooShort);
-        }
+        let password_hash = hash_password(&change_password_form.password)?;
 
-        if password_length >= settings.auth.max_password_length {
-            return Err(ServiceError::PasswordTooLong);
-        }
-
-        let salt = SaltString::generate(&mut OsRng);
-
-        // Argon2 with default params (Argon2id v19)
-        let argon2 = Argon2::default();
-
-        // Hash password to PHC string ($argon2id$v=19$...)
-        let new_password_hash = argon2
-            .hash_password(change_password_form.password.as_bytes(), &salt)?
-            .to_string();
-
-        self.user_authentication_repository.change_password(user_id, &new_password_hash).await?;
+        self.user_authentication_repository
+            .change_password(user_id, &password_hash)
+            .await?;
 
         Ok(())
     }
@@ -428,4 +406,39 @@ impl DbBannedUserList {
 
         self.database.ban_user(*user_id, &reason, date_expiry).await
     }
+}
+
+struct PasswordConstraints {
+    pub min_password_length: usize,
+    pub max_password_length: usize,
+}
+
+fn validate_password(password: &str, confirm_password: &str, password_rules: &PasswordConstraints) -> Result<(), ServiceError> {
+    if password != confirm_password {
+        return Err(ServiceError::PasswordsDontMatch);
+    }
+
+    let password_length = password.len();
+
+    if password_length <= password_rules.min_password_length {
+        return Err(ServiceError::PasswordTooShort);
+    }
+
+    if password_length >= password_rules.max_password_length {
+        return Err(ServiceError::PasswordTooLong);
+    }
+
+    Ok(())
+}
+
+fn hash_password(password: &str) -> Result<String, ServiceError> {
+    let salt = SaltString::generate(&mut OsRng);
+
+    // Argon2 with default params (Argon2id v19)
+    let argon2 = Argon2::default();
+
+    // Hash password to PHC string ($argon2id$v=19$...)
+    let password_hash = argon2.hash_password(password.as_bytes(), &salt)?.to_string();
+
+    Ok(password_hash)
 }
