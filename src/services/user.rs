@@ -17,6 +17,7 @@ use crate::errors::ServiceError;
 use crate::mailer;
 use crate::mailer::VerifyClaims;
 use crate::models::user::{UserCompact, UserId, UserProfile, Username};
+use crate::services::authentication::verify_password;
 use crate::utils::validation::validate_email_address;
 use crate::web::api::server::v1::contexts::user::forms::{ChangePasswordForm, RegistrationForm};
 
@@ -100,7 +101,7 @@ impl RegistrationService {
             max_password_length: settings.auth.max_password_length,
         };
 
-        validate_password(
+        validate_password_constrains(
             &registration_form.password,
             &registration_form.confirm_password,
             &password_constraints,
@@ -196,6 +197,7 @@ impl ProfileService {
     ///
     /// This function will return a:
     ///
+    /// * `ServiceError::InvalidPassword` if the current password supplied is invalid.
     /// * `ServiceError::PasswordsDontMatch` if the supplied passwords do not match.
     /// * `ServiceError::PasswordTooShort` if the supplied password is too short.
     /// * `ServiceError::PasswordTooLong` if the supplied password is too long.
@@ -206,14 +208,19 @@ impl ProfileService {
 
         let settings = self.configuration.settings.read().await;
 
-        // todo: guard that current password matches the one provided in change password form
+        let user_authentication = self
+            .user_authentication_repository
+            .get_user_authentication_from_id(&user_id)
+            .await?;
+
+        verify_password(change_password_form.current_password.as_bytes(), &user_authentication)?;
 
         let password_constraints = PasswordConstraints {
             min_password_length: settings.auth.min_password_length,
             max_password_length: settings.auth.max_password_length,
         };
 
-        validate_password(
+        validate_password_constrains(
             &change_password_form.password,
             &change_password_form.confirm_password,
             &password_constraints,
@@ -413,7 +420,11 @@ struct PasswordConstraints {
     pub max_password_length: usize,
 }
 
-fn validate_password(password: &str, confirm_password: &str, password_rules: &PasswordConstraints) -> Result<(), ServiceError> {
+fn validate_password_constrains(
+    password: &str,
+    confirm_password: &str,
+    password_rules: &PasswordConstraints,
+) -> Result<(), ServiceError> {
     if password != confirm_password {
         return Err(ServiceError::PasswordsDontMatch);
     }

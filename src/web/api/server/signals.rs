@@ -23,7 +23,7 @@ pub async fn graceful_shutdown(handle: axum_server::Handle, rx_halt: tokio::sync
     shutdown_signal_with_message(rx_halt, message).await;
 
     info!("Sending graceful shutdown signal");
-    handle.graceful_shutdown(Some(Duration::from_secs(2)));
+    handle.graceful_shutdown(Some(Duration::from_secs(90)));
 
     println!("!! shuting down in 90 seconds !!");
 

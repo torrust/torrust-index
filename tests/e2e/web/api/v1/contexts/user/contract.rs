@@ -119,6 +119,29 @@ mod authentication {
     }
 
     #[tokio::test]
+    async fn it_should_fail_changing_the_password_if_the_user_does_not_provide_the_current_password() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
+
+        let logged_in_user = new_logged_in_user(&env).await;
+
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_user.token);
+
+        let response = client
+            .change_password(
+                Username::new(logged_in_user.username.clone()),
+                ChangePasswordForm {
+                    current_password: "INVALID PASSWORD".to_string(),
+                    password: VALID_PASSWORD.to_string(),
+                    confirm_password: VALID_PASSWORD.to_string(),
+                },
+            )
+            .await;
+
+        assert_eq!(response.status, 403);
+    }
+
+    #[tokio::test]
     async fn it_should_allow_a_logged_in_user_to_verify_an_authentication_token() {
         let mut env = TestEnv::new();
         env.start(api::Version::V1).await;

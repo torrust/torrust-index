@@ -65,7 +65,7 @@ impl Service {
             .await
             .map_err(|_| ServiceError::InternalServerError)?;
 
-        verify_password(password.as_bytes(), &user_authentication)?;
+        verify_password(password.as_bytes(), &user_authentication).map_err(|_| ServiceError::WrongPasswordOrUsername)?;
 
         let settings = self.configuration.settings.read().await;
 
@@ -191,7 +191,7 @@ impl DbUserAuthenticationRepository {
     /// It returns an error if there is a database error.
     pub async fn change_password(&self, user_id: UserId, password_hash: &str) -> Result<(), Error> {
         self.database.change_user_password(user_id, password_hash).await
-    }    
+    }
 }
 
 /// Verify if the user supplied and the database supplied passwords match
@@ -199,27 +199,27 @@ impl DbUserAuthenticationRepository {
 /// # Errors
 ///
 /// This function will return an error if unable to parse password hash from the stored user authentication value.
-/// This function will return a `ServiceError::WrongPasswordOrUsername` if unable to match the password with either `argon2id` or `pbkdf2-sha256`.
-fn verify_password(password: &[u8], user_authentication: &UserAuthentication) -> Result<(), ServiceError> {
+/// This function will return a `ServiceError::InvalidPassword` if unable to match the password with either `argon2id` or `pbkdf2-sha256`.
+pub fn verify_password(password: &[u8], user_authentication: &UserAuthentication) -> Result<(), ServiceError> {
     // wrap string of the hashed password into a PasswordHash struct for verification
     let parsed_hash = PasswordHash::new(&user_authentication.password_hash)?;
 
     match parsed_hash.algorithm.as_str() {
         "argon2id" => {
             if Argon2::default().verify_password(password, &parsed_hash).is_err() {
-                return Err(ServiceError::WrongPasswordOrUsername);
+                return Err(ServiceError::InvalidPassword);
             }
 
             Ok(())
         }
         "pbkdf2-sha256" => {
             if Pbkdf2.verify_password(password, &parsed_hash).is_err() {
-                return Err(ServiceError::WrongPasswordOrUsername);
+                return Err(ServiceError::InvalidPassword);
             }
 
             Ok(())
         }
-        _ => Err(ServiceError::WrongPasswordOrUsername),
+        _ => Err(ServiceError::InvalidPassword),
     }
 }
 
