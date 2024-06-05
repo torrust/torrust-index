@@ -10,14 +10,16 @@ use log::{debug, info};
 use mockall::automock;
 use pbkdf2::password_hash::rand_core::OsRng;
 
+use super::authentication::DbUserAuthenticationRepository;
 use crate::config::{Configuration, EmailOnSignup};
 use crate::databases::database::{Database, Error};
 use crate::errors::ServiceError;
 use crate::mailer;
 use crate::mailer::VerifyClaims;
 use crate::models::user::{UserCompact, UserId, UserProfile, Username};
+use crate::services::authentication::verify_password;
 use crate::utils::validation::validate_email_address;
-use crate::web::api::server::v1::contexts::user::forms::RegistrationForm;
+use crate::web::api::server::v1::contexts::user::forms::{ChangePasswordForm, RegistrationForm};
 
 /// Since user email could be optional, we need a way to represent "no email"
 /// in the database. This function returns the string that should be used for
@@ -94,29 +96,18 @@ impl RegistrationService {
             }
         }
 
-        if registration_form.password != registration_form.confirm_password {
-            return Err(ServiceError::PasswordsDontMatch);
-        }
+        let password_constraints = PasswordConstraints {
+            min_password_length: settings.auth.min_password_length,
+            max_password_length: settings.auth.max_password_length,
+        };
 
-        let password_length = registration_form.password.len();
+        validate_password_constrains(
+            &registration_form.password,
+            &registration_form.confirm_password,
+            &password_constraints,
+        )?;
 
-        if password_length <= settings.auth.min_password_length {
-            return Err(ServiceError::PasswordTooShort);
-        }
-
-        if password_length >= settings.auth.max_password_length {
-            return Err(ServiceError::PasswordTooLong);
-        }
-
-        let salt = SaltString::generate(&mut OsRng);
-
-        // Argon2 with default params (Argon2id v19)
-        let argon2 = Argon2::default();
-
-        // Hash password to PHC string ($argon2id$v=19$...)
-        let password_hash = argon2
-            .hash_password(registration_form.password.as_bytes(), &salt)?
-            .to_string();
+        let password_hash = hash_password(&registration_form.password)?;
 
         let user_id = self
             .user_repository
@@ -183,6 +174,65 @@ impl RegistrationService {
         };
 
         Ok(true)
+    }
+}
+
+pub struct ProfileService {
+    configuration: Arc<Configuration>,
+    user_authentication_repository: Arc<DbUserAuthenticationRepository>,
+}
+
+impl ProfileService {
+    #[must_use]
+    pub fn new(configuration: Arc<Configuration>, user_repository: Arc<DbUserAuthenticationRepository>) -> Self {
+        Self {
+            configuration,
+            user_authentication_repository: user_repository,
+        }
+    }
+
+    /// It registers a new user.
+    ///
+    /// # Errors
+    ///
+    /// This function will return a:
+    ///
+    /// * `ServiceError::InvalidPassword` if the current password supplied is invalid.
+    /// * `ServiceError::PasswordsDontMatch` if the supplied passwords do not match.
+    /// * `ServiceError::PasswordTooShort` if the supplied password is too short.
+    /// * `ServiceError::PasswordTooLong` if the supplied password is too long.
+    /// * An error if unable to successfully hash the password.
+    /// * An error if unable to change the password in the database.
+    pub async fn change_password(&self, user_id: UserId, change_password_form: &ChangePasswordForm) -> Result<(), ServiceError> {
+        info!("changing user password for user ID: {user_id}");
+
+        let settings = self.configuration.settings.read().await;
+
+        let user_authentication = self
+            .user_authentication_repository
+            .get_user_authentication_from_id(&user_id)
+            .await?;
+
+        verify_password(change_password_form.current_password.as_bytes(), &user_authentication)?;
+
+        let password_constraints = PasswordConstraints {
+            min_password_length: settings.auth.min_password_length,
+            max_password_length: settings.auth.max_password_length,
+        };
+
+        validate_password_constrains(
+            &change_password_form.password,
+            &change_password_form.confirm_password,
+            &password_constraints,
+        )?;
+
+        let password_hash = hash_password(&change_password_form.password)?;
+
+        self.user_authentication_repository
+            .change_password(user_id, &password_hash)
+            .await?;
+
+        Ok(())
     }
 }
 
@@ -363,4 +413,43 @@ impl DbBannedUserList {
 
         self.database.ban_user(*user_id, &reason, date_expiry).await
     }
+}
+
+struct PasswordConstraints {
+    pub min_password_length: usize,
+    pub max_password_length: usize,
+}
+
+fn validate_password_constrains(
+    password: &str,
+    confirm_password: &str,
+    password_rules: &PasswordConstraints,
+) -> Result<(), ServiceError> {
+    if password != confirm_password {
+        return Err(ServiceError::PasswordsDontMatch);
+    }
+
+    let password_length = password.len();
+
+    if password_length <= password_rules.min_password_length {
+        return Err(ServiceError::PasswordTooShort);
+    }
+
+    if password_length >= password_rules.max_password_length {
+        return Err(ServiceError::PasswordTooLong);
+    }
+
+    Ok(())
+}
+
+fn hash_password(password: &str) -> Result<String, ServiceError> {
+    let salt = SaltString::generate(&mut OsRng);
+
+    // Argon2 with default params (Argon2id v19)
+    let argon2 = Argon2::default();
+
+    // Hash password to PHC string ($argon2id$v=19$...)
+    let password_hash = argon2.hash_password(password.as_bytes(), &salt)?.to_string();
+
+    Ok(password_hash)
 }

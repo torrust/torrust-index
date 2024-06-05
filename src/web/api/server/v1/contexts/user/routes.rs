@@ -7,7 +7,8 @@ use axum::routing::{delete, get, post};
 use axum::Router;
 
 use super::handlers::{
-    ban_handler, email_verification_handler, login_handler, registration_handler, renew_token_handler, verify_token_handler,
+    ban_handler, change_password_handler, email_verification_handler, login_handler, registration_handler, renew_token_handler,
+    verify_token_handler,
 };
 use crate::common::AppData;
 
@@ -28,6 +29,11 @@ pub fn router(app_data: Arc<AppData>) -> Router {
         .route("/login", post(login_handler).with_state(app_data.clone()))
         .route("/token/verify", post(verify_token_handler).with_state(app_data.clone()))
         .route("/token/renew", post(renew_token_handler).with_state(app_data.clone()))
+        // Profile
+        .route(
+            "/:user/change-password",
+            post(change_password_handler).with_state(app_data.clone()),
+        )
         // User ban
         // code-review: should not this be a POST method? We add the user to the blacklist. We do not delete the user.
         .route("/ban/:user", delete(ban_handler).with_state(app_data))

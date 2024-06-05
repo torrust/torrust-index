@@ -49,6 +49,7 @@ pub struct AppData {
     pub settings_service: Arc<settings::Service>,
     pub torrent_service: Arc<torrent::Index>,
     pub registration_service: Arc<user::RegistrationService>,
+    pub profile_service: Arc<user::ProfileService>,
     pub ban_service: Arc<user::BanService>,
 }
 
@@ -85,6 +86,7 @@ impl AppData {
         settings_service: Arc<settings::Service>,
         torrent_service: Arc<torrent::Index>,
         registration_service: Arc<user::RegistrationService>,
+        profile_service: Arc<user::ProfileService>,
         ban_service: Arc<user::BanService>,
     ) -> AppData {
         AppData {
@@ -118,6 +120,7 @@ impl AppData {
             settings_service,
             torrent_service,
             registration_service,
+            profile_service,
             ban_service,
         }
     }

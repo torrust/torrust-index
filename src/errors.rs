@@ -30,6 +30,8 @@ pub enum ServiceError {
 
     #[display(fmt = "Invalid username/email or password")]
     WrongPasswordOrUsername,
+    #[display(fmt = "Invalid password")]
+    InvalidPassword,
     #[display(fmt = "Username not found")]
     UsernameNotFound,
     #[display(fmt = "User not found")]
@@ -273,6 +275,7 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::EmailInvalid => StatusCode::BAD_REQUEST,
         ServiceError::NotAUrl => StatusCode::BAD_REQUEST,
         ServiceError::WrongPasswordOrUsername => StatusCode::FORBIDDEN,
+        ServiceError::InvalidPassword => StatusCode::FORBIDDEN,
         ServiceError::UsernameNotFound => StatusCode::NOT_FOUND,
         ServiceError::UserNotFound => StatusCode::NOT_FOUND,
         ServiceError::AccountNotFound => StatusCode::NOT_FOUND,

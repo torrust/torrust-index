@@ -7,7 +7,7 @@ use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 
-use super::forms::{JsonWebToken, LoginForm, RegistrationForm};
+use super::forms::{ChangePasswordForm, JsonWebToken, LoginForm, RegistrationForm};
 use super::responses::{self};
 use crate::common::AppData;
 use crate::web::api::server::v1::extractors::user_id::ExtractLoggedInUser;
@@ -119,6 +119,28 @@ pub async fn renew_token_handler(
 ) -> Response {
     match app_data.authentication_service.renew_token(&token.token).await {
         Ok((token, user_compact)) => responses::renewed_token(token, user_compact).into_response(),
+        Err(error) => error.into_response(),
+    }
+}
+
+/// It changes the user's password.
+///
+/// # Errors
+///
+/// It returns an error if:
+///
+/// - The user account is not found.
+#[allow(clippy::unused_async)]
+pub async fn change_password_handler(
+    State(app_data): State<Arc<AppData>>,
+    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
+    extract::Json(change_password_form): extract::Json<ChangePasswordForm>,
+) -> Response {
+    match app_data.profile_service.change_password(user_id, &change_password_form).await {
+        Ok(()) => Json(OkResponseData {
+            data: format!("Password changed for user with ID: {user_id}"),
+        })
+        .into_response(),
         Err(error) => error.into_response(),
     }
 }

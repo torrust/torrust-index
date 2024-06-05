@@ -120,6 +120,10 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         user_repository.clone(),
         user_profile_repository.clone(),
     ));
+    let profile_service = Arc::new(user::ProfileService::new(
+        configuration.clone(),
+        user_authentication_repository.clone(),
+    ));
     let ban_service = Arc::new(user::BanService::new(
         user_repository.clone(),
         user_profile_repository.clone(),
@@ -164,6 +168,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         settings_service,
         torrent_index,
         registration_service,
+        profile_service,
         ban_service,
     ));
 
