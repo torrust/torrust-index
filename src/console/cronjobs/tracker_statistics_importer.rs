@@ -17,11 +17,11 @@ use axum::extract::State;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use chrono::{DateTime, Utc};
-use log::{debug, error, info};
 use serde_json::{json, Value};
 use text_colorizer::Colorize;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
+use tracing::{debug, error, info};
 
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::utils::clock::seconds_ago_utc;

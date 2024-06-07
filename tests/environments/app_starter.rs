@@ -1,11 +1,11 @@
 use std::net::SocketAddr;
 
-use log::info;
 use tokio::sync::{oneshot, RwLock};
 use tokio::task::JoinHandle;
 use torrust_index::config::Configuration;
 use torrust_index::web::api::Version;
 use torrust_index::{app, config};
+use tracing::info;
 
 /// It launches the app and provides a way to stop it.
 pub struct AppStarter {

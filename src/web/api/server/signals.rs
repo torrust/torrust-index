@@ -2,8 +2,8 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use derive_more::Display;
-use log::info;
 use tokio::time::sleep;
+use tracing::info;
 
 /// This is the message that the "launcher" spawned task sends to the main
 /// application process to notify the service was successfully started.

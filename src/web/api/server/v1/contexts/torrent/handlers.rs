@@ -7,8 +7,8 @@ use std::sync::Arc;
 use axum::extract::{self, Multipart, Path, Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Json;
-use log::debug;
 use serde::Deserialize;
+use tracing::debug;
 use uuid::Uuid;
 
 use super::errors;

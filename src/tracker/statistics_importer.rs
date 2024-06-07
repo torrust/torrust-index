@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
-use log::{debug, error, info};
 use text_colorizer::Colorize;
+use tracing::{debug, error, info};
 use url::Url;
 
 use super::service::{Service, TorrentInfo, TrackerAPIError};

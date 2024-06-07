@@ -152,7 +152,7 @@ impl Service {
 
 fn build_letter(verification_url: &str, username: &str, builder: MessageBuilder) -> Result<Message, ServiceError> {
     let (plain_body, html_body) = build_content(verification_url, username).map_err(|e| {
-        log::error!("{e}");
+        tracing::error!("{e}");
         ServiceError::InternalServerError
     })?;
 

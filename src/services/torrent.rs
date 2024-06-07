@@ -1,8 +1,8 @@
 //! Torrent service.
 use std::sync::Arc;
 
-use log::debug;
 use serde_derive::{Deserialize, Serialize};
+use tracing::debug;
 use url::Url;
 
 use super::category::DbCategoryRepository;

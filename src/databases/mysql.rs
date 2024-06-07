@@ -509,7 +509,7 @@ impl Database for Mysql {
         .map(|v| i64::try_from(v.last_insert_id()).expect("last ID is larger than i64"))
         .map_err(|e| match e {
             sqlx::Error::Database(err) => {
-                log::error!("DB error: {:?}", err);
+                tracing::error!("DB error: {:?}", err);
                 if err.message().contains("Duplicate entry") && err.message().contains("info_hash") {
                     database::Error::TorrentAlreadyExists
                 } else {
@@ -530,7 +530,7 @@ impl Database for Mysql {
                 .await
                 .map(|_| ())
                 .map_err(|err| {
-                    log::error!("DB error: {:?}", err);
+                    tracing::error!("DB error: {:?}", err);
                     database::Error::Error
                 });
 
@@ -683,7 +683,7 @@ impl Database for Mysql {
                 .await
                 .map_err(|e| match e {
                     sqlx::Error::Database(err) => {
-                        log::error!("DB error: {:?}", err);
+                        tracing::error!("DB error: {:?}", err);
                         if err.message().contains("Duplicate entry") && err.message().contains("title") {
                             database::Error::TorrentTitleAlreadyExists
                         } else {
@@ -931,7 +931,7 @@ impl Database for Mysql {
             .await
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
-                    log::error!("DB error: {:?}", err);
+                    tracing::error!("DB error: {:?}", err);
                     if err.message().contains("Duplicate entry") && err.message().contains("title") {
                         database::Error::TorrentTitleAlreadyExists
                     } else {
@@ -989,7 +989,7 @@ impl Database for Mysql {
             .map(|v| i64::try_from(v.last_insert_id()).expect("last ID is larger than i64"))
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
-                    log::error!("DB error: {:?}", err);
+                    tracing::error!("DB error: {:?}", err);
                     if err.message().contains("Duplicate entry") && err.message().contains("name") {
                         database::Error::TagAlreadyExists
                     } else {

@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use derive_more::{Display, Error};
 use hyper::StatusCode;
-use log::{debug, error};
 use serde::{Deserialize, Serialize};
+use tracing::{debug, error};
 use url::Url;
 
 use super::api::{Client, ConnectionInfo};
