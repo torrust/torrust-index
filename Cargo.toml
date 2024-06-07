@@ -96,6 +96,7 @@ tracing = "0.1.40"
 url = { version = "2.5.0", features = ["serde"] }
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
+tracing-subscriber = { version = "0.3.18", features = ["json"] }
 
 [dev-dependencies]
 tempfile = "3"
