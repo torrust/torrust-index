@@ -8,10 +8,10 @@ use std::sync::Arc;
 
 use axum_server::tls_rustls::RustlsConfig;
 use axum_server::Handle;
-use log::{error, info};
 use thiserror::Error;
 use tokio::sync::oneshot::{Receiver, Sender};
 use torrust_index_located_error::LocatedError;
+use tracing::{error, info};
 use v1::routes::router;
 
 use self::signals::{Halted, Started};

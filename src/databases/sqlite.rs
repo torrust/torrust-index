@@ -499,7 +499,7 @@ impl Database for Sqlite {
         .map(|v| v.last_insert_rowid())
         .map_err(|e| match e {
             sqlx::Error::Database(err) => {
-                log::error!("DB error: {:?}", err);
+                tracing::error!("DB error: {:?}", err);
                 if err.message().contains("UNIQUE") && err.message().contains("info_hash") {
                     database::Error::TorrentAlreadyExists
                 } else {
@@ -520,7 +520,7 @@ impl Database for Sqlite {
                 .await
                 .map(|_| ())
                 .map_err(|err| {
-                    log::error!("DB error: {:?}", err);
+                    tracing::error!("DB error: {:?}", err);
                     database::Error::Error
                 });
 
@@ -677,7 +677,7 @@ impl Database for Sqlite {
                 .await
                 .map_err(|e| match e {
                     sqlx::Error::Database(err) => {
-                        log::error!("DB error: {:?}", err);
+                        tracing::error!("DB error: {:?}", err);
                         if err.message().contains("UNIQUE") && err.message().contains("title") {
                             database::Error::TorrentTitleAlreadyExists
                         } else {
@@ -923,7 +923,7 @@ impl Database for Sqlite {
             .await
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
-                    log::error!("DB error: {:?}", err);
+                    tracing::error!("DB error: {:?}", err);
                     if err.message().contains("UNIQUE") && err.message().contains("title") {
                         database::Error::TorrentTitleAlreadyExists
                     } else {
@@ -981,7 +981,7 @@ impl Database for Sqlite {
             .map(|v| v.last_insert_rowid())
             .map_err(|e| match e {
                 sqlx::Error::Database(err) => {
-                    log::error!("DB error: {:?}", err);
+                    tracing::error!("DB error: {:?}", err);
                     if err.message().contains("UNIQUE") && err.message().contains("name") {
                         database::Error::TagAlreadyExists
                     } else {

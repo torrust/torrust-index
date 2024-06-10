@@ -90,7 +90,7 @@ where
             source: Arc::new(self.0),
             location: Box::new(*std::panic::Location::caller()),
         };
-        log::debug!("{e}");
+        tracing::debug!("{e}");
         e
     }
 }

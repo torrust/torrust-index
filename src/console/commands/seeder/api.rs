@@ -1,6 +1,6 @@
 //! Action that a user can perform on a Index website.
-use log::debug;
 use thiserror::Error;
+use tracing::debug;
 
 use crate::web::api::client::v1::client::Client;
 use crate::web::api::client::v1::contexts::category::forms::AddCategoryForm;

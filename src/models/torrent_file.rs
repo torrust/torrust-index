@@ -1,8 +1,8 @@
-use log::error;
 use serde::{Deserialize, Serialize};
 use serde_bencode::ser;
 use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
+use tracing::error;
 use url::Url;
 
 use super::info_hash::InfoHash;

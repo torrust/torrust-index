@@ -133,9 +133,10 @@ use std::time::Duration;
 
 use anyhow::Context;
 use clap::Parser;
-use log::{debug, info, LevelFilter};
 use reqwest::Url;
 use text_colorizer::Colorize;
+use tracing::level_filters::LevelFilter;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use super::api::Error;
@@ -171,7 +172,7 @@ struct Args {
 ///
 /// Will not return any errors for the time being.
 pub async fn run() -> anyhow::Result<()> {
-    logging::setup(LevelFilter::Info);
+    logging::setup(LevelFilter::INFO);
 
     let args = Args::parse();
 

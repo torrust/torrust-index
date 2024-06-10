@@ -5,10 +5,10 @@ use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
 use async_trait::async_trait;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
-use log::{debug, info};
 #[cfg(test)]
 use mockall::automock;
 use pbkdf2::password_hash::rand_core::OsRng;
+use tracing::{debug, info};
 
 use super::authentication::DbUserAuthenticationRepository;
 use crate::config::{Configuration, EmailOnSignup};
