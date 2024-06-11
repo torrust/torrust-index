@@ -52,7 +52,7 @@ TORRUST_INDEX_E2E_SHARED=true \
 # Stop E2E testing environment
 ./contrib/dev-tools/container/e2e/sqlite/mode/public/e2e-env-down.sh || exit 1
 
-# TEST USING A PUBLIC TRACKER
+# TEST USING A PRIVATE TRACKER
 echo "Running E2E tests with a private tracker ..."
 
 # Start E2E testing environment
