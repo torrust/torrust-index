@@ -1,13 +1,6 @@
-p, alice, data1, read
-p, bob, data2, write
-p, data2_admin, data2, read
-p, data2_admin, data2, write
-p, admin, A
-p, testuser, AddCategory
-p, admin, AddCategory
-p, admin, ACTION::DeleteCategory
-
-
-g, alice, data2_admins
-
-g, alice, data2_admin
+p, true, AddCategory
+p, true, DeleteCategory
+p, true, GetSettings
+p, true, GetSettingsSecret
+p, true, AddTag
+p, true, DeleteTag
