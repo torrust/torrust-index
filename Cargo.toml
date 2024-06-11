@@ -42,7 +42,7 @@ binascii = "0"
 bytes = "1"
 camino = { version = "1.1.6", features = ["serde"] }
 chrono = { version = "0", default-features = false, features = ["clock"] }
-clap = { version = "4.5.4", features = ["derive", "env"] }
+clap = { version = "4.5.7", features = ["derive", "env"] }
 derive_more = "0"
 email_address = "0"
 fern = "0"
