@@ -3,6 +3,7 @@ pub mod v1;
 pub mod validator;
 
 use std::env;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use camino::Utf8PathBuf;
@@ -122,15 +123,17 @@ impl From<figment::Error> for Error {
 
 Use https://crates.io/crates/torrust-tracker-primitives for TrackerMode.
 
-Enum variants (Index -> Tracker):
+Enum variants:
 
+  In Index                In Tracker
 - `Public`             -> `Public`
 - `Private`            -> `Private`
 - `Whitelisted`        -> `Listed`
 - `PrivateWhitelisted` -> `PrivateListed`
 
-Enum serialized values (Index -> Tracker):
+Enum serialized values:
 
+  In Index                In Tracker
 - `Public`             -> `public`
 - `Private`            -> `private`
 - `Whitelisted`        -> `listed`
@@ -160,6 +163,22 @@ pub enum TrackerMode {
 impl Default for TrackerMode {
     fn default() -> Self {
         Self::Public
+    }
+}
+
+impl FromStr for TrackerMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Public" => Ok(TrackerMode::Public),
+            "Private" => Ok(TrackerMode::Private),
+            "Whitelisted" => Ok(TrackerMode::Whitelisted),
+            "PrivateWhitelisted" => Ok(TrackerMode::PrivateWhitelisted),
+            _ => Err(format!(
+                "{s} is not a valid tracker mode. Valid values: 'Public', 'Private', 'Whitelisted', 'PrivateWhitelisted' "
+            )),
+        }
     }
 }
 

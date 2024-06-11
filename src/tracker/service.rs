@@ -376,7 +376,9 @@ impl Service {
     /// It builds the announce url appending the user tracker key.
     /// Eg: <https://tracker:7070/USER_TRACKER_KEY>
     fn announce_url_with_key(&self, tracker_key: &TrackerKey) -> Url {
-        Url::parse(&format!("{}/{}", self.tracker_url, tracker_key.key)).unwrap()
+        self.tracker_url
+            .join(&tracker_key.key)
+            .expect("a tracker key should be added to the tracker base URL")
     }
 
     fn invalid_token_body() -> String {

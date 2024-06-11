@@ -1,6 +1,8 @@
 use std::env;
+use std::str::FromStr;
 
 use torrust_index::config::v1::tracker::ApiToken;
+use torrust_index::config::TrackerMode;
 use torrust_index::web::api::Version;
 use url::Url;
 
@@ -75,10 +77,23 @@ impl TestEnv {
         }
     }
 
-    /// Some test requires the real tracker to be running, so they can only
-    /// be run in shared mode.
+    /// Some test requires a real tracker running.
     pub fn provides_a_tracker(&self) -> bool {
-        self.is_shared()
+        self.is_shared() && self.server_settings().is_some()
+    }
+
+    /// Some test requires a real tracker running in `private` mode.
+    pub fn provides_a_private_tracker(&self) -> bool {
+        if !self.is_shared() {
+            return false;
+        };
+
+        match self.server_settings() {
+            Some(settings) => {
+                TrackerMode::from_str(&settings.tracker.mode).expect("it should be a valid tracker mode") == TrackerMode::Private
+            }
+            None => false,
+        }
     }
 
     /// Returns the server starting settings if the servers was already started.

@@ -1,7 +1,3 @@
-# Please override the following settings with environmental variable!
-# tracker::token   -> `TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN`
-# auth::secret_key -> `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__SECRET_KEY`
-
 log_level = "info"
 
 [database]

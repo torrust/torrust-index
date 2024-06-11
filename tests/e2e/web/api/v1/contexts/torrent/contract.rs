@@ -765,6 +765,47 @@ mod for_authenticated_users {
         }
     }
 
+    mod downloading_a_torrent {
+
+        use regex::Regex;
+        use torrust_index::utils::parse_torrent::decode_torrent;
+        use torrust_index::web::api;
+        use url::Url;
+
+        use crate::common::client::Client;
+        use crate::e2e::environment::TestEnv;
+        use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
+        use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
+
+        #[tokio::test]
+        async fn it_should_include_the_tracker_key_when_the_tracker_is_running_in_private_mode() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_private_tracker() {
+                println!("test skipped. It requires a private tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+            // Upload
+            let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            // Download
+            let response = client.download_torrent(&test_torrent.file_info_hash()).await;
+
+            let torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
+
+            let announce_url = Url::parse(&torrent.announce.unwrap()).unwrap();
+
+            let re = Regex::new(r"^http://tracker:7070/[a-zA-Z0-9]{32}$").unwrap(); // DevSkim: ignore DS137138
+
+            assert!(re.is_match(announce_url.as_ref()), "Invalid announce URL: '{announce_url}'.");
+        }
+    }
+
     mod and_non_admins {
 
         use torrust_index::web::api;
