@@ -2,7 +2,7 @@ log_level = "info"
 
 [tracker]
 api_url = "http://tracker:1212"
-mode = "Private"
+mode = "private"
 url = "http://tracker:7070"
 
 [database]

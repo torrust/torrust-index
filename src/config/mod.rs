@@ -2,9 +2,9 @@
 pub mod v1;
 pub mod validator;
 
-use std::env;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::{env, fmt};
 
 use camino::Utf8PathBuf;
 use figment::providers::{Env, Format, Serialized, Toml};
@@ -119,45 +119,29 @@ impl From<figment::Error> for Error {
     }
 }
 
-/* todo:
+// todo: use https://crates.io/crates/torrust-tracker-primitives for TrackerMode.
 
-Use https://crates.io/crates/torrust-tracker-primitives for TrackerMode.
-
-Enum variants:
-
-  In Index                In Tracker
-- `Public`             -> `Public`
-- `Private`            -> `Private`
-- `Whitelisted`        -> `Listed`
-- `PrivateWhitelisted` -> `PrivateListed`
-
-Enum serialized values:
-
-  In Index                In Tracker
-- `Public`             -> `public`
-- `Private`            -> `private`
-- `Whitelisted`        -> `listed`
-- `PrivateWhitelisted` -> `private_listed`
-
-It's a breaking change for the toml config file en the API.
-
-*/
-
-/// See `TrackerMode` in [`torrust-tracker-primitives`](https://docs.rs/torrust-tracker-primitives)
-/// crate for more information.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+/// The mode the tracker will run in.
+///
+/// Refer to [Torrust Tracker Configuration](https://docs.rs/torrust-tracker-configuration)
+/// to know how to configure the tracker to run in each mode.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum TrackerMode {
     /// Will track every new info hash and serve every peer.
+    #[serde(rename = "public")]
     Public,
 
-    /// Will only serve authenticated peers.
+    /// Will only track whitelisted info hashes.
+    #[serde(rename = "listed")]
+    Listed,
+
+    /// Will only serve authenticated peers
+    #[serde(rename = "private")]
     Private,
 
-    /// Will only track whitelisted info hashes.
-    Whitelisted,
-
-    /// Will only track whitelisted info hashes and serve authenticated peers.
-    PrivateWhitelisted,
+    /// Will only track whitelisted info hashes and serve authenticated peers
+    #[serde(rename = "private_listed")]
+    PrivateListed,
 }
 
 impl Default for TrackerMode {
@@ -166,18 +150,28 @@ impl Default for TrackerMode {
     }
 }
 
+impl fmt::Display for TrackerMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let display_str = match self {
+            TrackerMode::Public => "public",
+            TrackerMode::Listed => "listed",
+            TrackerMode::Private => "private",
+            TrackerMode::PrivateListed => "private_listed",
+        };
+        write!(f, "{display_str}")
+    }
+}
+
 impl FromStr for TrackerMode {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Public" => Ok(TrackerMode::Public),
-            "Private" => Ok(TrackerMode::Private),
-            "Whitelisted" => Ok(TrackerMode::Whitelisted),
-            "PrivateWhitelisted" => Ok(TrackerMode::PrivateWhitelisted),
-            _ => Err(format!(
-                "{s} is not a valid tracker mode. Valid values: 'Public', 'Private', 'Whitelisted', 'PrivateWhitelisted' "
-            )),
+        match s.to_lowercase().as_str() {
+            "public" => Ok(TrackerMode::Public),
+            "listed" => Ok(TrackerMode::Listed),
+            "private" => Ok(TrackerMode::Private),
+            "private_listed" => Ok(TrackerMode::PrivateListed),
+            _ => Err(format!("Unknown tracker mode: {s}")),
         }
     }
 }
@@ -185,7 +179,7 @@ impl FromStr for TrackerMode {
 impl TrackerMode {
     #[must_use]
     pub fn is_open(&self) -> bool {
-        matches!(self, TrackerMode::Public | TrackerMode::Whitelisted)
+        matches!(self, TrackerMode::Public | TrackerMode::Listed)
     }
 
     #[must_use]
@@ -336,7 +330,7 @@ mod tests {
 
                                 [tracker]
                                 url = "udp://localhost:6969"
-                                mode = "Public"
+                                mode = "public"
                                 api_url = "http://localhost:1212/"
                                 token = "MyAccessToken"
                                 token_valid_seconds = 7257600

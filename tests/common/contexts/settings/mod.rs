@@ -113,7 +113,7 @@ impl From<DomainTracker> for Tracker {
     fn from(tracker: DomainTracker) -> Self {
         Self {
             url: tracker.url,
-            mode: format!("{:?}", tracker.mode),
+            mode: tracker.mode.to_string(),
             api_url: tracker.api_url,
             token: tracker.token,
             token_valid_seconds: tracker.token_valid_seconds,

@@ -58,7 +58,7 @@
 //! ```toml
 //! [tracker]
 //! url = "udp://localhost:6969"
-//! mode = "Public"
+//! mode = "public"
 //! api_url = "http://localhost:1212/"
 //! token = "MyAccessToken"
 //! token_valid_seconds = 7257600
@@ -171,7 +171,7 @@
 //!
 //! [tracker]
 //! url = "udp://localhost:6969"
-//! mode = "Public"
+//! mode = "public"
 //! api_url = "http://localhost:1212/"
 //! token = "MyAccessToken"
 //! token_valid_seconds = 7257600
