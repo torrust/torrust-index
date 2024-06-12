@@ -6,8 +6,8 @@ use url::Url;
 use crate::config::v1::tracker::ApiToken;
 use crate::config::{
     Api as DomainApi, Auth as DomainAuth, Database as DomainDatabase, ImageCache as DomainImageCache, Mail as DomainMail,
-    Network as DomainNetwork, Settings as DomainSettings, Tracker as DomainTracker,
-    TrackerStatisticsImporter as DomainTrackerStatisticsImporter, Website as DomainWebsite,
+    Network as DomainNetwork, PasswordConstraints as DomainPasswordConstraints, Settings as DomainSettings,
+    Tracker as DomainTracker, TrackerStatisticsImporter as DomainTrackerStatisticsImporter, Website as DomainWebsite,
 };
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -46,9 +46,14 @@ pub struct Network {
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Auth {
     pub email_on_signup: String,
+    pub secret_key: String,
+    pub password_constraints: PasswordConstraints,
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+pub struct PasswordConstraints {
     pub min_password_length: usize,
     pub max_password_length: usize,
-    pub secret_key: String,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -135,9 +140,17 @@ impl From<DomainAuth> for Auth {
     fn from(auth: DomainAuth) -> Self {
         Self {
             email_on_signup: format!("{:?}", auth.email_on_signup),
-            min_password_length: auth.min_password_length,
-            max_password_length: auth.max_password_length,
             secret_key: auth.secret_key.to_string(),
+            password_constraints: auth.password_constraints.into(),
+        }
+    }
+}
+
+impl From<DomainPasswordConstraints> for PasswordConstraints {
+    fn from(password_constraints: DomainPasswordConstraints) -> Self {
+        Self {
+            min_password_length: password_constraints.min_password_length,
+            max_password_length: password_constraints.max_password_length,
         }
     }
 }

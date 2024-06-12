@@ -30,6 +30,7 @@ pub type Tracker = v1::tracker::Tracker;
 pub type Logging = v1::logging::Logging;
 pub type Website = v1::website::Website;
 pub type EmailOnSignup = v1::auth::EmailOnSignup;
+pub type PasswordConstraints = v1::auth::PasswordConstraints;
 
 /// Prefix for env vars that overwrite configuration options.
 const CONFIG_OVERRIDE_PREFIX: &str = "TORRUST_INDEX_CONFIG_OVERRIDE_";
@@ -344,10 +345,12 @@ mod tests {
 
                                 [auth]
                                 email_on_signup = "optional"
-                                min_password_length = 6
-                                max_password_length = 64
                                 secret_key = "MaxVerstappenWC2021"
 
+                                [auth.password_constraints]
+                                min_password_length = 6
+                                max_password_length = 64
+                                
                                 [database]
                                 connect_url = "sqlite://data.db?mode=rwc"
 

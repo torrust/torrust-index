@@ -181,9 +181,11 @@
 //!
 //! [auth]
 //! email_on_signup = "optional"
+//! secret_key = "MaxVerstappenWC2021"
+//!
+//! [auth.password_constraints]
 //! min_password_length = 6
 //! max_password_length = 64
-//! secret_key = "MaxVerstappenWC2021"
 //!
 //! [database]
 //! connect_url = "sqlite://data.db?mode=rwc"

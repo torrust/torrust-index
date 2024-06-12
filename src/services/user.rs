@@ -11,7 +11,7 @@ use pbkdf2::password_hash::rand_core::OsRng;
 use tracing::{debug, info};
 
 use super::authentication::DbUserAuthenticationRepository;
-use crate::config::{Configuration, EmailOnSignup};
+use crate::config::{Configuration, EmailOnSignup, PasswordConstraints};
 use crate::databases::database::{Database, Error};
 use crate::errors::ServiceError;
 use crate::mailer;
@@ -97,11 +97,11 @@ impl RegistrationService {
         }
 
         let password_constraints = PasswordConstraints {
-            min_password_length: settings.auth.min_password_length,
-            max_password_length: settings.auth.max_password_length,
+            min_password_length: settings.auth.password_constraints.min_password_length,
+            max_password_length: settings.auth.password_constraints.max_password_length,
         };
 
-        validate_password_constrains(
+        validate_password_constraints(
             &registration_form.password,
             &registration_form.confirm_password,
             &password_constraints,
@@ -216,11 +216,11 @@ impl ProfileService {
         verify_password(change_password_form.current_password.as_bytes(), &user_authentication)?;
 
         let password_constraints = PasswordConstraints {
-            min_password_length: settings.auth.min_password_length,
-            max_password_length: settings.auth.max_password_length,
+            min_password_length: settings.auth.password_constraints.min_password_length,
+            max_password_length: settings.auth.password_constraints.max_password_length,
         };
 
-        validate_password_constrains(
+        validate_password_constraints(
             &change_password_form.password,
             &change_password_form.confirm_password,
             &password_constraints,
@@ -415,12 +415,7 @@ impl DbBannedUserList {
     }
 }
 
-struct PasswordConstraints {
-    pub min_password_length: usize,
-    pub max_password_length: usize,
-}
-
-fn validate_password_constrains(
+fn validate_password_constraints(
     password: &str,
     confirm_password: &str,
     password_rules: &PasswordConstraints,
