@@ -133,7 +133,7 @@ impl From<DomainNetwork> for Network {
 impl From<DomainAuth> for Auth {
     fn from(auth: DomainAuth) -> Self {
         Self {
-            email_on_signup: format!("{:?}", auth.email_on_signup),
+            email_on_signup: auth.email_on_signup.to_string(),
             min_password_length: auth.min_password_length,
             max_password_length: auth.max_password_length,
             secret_key: auth.secret_key.to_string(),

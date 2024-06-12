@@ -339,7 +339,7 @@ mod tests {
                                 port = 3001
 
                                 [auth]
-                                email_on_signup = "Optional"
+                                email_on_signup = "optional"
                                 min_password_length = 6
                                 max_password_length = 64
                                 secret_key = "MaxVerstappenWC2021"

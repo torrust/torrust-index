@@ -1,4 +1,5 @@
 use std::fmt;
+use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
 
@@ -50,6 +51,7 @@ impl Auth {
 
 /// Whether the email is required on signup or not.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum EmailOnSignup {
     /// The email is required on signup.
     Required,
@@ -62,6 +64,30 @@ pub enum EmailOnSignup {
 impl Default for EmailOnSignup {
     fn default() -> Self {
         Self::Optional
+    }
+}
+
+impl fmt::Display for EmailOnSignup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let display_str = match self {
+            EmailOnSignup::Required => "required",
+            EmailOnSignup::Optional => "optional",
+            EmailOnSignup::None => "none",
+        };
+        write!(f, "{display_str}")
+    }
+}
+
+impl FromStr for EmailOnSignup {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "required" => Ok(EmailOnSignup::Required),
+            "optional" => Ok(EmailOnSignup::Optional),
+            "none" => Ok(EmailOnSignup::None),
+            _ => Err(format!("Unknown config 'email_on_signup' option (required, optional, none): {s}")),
+        }
     }
 }
 
