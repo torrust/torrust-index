@@ -86,7 +86,7 @@ impl RegistrationService {
                 }
                 registration_form.email.clone()
             }
-            EmailOnSignup::None => None,
+            EmailOnSignup::Ignored => None,
             EmailOnSignup::Optional => registration_form.email.clone(),
         };
 

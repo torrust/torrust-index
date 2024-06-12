@@ -58,7 +58,7 @@ pub enum EmailOnSignup {
     /// The email is optional on signup.
     Optional,
     /// The email is not allowed on signup. It will only be ignored if provided.
-    None, // code-review: rename to `Ignored`?
+    Ignored,
 }
 
 impl Default for EmailOnSignup {
@@ -72,7 +72,7 @@ impl fmt::Display for EmailOnSignup {
         let display_str = match self {
             EmailOnSignup::Required => "required",
             EmailOnSignup::Optional => "optional",
-            EmailOnSignup::None => "none",
+            EmailOnSignup::Ignored => "ignored",
         };
         write!(f, "{display_str}")
     }
@@ -85,8 +85,10 @@ impl FromStr for EmailOnSignup {
         match s.to_lowercase().as_str() {
             "required" => Ok(EmailOnSignup::Required),
             "optional" => Ok(EmailOnSignup::Optional),
-            "none" => Ok(EmailOnSignup::None),
-            _ => Err(format!("Unknown config 'email_on_signup' option (required, optional, none): {s}")),
+            "none" => Ok(EmailOnSignup::Ignored),
+            _ => Err(format!(
+                "Unknown config 'email_on_signup' option (required, optional, ignored): {s}"
+            )),
         }
     }
 }
