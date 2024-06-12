@@ -1,6 +1,6 @@
 use tempfile::TempDir;
 use torrust_index::config;
-use torrust_index::config::v1::LogLevel;
+use torrust_index::config::v1::logging::LogLevel;
 use torrust_index::config::FREE_PORT;
 use torrust_index::web::api::Version;
 use url::Url;
@@ -72,10 +72,9 @@ impl Default for TestEnv {
 
 /// Provides a configuration with ephemeral data for testing.
 fn ephemeral(temp_dir: &TempDir) -> config::Settings {
-    let mut configuration = config::Settings {
-        log_level: Some(LogLevel::Off), // Change to `debug` for tests debugging
-        ..config::Settings::default()
-    };
+    let mut configuration = config::Settings::default();
+
+    configuration.logging.log_level = LogLevel::Off; // Change to `debug` for tests debugging
 
     // Ephemeral API port
     configuration.net.port = FREE_PORT;

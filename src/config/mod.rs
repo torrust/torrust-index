@@ -27,6 +27,7 @@ pub type Mail = v1::mail::Mail;
 pub type Network = v1::net::Network;
 pub type TrackerStatisticsImporter = v1::tracker_statistics_importer::TrackerStatisticsImporter;
 pub type Tracker = v1::tracker::Tracker;
+pub type Logging = v1::logging::Logging;
 pub type Website = v1::website::Website;
 pub type EmailOnSignup = v1::auth::EmailOnSignup;
 
@@ -325,7 +326,10 @@ mod tests {
 
     #[cfg(test)]
     fn default_config_toml() -> String {
-        let config = r#"[website]
+        let config = r#"[logging]
+                                log_level = "info"
+
+                                [website]
                                 name = "Torrust"
 
                                 [tracker]

@@ -2,12 +2,14 @@ pub mod api;
 pub mod auth;
 pub mod database;
 pub mod image_cache;
+pub mod logging;
 pub mod mail;
 pub mod net;
 pub mod tracker;
 pub mod tracker_statistics_importer;
 pub mod website;
 
+use logging::Logging;
 use serde::{Deserialize, Serialize};
 
 use self::api::Api;
@@ -24,10 +26,9 @@ use super::validator::{ValidationError, Validator};
 /// The whole configuration for the index.
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Settings {
-    /// Logging level. Possible values are: `Off`, `Error`, `Warn`, `Info`,
-    /// `Debug` and `Trace`. Default is `Info`.
+    /// The logging configuration.
     #[serde(default)]
-    pub log_level: Option<LogLevel>,
+    pub logging: Logging,
     /// The website customizable values.
     #[serde(default)]
     pub website: Website,
@@ -72,21 +73,4 @@ impl Validator for Settings {
     fn validate(&self) -> Result<(), ValidationError> {
         self.tracker.validate()
     }
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum LogLevel {
-    /// A level lower than all log levels.
-    Off,
-    /// Corresponds to the `Error` log level.
-    Error,
-    /// Corresponds to the `Warn` log level.
-    Warn,
-    /// Corresponds to the `Info` log level.
-    Info,
-    /// Corresponds to the `Debug` log level.
-    Debug,
-    /// Corresponds to the `Trace` log level.
-    Trace,
 }

@@ -38,7 +38,7 @@ pub struct Running {
 /// It panics if there is an error connecting to the database.
 #[allow(clippy::too_many_lines)]
 pub async fn run(configuration: Configuration, api_version: &Version) -> Running {
-    let log_level = configuration.settings.read().await.log_level.clone();
+    let log_level = configuration.settings.read().await.logging.log_level.clone();
 
     logging::setup(&log_level);
 

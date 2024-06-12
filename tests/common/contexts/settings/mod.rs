@@ -3,14 +3,15 @@ pub mod responses;
 use serde::{Deserialize, Serialize};
 use torrust_index::config::v1::tracker::ApiToken;
 use torrust_index::config::{
-    Api as DomainApi, Auth as DomainAuth, Database as DomainDatabase, ImageCache as DomainImageCache, Mail as DomainMail,
-    Network as DomainNetwork, Settings as DomainSettings, Tracker as DomainTracker,
+    Api as DomainApi, Auth as DomainAuth, Database as DomainDatabase, ImageCache as DomainImageCache, Logging as DomainLogging,
+    Mail as DomainMail, Network as DomainNetwork, Settings as DomainSettings, Tracker as DomainTracker,
     TrackerStatisticsImporter as DomainTrackerStatisticsImporter, Website as DomainWebsite,
 };
 use url::Url;
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Settings {
+    pub logging: Logging,
     pub website: Website,
     pub tracker: Tracker,
     pub net: Network,
@@ -20,6 +21,11 @@ pub struct Settings {
     pub image_cache: ImageCache,
     pub api: Api,
     pub tracker_statistics_importer: TrackerStatisticsImporter,
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+pub struct Logging {
+    pub log_level: String,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -90,6 +96,7 @@ pub struct TrackerStatisticsImporter {
 impl From<DomainSettings> for Settings {
     fn from(settings: DomainSettings) -> Self {
         Settings {
+            logging: Logging::from(settings.logging),
             website: Website::from(settings.website),
             tracker: Tracker::from(settings.tracker),
             net: Network::from(settings.net),
@@ -99,6 +106,14 @@ impl From<DomainSettings> for Settings {
             image_cache: ImageCache::from(settings.image_cache),
             api: Api::from(settings.api),
             tracker_statistics_importer: TrackerStatisticsImporter::from(settings.tracker_statistics_importer),
+        }
+    }
+}
+
+impl From<DomainLogging> for Logging {
+    fn from(logging: DomainLogging) -> Self {
+        Self {
+            log_level: logging.log_level.to_string(),
         }
     }
 }
