@@ -17,12 +17,14 @@ pub struct Network {
     /// If not set, the base URL will be inferred from the request.
     #[serde(default = "Network::default_base_url")]
     pub base_url: Option<Url>,
+
     /// The address the tracker will bind to.
     /// The format is `ip:port`, for example `0.0.0.0:6969`. If you want to
     /// listen to all interfaces, use `0.0.0.0`. If you want the operating
     /// system to choose a random port, use port `0`.
     #[serde(default = "Network::default_bind_address")]
     pub bind_address: SocketAddr,
+
     /// TSL configuration.
     #[serde(default = "Network::default_tsl")]
     pub tsl: Option<Tsl>,

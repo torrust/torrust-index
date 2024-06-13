@@ -347,11 +347,11 @@ mod tests {
                                 name = "Torrust"
 
                                 [tracker]
-                                url = "udp://localhost:6969"
-                                mode = "public"
                                 api_url = "http://localhost:1212/"
+                                mode = "public"
                                 token = "MyAccessToken"
                                 token_valid_seconds = 7257600
+                                url = "udp://localhost:6969"
 
                                 [net]
                                 bind_address = "0.0.0.0:3001"
@@ -361,9 +361,9 @@ mod tests {
                                 secret_key = "MaxVerstappenWC2021"
 
                                 [auth.password_constraints]
-                                min_password_length = 6
                                 max_password_length = 64
-                                
+                                min_password_length = 6
+
                                 [database]
                                 connect_url = "sqlite://data.db?mode=rwc"
 
@@ -381,19 +381,19 @@ mod tests {
                                 username = ""
 
                                 [image_cache]
-                                max_request_timeout_ms = 1000
                                 capacity = 128000000
                                 entry_size_limit = 4000000
-                                user_quota_period_seconds = 3600
+                                max_request_timeout_ms = 1000
                                 user_quota_bytes = 64000000
+                                user_quota_period_seconds = 3600
 
                                 [api]
                                 default_torrent_page_size = 10
                                 max_torrent_page_size = 30
 
                                 [tracker_statistics_importer]
-                                torrent_info_update_interval = 3600
                                 port = 3002
+                                torrent_info_update_interval = 3600
         "#
         .lines()
         .map(str::trim_start)

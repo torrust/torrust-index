@@ -9,9 +9,11 @@ pub struct Auth {
     /// Whether or not to require an email on signup.
     #[serde(default = "Auth::default_email_on_signup")]
     pub email_on_signup: EmailOnSignup,
+
     /// The secret key used to sign JWT tokens.
     #[serde(default = "Auth::default_secret_key")]
     pub secret_key: SecretKey,
+
     /// The password constraints
     #[serde(default = "Auth::default_password_constraints")]
     pub password_constraints: PasswordConstraints,
@@ -117,19 +119,19 @@ impl fmt::Display for SecretKey {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PasswordConstraints {
-    /// The minimum password length.
-    #[serde(default = "PasswordConstraints::default_min_password_length")]
-    pub min_password_length: usize,
     /// The maximum password length.
     #[serde(default = "PasswordConstraints::default_max_password_length")]
     pub max_password_length: usize,
+    /// The minimum password length.
+    #[serde(default = "PasswordConstraints::default_min_password_length")]
+    pub min_password_length: usize,
 }
 
 impl Default for PasswordConstraints {
     fn default() -> Self {
         Self {
-            min_password_length: Self::default_min_password_length(),
             max_password_length: Self::default_max_password_length(),
+            min_password_length: Self::default_min_password_length(),
         }
     }
 }

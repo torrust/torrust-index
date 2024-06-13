@@ -6,6 +6,7 @@ pub struct Api {
     /// The default page size for torrent lists.
     #[serde(default = "Api::default_default_torrent_page_size")]
     pub default_torrent_page_size: u8,
+
     /// The maximum page size for torrent lists.
     #[serde(default = "Api::default_max_torrent_page_size")]
     pub max_torrent_page_size: u8,

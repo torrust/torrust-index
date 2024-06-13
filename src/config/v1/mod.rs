@@ -29,30 +29,39 @@ pub struct Settings {
     /// The logging configuration.
     #[serde(default)]
     pub logging: Logging,
+
     /// The website customizable values.
     #[serde(default)]
     pub website: Website,
+
     /// The tracker configuration.
     #[serde(default)]
     pub tracker: Tracker,
+
     /// The network configuration.
     #[serde(default)]
     pub net: Network,
+
     /// The authentication configuration.
     #[serde(default)]
     pub auth: Auth,
+
     /// The database configuration.
     #[serde(default)]
     pub database: Database,
+
     /// The SMTP configuration.
     #[serde(default)]
     pub mail: Mail,
+
     /// The image proxy cache configuration.
     #[serde(default)]
     pub image_cache: ImageCache,
+
     /// The API configuration.
     #[serde(default)]
     pub api: Api,
+
     /// The tracker statistics importer job configuration.
     #[serde(default)]
     pub tracker_statistics_importer: TrackerStatisticsImporter,

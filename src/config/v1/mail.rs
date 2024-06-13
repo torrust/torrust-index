@@ -7,12 +7,15 @@ pub struct Mail {
     /// Whether or not to enable email verification on signup.
     #[serde(default = "Mail::default_email_verification_enabled")]
     pub email_verification_enabled: bool,
+
     /// The email address to send emails from.
     #[serde(default = "Mail::default_from")]
     pub from: Mailbox,
+
     /// The email address to reply to.
     #[serde(default = "Mail::default_reply_to")]
     pub reply_to: Mailbox,
+
     /// The SMTP server configuration.
     #[serde(default = "Mail::default_smtp")]
     pub smtp: Smtp,
