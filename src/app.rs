@@ -57,8 +57,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let importer_torrent_info_update_interval = settings.tracker_statistics_importer.torrent_info_update_interval;
     let importer_port = settings.tracker_statistics_importer.port;
     // From [net] config
-    let net_ip = settings.net.bind_address.ip().to_string();
-    let net_port = settings.net.bind_address.port();
+    let config_bind_address = settings.net.bind_address;
     let opt_net_tsl = settings.net.tsl.clone();
 
     // IMPORTANT: drop settings before starting server to avoid read locks that
@@ -181,7 +180,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     );
 
     // Start API server
-    let running_api = web::api::start(app_data, &net_ip, net_port, opt_net_tsl, api_version).await;
+    let running_api = web::api::start(app_data, config_bind_address, opt_net_tsl, api_version).await;
 
     // Full running application
     Running {
