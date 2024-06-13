@@ -58,7 +58,7 @@
 //! ```toml
 //! [tracker]
 //! url = "udp://localhost:6969"
-//! mode = "Public"
+//! mode = "public"
 //! api_url = "http://localhost:1212/"
 //! token = "MyAccessToken"
 //! token_valid_seconds = 7257600
@@ -171,19 +171,21 @@
 //!
 //! [tracker]
 //! url = "udp://localhost:6969"
-//! mode = "Public"
+//! mode = "public"
 //! api_url = "http://localhost:1212/"
 //! token = "MyAccessToken"
 //! token_valid_seconds = 7257600
 //!
 //! [net]
-//! port = 3001
+//! bind_address = "0.0.0.0:3001"
 //!
 //! [auth]
-//! email_on_signup = "Optional"
+//! email_on_signup = "optional"
+//! secret_key = "MaxVerstappenWC2021"
+//!
+//! [auth.password_constraints]
 //! min_password_length = 6
 //! max_password_length = 64
-//! secret_key = "MaxVerstappenWC2021"
 //!
 //! [database]
 //! connect_url = "sqlite://data.db?mode=rwc"
@@ -192,10 +194,14 @@
 //! email_verification_enabled = false
 //! from = "example@email.com"
 //! reply_to = "noreply@email.com"
-//! username = ""
-//! password = ""
-//! server = ""
+//!
+//! [mail.smtp]
 //! port = 25
+//! server = ""
+//!
+//! [mail.smtp.credentials]
+//! password = ""
+//! username = ""
 //!
 //! [image_cache]
 //! max_request_timeout_ms = 1000

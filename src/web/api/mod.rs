@@ -38,12 +38,11 @@ pub struct Running {
 #[must_use]
 pub async fn start(
     app_data: Arc<AppData>,
-    net_ip: &str,
-    net_port: u16,
+    config_bind_address: SocketAddr,
     opt_tsl: Option<Tsl>,
     implementation: &Version,
 ) -> api::Running {
     match implementation {
-        Version::V1 => server::start(app_data, net_ip, net_port, opt_tsl).await,
+        Version::V1 => server::start(app_data, config_bind_address, opt_tsl).await,
     }
 }

@@ -1,8 +1,9 @@
+[logging]
 log_level = "info"
 
 [database]
 connect_url = "sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc"
 
-[mail]
+[mail.smtp]
 port = 1025
 server = "mailcatcher"

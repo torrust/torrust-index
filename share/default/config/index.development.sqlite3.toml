@@ -1,3 +1,4 @@
+[logging]
 log_level = "info"
 
 # Uncomment if you want to enable TSL for development

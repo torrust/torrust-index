@@ -46,8 +46,7 @@
 //! ```toml
 //! [auth]
 //! email_on_signup = "Optional"
-//! min_password_length = 6
-//! max_password_length = 64
+//! secret_key = "MaxVerstappenWC2021"
 //! ```
 //!
 //! Refer to the [`RegistrationForm`](crate::web::api::server::v1::contexts::user::forms::RegistrationForm)

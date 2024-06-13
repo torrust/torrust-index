@@ -28,11 +28,7 @@ pub type DynError = Arc<dyn std::error::Error + Send + Sync>;
 /// # Panics
 ///
 /// Panics if the API server can't be started.
-pub async fn start(app_data: Arc<AppData>, net_ip: &str, net_port: u16, opt_tsl: Option<Tsl>) -> Running {
-    let config_socket_addr: SocketAddr = format!("{net_ip}:{net_port}")
-        .parse()
-        .expect("API server socket address to be valid.");
-
+pub async fn start(app_data: Arc<AppData>, config_bind_address: SocketAddr, opt_tsl: Option<Tsl>) -> Running {
     let opt_rust_tls_config = make_rust_tls(&opt_tsl)
         .await
         .map(|tls| tls.expect("it should have a valid net tls configuration"));
@@ -42,9 +38,9 @@ pub async fn start(app_data: Arc<AppData>, net_ip: &str, net_port: u16, opt_tsl:
 
     // Run the API server
     let join_handle = tokio::spawn(async move {
-        info!("Starting API server with net config: {} ...", config_socket_addr);
+        info!("Starting API server with net config: {} ...", config_bind_address);
 
-        start_server(config_socket_addr, app_data.clone(), tx_start, rx_halt, opt_rust_tls_config).await;
+        start_server(config_bind_address, app_data.clone(), tx_start, rx_halt, opt_rust_tls_config).await;
 
         info!("API server stopped");
 

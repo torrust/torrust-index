@@ -9,23 +9,27 @@ use crate::config::TrackerMode;
 /// Configuration for the associated tracker.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Tracker {
-    /// Connection string for the tracker. For example: `udp://TRACKER_IP:6969`.
-    #[serde(default = "Tracker::default_url")]
-    pub url: Url,
+    /// The url of the tracker API. For example: `http://localhost:1212/`.
+    #[serde(default = "Tracker::default_api_url")]
+    pub api_url: Url,
+
     /// The mode of the tracker. For example: `Public`.
     /// See `TrackerMode` in [`torrust-tracker-primitives`](https://docs.rs/torrust-tracker-primitives)
     /// crate for more information.
     #[serde(default = "Tracker::default_mode")]
     pub mode: TrackerMode,
-    /// The url of the tracker API. For example: `http://localhost:1212/`.
-    #[serde(default = "Tracker::default_api_url")]
-    pub api_url: Url,
+
     /// The token used to authenticate with the tracker API.
     #[serde(default = "Tracker::default_token")]
     pub token: ApiToken,
+
     /// The amount of seconds the tracker API token is valid.
     #[serde(default = "Tracker::default_token_valid_seconds")]
     pub token_valid_seconds: u64,
+
+    /// Connection string for the tracker. For example: `udp://TRACKER_IP:6969`.
+    #[serde(default = "Tracker::default_url")]
+    pub url: Url,
 }
 
 impl Validator for Tracker {

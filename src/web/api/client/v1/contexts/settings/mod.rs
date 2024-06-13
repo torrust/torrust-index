@@ -1,12 +1,15 @@
 pub mod responses;
 
+use std::net::SocketAddr;
+
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::config::v1::tracker::ApiToken;
 use crate::config::{
-    Api as DomainApi, Auth as DomainAuth, Database as DomainDatabase, ImageCache as DomainImageCache, Mail as DomainMail,
-    Network as DomainNetwork, Settings as DomainSettings, Tracker as DomainTracker,
+    Api as DomainApi, Auth as DomainAuth, Credentials as DomainCredentials, Database as DomainDatabase,
+    ImageCache as DomainImageCache, Mail as DomainMail, Network as DomainNetwork,
+    PasswordConstraints as DomainPasswordConstraints, Settings as DomainSettings, Smtp as DomainSmtp, Tracker as DomainTracker,
     TrackerStatisticsImporter as DomainTrackerStatisticsImporter, Website as DomainWebsite,
 };
 
@@ -39,16 +42,21 @@ pub struct Tracker {
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Network {
-    pub port: u16,
     pub base_url: Option<String>,
+    pub bind_address: SocketAddr,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Auth {
     pub email_on_signup: String,
+    pub secret_key: String,
+    pub password_constraints: PasswordConstraints,
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+pub struct PasswordConstraints {
     pub min_password_length: usize,
     pub max_password_length: usize,
-    pub secret_key: String,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -61,10 +69,20 @@ pub struct Mail {
     pub email_verification_enabled: bool,
     pub from: String,
     pub reply_to: String,
-    pub username: String,
-    pub password: String,
+    pub smtp: Smtp,
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+pub struct Smtp {
     pub server: String,
     pub port: u16,
+    pub credentials: Credentials,
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+pub struct Credentials {
+    pub username: String,
+    pub password: String,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -125,8 +143,8 @@ impl From<DomainTracker> for Tracker {
 impl From<DomainNetwork> for Network {
     fn from(net: DomainNetwork) -> Self {
         Self {
-            port: net.port,
             base_url: net.base_url.map(|url_without_port| url_without_port.to_string()),
+            bind_address: net.bind_address,
         }
     }
 }
@@ -135,9 +153,17 @@ impl From<DomainAuth> for Auth {
     fn from(auth: DomainAuth) -> Self {
         Self {
             email_on_signup: format!("{:?}", auth.email_on_signup),
-            min_password_length: auth.min_password_length,
-            max_password_length: auth.max_password_length,
             secret_key: auth.secret_key.to_string(),
+            password_constraints: auth.password_constraints.into(),
+        }
+    }
+}
+
+impl From<DomainPasswordConstraints> for PasswordConstraints {
+    fn from(password_constraints: DomainPasswordConstraints) -> Self {
+        Self {
+            min_password_length: password_constraints.min_password_length,
+            max_password_length: password_constraints.max_password_length,
         }
     }
 }
@@ -156,10 +182,26 @@ impl From<DomainMail> for Mail {
             email_verification_enabled: mail.email_verification_enabled,
             from: mail.from.to_string(),
             reply_to: mail.reply_to.to_string(),
-            username: mail.username,
-            password: mail.password,
-            server: mail.server,
-            port: mail.port,
+            smtp: Smtp::from(mail.smtp),
+        }
+    }
+}
+
+impl From<DomainSmtp> for Smtp {
+    fn from(smtp: DomainSmtp) -> Self {
+        Self {
+            server: smtp.server,
+            port: smtp.port,
+            credentials: Credentials::from(smtp.credentials),
+        }
+    }
+}
+
+impl From<DomainCredentials> for Credentials {
+    fn from(credentials: DomainCredentials) -> Self {
+        Self {
+            username: credentials.username,
+            password: credentials.password,
         }
     }
 }

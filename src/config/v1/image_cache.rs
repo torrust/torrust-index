@@ -10,23 +10,27 @@ use serde::{Deserialize, Serialize};
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ImageCache {
-    /// Maximum time in seconds to wait for downloading the image form the original source.
-    #[serde(default = "ImageCache::default_max_request_timeout_ms")]
-    pub max_request_timeout_ms: u64,
     /// Cache size in bytes.
     #[serde(default = "ImageCache::default_capacity")]
     pub capacity: usize,
+
     /// Maximum size in bytes for a single image.
     #[serde(default = "ImageCache::default_entry_size_limit")]
     pub entry_size_limit: usize,
-    /// Users have a cache quota per period. For example: 100MB per day.
-    /// This is the period in seconds (1 day in seconds).
-    #[serde(default = "ImageCache::default_user_quota_period_seconds")]
-    pub user_quota_period_seconds: u64,
+
+    /// Maximum time in seconds to wait for downloading the image form the original source.
+    #[serde(default = "ImageCache::default_max_request_timeout_ms")]
+    pub max_request_timeout_ms: u64,
+
     /// Users have a cache quota per period. For example: 100MB per day.
     /// This is the maximum size in bytes (100MB in bytes).    
     #[serde(default = "ImageCache::default_user_quota_bytes")]
     pub user_quota_bytes: usize,
+
+    /// Users have a cache quota per period. For example: 100MB per day.
+    /// This is the period in seconds (1 day in seconds).
+    #[serde(default = "ImageCache::default_user_quota_period_seconds")]
+    pub user_quota_period_seconds: u64,
 }
 
 impl Default for ImageCache {

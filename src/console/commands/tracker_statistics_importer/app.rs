@@ -90,7 +90,7 @@ pub async fn import() {
 
     let configuration = initialize_configuration();
 
-    let log_level = configuration.settings.read().await.log_level.clone();
+    let log_level = configuration.settings.read().await.logging.log_level.clone();
 
     logging::setup(&log_level);
 

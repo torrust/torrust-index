@@ -1,7 +1,8 @@
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
 use tempfile::TempDir;
 use torrust_index::config;
-use torrust_index::config::v1::LogLevel;
-use torrust_index::config::FREE_PORT;
+use torrust_index::config::{LogLevel, FREE_PORT};
 use torrust_index::web::api::Version;
 use url::Url;
 
@@ -72,13 +73,12 @@ impl Default for TestEnv {
 
 /// Provides a configuration with ephemeral data for testing.
 fn ephemeral(temp_dir: &TempDir) -> config::Settings {
-    let mut configuration = config::Settings {
-        log_level: Some(LogLevel::Off), // Change to `debug` for tests debugging
-        ..config::Settings::default()
-    };
+    let mut configuration = config::Settings::default();
+
+    configuration.logging.log_level = LogLevel::Off; // Change to `debug` for tests debugging
 
     // Ephemeral API port
-    configuration.net.port = FREE_PORT;
+    configuration.net.bind_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), FREE_PORT);
 
     // Ephemeral Importer API port
     configuration.tracker_statistics_importer.port = FREE_PORT;

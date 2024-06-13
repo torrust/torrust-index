@@ -1,8 +1,7 @@
 use std::env;
 use std::str::FromStr;
 
-use torrust_index::config::v1::tracker::ApiToken;
-use torrust_index::config::TrackerMode;
+use torrust_index::config::{ApiToken, TrackerMode};
 use torrust_index::web::api::Version;
 use url::Url;
 
@@ -116,7 +115,7 @@ impl TestEnv {
 
                 settings.tracker.token = ApiToken::new("***");
 
-                "***".clone_into(&mut settings.mail.password);
+                "***".clone_into(&mut settings.mail.smtp.credentials.password);
 
                 "***".clone_into(&mut settings.auth.secret_key);
 
