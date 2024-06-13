@@ -5,6 +5,7 @@ use serde_derive::{Deserialize, Serialize};
 use tracing::debug;
 use url::Url;
 
+use super::authorization::{self, ACTION};
 use super::category::DbCategoryRepository;
 use crate::config::{Configuration, TrackerMode};
 use crate::databases::database::{Database, Error, Sorting};
@@ -34,6 +35,7 @@ pub struct Index {
     torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
     torrent_tag_repository: Arc<DbTorrentTagRepository>,
     torrent_listing_generator: Arc<DbTorrentListingGenerator>,
+    authorization_service: Arc<authorization::Service>,
 }
 
 pub struct AddTorrentRequest {
@@ -90,6 +92,7 @@ impl Index {
         torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
         torrent_tag_repository: Arc<DbTorrentTagRepository>,
         torrent_listing_repository: Arc<DbTorrentListingGenerator>,
+        authorization_service: Arc<authorization::Service>,
     ) -> Self {
         Self {
             configuration,
@@ -104,6 +107,7 @@ impl Index {
             torrent_announce_url_repository,
             torrent_tag_repository,
             torrent_listing_generator: torrent_listing_repository,
+            authorization_service,
         }
     }
 
@@ -289,13 +293,9 @@ impl Index {
     /// * Unable to get the torrent listing from it's ID.
     /// * Unable to delete the torrent from the database.
     pub async fn delete_torrent(&self, info_hash: &InfoHash, user_id: &UserId) -> Result<DeletedTorrentResponse, ServiceError> {
-        let user = self.user_repository.get_compact(user_id).await?;
-
-        // Only administrator can delete torrents.
-        // todo: move this to an authorization service.
-        if !user.administrator {
-            return Err(ServiceError::Unauthorized);
-        }
+        self.authorization_service
+            .authorize(ACTION::DeleteTorrent, Some(*user_id))
+            .await?;
 
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
 

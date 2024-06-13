@@ -116,6 +116,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         torrent_announce_url_repository.clone(),
         torrent_tag_repository.clone(),
         torrent_listing_generator.clone(),
+        authorization_service.clone(),
     ));
     let registration_service = Arc::new(user::RegistrationService::new(
         configuration.clone(),

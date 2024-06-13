@@ -4,3 +4,4 @@ p, true, GetSettings
 p, true, GetSettingsSecret
 p, true, AddTag
 p, true, DeleteTag
+p, true, DeleteTorrent
