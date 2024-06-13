@@ -64,7 +64,7 @@ impl Settings {
         if let Some(_password) = self.database.connect_url.password() {
             let _ = self.database.connect_url.set_password(Some("***"));
         }
-        "***".clone_into(&mut self.mail.password);
+        "***".clone_into(&mut self.mail.smtp.credentials.password);
         self.auth.secret_key = SecretKey::new("***");
     }
 }

@@ -1,7 +1,6 @@
 use tempfile::TempDir;
 use torrust_index::config;
-use torrust_index::config::v1::logging::LogLevel;
-use torrust_index::config::FREE_PORT;
+use torrust_index::config::{LogLevel, FREE_PORT};
 use torrust_index::web::api::Version;
 use url::Url;
 

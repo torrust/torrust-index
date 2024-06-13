@@ -8,6 +8,6 @@ url = "udp://tracker:6969"
 [database]
 connect_url = "sqlite:///var/lib/torrust/index/database/e2e_testing_sqlite3.db?mode=rwc"
 
-[mail]
+[mail.smtp]
 port = 1025
 server = "mailcatcher"

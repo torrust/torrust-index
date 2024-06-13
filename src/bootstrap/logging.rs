@@ -11,7 +11,7 @@ use std::sync::Once;
 use tracing::info;
 use tracing::level_filters::LevelFilter;
 
-use crate::config::v1::logging::LogLevel;
+use crate::config::LogLevel;
 
 static INIT: Once = Once::new();
 

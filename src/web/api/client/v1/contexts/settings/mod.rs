@@ -5,9 +5,10 @@ use url::Url;
 
 use crate::config::v1::tracker::ApiToken;
 use crate::config::{
-    Api as DomainApi, Auth as DomainAuth, Database as DomainDatabase, ImageCache as DomainImageCache, Mail as DomainMail,
-    Network as DomainNetwork, PasswordConstraints as DomainPasswordConstraints, Settings as DomainSettings,
-    Tracker as DomainTracker, TrackerStatisticsImporter as DomainTrackerStatisticsImporter, Website as DomainWebsite,
+    Api as DomainApi, Auth as DomainAuth, Credentials as DomainCredentials, Database as DomainDatabase,
+    ImageCache as DomainImageCache, Mail as DomainMail, Network as DomainNetwork,
+    PasswordConstraints as DomainPasswordConstraints, Settings as DomainSettings, Smtp as DomainSmtp, Tracker as DomainTracker,
+    TrackerStatisticsImporter as DomainTrackerStatisticsImporter, Website as DomainWebsite,
 };
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -66,10 +67,20 @@ pub struct Mail {
     pub email_verification_enabled: bool,
     pub from: String,
     pub reply_to: String,
-    pub username: String,
-    pub password: String,
+    pub smtp: Smtp,
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+pub struct Smtp {
     pub server: String,
     pub port: u16,
+    pub credentials: Credentials,
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+pub struct Credentials {
+    pub username: String,
+    pub password: String,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -169,10 +180,26 @@ impl From<DomainMail> for Mail {
             email_verification_enabled: mail.email_verification_enabled,
             from: mail.from.to_string(),
             reply_to: mail.reply_to.to_string(),
-            username: mail.username,
-            password: mail.password,
-            server: mail.server,
-            port: mail.port,
+            smtp: Smtp::from(mail.smtp),
+        }
+    }
+}
+
+impl From<DomainSmtp> for Smtp {
+    fn from(smtp: DomainSmtp) -> Self {
+        Self {
+            server: smtp.server,
+            port: smtp.port,
+            credentials: Credentials::from(smtp.credentials),
+        }
+    }
+}
+
+impl From<DomainCredentials> for Credentials {
+    fn from(credentials: DomainCredentials) -> Self {
+        Self {
+            username: credentials.username,
+            password: credentials.password,
         }
     }
 }

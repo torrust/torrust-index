@@ -13,18 +13,9 @@ pub struct Mail {
     /// The email address to reply to.
     #[serde(default = "Mail::default_reply_to")]
     pub reply_to: Mailbox,
-    /// The username to use for SMTP authentication.
-    #[serde(default = "Mail::default_username")]
-    pub username: String,
-    /// The password to use for SMTP authentication.
-    #[serde(default = "Mail::default_password")]
-    pub password: String,
-    /// The SMTP server to use.
-    #[serde(default = "Mail::default_server")]
-    pub server: String,
-    /// The SMTP port to use.
-    #[serde(default = "Mail::default_port")]
-    pub port: u16,
+    /// The SMTP server configuration.
+    #[serde(default = "Mail::default_smtp")]
+    pub smtp: Smtp,
 }
 
 impl Default for Mail {
@@ -33,10 +24,7 @@ impl Default for Mail {
             email_verification_enabled: Self::default_email_verification_enabled(),
             from: Self::default_from(),
             reply_to: Self::default_reply_to(),
-            username: Self::default_username(),
-            password: Self::default_password(),
-            server: Self::default_server(),
-            port: Self::default_port(),
+            smtp: Self::default_smtp(),
         }
     }
 }
@@ -54,19 +42,75 @@ impl Mail {
         "noreply@email.com".parse().expect("valid mailbox")
     }
 
-    fn default_username() -> String {
-        String::default()
+    fn default_smtp() -> Smtp {
+        Smtp::default()
     }
+}
 
-    fn default_password() -> String {
-        String::default()
+/// SMTP configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Smtp {
+    /// The SMTP port to use.
+    #[serde(default = "Smtp::default_port")]
+    pub port: u16,
+    /// The SMTP server to use.
+    #[serde(default = "Smtp::default_server")]
+    pub server: String,
+    /// The SMTP server credentials.
+    #[serde(default = "Smtp::default_credentials")]
+    pub credentials: Credentials,
+}
+
+impl Default for Smtp {
+    fn default() -> Self {
+        Self {
+            server: Self::default_server(),
+            port: Self::default_port(),
+            credentials: Self::default_credentials(),
+        }
     }
+}
 
+impl Smtp {
     fn default_server() -> String {
         String::default()
     }
 
     fn default_port() -> u16 {
         25
+    }
+
+    fn default_credentials() -> Credentials {
+        Credentials::default()
+    }
+}
+
+/// SMTP configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Credentials {
+    /// The password to use for SMTP authentication.
+    #[serde(default = "Credentials::default_password")]
+    pub password: String,
+    /// The username to use for SMTP authentication.
+    #[serde(default = "Credentials::default_username")]
+    pub username: String,
+}
+
+impl Default for Credentials {
+    fn default() -> Self {
+        Self {
+            username: Self::default_username(),
+            password: Self::default_password(),
+        }
+    }
+}
+
+impl Credentials {
+    fn default_username() -> String {
+        String::default()
+    }
+
+    fn default_password() -> String {
+        String::default()
     }
 }

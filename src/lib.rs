@@ -194,10 +194,14 @@
 //! email_verification_enabled = false
 //! from = "example@email.com"
 //! reply_to = "noreply@email.com"
-//! username = ""
-//! password = ""
-//! server = ""
+//!
+//! [mail.smtp]
 //! port = 25
+//! server = ""
+//!
+//! [mail.smtp.credentials]
+//! password = ""
+//! username = ""
 //!
 //! [image_cache]
 //! max_request_timeout_ms = 1000

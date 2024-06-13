@@ -70,19 +70,22 @@ impl Service {
     async fn get_mailer(cfg: &Configuration) -> Mailer {
         let settings = cfg.settings.read().await;
 
-        if !settings.mail.username.is_empty() && !settings.mail.password.is_empty() {
+        if !settings.mail.smtp.credentials.username.is_empty() && !settings.mail.smtp.credentials.password.is_empty() {
             // SMTP authentication
-            let creds = Credentials::new(settings.mail.username.clone(), settings.mail.password.clone());
+            let creds = Credentials::new(
+                settings.mail.smtp.credentials.username.clone(),
+                settings.mail.smtp.credentials.password.clone(),
+            );
 
-            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&settings.mail.server)
-                .port(settings.mail.port)
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&settings.mail.smtp.server)
+                .port(settings.mail.smtp.port)
                 .credentials(creds)
                 .authentication(vec![Mechanism::Login, Mechanism::Xoauth2, Mechanism::Plain])
                 .build()
         } else {
             // SMTP without authentication
-            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&settings.mail.server)
-                .port(settings.mail.port)
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&settings.mail.smtp.server)
+                .port(settings.mail.smtp.port)
                 .build()
         }
     }

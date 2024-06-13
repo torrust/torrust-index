@@ -19,18 +19,33 @@ use url::Url;
 use crate::web::api::server::DynError;
 
 pub type Settings = v1::Settings;
+
 pub type Api = v1::api::Api;
+
 pub type Auth = v1::auth::Auth;
-pub type Database = v1::database::Database;
-pub type ImageCache = v1::image_cache::ImageCache;
-pub type Mail = v1::mail::Mail;
-pub type Network = v1::net::Network;
-pub type TrackerStatisticsImporter = v1::tracker_statistics_importer::TrackerStatisticsImporter;
-pub type Tracker = v1::tracker::Tracker;
-pub type Logging = v1::logging::Logging;
-pub type Website = v1::website::Website;
 pub type EmailOnSignup = v1::auth::EmailOnSignup;
+pub type SecretKey = v1::auth::SecretKey;
 pub type PasswordConstraints = v1::auth::PasswordConstraints;
+
+pub type Database = v1::database::Database;
+
+pub type ImageCache = v1::image_cache::ImageCache;
+
+pub type Mail = v1::mail::Mail;
+pub type Smtp = v1::mail::Smtp;
+pub type Credentials = v1::mail::Credentials;
+
+pub type Network = v1::net::Network;
+
+pub type TrackerStatisticsImporter = v1::tracker_statistics_importer::TrackerStatisticsImporter;
+
+pub type Tracker = v1::tracker::Tracker;
+pub type ApiToken = v1::tracker::ApiToken;
+
+pub type Logging = v1::logging::Logging;
+pub type LogLevel = v1::logging::LogLevel;
+
+pub type Website = v1::website::Website;
 
 /// Prefix for env vars that overwrite configuration options.
 const CONFIG_OVERRIDE_PREFIX: &str = "TORRUST_INDEX_CONFIG_OVERRIDE_";
@@ -321,9 +336,7 @@ mod tests {
 
     use url::Url;
 
-    use crate::config::v1::auth::SecretKey;
-    use crate::config::v1::tracker::ApiToken;
-    use crate::config::{Configuration, ConfigurationPublic, Info, Settings};
+    use crate::config::{ApiToken, Configuration, ConfigurationPublic, Info, SecretKey, Settings};
 
     #[cfg(test)]
     fn default_config_toml() -> String {
@@ -358,10 +371,14 @@ mod tests {
                                 email_verification_enabled = false
                                 from = "example@email.com"
                                 reply_to = "noreply@email.com"
-                                username = ""
-                                password = ""
-                                server = ""
+
+                                [mail.smtp]
                                 port = 25
+                                server = ""
+
+                                [mail.smtp.credentials]
+                                password = ""
+                                username = ""
 
                                 [image_cache]
                                 max_request_timeout_ms = 1000
