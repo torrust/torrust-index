@@ -1,3 +1,5 @@
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
 use tempfile::TempDir;
 use torrust_index::config;
 use torrust_index::config::{LogLevel, FREE_PORT};
@@ -76,7 +78,7 @@ fn ephemeral(temp_dir: &TempDir) -> config::Settings {
     configuration.logging.log_level = LogLevel::Off; // Change to `debug` for tests debugging
 
     // Ephemeral API port
-    configuration.net.port = FREE_PORT;
+    configuration.net.bind_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), FREE_PORT);
 
     // Ephemeral Importer API port
     configuration.tracker_statistics_importer.port = FREE_PORT;

@@ -354,7 +354,7 @@ mod tests {
                                 token_valid_seconds = 7257600
 
                                 [net]
-                                port = 3001
+                                bind_address = "0.0.0.0:3001"
 
                                 [auth]
                                 email_on_signup = "optional"

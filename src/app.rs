@@ -57,8 +57,8 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let importer_torrent_info_update_interval = settings.tracker_statistics_importer.torrent_info_update_interval;
     let importer_port = settings.tracker_statistics_importer.port;
     // From [net] config
-    let net_ip = "0.0.0.0".to_string();
-    let net_port = settings.net.port;
+    let net_ip = settings.net.bind_address.ip().to_string();
+    let net_port = settings.net.bind_address.port();
     let opt_net_tsl = settings.net.tsl.clone();
 
     // IMPORTANT: drop settings before starting server to avoid read locks that

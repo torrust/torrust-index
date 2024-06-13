@@ -1,5 +1,7 @@
 pub mod responses;
 
+use std::net::SocketAddr;
+
 use serde::{Deserialize, Serialize};
 use torrust_index::config::{
     Api as DomainApi, ApiToken, Auth as DomainAuth, Credentials as DomainCredentials, Database as DomainDatabase,
@@ -44,8 +46,8 @@ pub struct Tracker {
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Network {
-    pub port: u16,
     pub base_url: Option<String>,
+    pub bind_address: SocketAddr,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -154,7 +156,7 @@ impl From<DomainTracker> for Tracker {
 impl From<DomainNetwork> for Network {
     fn from(net: DomainNetwork) -> Self {
         Self {
-            port: net.port,
+            bind_address: net.bind_address,
             base_url: net.base_url.as_ref().map(std::string::ToString::to_string),
         }
     }
