@@ -49,28 +49,32 @@ impl Service {
     /// # Errors
     ///
     /// Will return an error if:
-    /// - There is no user_id found in the request
-    /// - The user_id is not found in the database
+    /// - There is no user id found in the request
+    /// - The user id is not found in the database
     /// - The user is not authorized to perform the action.
+
     pub async fn authorize(&self, action: ACTION, maybe_user_id: Option<UserId>) -> std::result::Result<(), ServiceError> {
         match maybe_user_id {
             Some(user_id) => {
-                let user_guard = self.get_user(user_id).await.map_err(|_| ServiceError::UserNotFound);
-                // the user that wants to access a resource.
-                let role = user_guard.unwrap().administrator;
+                // Checks if the user found in the requests exists in the database
+                let user_guard = self.get_user(user_id).await?;
 
-                // the user that wants to access a resource.
+                let role = user_guard.administrator;
+
+                // The user that wants to access a resource.
                 let sub = role.to_string();
 
-                let act = action; // the operation that the user performs on the resource.
+                // The operation that the user wants to perform
+                let act = action;
 
                 let enforcer = self.casbin_enforcer.enforcer.read().await;
-                /* let enforcer = self.casbin_enforcer.clone();
-                let enforcer_lock = enforcer.enforcer.read().await; */
-                let authorize = enforcer.enforce((sub, act)).unwrap();
-                match authorize {
-                    true => Ok(()),
-                    false => Err(ServiceError::Unauthorized),
+
+                let authorize = enforcer.enforce((sub, act)).map_err(|_| ServiceError::Unauthorized)?;
+
+                if authorize {
+                    Ok(())
+                } else {
+                    Err(ServiceError::Unauthorized)
                 }
             }
             None => Err(ServiceError::Unauthorized),
@@ -83,6 +87,9 @@ pub struct CasbinEnforcer {
 }
 
 impl CasbinEnforcer {
+    /// # Panics
+    ///
+    /// It panics if the policy and/or model file cannot be loaded or are missing
     pub async fn new() -> Self {
         let enforcer = Enforcer::new("casbin/model.conf", "casbin/policy.csv").await.unwrap();
         let enforcer = Arc::new(RwLock::new(enforcer));
