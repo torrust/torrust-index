@@ -129,9 +129,9 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         user_authentication_repository.clone(),
     ));
     let ban_service = Arc::new(user::BanService::new(
-        user_repository.clone(),
         user_profile_repository.clone(),
         banned_user_list.clone(),
+        authorization_service.clone(),
     ));
     let authentication_service = Arc::new(Service::new(
         configuration.clone(),

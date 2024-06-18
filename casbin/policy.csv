@@ -5,3 +5,4 @@ p, true, GetSettingsSecret
 p, true, AddTag
 p, true, DeleteTag
 p, true, DeleteTorrent
+p, true, BanUser
