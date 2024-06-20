@@ -1,8 +1,9 @@
-p, true, AddCategory
-p, true, DeleteCategory
-p, true, GetSettings
-p, true, GetSettingsSecret
-p, true, AddTag
-p, true, DeleteTag
-p, true, DeleteTorrent
-p, true, BanUser
+# Admin user policies
+p, admin, AddCategory
+p, admin, DeleteCategory
+p, admin, GetSettings
+p, admin, GetSettingsSecret
+p, admin, AddTag
+p, admin, DeleteTag
+p, admin, DeleteTorrent
+p, admin, BanUser
