@@ -35,15 +35,6 @@ impl Service {
         }
     }
 
-    /// It returns the compact user.
-    ///
-    /// # Errors
-    ///
-    /// It returns an error if there is a database error.
-    pub async fn get_user(&self, user_id: UserId) -> std::result::Result<UserCompact, ServiceError> {
-        self.user_repository.get_compact(&user_id).await
-    }
-
     ///Allows or denies an user to perform an action based on the user's privileges
     ///
     /// # Errors
@@ -59,10 +50,14 @@ impl Service {
                 // Checks if the user found in the requests exists in the database
                 let user_guard = self.get_user(user_id).await?;
 
-                let role = user_guard.administrator;
+                //Converts the bool administrator value to a string so the enforcer can handle the request and match against the policy file
+                let role = match user_guard.administrator {
+                    true => "admin",
+                    false => "guest",
+                };
 
-                // The user that wants to access a resource.
-                let sub = role.to_string();
+                // The role of the user that wants to access a resource.
+                let sub = role;
 
                 // The operation that the user wants to perform
                 let act = action;
@@ -80,20 +75,77 @@ impl Service {
             None => Err(ServiceError::Unauthorized),
         }
     }
+
+    /// It returns the compact user.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    async fn get_user(&self, user_id: UserId) -> std::result::Result<UserCompact, ServiceError> {
+        self.user_repository.get_compact(&user_id).await
+    }
 }
 
 pub struct CasbinEnforcer {
-    enforcer: Arc<RwLock<Enforcer>>, //Arc<tokio::sync::RwLock<casbin::Enforcer>>
+    enforcer: Arc<RwLock<Enforcer>>,
 }
 
 impl CasbinEnforcer {
     /// # Panics
     ///
     /// It panics if the policy and/or model file cannot be loaded or are missing
+    ///
+    /// todo: review error handling and panics when creating the model, policy and enforcer
     pub async fn new() -> Self {
-        let enforcer = Enforcer::new("casbin/model.conf", "casbin/policy.csv").await.unwrap();
+        let casbin_configuration = CasbinConfiguration::new();
+
+        let model = DefaultModel::from_str(&casbin_configuration.model).await.unwrap();
+
+        let enforcer = Enforcer::new(model, "casbin/policy.csv").await.unwrap();
+
         let enforcer = Arc::new(RwLock::new(enforcer));
         //casbin_enforcer.enable_log(true);
         Self { enforcer }
+    }
+}
+#[allow(dead_code)]
+struct CasbinConfiguration {
+    model: String,
+    policy: String,
+}
+
+impl CasbinConfiguration {
+    pub fn new() -> Self {
+        CasbinConfiguration {
+            model: String::from(
+                "
+                [request_definition]
+                r = sub, act
+                
+                [policy_definition]
+                p = sub, act
+                
+                [policy_effect]
+                e = some(where (p.eft == allow))
+                
+                [matchers]
+                m = r.sub == p.sub && r.act == p.act
+            ",
+            ),
+            policy: String::from(
+                "
+                # Admin user policies
+                p, admin, AddCategory
+                p, admin, DeleteCategory
+                p, admin, GetSettings
+                p, admin, GetSettingsSecret
+                p, admin, AddTag
+                p, admin, DeleteTag
+                p, admin, DeleteTorrent
+                p, admin, BanUser),
+                
+                ",
+            ),
+        }
     }
 }
