@@ -1,9 +1,0 @@
-# Admin user policies
-p, admin, AddCategory
-p, admin, DeleteCategory
-p, admin, GetSettings
-p, admin, GetSettingsSecret
-p, admin, AddTag
-p, admin, DeleteTag
-p, admin, DeleteTorrent
-p, admin, BanUser
