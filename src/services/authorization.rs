@@ -88,16 +88,18 @@ impl CasbinEnforcer {
     pub async fn new() -> Self {
         let casbin_configuration = CasbinConfiguration::new();
 
-        let model = DefaultModel::from_str(&casbin_configuration.model).await.unwrap();
+        let model = DefaultModel::from_str(&casbin_configuration.model)
+            .await
+            .expect("Error loading the model");
 
         let policy = casbin_configuration.policy;
 
-        let mut enforcer = Enforcer::new(model, ()).await.unwrap();
+        let mut enforcer = Enforcer::new(model, ()).await.expect("Error creating the enforcer");
 
-        enforcer.add_policies(policy).await.unwrap();
+        enforcer.add_policies(policy).await.expect("Error loading the policy");
 
         let enforcer = Arc::new(RwLock::new(enforcer));
-        //casbin_enforcer.enable_log(true);
+
         Self { enforcer }
     }
 }
@@ -126,14 +128,14 @@ impl CasbinConfiguration {
             ",
             ),
             policy: vec![
-                vec!["admin".to_owned(), "AddCategory".to_owned()],
-                vec!["admin".to_owned(), "DeleteCategory".to_owned()],
-                vec!["admin".to_owned(), "GetSettings".to_owned()],
-                vec!["admin".to_owned(), "GetSettingsSecret".to_owned()],
-                vec!["admin".to_owned(), "AddTag".to_owned()],
-                vec!["admin".to_owned(), "DeleteTag".to_owned()],
-                vec!["admin".to_owned(), "DeleteTorrent".to_owned()],
-                vec!["admin".to_owned(), "BanUser".to_owned()],
+                vec!["admin".to_string(), "AddCategory".to_string()],
+                vec!["admin".to_string(), "DeleteCategory".to_string()],
+                vec!["admin".to_string(), "GetSettings".to_string()],
+                vec!["admin".to_string(), "GetSettingsSecret".to_string()],
+                vec!["admin".to_string(), "AddTag".to_string()],
+                vec!["admin".to_string(), "DeleteTag".to_string()],
+                vec!["admin".to_string(), "DeleteTorrent".to_string()],
+                vec!["admin".to_string(), "BanUser".to_string()],
             ],
         }
     }
