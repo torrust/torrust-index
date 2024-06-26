@@ -47,24 +47,15 @@ impl Service {
     pub async fn authorize(&self, action: ACTION, maybe_user_id: Option<UserId>) -> std::result::Result<(), ServiceError> {
         match maybe_user_id {
             Some(user_id) => {
-                // Checks if the user found in the requests exists in the database
+                // Checks if the user found in the request exists in the database
                 let user_guard = self.get_user(user_id).await?;
 
                 //Converts the bool administrator value to a string so the enforcer can handle the request and match against the policy file
-                let role = match user_guard.administrator {
-                    true => "admin",
-                    false => "guest",
-                };
-
-                // The role of the user that wants to access a resource.
-                let sub = role;
-
-                // The operation that the user wants to perform
-                let act = action;
+                let role = if user_guard.administrator { "admin" } else { "guest" };
 
                 let enforcer = self.casbin_enforcer.enforcer.read().await;
 
-                let authorize = enforcer.enforce((sub, act)).map_err(|_| ServiceError::Unauthorized)?;
+                let authorize = enforcer.enforce((role, action)).map_err(|_| ServiceError::Unauthorized)?;
 
                 if authorize {
                     Ok(())
@@ -93,15 +84,17 @@ pub struct CasbinEnforcer {
 impl CasbinEnforcer {
     /// # Panics
     ///
-    /// It panics if the policy and/or model file cannot be loaded or are missing
-    ///
-    /// todo: review error handling and panics when creating the model, policy and enforcer
+    /// It panics if the policy and/or model file cannot be loaded
     pub async fn new() -> Self {
         let casbin_configuration = CasbinConfiguration::new();
 
         let model = DefaultModel::from_str(&casbin_configuration.model).await.unwrap();
 
-        let enforcer = Enforcer::new(model, "casbin/policy.csv").await.unwrap();
+        let policy = casbin_configuration.policy;
+
+        let mut enforcer = Enforcer::new(model, ()).await.unwrap();
+
+        enforcer.add_policies(policy).await.unwrap();
 
         let enforcer = Arc::new(RwLock::new(enforcer));
         //casbin_enforcer.enable_log(true);
@@ -111,7 +104,7 @@ impl CasbinEnforcer {
 #[allow(dead_code)]
 struct CasbinConfiguration {
     model: String,
-    policy: String,
+    policy: Vec<Vec<std::string::String>>,
 }
 
 impl CasbinConfiguration {
@@ -120,32 +113,28 @@ impl CasbinConfiguration {
             model: String::from(
                 "
                 [request_definition]
-                r = sub, act
+                r = role, action
                 
                 [policy_definition]
-                p = sub, act
+                p = role, action
                 
                 [policy_effect]
                 e = some(where (p.eft == allow))
                 
                 [matchers]
-                m = r.sub == p.sub && r.act == p.act
+                m = r.role == p.role && r.action == p.action
             ",
             ),
-            policy: String::from(
-                "
-                # Admin user policies
-                p, admin, AddCategory
-                p, admin, DeleteCategory
-                p, admin, GetSettings
-                p, admin, GetSettingsSecret
-                p, admin, AddTag
-                p, admin, DeleteTag
-                p, admin, DeleteTorrent
-                p, admin, BanUser),
-                
-                ",
-            ),
+            policy: vec![
+                vec!["admin".to_owned(), "AddCategory".to_owned()],
+                vec!["admin".to_owned(), "DeleteCategory".to_owned()],
+                vec!["admin".to_owned(), "GetSettings".to_owned()],
+                vec!["admin".to_owned(), "GetSettingsSecret".to_owned()],
+                vec!["admin".to_owned(), "AddTag".to_owned()],
+                vec!["admin".to_owned(), "DeleteTag".to_owned()],
+                vec!["admin".to_owned(), "DeleteTorrent".to_owned()],
+                vec!["admin".to_owned(), "BanUser".to_owned()],
+            ],
         }
     }
 }
