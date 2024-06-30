@@ -1,7 +1,7 @@
 //! Authorization service.
 use std::sync::Arc;
 
-use casbin::prelude::*;
+use casbin::{CoreApi, DefaultModel, Enforcer, MgmtApi};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
@@ -92,7 +92,13 @@ impl CasbinEnforcer {
             .await
             .expect("Error loading the model");
 
-        let policy = casbin_configuration.policy;
+        // Converts the policy from a string type to a vector
+        let policy = casbin_configuration
+            .policy
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| line.split(',').map(|s| s.trim().to_owned()).collect::<Vec<String>>())
+            .collect();
 
         let mut enforcer = Enforcer::new(model, ()).await.expect("Error creating the enforcer");
 
@@ -106,7 +112,7 @@ impl CasbinEnforcer {
 #[allow(dead_code)]
 struct CasbinConfiguration {
     model: String,
-    policy: Vec<Vec<std::string::String>>,
+    policy: String,
 }
 
 impl CasbinConfiguration {
@@ -127,16 +133,19 @@ impl CasbinConfiguration {
                 m = r.role == p.role && r.action == p.action
             ",
             ),
-            policy: vec![
-                vec!["admin".to_string(), "AddCategory".to_string()],
-                vec!["admin".to_string(), "DeleteCategory".to_string()],
-                vec!["admin".to_string(), "GetSettings".to_string()],
-                vec!["admin".to_string(), "GetSettingsSecret".to_string()],
-                vec!["admin".to_string(), "AddTag".to_string()],
-                vec!["admin".to_string(), "DeleteTag".to_string()],
-                vec!["admin".to_string(), "DeleteTorrent".to_string()],
-                vec!["admin".to_string(), "BanUser".to_string()],
-            ],
+            policy: String::from(
+                "
+                admin, AddCategory
+                admin, DeleteCategory
+                admin, GetSettings
+                admin, GetSettingsSecret
+                admin, AddTag
+                admin, DeleteTag
+                admin, DeleteTorrent
+                admin, BanUser
+
+                ",
+            ),
         }
     }
 }
