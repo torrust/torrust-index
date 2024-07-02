@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::config::v1::tracker::ApiToken;
+use crate::config::v2::tracker::ApiToken;
 use crate::config::{
     Api as DomainApi, Auth as DomainAuth, Credentials as DomainCredentials, Database as DomainDatabase,
     ImageCache as DomainImageCache, Mail as DomainMail, Network as DomainNetwork,

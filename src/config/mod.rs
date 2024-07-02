@@ -1,5 +1,5 @@
 //! Configuration for the application.
-pub mod v1;
+pub mod v2;
 pub mod validator;
 
 use std::str::FromStr;
@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::{env, fmt};
 
 use camino::Utf8PathBuf;
+use derive_more::Display;
 use figment::providers::{Env, Format, Serialized, Toml};
 use figment::Figment;
 use serde::{Deserialize, Serialize};
@@ -18,34 +19,37 @@ use url::Url;
 
 use crate::web::api::server::DynError;
 
-pub type Settings = v1::Settings;
+pub type Settings = v2::Settings;
 
-pub type Api = v1::api::Api;
+pub type Api = v2::api::Api;
 
-pub type Auth = v1::auth::Auth;
-pub type EmailOnSignup = v1::auth::EmailOnSignup;
-pub type SecretKey = v1::auth::SecretKey;
-pub type PasswordConstraints = v1::auth::PasswordConstraints;
+pub type Auth = v2::auth::Auth;
+pub type EmailOnSignup = v2::auth::EmailOnSignup;
+pub type SecretKey = v2::auth::SecretKey;
+pub type PasswordConstraints = v2::auth::PasswordConstraints;
 
-pub type Database = v1::database::Database;
+pub type Database = v2::database::Database;
 
-pub type ImageCache = v1::image_cache::ImageCache;
+pub type ImageCache = v2::image_cache::ImageCache;
 
-pub type Mail = v1::mail::Mail;
-pub type Smtp = v1::mail::Smtp;
-pub type Credentials = v1::mail::Credentials;
+pub type Mail = v2::mail::Mail;
+pub type Smtp = v2::mail::Smtp;
+pub type Credentials = v2::mail::Credentials;
 
-pub type Network = v1::net::Network;
+pub type Network = v2::net::Network;
 
-pub type TrackerStatisticsImporter = v1::tracker_statistics_importer::TrackerStatisticsImporter;
+pub type TrackerStatisticsImporter = v2::tracker_statistics_importer::TrackerStatisticsImporter;
 
-pub type Tracker = v1::tracker::Tracker;
-pub type ApiToken = v1::tracker::ApiToken;
+pub type Tracker = v2::tracker::Tracker;
+pub type ApiToken = v2::tracker::ApiToken;
 
-pub type Logging = v1::logging::Logging;
-pub type LogLevel = v1::logging::LogLevel;
+pub type Logging = v2::logging::Logging;
+pub type LogLevel = v2::logging::LogLevel;
 
-pub type Website = v1::website::Website;
+pub type Website = v2::website::Website;
+
+/// Configuration version
+const VERSION_2: &str = "2";
 
 /// Prefix for env vars that overwrite configuration options.
 const CONFIG_OVERRIDE_PREFIX: &str = "TORRUST_INDEX_CONFIG_OVERRIDE_";
@@ -59,6 +63,63 @@ pub const ENV_VAR_CONFIG_TOML: &str = "TORRUST_INDEX_CONFIG_TOML";
 
 /// The `index.toml` file location.
 pub const ENV_VAR_CONFIG_TOML_PATH: &str = "TORRUST_INDEX_CONFIG_TOML_PATH";
+
+pub const LATEST_VERSION: &str = "2";
+
+/// Info about the configuration specification.
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Display, Clone)]
+pub struct Metadata {
+    #[serde(default = "Metadata::default_version")]
+    #[serde(flatten)]
+    version: Version,
+}
+
+impl Default for Metadata {
+    fn default() -> Self {
+        Self {
+            version: Self::default_version(),
+        }
+    }
+}
+
+impl Metadata {
+    fn default_version() -> Version {
+        Version::latest()
+    }
+}
+
+/// The configuration version.
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Display, Clone)]
+pub struct Version {
+    #[serde(default = "Version::default_semver")]
+    version: String,
+}
+
+impl Default for Version {
+    fn default() -> Self {
+        Self {
+            version: Self::default_semver(),
+        }
+    }
+}
+
+impl Version {
+    fn new(semver: &str) -> Self {
+        Self {
+            version: semver.to_owned(),
+        }
+    }
+
+    fn latest() -> Self {
+        Self {
+            version: LATEST_VERSION.to_string(),
+        }
+    }
+
+    fn default_semver() -> String {
+        LATEST_VERSION.to_string()
+    }
+}
 
 /// Information required for loading config
 #[derive(Debug, Default, Clone)]
@@ -125,6 +186,9 @@ pub enum Error {
 
     #[error("The error for errors that can never happen.")]
     Infallible,
+
+    #[error("Unsupported configuration version: {version}")]
+    UnsupportedVersion { version: Version },
 }
 
 impl From<figment::Error> for Error {
@@ -284,6 +348,12 @@ impl Configuration {
 
         let settings: Settings = figment.extract()?;
 
+        if settings.metadata.version != Version::new(VERSION_2) {
+            return Err(Error::UnsupportedVersion {
+                version: settings.metadata.version,
+            });
+        }
+
         Ok(settings)
     }
 
@@ -335,7 +405,9 @@ mod tests {
 
     #[cfg(test)]
     fn default_config_toml() -> String {
-        let config = r#"[logging]
+        let config = r#"version = "2"
+
+                                [logging]
                                 log_level = "info"
 
                                 [website]
