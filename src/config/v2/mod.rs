@@ -22,10 +22,15 @@ use self::tracker::{ApiToken, Tracker};
 use self::tracker_statistics_importer::TrackerStatisticsImporter;
 use self::website::Website;
 use super::validator::{ValidationError, Validator};
+use super::Metadata;
 
 /// The whole configuration for the index.
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Settings {
+    /// Configuration metadata.
+    #[serde(flatten)]
+    pub metadata: Metadata,
+
     /// The logging configuration.
     #[serde(default)]
     pub logging: Logging,

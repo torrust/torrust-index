@@ -1,3 +1,5 @@
+version = "2"
+
 [logging]
 log_level = "info"
 
