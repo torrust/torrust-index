@@ -90,9 +90,9 @@ pub async fn import() {
 
     let configuration = initialize_configuration();
 
-    let log_level = configuration.settings.read().await.logging.log_level.clone();
+    let threshold = configuration.settings.read().await.logging.threshold.clone();
 
-    logging::setup(&log_level);
+    logging::setup(&threshold);
 
     let cfg = Arc::new(configuration);
 

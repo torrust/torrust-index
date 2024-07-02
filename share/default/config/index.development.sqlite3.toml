@@ -1,7 +1,12 @@
 version = "2"
 
 [logging]
-log_level = "info"
+#threshold = "off"
+#threshold = "error"
+#threshold = "warn"
+threshold = "info"
+#threshold = "debug"
+#threshold = "trace"
 
 # Uncomment if you want to enable TSL for development
 #[net.tsl]

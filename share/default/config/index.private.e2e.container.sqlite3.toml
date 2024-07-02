@@ -1,7 +1,12 @@
 version = "2"
 
 [logging]
-log_level = "info"
+#threshold = "off"
+#threshold = "error"
+#threshold = "warn"
+threshold = "info"
+#threshold = "debug"
+#threshold = "trace"
 
 [tracker]
 api_url = "http://tracker:1212"
