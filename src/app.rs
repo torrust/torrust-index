@@ -194,6 +194,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     }
 }
 
+/// It logs the final configuration removing secrets.
 async fn log_configuration(configuration: &Configuration) {
     let mut setting = configuration.get_all().await.clone();
     setting.remove_secrets();
