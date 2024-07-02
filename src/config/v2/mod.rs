@@ -81,6 +81,26 @@ impl Settings {
         "***".clone_into(&mut self.mail.smtp.credentials.password);
         self.auth.secret_key = SecretKey::new("***");
     }
+
+    /// Encodes the configuration to TOML.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if it can't be converted to TOML.
+    #[must_use]
+    pub fn to_toml(&self) -> String {
+        toml::to_string(self).expect("Could not encode TOML value")
+    }
+
+    /// Encodes the configuration to JSON.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if it can't be converted to JSON.
+    #[must_use]
+    pub fn to_json(&self) -> String {
+        serde_json::to_string_pretty(self).expect("Could not encode JSON value")
+    }
 }
 
 impl Validator for Settings {

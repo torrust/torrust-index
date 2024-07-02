@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use tokio::task::JoinHandle;
+use tracing::info;
 
 use crate::bootstrap::logging;
 use crate::cache::image::manager::ImageCacheService;
@@ -41,6 +42,8 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let log_level = configuration.settings.read().await.logging.log_level.clone();
 
     logging::setup(&log_level);
+
+    log_configuration(&configuration).await;
 
     let configuration = Arc::new(configuration);
 
@@ -189,4 +192,10 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         api_server_halt_task: running_api.halt_task,
         tracker_data_importer_handle: tracker_statistics_importer_handle,
     }
+}
+
+async fn log_configuration(configuration: &Configuration) {
+    let mut setting = configuration.get_all().await.clone();
+    setting.remove_secrets();
+    info!("Configuration:\n{}", setting.to_json());
 }
