@@ -27,7 +27,7 @@ pub struct Settings {
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Logging {
-    pub log_level: String,
+    pub threshold: String,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -130,7 +130,7 @@ impl From<DomainSettings> for Settings {
 impl From<DomainLogging> for Logging {
     fn from(logging: DomainLogging) -> Self {
         Self {
-            log_level: logging.log_level.to_string(),
+            threshold: logging.threshold.to_string(),
         }
     }
 }

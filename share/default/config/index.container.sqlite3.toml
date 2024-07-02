@@ -1,7 +1,12 @@
 version = "2"
 
 [logging]
-log_level = "info"
+#threshold = "off"
+#threshold = "error"
+#threshold = "warn"
+threshold = "info"
+#threshold = "debug"
+#threshold = "trace"
 
 [database]
 connect_url = "sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc"

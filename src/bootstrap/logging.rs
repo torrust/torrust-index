@@ -11,19 +11,19 @@ use std::sync::Once;
 use tracing::info;
 use tracing::level_filters::LevelFilter;
 
-use crate::config::LogLevel;
+use crate::config::Threshold;
 
 static INIT: Once = Once::new();
 
-pub fn setup(log_level: &LogLevel) {
-    let tracing_level: LevelFilter = log_level.clone().into();
+pub fn setup(threshold: &Threshold) {
+    let tracing_level_filter: LevelFilter = threshold.clone().into();
 
-    if tracing_level == LevelFilter::OFF {
+    if tracing_level_filter == LevelFilter::OFF {
         return;
     }
 
     INIT.call_once(|| {
-        tracing_stdout_init(tracing_level, &TraceStyle::Default);
+        tracing_stdout_init(tracing_level_filter, &TraceStyle::Default);
     });
 }
 

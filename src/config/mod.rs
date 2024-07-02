@@ -44,7 +44,7 @@ pub type Tracker = v2::tracker::Tracker;
 pub type ApiToken = v2::tracker::ApiToken;
 
 pub type Logging = v2::logging::Logging;
-pub type LogLevel = v2::logging::LogLevel;
+pub type Threshold = v2::logging::Threshold;
 
 pub type Website = v2::website::Website;
 
@@ -408,7 +408,7 @@ mod tests {
         let config = r#"version = "2"
 
                                 [logging]
-                                log_level = "info"
+                                threshold = "info"
 
                                 [website]
                                 name = "Torrust"
