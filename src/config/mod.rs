@@ -136,12 +136,7 @@ impl From<figment::Error> for Error {
     }
 }
 
-// todo: use https://crates.io/crates/torrust-tracker-primitives for TrackerMode.
-
-/// The mode the tracker will run in.
-///
-/// Refer to [Torrust Tracker Configuration](https://docs.rs/torrust-tracker-configuration)
-/// to know how to configure the tracker to run in each mode.
+/// The mode the tracker is running in.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub enum TrackerMode {
     /// Will track every new info hash and serve every peer.
