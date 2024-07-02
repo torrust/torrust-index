@@ -1,4 +1,5 @@
 //! Authorization service.
+use std::fmt;
 use std::sync::Arc;
 
 use casbin::{CoreApi, DefaultModel, Enforcer, MgmtApi};
@@ -8,6 +9,25 @@ use tokio::sync::RwLock;
 use super::user::Repository;
 use crate::errors::ServiceError;
 use crate::models::user::{UserCompact, UserId};
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "lowercase")]
+enum UserRole {
+    Admin,
+    Registered,
+    Guest,
+}
+
+impl fmt::Display for UserRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let role_str = match self {
+            UserRole::Admin => "admin",
+            UserRole::Registered => "registered",
+            UserRole::Guest => "guest",
+        };
+        write!(f, "{role_str}")
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum ACTION {
@@ -40,30 +60,19 @@ impl Service {
     /// # Errors
     ///
     /// Will return an error if:
-    /// - There is no user id found in the request
-    /// - The user id is not found in the database
     /// - The user is not authorized to perform the action.
 
     pub async fn authorize(&self, action: ACTION, maybe_user_id: Option<UserId>) -> std::result::Result<(), ServiceError> {
-        match maybe_user_id {
-            Some(user_id) => {
-                // Checks if the user found in the request exists in the database
-                let user_guard = self.get_user(user_id).await?;
+        let role = self.get_role(maybe_user_id).await;
 
-                //Converts the bool administrator value to a string so the enforcer can handle the request and match against the policy file
-                let role = if user_guard.administrator { "admin" } else { "guest" };
+        let enforcer = self.casbin_enforcer.enforcer.read().await;
 
-                let enforcer = self.casbin_enforcer.enforcer.read().await;
+        let authorize = enforcer.enforce((role, action)).map_err(|_| ServiceError::Unauthorized)?;
 
-                let authorize = enforcer.enforce((role, action)).map_err(|_| ServiceError::Unauthorized)?;
-
-                if authorize {
-                    Ok(())
-                } else {
-                    Err(ServiceError::Unauthorized)
-                }
-            }
-            None => Err(ServiceError::Unauthorized),
+        if authorize {
+            Ok(())
+        } else {
+            Err(ServiceError::Unauthorized)
         }
     }
 
@@ -74,6 +83,29 @@ impl Service {
     /// It returns an error if there is a database error.
     async fn get_user(&self, user_id: UserId) -> std::result::Result<UserCompact, ServiceError> {
         self.user_repository.get_compact(&user_id).await
+    }
+
+    /// It returns the role of the user.
+    /// If the user found in the request does not exist in the database or there is no user id, a guest role is returned
+    async fn get_role(&self, maybe_user_id: Option<UserId>) -> UserRole {
+        match maybe_user_id {
+            Some(user_id) => {
+                // Checks if the user found in the request exists in the database
+                let user_guard = self.get_user(user_id).await;
+
+                match user_guard {
+                    Ok(user_data) => {
+                        if user_data.administrator {
+                            UserRole::Admin
+                        } else {
+                            UserRole::Registered
+                        }
+                    }
+                    Err(_) => UserRole::Guest,
+                }
+            }
+            None => UserRole::Guest,
+        }
     }
 }
 
