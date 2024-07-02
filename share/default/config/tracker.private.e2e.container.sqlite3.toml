@@ -1,5 +1,7 @@
+version = "2"
+
 [core]
-mode = "private"
+private = true
 
 [core.database]
 driver = "Sqlite3"

@@ -13,9 +13,7 @@ pub struct Tracker {
     #[serde(default = "Tracker::default_api_url")]
     pub api_url: Url,
 
-    /// The mode of the tracker. For example: `Public`.
-    /// See `TrackerMode` in [`torrust-tracker-primitives`](https://docs.rs/torrust-tracker-primitives)
-    /// crate for more information.
+    /// The mode the tracker is running in.
     #[serde(default = "Tracker::default_mode")]
     pub mode: TrackerMode,
 
