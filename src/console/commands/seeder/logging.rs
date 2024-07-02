@@ -8,5 +8,5 @@ use tracing::level_filters::LevelFilter;
 pub fn setup(level: LevelFilter) {
     tracing_subscriber::fmt().with_max_level(level).init();
 
-    debug!("logging initialized.");
+    debug!("Logging initialized");
 }

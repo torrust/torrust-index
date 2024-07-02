@@ -37,7 +37,7 @@ fn tracing_stdout_init(filter: LevelFilter, style: &TraceStyle) {
         TraceStyle::Json => builder.json().init(),
     };
 
-    info!("logging initialized.");
+    info!("Logging initialized");
 }
 
 #[derive(Debug)]
