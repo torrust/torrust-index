@@ -10,7 +10,8 @@ threshold = "info"
 
 [tracker]
 api_url = "http://tracker:1212"
-mode = "private"
+listed = false
+private = true
 url = "http://tracker:7070"
 
 [database]

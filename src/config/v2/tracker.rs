@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use super::{ValidationError, Validator};
-use crate::config::TrackerMode;
 
 /// Configuration for the associated tracker.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -13,9 +12,13 @@ pub struct Tracker {
     #[serde(default = "Tracker::default_api_url")]
     pub api_url: Url,
 
-    /// The mode the tracker is running in.
-    #[serde(default = "Tracker::default_mode")]
-    pub mode: TrackerMode,
+    /// Whether the tracker is running in listed mode or not.
+    #[serde(default = "Tracker::default_listed")]
+    pub listed: bool,
+
+    /// Whether the tracker is running in private mode or not.
+    #[serde(default = "Tracker::default_private")]
+    pub private: bool,
 
     /// The token used to authenticate with the tracker API.
     #[serde(default = "Tracker::default_token")]
@@ -32,10 +35,7 @@ pub struct Tracker {
 
 impl Validator for Tracker {
     fn validate(&self) -> Result<(), ValidationError> {
-        let tracker_mode = self.mode.clone();
-        let tracker_url = self.url.clone();
-
-        if tracker_mode.is_close() && (tracker_url.scheme() != "http" && tracker_url.scheme() != "https") {
+        if self.private && (self.url.scheme() != "http" && self.url.scheme() != "https") {
             return Err(ValidationError::UdpTrackersInPrivateModeNotSupported);
         }
 
@@ -47,7 +47,8 @@ impl Default for Tracker {
     fn default() -> Self {
         Self {
             url: Self::default_url(),
-            mode: Self::default_mode(),
+            listed: Self::default_listed(),
+            private: Self::default_private(),
             api_url: Self::default_api_url(),
             token: Self::default_token(),
             token_valid_seconds: Self::default_token_valid_seconds(),
@@ -64,8 +65,12 @@ impl Tracker {
         Url::parse("udp://localhost:6969").unwrap()
     }
 
-    fn default_mode() -> TrackerMode {
-        TrackerMode::default()
+    fn default_listed() -> bool {
+        false
+    }
+
+    fn default_private() -> bool {
+        false
     }
 
     fn default_api_url() -> Url {

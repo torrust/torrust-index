@@ -2,9 +2,8 @@
 pub mod v2;
 pub mod validator;
 
-use std::str::FromStr;
+use std::env;
 use std::sync::Arc;
-use std::{env, fmt};
 
 use camino::Utf8PathBuf;
 use derive_more::Display;
@@ -200,70 +199,6 @@ impl From<figment::Error> for Error {
     }
 }
 
-/// The mode the tracker is running in.
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub enum TrackerMode {
-    /// Will track every new info hash and serve every peer.
-    #[serde(rename = "public")]
-    Public,
-
-    /// Will only track whitelisted info hashes.
-    #[serde(rename = "listed")]
-    Listed,
-
-    /// Will only serve authenticated peers
-    #[serde(rename = "private")]
-    Private,
-
-    /// Will only track whitelisted info hashes and serve authenticated peers
-    #[serde(rename = "private_listed")]
-    PrivateListed,
-}
-
-impl Default for TrackerMode {
-    fn default() -> Self {
-        Self::Public
-    }
-}
-
-impl fmt::Display for TrackerMode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let display_str = match self {
-            TrackerMode::Public => "public",
-            TrackerMode::Listed => "listed",
-            TrackerMode::Private => "private",
-            TrackerMode::PrivateListed => "private_listed",
-        };
-        write!(f, "{display_str}")
-    }
-}
-
-impl FromStr for TrackerMode {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "public" => Ok(TrackerMode::Public),
-            "listed" => Ok(TrackerMode::Listed),
-            "private" => Ok(TrackerMode::Private),
-            "private_listed" => Ok(TrackerMode::PrivateListed),
-            _ => Err(format!("Unknown tracker mode: {s}")),
-        }
-    }
-}
-
-impl TrackerMode {
-    #[must_use]
-    pub fn is_open(&self) -> bool {
-        matches!(self, TrackerMode::Public | TrackerMode::Listed)
-    }
-
-    #[must_use]
-    pub fn is_close(&self) -> bool {
-        !self.is_open()
-    }
-}
-
 /// Port number representing that the OS will choose one randomly from the available ports.
 ///
 /// It's the port number `0`
@@ -369,7 +304,8 @@ impl Configuration {
         ConfigurationPublic {
             website_name: settings_lock.website.name.clone(),
             tracker_url: settings_lock.tracker.url.clone(),
-            tracker_mode: settings_lock.tracker.mode.clone(),
+            tracker_listed: settings_lock.tracker.listed,
+            tracker_private: settings_lock.tracker.private,
             email_on_signup: settings_lock.auth.email_on_signup.clone(),
         }
     }
@@ -392,7 +328,8 @@ impl Configuration {
 pub struct ConfigurationPublic {
     website_name: String,
     tracker_url: Url,
-    tracker_mode: TrackerMode,
+    tracker_listed: bool,
+    tracker_private: bool,
     email_on_signup: EmailOnSignup,
 }
 
@@ -415,7 +352,8 @@ mod tests {
 
                                 [tracker]
                                 api_url = "http://localhost:1212/"
-                                mode = "public"
+                                listed = false
+                                private = false
                                 token = "MyAccessToken"
                                 token_valid_seconds = 7257600
                                 url = "udp://localhost:6969"
@@ -497,7 +435,8 @@ mod tests {
             ConfigurationPublic {
                 website_name: all_settings.website.name,
                 tracker_url: all_settings.tracker.url,
-                tracker_mode: all_settings.tracker.mode,
+                tracker_listed: all_settings.tracker.listed,
+                tracker_private: all_settings.tracker.private,
                 email_on_signup: all_settings.auth.email_on_signup,
             }
         );
@@ -586,14 +525,14 @@ mod tests {
         use url::Url;
 
         use crate::config::validator::Validator;
-        use crate::config::{Configuration, TrackerMode};
+        use crate::config::Configuration;
 
         #[tokio::test]
-        async fn udp_trackers_in_close_mode_are_not_supported() {
+        async fn udp_trackers_in_private_mode_are_not_supported() {
             let configuration = Configuration::default();
 
             let mut settings_lock = configuration.settings.write().await;
-            settings_lock.tracker.mode = TrackerMode::Private;
+            settings_lock.tracker.private = true;
             settings_lock.tracker.url = Url::parse("udp://localhost:6969").unwrap();
 
             assert!(settings_lock.validate().is_err());

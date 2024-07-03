@@ -1,7 +1,6 @@
 use std::env;
-use std::str::FromStr;
 
-use torrust_index::config::{ApiToken, TrackerMode};
+use torrust_index::config::ApiToken;
 use torrust_index::web::api::Version;
 use url::Url;
 
@@ -88,9 +87,7 @@ impl TestEnv {
         };
 
         match self.server_settings() {
-            Some(settings) => {
-                TrackerMode::from_str(&settings.tracker.mode).expect("it should be a valid tracker mode") == TrackerMode::Private
-            }
+            Some(settings) => settings.tracker.private,
             None => false,
         }
     }

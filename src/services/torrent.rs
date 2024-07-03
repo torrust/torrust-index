@@ -6,7 +6,7 @@ use tracing::debug;
 use url::Url;
 
 use super::category::DbCategoryRepository;
-use crate::config::{Configuration, TrackerMode};
+use crate::config::Configuration;
 use crate::databases::database::{Database, Error, Sorting};
 use crate::errors::ServiceError;
 use crate::models::category::CategoryId;
@@ -261,12 +261,12 @@ impl Index {
         let mut torrent = self.torrent_repository.get_by_info_hash(info_hash).await?;
 
         let tracker_url = self.get_tracker_url().await;
-        let tracker_mode = self.get_tracker_mode().await;
+        let tracker_is_private = self.tracker_is_private().await;
 
         // code-review: should we remove all tracker URLs in the `announce_list`
-        // when the tracker is not open?
+        // when the tracker is private?
 
-        if tracker_mode.is_open() {
+        if !tracker_is_private {
             torrent.include_url_as_main_tracker(&tracker_url);
         } else if let Some(authenticated_user_id) = opt_user_id {
             let personal_announce_url = self.tracker_service.get_personal_announce_url(authenticated_user_id).await?;
@@ -438,9 +438,9 @@ impl Index {
         settings.tracker.url.clone()
     }
 
-    async fn get_tracker_mode(&self) -> TrackerMode {
+    async fn tracker_is_private(&self) -> bool {
         let settings = self.configuration.settings.read().await;
-        settings.tracker.mode.clone()
+        settings.tracker.private
     }
 
     async fn build_short_torrent_response(
@@ -497,11 +497,8 @@ impl Index {
         torrent_response.trackers = self.torrent_announce_url_repository.get_by_torrent_id(&torrent_id).await?;
 
         let tracker_url = self.get_tracker_url().await;
-        let tracker_mode = self.get_tracker_mode().await;
 
-        if tracker_mode.is_open() {
-            torrent_response.include_url_as_main_tracker(&tracker_url);
-        } else {
+        if self.tracker_is_private().await {
             // Add main tracker URL
             match opt_user_id {
                 Some(user_id) => {
@@ -513,6 +510,8 @@ impl Index {
                     torrent_response.include_url_as_main_tracker(&tracker_url);
                 }
             }
+        } else {
+            torrent_response.include_url_as_main_tracker(&tracker_url);
         }
 
         // Add magnet link
