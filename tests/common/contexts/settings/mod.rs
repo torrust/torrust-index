@@ -38,7 +38,8 @@ pub struct Website {
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Tracker {
     pub url: Url,
-    pub mode: String,
+    pub listed: bool,
+    pub private: bool,
     pub api_url: Url,
     pub token: ApiToken,
     pub token_valid_seconds: u64,
@@ -145,7 +146,8 @@ impl From<DomainTracker> for Tracker {
     fn from(tracker: DomainTracker) -> Self {
         Self {
             url: tracker.url,
-            mode: tracker.mode.to_string(),
+            listed: tracker.listed,
+            private: tracker.private,
             api_url: tracker.api_url,
             token: tracker.token,
             token_valid_seconds: tracker.token_valid_seconds,

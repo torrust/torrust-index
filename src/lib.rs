@@ -58,7 +58,7 @@
 //! ```toml
 //! [tracker]
 //! url = "udp://localhost:6969"
-//! mode = "public"
+//!
 //! api_url = "http://localhost:1212/"
 //! token = "MyAccessToken"
 //! token_valid_seconds = 7257600
@@ -170,11 +170,12 @@
 //! name = "Torrust"
 //!
 //! [tracker]
-//! url = "udp://localhost:6969"
-//! mode = "public"
 //! api_url = "http://localhost:1212/"
+//! listed = false
+//! private = false
 //! token = "MyAccessToken"
 //! token_valid_seconds = 7257600
+//! url = "udp://localhost:6969"
 //!
 //! [net]
 //! bind_address = "0.0.0.0:3001"
