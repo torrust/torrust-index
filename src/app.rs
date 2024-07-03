@@ -87,9 +87,10 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let torrent_tag_repository = Arc::new(DbTorrentTagRepository::new(database.clone()));
     let torrent_listing_generator = Arc::new(DbTorrentListingGenerator::new(database.clone()));
     let banned_user_list = Arc::new(DbBannedUserList::new(database.clone()));
+    let casbin_enforcer = Arc::new(authorization::CasbinEnforcer::new().await);
 
     // Services
-    let authorization_service = Arc::new(authorization::Service::new(user_repository.clone()));
+    let authorization_service = Arc::new(authorization::Service::new(user_repository.clone(), casbin_enforcer.clone()));
     let tracker_service = Arc::new(tracker::service::Service::new(configuration.clone(), database.clone()).await);
     let tracker_statistics_importer =
         Arc::new(StatisticsImporter::new(configuration.clone(), tracker_service.clone(), database.clone()).await);
@@ -115,6 +116,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         torrent_announce_url_repository.clone(),
         torrent_tag_repository.clone(),
         torrent_listing_generator.clone(),
+        authorization_service.clone(),
     ));
     let registration_service = Arc::new(user::RegistrationService::new(
         configuration.clone(),
@@ -127,9 +129,9 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         user_authentication_repository.clone(),
     ));
     let ban_service = Arc::new(user::BanService::new(
-        user_repository.clone(),
         user_profile_repository.clone(),
         banned_user_list.clone(),
+        authorization_service.clone(),
     ));
     let authentication_service = Arc::new(Service::new(
         configuration.clone(),

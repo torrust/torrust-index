@@ -11,6 +11,7 @@ use pbkdf2::password_hash::rand_core::OsRng;
 use tracing::{debug, info};
 
 use super::authentication::DbUserAuthenticationRepository;
+use super::authorization::{self, ACTION};
 use crate::config::{Configuration, EmailOnSignup, PasswordConstraints};
 use crate::databases::database::{Database, Error};
 use crate::errors::ServiceError;
@@ -237,22 +238,22 @@ impl ProfileService {
 }
 
 pub struct BanService {
-    user_repository: Arc<Box<dyn Repository>>,
     user_profile_repository: Arc<DbUserProfileRepository>,
     banned_user_list: Arc<DbBannedUserList>,
+    authorization_service: Arc<authorization::Service>,
 }
 
 impl BanService {
     #[must_use]
     pub fn new(
-        user_repository: Arc<Box<dyn Repository>>,
         user_profile_repository: Arc<DbUserProfileRepository>,
         banned_user_list: Arc<DbBannedUserList>,
+        authorization_service: Arc<authorization::Service>,
     ) -> Self {
         Self {
-            user_repository,
             user_profile_repository,
             banned_user_list,
+            authorization_service,
         }
     }
 
@@ -268,12 +269,7 @@ impl BanService {
     pub async fn ban_user(&self, username_to_be_banned: &str, user_id: &UserId) -> Result<(), ServiceError> {
         debug!("user with ID {user_id} banning username: {username_to_be_banned}");
 
-        let user = self.user_repository.get_compact(user_id).await?;
-
-        // Check if user is administrator
-        if !user.administrator {
-            return Err(ServiceError::Unauthorized);
-        }
+        self.authorization_service.authorize(ACTION::BanUser, Some(*user_id)).await?;
 
         let user_profile = self
             .user_profile_repository

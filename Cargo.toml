@@ -97,6 +97,7 @@ url = { version = "2.5.0", features = ["serde"] }
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
 tracing-subscriber = { version = "0.3.18", features = ["json"] }
+casbin = "2.2.0"
 
 [dev-dependencies]
 tempfile = "3"

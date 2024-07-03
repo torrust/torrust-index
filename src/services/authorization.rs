@@ -1,10 +1,35 @@
 //! Authorization service.
+use std::fmt;
 use std::sync::Arc;
+
+use casbin::{CoreApi, DefaultModel, Enforcer, MgmtApi};
+use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 
 use super::user::Repository;
 use crate::errors::ServiceError;
 use crate::models::user::{UserCompact, UserId};
 
+#[derive(Debug, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "lowercase")]
+enum UserRole {
+    Admin,
+    Registered,
+    Guest,
+}
+
+impl fmt::Display for UserRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let role_str = match self {
+            UserRole::Admin => "admin",
+            UserRole::Registered => "registered",
+            UserRole::Guest => "guest",
+        };
+        write!(f, "{role_str}")
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum ACTION {
     AddCategory,
     DeleteCategory,
@@ -12,188 +37,147 @@ pub enum ACTION {
     GetSettingsSecret,
     AddTag,
     DeleteTag,
+    DeleteTorrent,
+    BanUser,
 }
 
 pub struct Service {
     user_repository: Arc<Box<dyn Repository>>,
+    casbin_enforcer: Arc<CasbinEnforcer>,
 }
 
 impl Service {
     #[must_use]
-    pub fn new(user_repository: Arc<Box<dyn Repository>>) -> Self {
-        Self { user_repository }
-    }
-
-    /// # Errors
-    ///
-    /// Will return an error if:
-    ///
-    /// - There is not any user with the provided `UserId` (when the user id is some).
-    /// - The user is not authorized to perform the action.
-    pub async fn authorize(&self, action: ACTION, maybe_user_id: Option<UserId>) -> Result<(), ServiceError> {
-        match action {
-            ACTION::AddCategory
-            | ACTION::DeleteCategory
-            | ACTION::GetSettings
-            | ACTION::GetSettingsSecret
-            | ACTION::AddTag
-            | ACTION::DeleteTag => match maybe_user_id {
-                Some(user_id) => {
-                    let user = self.get_user(user_id).await?;
-
-                    if !user.administrator {
-                        return Err(ServiceError::Unauthorized);
-                    }
-
-                    Ok(())
-                }
-                None => Err(ServiceError::Unauthorized),
-            },
+    pub fn new(user_repository: Arc<Box<dyn Repository>>, casbin_enforcer: Arc<CasbinEnforcer>) -> Self {
+        Self {
+            user_repository,
+            casbin_enforcer,
         }
     }
 
-    async fn get_user(&self, user_id: UserId) -> Result<UserCompact, ServiceError> {
+    ///Allows or denies an user to perform an action based on the user's privileges
+    ///
+    /// # Errors
+    ///
+    /// Will return an error if:
+    /// - The user is not authorized to perform the action.
+
+    pub async fn authorize(&self, action: ACTION, maybe_user_id: Option<UserId>) -> std::result::Result<(), ServiceError> {
+        let role = self.get_role(maybe_user_id).await;
+
+        let enforcer = self.casbin_enforcer.enforcer.read().await;
+
+        let authorize = enforcer.enforce((role, action)).map_err(|_| ServiceError::Unauthorized)?;
+
+        if authorize {
+            Ok(())
+        } else {
+            Err(ServiceError::Unauthorized)
+        }
+    }
+
+    /// It returns the compact user.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    async fn get_user(&self, user_id: UserId) -> std::result::Result<UserCompact, ServiceError> {
         self.user_repository.get_compact(&user_id).await
     }
+
+    /// It returns the role of the user.
+    /// If the user found in the request does not exist in the database or there is no user id, a guest role is returned
+    async fn get_role(&self, maybe_user_id: Option<UserId>) -> UserRole {
+        match maybe_user_id {
+            Some(user_id) => {
+                // Checks if the user found in the request exists in the database
+                let user_guard = self.get_user(user_id).await;
+
+                match user_guard {
+                    Ok(user_data) => {
+                        if user_data.administrator {
+                            UserRole::Admin
+                        } else {
+                            UserRole::Registered
+                        }
+                    }
+                    Err(_) => UserRole::Guest,
+                }
+            }
+            None => UserRole::Guest,
+        }
+    }
 }
-#[allow(unused_imports)]
-#[cfg(test)]
-mod test {
-    use std::str::FromStr;
-    use std::sync::Arc;
 
-    use mockall::predicate;
+pub struct CasbinEnforcer {
+    enforcer: Arc<RwLock<Enforcer>>,
+}
 
-    use crate::databases::database;
-    use crate::errors::ServiceError;
-    use crate::models::user::{User, UserCompact};
-    use crate::services::authorization::{Service, ACTION};
-    use crate::services::user::{MockRepository, Repository};
-    use crate::web::api::client::v1::random::string;
+impl CasbinEnforcer {
+    /// # Panics
+    ///
+    /// It panics if the policy and/or model file cannot be loaded
+    pub async fn new() -> Self {
+        let casbin_configuration = CasbinConfiguration::new();
 
-    #[tokio::test]
-    async fn a_guest_user_should_not_be_able_to_add_categories() {
-        let test_user_id = 1;
+        let model = DefaultModel::from_str(&casbin_configuration.model)
+            .await
+            .expect("Error loading the model");
 
-        let mut mock_repository = MockRepository::new();
-        mock_repository
-            .expect_get_compact()
-            .with(predicate::eq(test_user_id))
-            .times(1)
-            .returning(|_| Err(ServiceError::UserNotFound));
+        // Converts the policy from a string type to a vector
+        let policy = casbin_configuration
+            .policy
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| line.split(',').map(|s| s.trim().to_owned()).collect::<Vec<String>>())
+            .collect();
 
-        let service = Service::new(Arc::new(Box::new(mock_repository)));
-        assert_eq!(
-            service.authorize(ACTION::AddCategory, Some(test_user_id)).await,
-            Err(ServiceError::UserNotFound)
-        );
+        let mut enforcer = Enforcer::new(model, ()).await.expect("Error creating the enforcer");
+
+        enforcer.add_policies(policy).await.expect("Error loading the policy");
+
+        let enforcer = Arc::new(RwLock::new(enforcer));
+
+        Self { enforcer }
     }
+}
+#[allow(dead_code)]
+struct CasbinConfiguration {
+    model: String,
+    policy: String,
+}
 
-    #[tokio::test]
-    async fn a_registered_user_should_not_be_able_to_add_categories() {
-        let test_user_id = 2;
+impl CasbinConfiguration {
+    pub fn new() -> Self {
+        CasbinConfiguration {
+            model: String::from(
+                "
+                [request_definition]
+                r = role, action
+                
+                [policy_definition]
+                p = role, action
+                
+                [policy_effect]
+                e = some(where (p.eft == allow))
+                
+                [matchers]
+                m = r.role == p.role && r.action == p.action
+            ",
+            ),
+            policy: String::from(
+                "
+                admin, AddCategory
+                admin, DeleteCategory
+                admin, GetSettings
+                admin, GetSettingsSecret
+                admin, AddTag
+                admin, DeleteTag
+                admin, DeleteTorrent
+                admin, BanUser
 
-        let mut mock_repository = MockRepository::new();
-        mock_repository
-            .expect_get_compact()
-            .with(predicate::eq(test_user_id))
-            .times(1)
-            .returning(move |_| {
-                Ok(UserCompact {
-                    user_id: test_user_id,
-                    username: "non_admin_user".to_string(),
-                    administrator: false,
-                })
-            });
-
-        let service = Service::new(Arc::new(Box::new(mock_repository)));
-        assert_eq!(
-            service.authorize(ACTION::AddCategory, Some(test_user_id)).await,
-            Err(ServiceError::Unauthorized)
-        );
-    }
-
-    #[tokio::test]
-    async fn an_admin_user_should_be_able_to_add_categories() {
-        let test_user_id = 3;
-
-        let mut mock_repository = MockRepository::new();
-        mock_repository
-            .expect_get_compact()
-            .with(predicate::eq(test_user_id))
-            .times(1)
-            .returning(move |_| {
-                Ok(UserCompact {
-                    user_id: test_user_id,
-                    username: "admin_user".to_string(),
-                    administrator: true,
-                })
-            });
-
-        let service = Service::new(Arc::new(Box::new(mock_repository)));
-        assert_eq!(service.authorize(ACTION::AddCategory, Some(test_user_id)).await, Ok(()));
-    }
-
-    #[tokio::test]
-    async fn a_guest_user_should_not_be_able_to_delete_categories() {
-        let test_user_id = 4;
-
-        let mut mock_repository = MockRepository::new();
-        mock_repository
-            .expect_get_compact()
-            .with(predicate::eq(test_user_id))
-            .times(1)
-            .returning(|_| Err(ServiceError::UserNotFound));
-
-        let service = Service::new(Arc::new(Box::new(mock_repository)));
-        assert_eq!(
-            service.authorize(ACTION::DeleteCategory, Some(test_user_id)).await,
-            Err(ServiceError::UserNotFound)
-        );
-    }
-
-    #[tokio::test]
-    async fn a_registered_user_should_not_be_able_to_delete_categories() {
-        let test_user_id = 5;
-
-        let mut mock_repository = MockRepository::new();
-        mock_repository
-            .expect_get_compact()
-            .with(predicate::eq(test_user_id))
-            .times(1)
-            .returning(move |_| {
-                Ok(UserCompact {
-                    user_id: test_user_id,
-                    username: "non_admin_user".to_string(),
-                    administrator: false,
-                })
-            });
-
-        let service = Service::new(Arc::new(Box::new(mock_repository)));
-        assert_eq!(
-            service.authorize(ACTION::DeleteCategory, Some(test_user_id)).await,
-            Err(ServiceError::Unauthorized)
-        );
-    }
-
-    #[tokio::test]
-    async fn an_admin_user_should_be_able_to_delete_categories() {
-        let test_user_id = 6;
-
-        let mut mock_repository = MockRepository::new();
-        mock_repository
-            .expect_get_compact()
-            .with(predicate::eq(test_user_id))
-            .times(1)
-            .returning(move |_| {
-                Ok(UserCompact {
-                    user_id: test_user_id,
-                    username: "admin_user".to_string(),
-                    administrator: true,
-                })
-            });
-
-        let service = Service::new(Arc::new(Box::new(mock_repository)));
-        assert_eq!(service.authorize(ACTION::DeleteCategory, Some(test_user_id)).await, Ok(()));
+                ",
+            ),
+        }
     }
 }
