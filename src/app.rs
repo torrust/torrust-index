@@ -18,7 +18,7 @@ use crate::services::torrent::{
     DbTorrentListingGenerator, DbTorrentRepository, DbTorrentTagRepository,
 };
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository, Repository};
-use crate::services::{authorization, proxy, settings, torrent};
+use crate::services::{about, authorization, proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::web::api::server::signals::Halted;
 use crate::web::api::server::v1::auth::Authentication;
@@ -141,6 +141,8 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         user_authentication_repository.clone(),
     ));
 
+    let about_service = Arc::new(about::Service::new());
+
     // Build app container
 
     let app_data = Arc::new(AppData::new(
@@ -174,6 +176,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         registration_service,
         profile_service,
         ban_service,
+        about_service,
     ));
 
     // Start cronjob to import tracker torrent data and updating
