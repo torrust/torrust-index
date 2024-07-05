@@ -4,7 +4,7 @@ version = "2"
 private = true
 
 [core.database]
-driver = "Sqlite3"
+driver = "sqlite3"
 path = "/var/lib/torrust/tracker/database/e2e_testing_sqlite3.db"
 
 [[udp_trackers]]
