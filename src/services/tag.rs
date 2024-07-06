@@ -68,6 +68,12 @@ impl Service {
             },
         }
     }
+
+    pub async fn get_tags(&self) -> Result<Vec<TorrentTag>, ServiceError> {
+        self.authorization_service.authorize(ACTION::GetTags, None).await?;
+
+        self.tag_repository.get_all().await.map_err(|_| ServiceError::DatabaseError)
+    }
 }
 
 pub struct DbTagRepository {
