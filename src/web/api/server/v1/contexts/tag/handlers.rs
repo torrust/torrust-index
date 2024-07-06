@@ -26,7 +26,7 @@ use crate::web::api::server::v1::responses::{self};
 /// It returns an error if there is a database error.
 #[allow(clippy::unused_async)]
 pub async fn get_all_handler(State(app_data): State<Arc<AppData>>) -> Response {
-    match app_data.tag_repository.get_all().await {
+    match app_data.tag_service.get_tags().await {
         Ok(tags) => Json(responses::OkResponseData { data: tags }).into_response(),
         Err(error) => error.into_response(),
     }

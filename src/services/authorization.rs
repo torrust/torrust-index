@@ -41,6 +41,7 @@ pub enum ACTION {
     BanUser,
     GetAboutPage,
     GetLicensePage,
+    GetTags,
 }
 
 pub struct Service {
@@ -179,6 +180,7 @@ impl CasbinConfiguration {
                 admin, BanUser
                 guest, GetAboutPage
                 guest, GetLicensePage
+                guest, GetTags
                 ",
             ),
         }
