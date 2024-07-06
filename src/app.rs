@@ -141,7 +141,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         user_authentication_repository.clone(),
     ));
 
-    let about_service = Arc::new(about::Service::new());
+    let about_service = Arc::new(about::Service::new(authorization_service.clone()));
 
     // Build app container
 

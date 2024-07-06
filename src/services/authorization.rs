@@ -39,6 +39,8 @@ pub enum ACTION {
     DeleteTag,
     DeleteTorrent,
     BanUser,
+    GetAboutPage,
+    GetLicensePage,
 }
 
 pub struct Service {
@@ -175,7 +177,8 @@ impl CasbinConfiguration {
                 admin, DeleteTag
                 admin, DeleteTorrent
                 admin, BanUser
-
+                guest, GetAboutPage
+                guest, GetLicensePage
                 ",
             ),
         }

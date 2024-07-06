@@ -1,15 +1,24 @@
 //! Templates for "about" static pages.
 
-pub struct Service {}
+use std::sync::Arc;
+
+use super::authorization::{self, ACTION};
+use crate::errors::ServiceError;
+
+pub struct Service {
+    authorization_service: Arc<authorization::Service>,
+}
 
 impl Service {
     #[must_use]
-    pub fn new() -> Service {
-        Service {}
+    pub fn new(authorization_service: Arc<authorization::Service>) -> Service {
+        Service { authorization_service }
     }
 
-    pub fn get_about_page(&self) -> String {
-        r#"
+    pub async fn get_about_page(&self) -> Result<String, ServiceError> {
+        self.authorization_service.authorize(ACTION::GetAboutPage, None).await?;
+
+        let html = r#"
     <html>
         <head>
             <title>About</title>
@@ -25,12 +34,15 @@ impl Service {
             <a href="./about/license">license</a>
         </footer>
     </html>
-"#
-        .to_string()
+"#;
+
+        Ok(html.to_string())
     }
 
-    pub fn get_license_page(&self) -> String {
-        r#"
+    pub async fn get_license_page(&self) -> Result<String, ServiceError> {
+        self.authorization_service.authorize(ACTION::GetLicensePage, None).await?;
+
+        let html = r#"
         <html>
             <head>
                 <title>Licensing</title>
@@ -56,6 +68,8 @@ impl Service {
                 <a href="../about">about</a>
             </footer>
         </html>
-    "#.to_string()
+    "#;
+
+        Ok(html.to_string())
     }
 }

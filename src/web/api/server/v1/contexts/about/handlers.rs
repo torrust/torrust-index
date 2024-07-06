@@ -10,14 +10,18 @@ use crate::common::AppData;
 
 #[allow(clippy::unused_async)]
 pub async fn about_page_handler(State(app_data): State<Arc<AppData>>) -> Response {
-    let html = app_data.about_service.get_about_page();
-
-    (StatusCode::OK, [(header::CONTENT_TYPE, "text/html; charset=utf-8")], html).into_response()
+    match app_data.about_service.get_about_page().await {
+        Ok(html) => (StatusCode::OK, [(header::CONTENT_TYPE, "text/html; charset=utf-8")], html).into_response(),
+        Err(error) => error.into_response(),
+    }
 }
 
 #[allow(clippy::unused_async)]
 pub async fn license_page_handler(State(app_data): State<Arc<AppData>>) -> Response {
-    let html = app_data.about_service.get_license_page();
-
-    (StatusCode::OK, [(header::CONTENT_TYPE, "text/html; charset=utf-8")], html).into_response()
+    match app_data.about_service.get_license_page().await {
+        Ok(html) => (StatusCode::OK, [(header::CONTENT_TYPE, "text/html; charset=utf-8")], html)
+            .into_response()
+            .into_response(),
+        Err(error) => error.into_response(),
+    }
 }
