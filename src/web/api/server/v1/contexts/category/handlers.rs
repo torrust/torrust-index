@@ -26,7 +26,7 @@ use crate::web::api::server::v1::responses::{self};
 /// It returns an error if there is a database error.
 #[allow(clippy::unused_async)]
 pub async fn get_all_handler(State(app_data): State<Arc<AppData>>) -> Response {
-    match app_data.category_repository.get_all().await {
+    match app_data.category_service.get_categories().await {
         Ok(categories) => {
             let categories: Vec<Category> = categories.into_iter().map(Category::from).collect();
             Json(responses::OkResponseData { data: categories }).into_response()
