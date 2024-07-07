@@ -69,6 +69,14 @@ impl Service {
         }
     }
 
+    /// Returns all the tags from the database
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if:
+    ///
+    /// * The user does not have the required permissions.
+    /// * There is a database error retrieving the tags.
     pub async fn get_tags(&self) -> Result<Vec<TorrentTag>, ServiceError> {
         self.authorization_service.authorize(ACTION::GetTags, None).await?;
 

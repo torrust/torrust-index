@@ -15,6 +15,14 @@ impl Service {
         Service { authorization_service }
     }
 
+    /// Returns the html with the about page
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if:
+    ///
+    /// * The user does not have the required permissions.
+    /// * There is an error authorizing the action.
     pub async fn get_about_page(&self) -> Result<String, ServiceError> {
         self.authorization_service.authorize(ACTION::GetAboutPage, None).await?;
 
@@ -39,6 +47,14 @@ impl Service {
         Ok(html.to_string())
     }
 
+    /// Returns the html with the license page
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if:
+    ///
+    /// * The user does not have the required permissions.
+    /// * There is an error authorizing the action.
     pub async fn get_license_page(&self) -> Result<String, ServiceError> {
         self.authorization_service.authorize(ACTION::GetLicensePage, None).await?;
 
