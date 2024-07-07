@@ -78,6 +78,23 @@ impl Service {
             },
         }
     }
+
+    /// Returns all the categories from the database
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if:
+    ///
+    /// * The user does not have the required permissions.
+    /// * There is a database error retrieving the categories.
+    pub async fn get_categories(&self) -> Result<Vec<Category>, ServiceError> {
+        self.authorization_service.authorize(ACTION::GetCategories, None).await?;
+
+        self.category_repository
+            .get_all()
+            .await
+            .map_err(|_| ServiceError::DatabaseError)
+    }
 }
 
 pub struct DbCategoryRepository {
