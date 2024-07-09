@@ -18,3 +18,6 @@ connect_url = "sqlite:///var/lib/torrust/index/database/e2e_testing_sqlite3.db?m
 [mail.smtp]
 port = 1025
 server = "mailcatcher"
+
+[registration]
+[registration.email]

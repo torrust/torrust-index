@@ -15,3 +15,5 @@ connect_url = "mysql://root:root_secret_password@mysql:3306/torrust_index"
 port = 1025
 server = "mailcatcher"
 
+[registration]
+[registration.email]
