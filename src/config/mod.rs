@@ -433,7 +433,6 @@ mod tests {
                                 connect_url = "sqlite://data.db?mode=rwc"
 
                                 [mail]
-                                email_verification_enabled = false
                                 from = "example@email.com"
                                 reply_to = "noreply@email.com"
 

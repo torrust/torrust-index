@@ -4,10 +4,6 @@ use serde::{Deserialize, Serialize};
 /// SMTP configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Mail {
-    /// Whether or not to enable email verification on signup.
-    #[serde(default = "Mail::default_email_verification_enabled")]
-    pub email_verification_enabled: bool,
-
     /// The email address to send emails from.
     #[serde(default = "Mail::default_from")]
     pub from: Mailbox,
@@ -24,7 +20,6 @@ pub struct Mail {
 impl Default for Mail {
     fn default() -> Self {
         Self {
-            email_verification_enabled: Self::default_email_verification_enabled(),
             from: Self::default_from(),
             reply_to: Self::default_reply_to(),
             smtp: Self::default_smtp(),
@@ -33,10 +28,6 @@ impl Default for Mail {
 }
 
 impl Mail {
-    fn default_email_verification_enabled() -> bool {
-        false
-    }
-
     fn default_from() -> Mailbox {
         "example@email.com".parse().expect("valid mailbox")
     }

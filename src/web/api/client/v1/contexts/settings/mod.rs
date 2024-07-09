@@ -66,7 +66,6 @@ pub struct Database {
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Mail {
-    pub email_verification_enabled: bool,
     pub from: String,
     pub reply_to: String,
     pub smtp: Smtp,
@@ -179,7 +178,6 @@ impl From<DomainDatabase> for Database {
 impl From<DomainMail> for Mail {
     fn from(mail: DomainMail) -> Self {
         Self {
-            email_verification_enabled: mail.email_verification_enabled,
             from: mail.from.to_string(),
             reply_to: mail.reply_to.to_string(),
             smtp: Smtp::from(mail.smtp),
