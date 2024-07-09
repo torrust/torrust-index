@@ -1,6 +1,6 @@
 //! API contract for `settings` context.
 
-use torrust_index::config::EmailOnSignup;
+use torrust_index::services::settings::EmailOnSignup;
 use torrust_index::web::api;
 
 use crate::common::asserts::assert_json_ok_response;

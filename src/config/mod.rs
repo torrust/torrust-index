@@ -2,9 +2,8 @@
 pub mod v2;
 pub mod validator;
 
-use std::str::FromStr;
+use std::env;
 use std::sync::Arc;
-use std::{env, fmt};
 
 use camino::Utf8PathBuf;
 use derive_more::Display;
@@ -15,7 +14,6 @@ use serde_with::{serde_as, NoneAsEmptyString};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use torrust_index_located_error::LocatedError;
-use url::Url;
 
 use crate::web::api::server::DynError;
 
@@ -301,32 +299,6 @@ impl Configuration {
         settings_lock.clone()
     }
 
-    pub async fn get_public(&self) -> ConfigurationPublic {
-        let settings_lock = self.settings.read().await;
-
-        let email_on_signup = match &settings_lock.registration {
-            Some(registration) => match &registration.email {
-                Some(email) => {
-                    if email.required {
-                        EmailOnSignup::Required
-                    } else {
-                        EmailOnSignup::Optional
-                    }
-                }
-                None => EmailOnSignup::NotIncluded,
-            },
-            None => EmailOnSignup::NotIncluded,
-        };
-
-        ConfigurationPublic {
-            website_name: settings_lock.website.name.clone(),
-            tracker_url: settings_lock.tracker.url.clone(),
-            tracker_listed: settings_lock.tracker.listed,
-            tracker_private: settings_lock.tracker.private,
-            email_on_signup,
-        }
-    }
-
     pub async fn get_site_name(&self) -> String {
         let settings_lock = self.settings.read().await;
 
@@ -339,67 +311,12 @@ impl Configuration {
     }
 }
 
-/// The public index configuration.
-/// There is an endpoint to get this configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ConfigurationPublic {
-    website_name: String,
-    tracker_url: Url,
-    tracker_listed: bool,
-    tracker_private: bool,
-    email_on_signup: EmailOnSignup,
-}
-
-/// Whether the email is required on signup or not.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum EmailOnSignup {
-    /// The email is required on signup.
-    Required,
-    /// The email is optional on signup.
-    Optional,
-    /// The email is not allowed on signup. It will only be ignored if provided.
-    NotIncluded,
-}
-
-impl Default for EmailOnSignup {
-    fn default() -> Self {
-        Self::Optional
-    }
-}
-
-impl fmt::Display for EmailOnSignup {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let display_str = match self {
-            EmailOnSignup::Required => "required",
-            EmailOnSignup::Optional => "optional",
-            EmailOnSignup::NotIncluded => "ignored",
-        };
-        write!(f, "{display_str}")
-    }
-}
-
-impl FromStr for EmailOnSignup {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "required" => Ok(EmailOnSignup::Required),
-            "optional" => Ok(EmailOnSignup::Optional),
-            "none" => Ok(EmailOnSignup::NotIncluded),
-            _ => Err(format!(
-                "Unknown config 'email_on_signup' option (required, optional, none): {s}"
-            )),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
     use url::Url;
 
-    use crate::config::{ApiToken, Configuration, ConfigurationPublic, EmailOnSignup, Info, SecretKey, Settings};
+    use crate::config::{ApiToken, Configuration, Info, SecretKey, Settings};
 
     #[cfg(test)]
     fn default_config_toml() -> String {
@@ -482,37 +399,6 @@ mod tests {
         let toml = toml::to_string(&configuration).expect("Could not encode TOML value for configuration");
 
         assert_eq!(toml, default_config_toml());
-    }
-
-    #[tokio::test]
-    async fn configuration_should_return_only_public_settings() {
-        let configuration = Configuration::default();
-        let all_settings = configuration.get_all().await;
-
-        let email_on_signup = match &all_settings.registration {
-            Some(registration) => match &registration.email {
-                Some(email) => {
-                    if email.required {
-                        EmailOnSignup::Required
-                    } else {
-                        EmailOnSignup::Optional
-                    }
-                }
-                None => EmailOnSignup::NotIncluded,
-            },
-            None => EmailOnSignup::NotIncluded,
-        };
-
-        assert_eq!(
-            configuration.get_public().await,
-            ConfigurationPublic {
-                website_name: all_settings.website.name,
-                tracker_url: all_settings.tracker.url,
-                tracker_listed: all_settings.tracker.listed,
-                tracker_private: all_settings.tracker.private,
-                email_on_signup,
-            }
-        );
     }
 
     #[tokio::test]

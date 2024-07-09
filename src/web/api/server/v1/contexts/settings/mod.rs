@@ -183,7 +183,7 @@
 //!
 //! **Resource**
 //!
-//! Refer to the [`ConfigurationPublic`](crate::config::ConfigurationPublic)
+//! Refer to the [`ConfigurationPublic`](crate::services::settings::ConfigurationPublic)
 //! struct for more information about the response attributes.
 pub mod handlers;
 pub mod routes;
