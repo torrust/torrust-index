@@ -87,12 +87,21 @@ impl RegistrationService {
                         if email.required && registration_form.email.is_none() {
                             return Err(ServiceError::EmailMissing);
                         }
-                        registration_form.email.clone()
+                        match &registration_form.email {
+                            Some(email) => {
+                                if email.trim() == String::new() {
+                                    None
+                                } else {
+                                    Some(email.clone())
+                                }
+                            }
+                            None => None,
+                        }
                     }
                     None => None,
                 };
 
-                if let Some(email) = &registration_form.email {
+                if let Some(email) = &opt_email {
                     if !validate_email_address(email) {
                         return Err(ServiceError::EmailInvalid);
                     }
