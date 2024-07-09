@@ -1,5 +1,6 @@
 //! API contract for `settings` context.
 
+use torrust_index::config::EmailOnSignup;
 use torrust_index::web::api;
 
 use crate::common::asserts::assert_json_ok_response;
@@ -20,6 +21,20 @@ async fn it_should_allow_guests_to_get_the_public_settings() {
     let res: PublicSettingsResponse = serde_json::from_str(&response.body)
         .unwrap_or_else(|_| panic!("response {:#?} should be a PublicSettingsResponse", response.body));
 
+    let email_on_signup = match &env.server_settings().unwrap().registration {
+        Some(registration) => match &registration.email {
+            Some(email) => {
+                if email.required {
+                    EmailOnSignup::Required
+                } else {
+                    EmailOnSignup::Optional
+                }
+            }
+            None => EmailOnSignup::NotIncluded,
+        },
+        None => EmailOnSignup::NotIncluded,
+    };
+
     assert_eq!(
         res.data,
         Public {
@@ -27,7 +42,7 @@ async fn it_should_allow_guests_to_get_the_public_settings() {
             tracker_url: env.server_settings().unwrap().tracker.url,
             tracker_listed: env.server_settings().unwrap().tracker.listed,
             tracker_private: env.server_settings().unwrap().tracker.private,
-            email_on_signup: env.server_settings().unwrap().auth.email_on_signup,
+            email_on_signup: email_on_signup.to_string(),
         }
     );
 

@@ -2,8 +2,9 @@
 pub mod v2;
 pub mod validator;
 
-use std::env;
+use std::str::FromStr;
 use std::sync::Arc;
+use std::{env, fmt};
 
 use camino::Utf8PathBuf;
 use derive_more::Display;
@@ -22,8 +23,10 @@ pub type Settings = v2::Settings;
 
 pub type Api = v2::api::Api;
 
+pub type Registration = v2::registration::Registration;
+pub type Email = v2::registration::Email;
+
 pub type Auth = v2::auth::Auth;
-pub type EmailOnSignup = v2::auth::EmailOnSignup;
 pub type SecretKey = v2::auth::SecretKey;
 pub type PasswordConstraints = v2::auth::PasswordConstraints;
 
@@ -301,12 +304,26 @@ impl Configuration {
     pub async fn get_public(&self) -> ConfigurationPublic {
         let settings_lock = self.settings.read().await;
 
+        let email_on_signup = match &settings_lock.registration {
+            Some(registration) => match &registration.email {
+                Some(email) => {
+                    if email.required {
+                        EmailOnSignup::Required
+                    } else {
+                        EmailOnSignup::Optional
+                    }
+                }
+                None => EmailOnSignup::NotIncluded,
+            },
+            None => EmailOnSignup::NotIncluded,
+        };
+
         ConfigurationPublic {
             website_name: settings_lock.website.name.clone(),
             tracker_url: settings_lock.tracker.url.clone(),
             tracker_listed: settings_lock.tracker.listed,
             tracker_private: settings_lock.tracker.private,
-            email_on_signup: settings_lock.auth.email_on_signup.clone(),
+            email_on_signup,
         }
     }
 
@@ -333,12 +350,56 @@ pub struct ConfigurationPublic {
     email_on_signup: EmailOnSignup,
 }
 
+/// Whether the email is required on signup or not.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum EmailOnSignup {
+    /// The email is required on signup.
+    Required,
+    /// The email is optional on signup.
+    Optional,
+    /// The email is not allowed on signup. It will only be ignored if provided.
+    NotIncluded,
+}
+
+impl Default for EmailOnSignup {
+    fn default() -> Self {
+        Self::Optional
+    }
+}
+
+impl fmt::Display for EmailOnSignup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let display_str = match self {
+            EmailOnSignup::Required => "required",
+            EmailOnSignup::Optional => "optional",
+            EmailOnSignup::NotIncluded => "ignored",
+        };
+        write!(f, "{display_str}")
+    }
+}
+
+impl FromStr for EmailOnSignup {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "required" => Ok(EmailOnSignup::Required),
+            "optional" => Ok(EmailOnSignup::Optional),
+            "none" => Ok(EmailOnSignup::NotIncluded),
+            _ => Err(format!(
+                "Unknown config 'email_on_signup' option (required, optional, none): {s}"
+            )),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
     use url::Url;
 
-    use crate::config::{ApiToken, Configuration, ConfigurationPublic, Info, SecretKey, Settings};
+    use crate::config::{ApiToken, Configuration, ConfigurationPublic, EmailOnSignup, Info, SecretKey, Settings};
 
     #[cfg(test)]
     fn default_config_toml() -> String {
@@ -362,7 +423,6 @@ mod tests {
                                 bind_address = "0.0.0.0:3001"
 
                                 [auth]
-                                email_on_signup = "optional"
                                 secret_key = "MaxVerstappenWC2021"
 
                                 [auth.password_constraints]
@@ -430,6 +490,20 @@ mod tests {
         let configuration = Configuration::default();
         let all_settings = configuration.get_all().await;
 
+        let email_on_signup = match &all_settings.registration {
+            Some(registration) => match &registration.email {
+                Some(email) => {
+                    if email.required {
+                        EmailOnSignup::Required
+                    } else {
+                        EmailOnSignup::Optional
+                    }
+                }
+                None => EmailOnSignup::NotIncluded,
+            },
+            None => EmailOnSignup::NotIncluded,
+        };
+
         assert_eq!(
             configuration.get_public().await,
             ConfigurationPublic {
@@ -437,7 +511,7 @@ mod tests {
                 tracker_url: all_settings.tracker.url,
                 tracker_listed: all_settings.tracker.listed,
                 tracker_private: all_settings.tracker.private,
-                email_on_signup: all_settings.auth.email_on_signup,
+                email_on_signup,
             }
         );
     }

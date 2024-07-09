@@ -49,7 +49,6 @@ pub struct Network {
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Auth {
-    pub email_on_signup: String,
     pub secret_key: String,
     pub password_constraints: PasswordConstraints,
 }
@@ -154,7 +153,6 @@ impl From<DomainNetwork> for Network {
 impl From<DomainAuth> for Auth {
     fn from(auth: DomainAuth) -> Self {
         Self {
-            email_on_signup: format!("{:?}", auth.email_on_signup),
             secret_key: auth.secret_key.to_string(),
             password_constraints: auth.password_constraints.into(),
         }
