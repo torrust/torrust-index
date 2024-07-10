@@ -31,18 +31,19 @@ impl fmt::Display for UserRole {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum ACTION {
+    GetCategories,
     AddCategory,
     DeleteCategory,
     GetSettings,
     GetSettingsSecret,
+    GetTags,
     AddTag,
     DeleteTag,
     DeleteTorrent,
     BanUser,
     GetAboutPage,
     GetLicensePage,
-    GetCategories,
-    GetTags,
+    GetImageByUrl,
 }
 
 pub struct Service {
@@ -179,10 +180,11 @@ impl CasbinConfiguration {
                 admin, DeleteTag
                 admin, DeleteTorrent
                 admin, BanUser
-                guest, GetAboutPage
-                guest, GetLicensePage
+                registered, GetImageByUrl
                 guest, GetCategories
                 guest, GetTags
+                guest, GetAboutPage
+                guest, GetLicensePage
                 ",
             ),
         }
