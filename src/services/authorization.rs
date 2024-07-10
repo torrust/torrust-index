@@ -180,6 +180,7 @@ impl CasbinConfiguration {
                 admin, DeleteTag
                 admin, DeleteTorrent
                 admin, BanUser
+                admin, GetImageByUrl
                 registered, GetImageByUrl
                 guest, GetCategories
                 guest, GetTags
