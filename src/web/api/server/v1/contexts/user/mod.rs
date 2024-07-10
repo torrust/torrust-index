@@ -45,7 +45,6 @@
 //!
 //! ```toml
 //! [auth]
-//! email_on_signup = "Optional"
 //! secret_key = "MaxVerstappenWC2021"
 //! ```
 //!

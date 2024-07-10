@@ -12,7 +12,7 @@ use tracing::{debug, info};
 
 use super::authentication::DbUserAuthenticationRepository;
 use super::authorization::{self, ACTION};
-use crate::config::{Configuration, EmailOnSignup, PasswordConstraints};
+use crate::config::{Configuration, PasswordConstraints};
 use crate::databases::database::{Database, Error};
 use crate::errors::ServiceError;
 use crate::mailer;
@@ -74,71 +74,90 @@ impl RegistrationService {
     pub async fn register_user(&self, registration_form: &RegistrationForm, api_base_url: &str) -> Result<UserId, ServiceError> {
         info!("registering user: {}", registration_form.username);
 
-        let Ok(username) = registration_form.username.parse::<Username>() else {
-            return Err(ServiceError::UsernameInvalid);
-        };
-
         let settings = self.configuration.settings.read().await;
 
-        let opt_email = match settings.auth.email_on_signup {
-            EmailOnSignup::Required => {
-                if registration_form.email.is_none() {
-                    return Err(ServiceError::EmailMissing);
+        match &settings.registration {
+            Some(registration) => {
+                let Ok(username) = registration_form.username.parse::<Username>() else {
+                    return Err(ServiceError::UsernameInvalid);
+                };
+
+                let opt_email = match &registration.email {
+                    Some(email) => {
+                        if email.required && registration_form.email.is_none() {
+                            return Err(ServiceError::EmailMissing);
+                        }
+                        match &registration_form.email {
+                            Some(email) => {
+                                if email.trim() == String::new() {
+                                    None
+                                } else {
+                                    Some(email.clone())
+                                }
+                            }
+                            None => None,
+                        }
+                    }
+                    None => None,
+                };
+
+                if let Some(email) = &opt_email {
+                    if !validate_email_address(email) {
+                        return Err(ServiceError::EmailInvalid);
+                    }
                 }
-                registration_form.email.clone()
-            }
-            EmailOnSignup::Ignored => None,
-            EmailOnSignup::Optional => registration_form.email.clone(),
-        };
 
-        if let Some(email) = &registration_form.email {
-            if !validate_email_address(email) {
-                return Err(ServiceError::EmailInvalid);
-            }
-        }
+                let password_constraints = PasswordConstraints {
+                    min_password_length: settings.auth.password_constraints.min_password_length,
+                    max_password_length: settings.auth.password_constraints.max_password_length,
+                };
 
-        let password_constraints = PasswordConstraints {
-            min_password_length: settings.auth.password_constraints.min_password_length,
-            max_password_length: settings.auth.password_constraints.max_password_length,
-        };
+                validate_password_constraints(
+                    &registration_form.password,
+                    &registration_form.confirm_password,
+                    &password_constraints,
+                )?;
 
-        validate_password_constraints(
-            &registration_form.password,
-            &registration_form.confirm_password,
-            &password_constraints,
-        )?;
+                let password_hash = hash_password(&registration_form.password)?;
 
-        let password_hash = hash_password(&registration_form.password)?;
+                let user_id = self
+                    .user_repository
+                    .add(
+                        &username.to_string(),
+                        &opt_email.clone().unwrap_or(no_email()),
+                        &password_hash,
+                    )
+                    .await?;
 
-        let user_id = self
-            .user_repository
-            .add(
-                &username.to_string(),
-                &opt_email.clone().unwrap_or(no_email()),
-                &password_hash,
-            )
-            .await?;
-
-        // If this is the first created account, give administrator rights
-        if user_id == 1 {
-            drop(self.user_repository.grant_admin_role(&user_id).await);
-        }
-
-        if settings.mail.email_verification_enabled {
-            if let Some(email) = opt_email {
-                let mail_res = self
-                    .mailer
-                    .send_verification_mail(&email, &registration_form.username, user_id, api_base_url)
-                    .await;
-
-                if mail_res.is_err() {
-                    drop(self.user_repository.delete(&user_id).await);
-                    return Err(ServiceError::FailedToSendVerificationEmail);
+                // If this is the first created account, give administrator rights
+                if user_id == 1 {
+                    drop(self.user_repository.grant_admin_role(&user_id).await);
                 }
-            }
-        }
 
-        Ok(user_id)
+                match &registration.email {
+                    Some(email) => {
+                        if email.verified {
+                            // Email verification is enabled
+                            if let Some(email) = opt_email {
+                                let mail_res = self
+                                    .mailer
+                                    .send_verification_mail(&email, &registration_form.username, user_id, api_base_url)
+                                    .await;
+
+                                if mail_res.is_err() {
+                                    drop(self.user_repository.delete(&user_id).await);
+                                    return Err(ServiceError::FailedToSendVerificationEmail);
+                                }
+                            }
+                        }
+                    }
+                    None => (),
+                }
+
+                Ok(user_id)
+            }
+            None => Err(ServiceError::ClosedForRegistration),
+        }
     }
 
     /// It verifies the email address of a user via the token sent to the

@@ -12,3 +12,6 @@ threshold = "info"
 #[net.tsl]
 #ssl_cert_path = "./storage/index/lib/tls/localhost.crt"
 #ssl_key_path = "./storage/index/lib/tls/localhost.key"
+
+[registration]
+[registration.email]

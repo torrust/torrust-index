@@ -181,7 +181,6 @@
 //! bind_address = "0.0.0.0:3001"
 //!
 //! [auth]
-//! email_on_signup = "optional"
 //! secret_key = "MaxVerstappenWC2021"
 //!
 //! [auth.password_constraints]
@@ -192,7 +191,6 @@
 //! connect_url = "sqlite://data.db?mode=rwc"
 //!
 //! [mail]
-//! email_verification_enabled = false
 //! from = "example@email.com"
 //! reply_to = "noreply@email.com"
 //!

@@ -70,8 +70,12 @@ impl Service {
         let settings = self.configuration.settings.read().await;
 
         // Fail login if email verification is required and this email is not verified
-        if settings.mail.email_verification_enabled && !user_profile.email_verified {
-            return Err(ServiceError::EmailNotVerified);
+        if let Some(registration) = &settings.registration {
+            if let Some(email) = &registration.email {
+                if email.verified && !user_profile.email_verified {
+                    return Err(ServiceError::EmailNotVerified);
+                }
+            }
         }
 
         // Drop read lock on settings

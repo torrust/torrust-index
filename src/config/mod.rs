@@ -14,7 +14,6 @@ use serde_with::{serde_as, NoneAsEmptyString};
 use thiserror::Error;
 use tokio::sync::RwLock;
 use torrust_index_located_error::LocatedError;
-use url::Url;
 
 use crate::web::api::server::DynError;
 
@@ -22,8 +21,10 @@ pub type Settings = v2::Settings;
 
 pub type Api = v2::api::Api;
 
+pub type Registration = v2::registration::Registration;
+pub type Email = v2::registration::Email;
+
 pub type Auth = v2::auth::Auth;
-pub type EmailOnSignup = v2::auth::EmailOnSignup;
 pub type SecretKey = v2::auth::SecretKey;
 pub type PasswordConstraints = v2::auth::PasswordConstraints;
 
@@ -298,18 +299,6 @@ impl Configuration {
         settings_lock.clone()
     }
 
-    pub async fn get_public(&self) -> ConfigurationPublic {
-        let settings_lock = self.settings.read().await;
-
-        ConfigurationPublic {
-            website_name: settings_lock.website.name.clone(),
-            tracker_url: settings_lock.tracker.url.clone(),
-            tracker_listed: settings_lock.tracker.listed,
-            tracker_private: settings_lock.tracker.private,
-            email_on_signup: settings_lock.auth.email_on_signup.clone(),
-        }
-    }
-
     pub async fn get_site_name(&self) -> String {
         let settings_lock = self.settings.read().await;
 
@@ -322,23 +311,12 @@ impl Configuration {
     }
 }
 
-/// The public index configuration.
-/// There is an endpoint to get this configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ConfigurationPublic {
-    website_name: String,
-    tracker_url: Url,
-    tracker_listed: bool,
-    tracker_private: bool,
-    email_on_signup: EmailOnSignup,
-}
-
 #[cfg(test)]
 mod tests {
 
     use url::Url;
 
-    use crate::config::{ApiToken, Configuration, ConfigurationPublic, Info, SecretKey, Settings};
+    use crate::config::{ApiToken, Configuration, Info, SecretKey, Settings};
 
     #[cfg(test)]
     fn default_config_toml() -> String {
@@ -362,7 +340,6 @@ mod tests {
                                 bind_address = "0.0.0.0:3001"
 
                                 [auth]
-                                email_on_signup = "optional"
                                 secret_key = "MaxVerstappenWC2021"
 
                                 [auth.password_constraints]
@@ -373,7 +350,6 @@ mod tests {
                                 connect_url = "sqlite://data.db?mode=rwc"
 
                                 [mail]
-                                email_verification_enabled = false
                                 from = "example@email.com"
                                 reply_to = "noreply@email.com"
 
@@ -423,23 +399,6 @@ mod tests {
         let toml = toml::to_string(&configuration).expect("Could not encode TOML value for configuration");
 
         assert_eq!(toml, default_config_toml());
-    }
-
-    #[tokio::test]
-    async fn configuration_should_return_only_public_settings() {
-        let configuration = Configuration::default();
-        let all_settings = configuration.get_all().await;
-
-        assert_eq!(
-            configuration.get_public().await,
-            ConfigurationPublic {
-                website_name: all_settings.website.name,
-                tracker_url: all_settings.tracker.url,
-                tracker_listed: all_settings.tracker.listed,
-                tracker_private: all_settings.tracker.private,
-                email_on_signup: all_settings.auth.email_on_signup,
-            }
-        );
     }
 
     #[tokio::test]

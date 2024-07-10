@@ -5,9 +5,10 @@ use std::net::SocketAddr;
 use serde::{Deserialize, Serialize};
 use torrust_index::config::{
     Api as DomainApi, ApiToken, Auth as DomainAuth, Credentials as DomainCredentials, Database as DomainDatabase,
-    ImageCache as DomainImageCache, Logging as DomainLogging, Mail as DomainMail, Network as DomainNetwork,
-    PasswordConstraints as DomainPasswordConstraints, Settings as DomainSettings, Smtp as DomainSmtp, Tracker as DomainTracker,
-    TrackerStatisticsImporter as DomainTrackerStatisticsImporter, Website as DomainWebsite,
+    Email as DomainEmail, ImageCache as DomainImageCache, Logging as DomainLogging, Mail as DomainMail, Network as DomainNetwork,
+    PasswordConstraints as DomainPasswordConstraints, Registration as DomainRegistration, Settings as DomainSettings,
+    Smtp as DomainSmtp, Tracker as DomainTracker, TrackerStatisticsImporter as DomainTrackerStatisticsImporter,
+    Website as DomainWebsite,
 };
 use url::Url;
 
@@ -22,6 +23,7 @@ pub struct Settings {
     pub mail: Mail,
     pub image_cache: ImageCache,
     pub api: Api,
+    pub registration: Option<Registration>,
     pub tracker_statistics_importer: TrackerStatisticsImporter,
 }
 
@@ -53,7 +55,6 @@ pub struct Network {
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Auth {
-    pub email_on_signup: String,
     pub secret_key: String,
     pub password_constraints: PasswordConstraints,
 }
@@ -71,7 +72,6 @@ pub struct Database {
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Mail {
-    pub email_verification_enabled: bool,
     pub from: String,
     pub reply_to: String,
     pub smtp: Smtp,
@@ -106,6 +106,17 @@ pub struct Api {
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+pub struct Registration {
+    pub email: Option<Email>,
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+pub struct Email {
+    pub required: bool,
+    pub verified: bool,
+}
+
+#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct TrackerStatisticsImporter {
     pub torrent_info_update_interval: u64,
     port: u16,
@@ -123,6 +134,7 @@ impl From<DomainSettings> for Settings {
             mail: Mail::from(settings.mail),
             image_cache: ImageCache::from(settings.image_cache),
             api: Api::from(settings.api),
+            registration: settings.registration.map(Registration::from),
             tracker_statistics_importer: TrackerStatisticsImporter::from(settings.tracker_statistics_importer),
         }
     }
@@ -167,7 +179,6 @@ impl From<DomainNetwork> for Network {
 impl From<DomainAuth> for Auth {
     fn from(auth: DomainAuth) -> Self {
         Self {
-            email_on_signup: auth.email_on_signup.to_string(),
             secret_key: auth.secret_key.to_string(),
             password_constraints: auth.password_constraints.into(),
         }
@@ -194,7 +205,6 @@ impl From<DomainDatabase> for Database {
 impl From<DomainMail> for Mail {
     fn from(mail: DomainMail) -> Self {
         Self {
-            email_verification_enabled: mail.email_verification_enabled,
             from: mail.from.to_string(),
             reply_to: mail.reply_to.to_string(),
             smtp: mail.smtp.into(),
@@ -238,6 +248,23 @@ impl From<DomainApi> for Api {
         Self {
             default_torrent_page_size: api.default_torrent_page_size,
             max_torrent_page_size: api.max_torrent_page_size,
+        }
+    }
+}
+
+impl From<DomainRegistration> for Registration {
+    fn from(registration: DomainRegistration) -> Self {
+        Self {
+            email: registration.email.map(Email::from),
+        }
+    }
+}
+
+impl From<DomainEmail> for Email {
+    fn from(email: DomainEmail) -> Self {
+        Self {
+            required: email.required,
+            verified: email.verified,
         }
     }
 }

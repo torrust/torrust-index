@@ -2,6 +2,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use tempfile::TempDir;
 use torrust_index::config;
+use torrust_index::config::v2::registration::{Email, Registration};
 use torrust_index::config::{Threshold, FREE_PORT};
 use torrust_index::web::api::Version;
 use url::Url;
@@ -86,6 +87,14 @@ fn ephemeral(temp_dir: &TempDir) -> config::Settings {
     // Ephemeral SQLite database
     configuration.database.connect_url =
         Url::parse(&format!("sqlite://{}?mode=rwc", random_database_file_path_in(temp_dir))).unwrap();
+
+    // Enable user registration
+    configuration.registration = Some(Registration {
+        email: Some(Email {
+            required: false,
+            verified: false,
+        }),
+    });
 
     configuration
 }

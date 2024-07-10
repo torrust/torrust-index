@@ -14,3 +14,6 @@ connect_url = "sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc"
 [mail.smtp]
 port = 1025
 server = "mailcatcher"
+
+[registration]
+[registration.email]

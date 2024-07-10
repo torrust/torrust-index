@@ -49,7 +49,6 @@ pub struct Network {
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Auth {
-    pub email_on_signup: String,
     pub secret_key: String,
     pub password_constraints: PasswordConstraints,
 }
@@ -67,7 +66,6 @@ pub struct Database {
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Mail {
-    pub email_verification_enabled: bool,
     pub from: String,
     pub reply_to: String,
     pub smtp: Smtp,
@@ -154,7 +152,6 @@ impl From<DomainNetwork> for Network {
 impl From<DomainAuth> for Auth {
     fn from(auth: DomainAuth) -> Self {
         Self {
-            email_on_signup: format!("{:?}", auth.email_on_signup),
             secret_key: auth.secret_key.to_string(),
             password_constraints: auth.password_constraints.into(),
         }
@@ -181,7 +178,6 @@ impl From<DomainDatabase> for Database {
 impl From<DomainMail> for Mail {
     fn from(mail: DomainMail) -> Self {
         Self {
-            email_verification_enabled: mail.email_verification_enabled,
             from: mail.from.to_string(),
             reply_to: mail.reply_to.to_string(),
             smtp: Smtp::from(mail.smtp),
