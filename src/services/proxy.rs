@@ -10,21 +10,21 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 
+use super::authorization::{self, ACTION};
 use crate::cache::image::manager::{Error, ImageCacheService};
 use crate::models::user::UserId;
-use crate::services::user::Repository;
 
 pub struct Service {
     image_cache_service: Arc<ImageCacheService>,
-    user_repository: Arc<Box<dyn Repository>>,
+    authorization_service: Arc<authorization::Service>,
 }
 
 impl Service {
     #[must_use]
-    pub fn new(image_cache_service: Arc<ImageCacheService>, user_repository: Arc<Box<dyn Repository>>) -> Self {
+    pub fn new(image_cache_service: Arc<ImageCacheService>, authorization_service: Arc<authorization::Service>) -> Self {
         Self {
             image_cache_service,
-            user_repository,
+            authorization_service,
         }
     }
 
@@ -39,8 +39,11 @@ impl Service {
     /// * The image is too big.
     /// * The user quota is met.
     pub async fn get_image_by_url(&self, url: &str, user_id: &UserId) -> Result<Bytes, Error> {
-        let user = self.user_repository.get_compact(user_id).await.ok();
+        self.authorization_service
+            .authorize(ACTION::GetImageByUrl, Some(*user_id))
+            .await
+            .map_err(|_| Error::Unauthenticated)?;
 
-        self.image_cache_service.get_image_by_url(url, user).await
+        self.image_cache_service.get_image_by_url(url, *user_id).await
     }
 }

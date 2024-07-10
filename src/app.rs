@@ -101,7 +101,10 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         authorization_service.clone(),
     ));
     let tag_service = Arc::new(tag::Service::new(tag_repository.clone(), authorization_service.clone()));
-    let proxy_service = Arc::new(proxy::Service::new(image_cache_service.clone(), user_repository.clone()));
+    let proxy_service = Arc::new(proxy::Service::new(
+        image_cache_service.clone(),
+        authorization_service.clone(),
+    ));
     let settings_service = Arc::new(settings::Service::new(configuration.clone(), authorization_service.clone()));
     let torrent_index = Arc::new(torrent::Index::new(
         configuration.clone(),
