@@ -7,7 +7,7 @@ use tokio::sync::RwLock;
 
 use crate::cache::BytesCache;
 use crate::config::Configuration;
-use crate::models::user::UserCompact;
+use crate::models::user::UserId;
 
 pub enum Error {
     UrlIsUnreachable,
@@ -125,33 +125,26 @@ impl ImageCacheService {
     /// # Errors
     ///
     /// Return a `Error::Unauthenticated` if the user has not been authenticated.
-    pub async fn get_image_by_url(&self, url: &str, opt_user: Option<UserCompact>) -> Result<Bytes, Error> {
+    pub async fn get_image_by_url(&self, url: &str, user_id: UserId) -> Result<Bytes, Error> {
         if let Some(entry) = self.image_cache.read().await.get(url).await {
             return Ok(entry.bytes);
         }
+        self.check_user_quota(&user_id).await?;
 
-        match opt_user {
-            None => Err(Error::Unauthenticated),
+        let image_bytes = self.get_image_from_url_as_bytes(url).await?;
 
-            Some(user) => {
-                self.check_user_quota(&user).await?;
+        self.check_image_size(&image_bytes).await?;
 
-                let image_bytes = self.get_image_from_url_as_bytes(url).await?;
+        // These two functions could be executed after returning the image to the client,
+        // but than we would need a dedicated task or thread that executes these functions.
+        // This can be problematic if a task is spawned after every user request.
+        // Since these functions execute very fast, I don't see a reason to further optimize this.
+        // For now.
+        self.update_image_cache(url, &image_bytes).await?;
 
-                self.check_image_size(&image_bytes).await?;
+        self.update_user_quota(&user_id, image_bytes.len()).await?;
 
-                // These two functions could be executed after returning the image to the client,
-                // but than we would need a dedicated task or thread that executes these functions.
-                // This can be problematic if a task is spawned after every user request.
-                // Since these functions execute very fast, I don't see a reason to further optimize this.
-                // For now.
-                self.update_image_cache(url, &image_bytes).await?;
-
-                self.update_user_quota(&user, image_bytes.len()).await?;
-
-                Ok(image_bytes)
-            }
-        }
+        Ok(image_bytes)
     }
 
     async fn get_image_from_url_as_bytes(&self, url: &str) -> Result<Bytes, Error> {
@@ -176,8 +169,8 @@ impl ImageCacheService {
         res.bytes().await.map_err(|_| Error::UrlIsNotAnImage)
     }
 
-    async fn check_user_quota(&self, user: &UserCompact) -> Result<(), Error> {
-        if let Some(quota) = self.user_quotas.read().await.get(&user.user_id) {
+    async fn check_user_quota(&self, user_id: &UserId) -> Result<(), Error> {
+        if let Some(quota) = self.user_quotas.read().await.get(user_id) {
             if quota.is_reached() {
                 return Err(Error::UserQuotaMet);
             }
@@ -211,24 +204,24 @@ impl ImageCacheService {
         Ok(())
     }
 
-    async fn update_user_quota(&self, user: &UserCompact, amount: usize) -> Result<(), Error> {
+    async fn update_user_quota(&self, user_id: &UserId, amount: usize) -> Result<(), Error> {
         let settings = self.cfg.settings.read().await;
 
         let mut quota = self
             .user_quotas
             .read()
             .await
-            .get(&user.user_id)
+            .get(&user_id)
             .cloned()
             .unwrap_or(ImageCacheQuota::new(
-                user.user_id,
+                *user_id,
                 settings.image_cache.user_quota_bytes,
                 settings.image_cache.user_quota_period_seconds,
             ));
 
         let _ = quota.add_usage(amount);
 
-        let _ = self.user_quotas.write().await.insert(user.user_id, quota);
+        let _ = self.user_quotas.write().await.insert(*user_id, quota);
 
         Ok(())
     }
