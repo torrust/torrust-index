@@ -211,7 +211,7 @@ impl ImageCacheService {
             .user_quotas
             .read()
             .await
-            .get(&user_id)
+            .get(user_id)
             .cloned()
             .unwrap_or(ImageCacheQuota::new(
                 *user_id,
