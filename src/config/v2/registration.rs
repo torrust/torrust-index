@@ -31,14 +31,14 @@ pub struct Email {
 
     /// Whether or not email is verified.
     #[serde(default = "Email::default_verified")]
-    pub verified: bool,
+    pub verification_required: bool,
 }
 
 impl Default for Email {
     fn default() -> Self {
         Self {
             required: Self::default_required(),
-            verified: Self::default_verified(),
+            verification_required: Self::default_verified(),
         }
     }
 }

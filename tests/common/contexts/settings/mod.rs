@@ -113,7 +113,7 @@ pub struct Registration {
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
 pub struct Email {
     pub required: bool,
-    pub verified: bool,
+    pub verification_required: bool,
 }
 
 #[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
@@ -264,7 +264,7 @@ impl From<DomainEmail> for Email {
     fn from(email: DomainEmail) -> Self {
         Self {
             required: email.required,
-            verified: email.verified,
+            verification_required: email.verification_required,
         }
     }
 }
