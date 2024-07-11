@@ -72,7 +72,7 @@ impl Service {
         // Fail login if email verification is required and this email is not verified
         if let Some(registration) = &settings.registration {
             if let Some(email) = &registration.email {
-                if email.verified && !user_profile.email_verified {
+                if email.verification_required && !user_profile.email_verified {
                     return Err(ServiceError::EmailNotVerified);
                 }
             }

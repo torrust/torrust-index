@@ -92,7 +92,7 @@ fn ephemeral(temp_dir: &TempDir) -> config::Settings {
     configuration.registration = Some(Registration {
         email: Some(Email {
             required: false,
-            verified: false,
+            verification_required: false,
         }),
     });
 

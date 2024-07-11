@@ -136,7 +136,7 @@ impl RegistrationService {
 
                 match &registration.email {
                     Some(email) => {
-                        if email.verified {
+                        if email.verification_required {
                             // Email verification is enabled
                             if let Some(email) = opt_email {
                                 let mail_res = self
