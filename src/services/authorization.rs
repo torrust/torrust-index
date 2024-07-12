@@ -173,17 +173,21 @@ impl CasbinConfiguration {
             ),
             policy: String::from(
                 "
+                admin, GetCategories
                 admin, AddCategory
                 admin, DeleteCategory
                 admin, GetPublicSettings
                 admin, GetSettingsSecret
+                admin, GetTags
                 admin, AddTag
                 admin, DeleteTag
                 admin, DeleteTorrent
                 admin, BanUser
                 admin, GetImageByUrl
+                registered, GetCategories
                 registered, GetImageByUrl
                 registered, GetPublicSettings
+                registered, GetTags
                 guest, GetCategories
                 guest, GetTags
                 guest, GetAboutPage
