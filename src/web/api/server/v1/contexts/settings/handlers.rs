@@ -6,6 +6,7 @@ use axum::extract::State;
 use axum::response::{IntoResponse, Json, Response};
 
 use crate::common::AppData;
+use crate::web::api::server::v1::extractors::optional_user_id::ExtractOptionalLoggedInUser;
 use crate::web::api::server::v1::extractors::user_id::ExtractLoggedInUser;
 use crate::web::api::server::v1::responses;
 
@@ -30,10 +31,14 @@ pub async fn get_all_handler(
 
 /// Get public Settings.
 #[allow(clippy::unused_async)]
-pub async fn get_public_handler(State(app_data): State<Arc<AppData>>) -> Response {
-    let public_settings = app_data.settings_service.get_public().await;
-
-    Json(responses::OkResponseData { data: public_settings }).into_response()
+pub async fn get_public_handler(
+    State(app_data): State<Arc<AppData>>,
+    ExtractOptionalLoggedInUser(opt_user_id): ExtractOptionalLoggedInUser,
+) -> Response {
+    match app_data.settings_service.get_public(opt_user_id).await {
+        Ok(public_settings) => Json(responses::OkResponseData { data: public_settings }).into_response(),
+        Err(error) => error.into_response(),
+    }
 }
 
 /// Get website name.

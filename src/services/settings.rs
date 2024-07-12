@@ -62,9 +62,13 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if the user does not have the required permissions.
-    pub async fn get_public(&self) -> ConfigurationPublic {
+    pub async fn get_public(&self, opt_user_id: Option<UserId>) -> Result<ConfigurationPublic, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GetPublicSettings, opt_user_id)
+            .await?;
+
         let settings_lock = self.configuration.get_all().await;
-        extract_public_settings(&settings_lock)
+        Ok(extract_public_settings(&settings_lock))
     }
 
     /// It gets the site name from the settings.

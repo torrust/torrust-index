@@ -44,6 +44,7 @@ pub enum ACTION {
     GetAboutPage,
     GetLicensePage,
     GetImageByUrl,
+    GetPublicSettings,
 }
 
 pub struct Service {
@@ -174,7 +175,7 @@ impl CasbinConfiguration {
                 "
                 admin, AddCategory
                 admin, DeleteCategory
-                admin, GetSettings
+                admin, GetPublicSettings
                 admin, GetSettingsSecret
                 admin, AddTag
                 admin, DeleteTag
@@ -182,10 +183,12 @@ impl CasbinConfiguration {
                 admin, BanUser
                 admin, GetImageByUrl
                 registered, GetImageByUrl
+                registered, GetPublicSettings
                 guest, GetCategories
                 guest, GetTags
                 guest, GetAboutPage
                 guest, GetLicensePage
+                guest, GetPublicSettings
                 ",
             ),
         }
