@@ -45,6 +45,7 @@ pub enum ACTION {
     GetLicensePage,
     GetImageByUrl,
     GetPublicSettings,
+    AddTorrent,
 }
 
 pub struct Service {
@@ -184,10 +185,12 @@ impl CasbinConfiguration {
                 admin, DeleteTorrent
                 admin, BanUser
                 admin, GetImageByUrl
+                admin, AddTorrent
                 registered, GetCategories
                 registered, GetImageByUrl
                 registered, GetPublicSettings
                 registered, GetTags
+                registered, AddTorrent
                 guest, GetCategories
                 guest, GetTags
                 guest, GetAboutPage

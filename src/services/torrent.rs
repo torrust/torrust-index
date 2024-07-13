@@ -134,8 +134,9 @@ impl Index {
         add_torrent_req: AddTorrentRequest,
         user_id: UserId,
     ) -> Result<AddTorrentResponse, ServiceError> {
-        // Guard that the users exists
-        let _user = self.user_repository.get_compact(&user_id).await?;
+        self.authorization_service
+            .authorize(ACTION::AddTorrent, Some(user_id))
+            .await?;
 
         let metadata = self.validate_and_build_metadata(&add_torrent_req).await?;
 
