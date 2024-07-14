@@ -263,6 +263,8 @@ impl Index {
     /// This function will return an error if unable to get the torrent from the
     /// database.
     pub async fn get_torrent(&self, info_hash: &InfoHash, opt_user_id: Option<UserId>) -> Result<Torrent, ServiceError> {
+        self.authorization_service.authorize(ACTION::GetTorrent, opt_user_id).await?;
+
         let mut torrent = self.torrent_repository.get_by_info_hash(info_hash).await?;
 
         let tracker_url = self.get_tracker_url().await;
