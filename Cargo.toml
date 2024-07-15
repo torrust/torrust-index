@@ -79,7 +79,7 @@ serde_bencode = "0"
 serde_bytes = "0"
 serde_derive = "1"
 serde_json = "1"
-serde_with = "3.8.1"
+serde_with = "3.9.0"
 sha-1 = "0"
 sqlx = { version = "0", features = ["migrate", "mysql", "runtime-tokio-native-tls", "sqlite", "time"] }
 tera = { version = "1", default-features = false }
