@@ -77,7 +77,9 @@ pub async fn download_torrent_handler(
 
     debug!("Downloading torrent: {:?}", info_hash.to_hex_string());
 
-    if let Some(redirect_response) = redirect_to_download_url_using_canonical_info_hash_if_needed(&app_data, &info_hash).await {
+    if let Some(redirect_response) =
+        redirect_to_download_url_using_canonical_info_hash_if_needed(&app_data, &info_hash, opt_user_id).await
+    {
         debug!("Redirecting to URL with canonical info-hash");
         redirect_response
     } else {
@@ -101,12 +103,9 @@ pub async fn download_torrent_handler(
 async fn redirect_to_download_url_using_canonical_info_hash_if_needed(
     app_data: &Arc<AppData>,
     info_hash: &InfoHash,
+    opt_user_id: Option<i64>,
 ) -> Option<Response> {
-    match app_data
-        .torrent_info_hash_repository
-        .find_canonical_info_hash_for(info_hash)
-        .await
-    {
+    match app_data.torrent_service.get_canonical_info_hash(info_hash, opt_user_id).await {
         Ok(Some(canonical_info_hash)) => {
             if canonical_info_hash != *info_hash {
                 return Some(
