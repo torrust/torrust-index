@@ -164,7 +164,9 @@ pub async fn get_torrent_info_handler(
         return errors::Request::InvalidInfoHashParam.into_response();
     };
 
-    if let Some(redirect_response) = redirect_to_details_url_using_canonical_info_hash_if_needed(&app_data, &info_hash).await {
+    if let Some(redirect_response) =
+        redirect_to_details_url_using_canonical_info_hash_if_needed(&app_data, &info_hash, opt_user_id).await
+    {
         redirect_response
     } else {
         match app_data.torrent_service.get_torrent_info(&info_hash, opt_user_id).await {
@@ -177,12 +179,9 @@ pub async fn get_torrent_info_handler(
 async fn redirect_to_details_url_using_canonical_info_hash_if_needed(
     app_data: &Arc<AppData>,
     info_hash: &InfoHash,
+    opt_user_id: Option<i64>,
 ) -> Option<Response> {
-    match app_data
-        .torrent_info_hash_repository
-        .find_canonical_info_hash_for(info_hash)
-        .await
-    {
+    match app_data.torrent_service.get_canonical_info_hash(info_hash, opt_user_id).await {
         Ok(Some(canonical_info_hash)) => {
             if canonical_info_hash != *info_hash {
                 return Some(
