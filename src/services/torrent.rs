@@ -547,6 +547,26 @@ impl Index {
 
         Ok(torrent_response)
     }
+
+    /// It returns the canonical info-hash.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the user is not is there was a problem with the database.
+    pub async fn get_canonical_info_hash(
+        &self,
+        info_hash: &InfoHash,
+        opt_user_id: Option<UserId>,
+    ) -> Result<Option<InfoHash>, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GetCanonicalInfoHash, opt_user_id)
+            .await?;
+
+        self.torrent_info_hash_repository
+            .find_canonical_info_hash_for(info_hash)
+            .await
+            .map_err(|_| ServiceError::DatabaseError)
+    }
 }
 
 pub struct DbTorrentRepository {
