@@ -49,6 +49,7 @@ pub enum ACTION {
     AddTorrent,
     GetCanonicalInfoHash,
     GenerateTorrentInfoListing,
+    GetTorrentInfo,
 }
 
 pub struct Service {
@@ -192,6 +193,7 @@ impl CasbinConfiguration {
                 admin, AddTorrent
                 admin, GetCanonicalInfoHash
                 admin, GenerateTorrentInfoListing
+                admin, GetTorrentInfo
                 registered, GetCategories
                 registered, GetImageByUrl
                 registered, GetPublicSettings
@@ -200,6 +202,7 @@ impl CasbinConfiguration {
                 registered, AddTorrent
                 registered, GetCanonicalInfoHash
                 registered, GenerateTorrentInfoListing
+                registered, GetTorrentInfo
                 guest, GetCategories
                 guest, GetTags
                 guest, GetAboutPage
@@ -208,6 +211,7 @@ impl CasbinConfiguration {
                 guest, GetTorrent
                 guest, GetCanonicalInfoHash
                 guest, GenerateTorrentInfoListing
+                guest, GetTorrentInfo
                 ",
             ),
         }

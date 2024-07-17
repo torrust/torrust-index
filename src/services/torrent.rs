@@ -333,6 +333,10 @@ impl Index {
         info_hash: &InfoHash,
         opt_user_id: Option<UserId>,
     ) -> Result<TorrentResponse, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GetTorrentInfo, opt_user_id)
+            .await?;
+
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
 
         let torrent_response = self
