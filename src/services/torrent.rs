@@ -548,11 +548,11 @@ impl Index {
         Ok(torrent_response)
     }
 
-    /// It returns the canonical info-hash.
+    /// Returns the canonical info-hash.
     ///
     /// # Errors
     ///
-    /// Returns an error if the user is not is there was a problem with the database.
+    /// Returns an error if the user is not authorized or if there is a problem with the database.
     pub async fn get_canonical_info_hash(
         &self,
         info_hash: &InfoHash,
