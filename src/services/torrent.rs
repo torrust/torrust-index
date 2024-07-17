@@ -347,7 +347,15 @@ impl Index {
     /// # Errors
     ///
     /// Returns a `ServiceError::DatabaseError` if the database query fails.
-    pub async fn generate_torrent_info_listing(&self, request: &ListingRequest) -> Result<TorrentsResponse, ServiceError> {
+    pub async fn generate_torrent_info_listing(
+        &self,
+        request: &ListingRequest,
+        opt_user_id: Option<UserId>,
+    ) -> Result<TorrentsResponse, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GenerateTorrentInfoListing, opt_user_id)
+            .await?;
+
         let torrent_listing_specification = self.listing_specification_from_user_request(request).await;
 
         let torrents_response = self

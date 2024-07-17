@@ -131,8 +131,16 @@ async fn redirect_to_download_url_using_canonical_info_hash_if_needed(
 ///
 /// It returns an error if the database query fails.
 #[allow(clippy::unused_async)]
-pub async fn get_torrents_handler(State(app_data): State<Arc<AppData>>, Query(criteria): Query<ListingRequest>) -> Response {
-    match app_data.torrent_service.generate_torrent_info_listing(&criteria).await {
+pub async fn get_torrents_handler(
+    State(app_data): State<Arc<AppData>>,
+    Query(criteria): Query<ListingRequest>,
+    ExtractOptionalLoggedInUser(opt_user_id): ExtractOptionalLoggedInUser,
+) -> Response {
+    match app_data
+        .torrent_service
+        .generate_torrent_info_listing(&criteria, opt_user_id)
+        .await
+    {
         Ok(torrents_response) => Json(OkResponseData { data: torrents_response }).into_response(),
         Err(error) => error.into_response(),
     }
