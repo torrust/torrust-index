@@ -200,14 +200,20 @@ impl RegistrationService {
 pub struct ProfileService {
     configuration: Arc<Configuration>,
     user_authentication_repository: Arc<DbUserAuthenticationRepository>,
+    authorization_service: Arc<authorization::Service>,
 }
 
 impl ProfileService {
     #[must_use]
-    pub fn new(configuration: Arc<Configuration>, user_repository: Arc<DbUserAuthenticationRepository>) -> Self {
+    pub fn new(
+        configuration: Arc<Configuration>,
+        user_repository: Arc<DbUserAuthenticationRepository>,
+        authorization_service: Arc<authorization::Service>,
+    ) -> Self {
         Self {
             configuration,
             user_authentication_repository: user_repository,
+            authorization_service,
         }
     }
 
@@ -223,7 +229,16 @@ impl ProfileService {
     /// * `ServiceError::PasswordTooLong` if the supplied password is too long.
     /// * An error if unable to successfully hash the password.
     /// * An error if unable to change the password in the database.
-    pub async fn change_password(&self, user_id: UserId, change_password_form: &ChangePasswordForm) -> Result<(), ServiceError> {
+    pub async fn change_password(
+        &self,
+        user_id: UserId,
+        change_password_form: &ChangePasswordForm,
+        maybe_user_id: Option<UserId>,
+    ) -> Result<(), ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::ChangePassword, maybe_user_id)
+            .await?;
+
         info!("changing user password for user ID: {user_id}");
 
         let settings = self.configuration.settings.read().await;

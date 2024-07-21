@@ -130,6 +130,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let profile_service = Arc::new(user::ProfileService::new(
         configuration.clone(),
         user_authentication_repository.clone(),
+        authorization_service.clone(),
     ));
     let ban_service = Arc::new(user::BanService::new(
         user_profile_repository.clone(),
