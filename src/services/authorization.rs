@@ -31,26 +31,26 @@ impl fmt::Display for UserRole {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub enum ACTION {
-    GetCategories,
-    AddCategory,
-    DeleteCategory,
-    GetSettings,
-    GetSettingsSecret,
-    GetTags,
-    AddTag,
-    DeleteTag,
-    DeleteTorrent,
-    BanUser,
     GetAboutPage,
     GetLicensePage,
+    AddCategory,
+    DeleteCategory,
+    GetCategories,
     GetImageByUrl,
+    GetSettings,
+    GetSettingsSecret,
     GetPublicSettings,
-    GetTorrent,
+    AddTag,
+    DeleteTag,
+    GetTags,
     AddTorrent,
-    GetCanonicalInfoHash,
-    GenerateTorrentInfoListing,
+    GetTorrent,
+    DeleteTorrent,
     GetTorrentInfo,
+    GenerateTorrentInfoListing,
+    GetCanonicalInfoHash,
     ChangePassword,
+    BanUser,
 }
 
 pub struct Service {
@@ -179,42 +179,47 @@ impl CasbinConfiguration {
             ),
             policy: String::from(
                 "
-                admin, GetCategories
+                admin, GetAboutPage
+                admin, GetLicensePage
                 admin, AddCategory
                 admin, DeleteCategory
-                admin, GetPublicSettings
+                admin, GetCategories
+                admin, GetImageByUrl
+                admin, GetSettings
                 admin, GetSettingsSecret
-                admin, GetTags
+                admin, GetPublicSettings
                 admin, AddTag
                 admin, DeleteTag
-                admin, DeleteTorrent
-                admin, BanUser
-                admin, GetImageByUrl
-                admin, GetTorrent
+                admin, GetTags
                 admin, AddTorrent
-                admin, GetCanonicalInfoHash
-                admin, GenerateTorrentInfoListing
+                admin, GetTorrent
+                admin, DeleteTorrent
                 admin, GetTorrentInfo
+                admin, GenerateTorrentInfoListing
+                admin, GetCanonicalInfoHash
                 admin, ChangePassword
+                admin, BanUser
+                registered, GetAboutPage
+                registered, GetLicensePage
                 registered, GetCategories
                 registered, GetImageByUrl
                 registered, GetPublicSettings
                 registered, GetTags
-                registered, GetTorrent
                 registered, AddTorrent
-                registered, GetCanonicalInfoHash
-                registered, GenerateTorrentInfoListing
+                registered, GetTorrent
                 registered, GetTorrentInfo
+                registered, GenerateTorrentInfoListing
+                registered, GetCanonicalInfoHash
                 registered, ChangePassword
-                guest, GetCategories
-                guest, GetTags
                 guest, GetAboutPage
                 guest, GetLicensePage
+                guest, GetCategories
                 guest, GetPublicSettings
+                guest, GetTags
                 guest, GetTorrent
-                guest, GetCanonicalInfoHash
-                guest, GenerateTorrentInfoListing
                 guest, GetTorrentInfo
+                guest, GenerateTorrentInfoListing
+                guest, GetCanonicalInfoHash
                 ",
             ),
         }
