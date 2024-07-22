@@ -77,8 +77,8 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is a database error retrieving the tags.
-    pub async fn get_tags(&self, opt_user_id: Option<UserId>) -> Result<Vec<TorrentTag>, ServiceError> {
-        self.authorization_service.authorize(ACTION::GetTags, opt_user_id).await?;
+    pub async fn get_tags(&self, maybe_user_id: Option<UserId>) -> Result<Vec<TorrentTag>, ServiceError> {
+        self.authorization_service.authorize(ACTION::GetTags, maybe_user_id).await?;
 
         self.tag_repository.get_all().await.map_err(|_| ServiceError::DatabaseError)
     }

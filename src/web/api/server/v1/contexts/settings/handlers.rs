@@ -33,9 +33,9 @@ pub async fn get_all_handler(
 #[allow(clippy::unused_async)]
 pub async fn get_public_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractOptionalLoggedInUser(opt_user_id): ExtractOptionalLoggedInUser,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
 ) -> Response {
-    match app_data.settings_service.get_public(opt_user_id).await {
+    match app_data.settings_service.get_public(maybe_user_id).await {
         Ok(public_settings) => Json(responses::OkResponseData { data: public_settings }).into_response(),
         Err(error) => error.into_response(),
     }

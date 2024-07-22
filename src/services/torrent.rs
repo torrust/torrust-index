@@ -262,8 +262,10 @@ impl Index {
     ///
     /// This function will return an error if unable to get the torrent from the
     /// database.
-    pub async fn get_torrent(&self, info_hash: &InfoHash, opt_user_id: Option<UserId>) -> Result<Torrent, ServiceError> {
-        self.authorization_service.authorize(ACTION::GetTorrent, opt_user_id).await?;
+    pub async fn get_torrent(&self, info_hash: &InfoHash, maybe_user_id: Option<UserId>) -> Result<Torrent, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GetTorrent, maybe_user_id)
+            .await?;
 
         let mut torrent = self.torrent_repository.get_by_info_hash(info_hash).await?;
 
@@ -275,7 +277,7 @@ impl Index {
 
         if !tracker_is_private {
             torrent.include_url_as_main_tracker(&tracker_url);
-        } else if let Some(authenticated_user_id) = opt_user_id {
+        } else if let Some(authenticated_user_id) = maybe_user_id {
             let personal_announce_url = self.tracker_service.get_personal_announce_url(authenticated_user_id).await?;
             torrent.include_url_as_main_tracker(&personal_announce_url);
         } else {
@@ -331,16 +333,16 @@ impl Index {
     pub async fn get_torrent_info(
         &self,
         info_hash: &InfoHash,
-        opt_user_id: Option<UserId>,
+        maybe_user_id: Option<UserId>,
     ) -> Result<TorrentResponse, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::GetTorrentInfo, opt_user_id)
+            .authorize(ACTION::GetTorrentInfo, maybe_user_id)
             .await?;
 
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
 
         let torrent_response = self
-            .build_full_torrent_response(torrent_listing, info_hash, opt_user_id)
+            .build_full_torrent_response(torrent_listing, info_hash, maybe_user_id)
             .await?;
 
         Ok(torrent_response)
@@ -354,10 +356,10 @@ impl Index {
     pub async fn generate_torrent_info_listing(
         &self,
         request: &ListingRequest,
-        opt_user_id: Option<UserId>,
+        maybe_user_id: Option<UserId>,
     ) -> Result<TorrentsResponse, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::GenerateTorrentInfoListing, opt_user_id)
+            .authorize(ACTION::GenerateTorrentInfoListing, maybe_user_id)
             .await?;
 
         let torrent_listing_specification = self.listing_specification_from_user_request(request).await;
@@ -484,7 +486,7 @@ impl Index {
         &self,
         torrent_listing: TorrentListing,
         info_hash: &InfoHash,
-        opt_user_id: Option<UserId>,
+        maybe_user_id: Option<UserId>,
     ) -> Result<TorrentResponse, ServiceError> {
         let torrent_id: i64 = torrent_listing.torrent_id;
 
@@ -515,7 +517,7 @@ impl Index {
 
         if self.tracker_is_private().await {
             // Add main tracker URL
-            match opt_user_id {
+            match maybe_user_id {
                 Some(user_id) => {
                     let personal_announce_url = self.tracker_service.get_personal_announce_url(user_id).await?;
 
@@ -568,10 +570,10 @@ impl Index {
     pub async fn get_canonical_info_hash(
         &self,
         info_hash: &InfoHash,
-        opt_user_id: Option<UserId>,
+        maybe_user_id: Option<UserId>,
     ) -> Result<Option<InfoHash>, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::GetCanonicalInfoHash, opt_user_id)
+            .authorize(ACTION::GetCanonicalInfoHash, maybe_user_id)
             .await?;
 
         self.torrent_info_hash_repository

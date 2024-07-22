@@ -14,7 +14,7 @@ use crate::web::api::server::v1::extractors::optional_user_id::ExtractOptionalLo
 #[allow(clippy::unused_async)]
 pub async fn get_proxy_image_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractOptionalLoggedInUser(opt_user_id): ExtractOptionalLoggedInUser,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
     Path(url): Path<String>,
 ) -> Response {
     // code-review: Handling status codes in the index-gui other tan OK is quite a pain.
@@ -27,7 +27,7 @@ pub async fn get_proxy_image_handler(
     // Get image URL from URL path parameter.
     let image_url = urlencoding::decode(&url).unwrap_or_default().into_owned();
 
-    match app_data.proxy_service.get_image_by_url(&image_url, opt_user_id).await {
+    match app_data.proxy_service.get_image_by_url(&image_url, maybe_user_id).await {
         Ok(image_bytes) => {
             // Returns the cached image.
             png_image(image_bytes)

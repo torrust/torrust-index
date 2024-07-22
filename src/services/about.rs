@@ -24,9 +24,9 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is an error authorizing the action.
-    pub async fn get_about_page(&self, opt_user_id: Option<UserId>) -> Result<String, ServiceError> {
+    pub async fn get_about_page(&self, maybe_user_id: Option<UserId>) -> Result<String, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::GetAboutPage, opt_user_id)
+            .authorize(ACTION::GetAboutPage, maybe_user_id)
             .await?;
 
         let html = r#"
@@ -58,9 +58,9 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is an error authorizing the action.
-    pub async fn get_license_page(&self, opt_user_id: Option<UserId>) -> Result<String, ServiceError> {
+    pub async fn get_license_page(&self, maybe_user_id: Option<UserId>) -> Result<String, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::GetLicensePage, opt_user_id)
+            .authorize(ACTION::GetLicensePage, maybe_user_id)
             .await?;
 
         let html = r#"

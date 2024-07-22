@@ -87,9 +87,9 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is a database error retrieving the categories.
-    pub async fn get_categories(&self, opt_user_id: Option<UserId>) -> Result<Vec<Category>, ServiceError> {
+    pub async fn get_categories(&self, maybe_user_id: Option<UserId>) -> Result<Vec<Category>, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::GetCategories, opt_user_id)
+            .authorize(ACTION::GetCategories, maybe_user_id)
             .await?;
 
         self.category_repository

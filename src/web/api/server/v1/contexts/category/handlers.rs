@@ -28,9 +28,9 @@ use crate::web::api::server::v1::responses::{self};
 #[allow(clippy::unused_async)]
 pub async fn get_all_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractOptionalLoggedInUser(opt_user_id): ExtractOptionalLoggedInUser,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
 ) -> Response {
-    match app_data.category_service.get_categories(opt_user_id).await {
+    match app_data.category_service.get_categories(maybe_user_id).await {
         Ok(categories) => {
             let categories: Vec<Category> = categories.into_iter().map(Category::from).collect();
             Json(responses::OkResponseData { data: categories }).into_response()
