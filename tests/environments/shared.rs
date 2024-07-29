@@ -36,7 +36,7 @@ impl TestEnv {
 impl Default for TestEnv {
     fn default() -> Self {
         Self {
-            authority: "localhost:3001".to_string(),
+            authority: "127.0.0.1:3001".to_string(),
         }
     }
 }
