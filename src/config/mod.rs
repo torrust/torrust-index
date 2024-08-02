@@ -25,7 +25,7 @@ pub type Registration = v2::registration::Registration;
 pub type Email = v2::registration::Email;
 
 pub type Auth = v2::auth::Auth;
-pub type SecretKey = v2::auth::SecretKey;
+pub type SecretKey = v2::auth::ClaimTokenPepper;
 pub type PasswordConstraints = v2::auth::PasswordConstraints;
 
 pub type Database = v2::database::Database;
@@ -376,7 +376,7 @@ mod tests {
                                 bind_address = "0.0.0.0:3001"
 
                                 [auth]
-                                secret_key = "MaxVerstappenWC2021"
+                                user_claim_token_pepper = "MaxVerstappenWC2021"
 
                                 [auth.password_constraints]
                                 max_password_length = 64
@@ -496,12 +496,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn configuration_should_allow_to_override_the_authentication_secret_key_provided_in_the_toml_file() {
+    async fn configuration_should_allow_to_override_the_authentication_user_claim_token_pepper_provided_in_the_toml_file() {
         figment::Jail::expect_with(|jail| {
             jail.create_dir("templates")?;
             jail.create_file("templates/verify.html", "EMAIL TEMPLATE")?;
 
-            jail.set_env("TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__SECRET_KEY", "OVERRIDDEN AUTH SECRET KEY");
+            jail.set_env(
+                "TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__USER_CLAIM_TOKEN_PEPPER",
+                "OVERRIDDEN AUTH SECRET KEY",
+            );
 
             let info = Info {
                 config_toml: Some(default_config_toml()),
@@ -510,7 +513,10 @@ mod tests {
 
             let settings = Configuration::load_settings(&info).expect("Could not load configuration from file");
 
-            assert_eq!(settings.auth.secret_key, SecretKey::new("OVERRIDDEN AUTH SECRET KEY"));
+            assert_eq!(
+                settings.auth.user_claim_token_pepper,
+                SecretKey::new("OVERRIDDEN AUTH SECRET KEY")
+            );
 
             Ok(())
         });

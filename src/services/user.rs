@@ -172,7 +172,7 @@ impl RegistrationService {
 
         let token_data = match decode::<VerifyClaims>(
             token,
-            &DecodingKey::from_secret(settings.auth.secret_key.as_bytes()),
+            &DecodingKey::from_secret(settings.auth.user_claim_token_pepper.as_bytes()),
             &Validation::new(Algorithm::HS256),
         ) {
             Ok(token_data) => {

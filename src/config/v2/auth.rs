@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Auth {
     /// The secret key used to sign JWT tokens.
-    #[serde(default = "Auth::default_secret_key")]
-    pub secret_key: SecretKey,
+    #[serde(default = "Auth::default_user_claim_token_pepper")]
+    pub user_claim_token_pepper: ClaimTokenPepper,
 
     /// The password constraints
     #[serde(default = "Auth::default_password_constraints")]
@@ -18,18 +18,18 @@ impl Default for Auth {
     fn default() -> Self {
         Self {
             password_constraints: Self::default_password_constraints(),
-            secret_key: Self::default_secret_key(),
+            user_claim_token_pepper: Self::default_user_claim_token_pepper(),
         }
     }
 }
 
 impl Auth {
-    pub fn override_secret_key(&mut self, secret_key: &str) {
-        self.secret_key = SecretKey::new(secret_key);
+    pub fn override_user_claim_token_pepper(&mut self, user_claim_token_pepper: &str) {
+        self.user_claim_token_pepper = ClaimTokenPepper::new(user_claim_token_pepper);
     }
 
-    fn default_secret_key() -> SecretKey {
-        SecretKey::new("MaxVerstappenWC2021")
+    fn default_user_claim_token_pepper() -> ClaimTokenPepper {
+        ClaimTokenPepper::new("MaxVerstappenWC2021")
     }
 
     fn default_password_constraints() -> PasswordConstraints {
@@ -38,9 +38,9 @@ impl Auth {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SecretKey(String);
+pub struct ClaimTokenPepper(String);
 
-impl SecretKey {
+impl ClaimTokenPepper {
     /// # Panics
     ///
     /// Will panic if the key if empty.
@@ -57,7 +57,7 @@ impl SecretKey {
     }
 }
 
-impl fmt::Display for SecretKey {
+impl fmt::Display for ClaimTokenPepper {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -94,11 +94,11 @@ impl PasswordConstraints {
 
 #[cfg(test)]
 mod tests {
-    use super::SecretKey;
+    use super::ClaimTokenPepper;
 
     #[test]
     #[should_panic(expected = "secret key cannot be empty")]
     fn secret_key_can_not_be_empty() {
-        drop(SecretKey::new(""));
+        drop(ClaimTokenPepper::new(""));
     }
 }

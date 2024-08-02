@@ -54,7 +54,7 @@
 //!       "tsl": null
 //!     },
 //!     "auth": {
-//!       "secret_key": "***",
+//!       "user_claim_token_pepper": "***",
 //!       "password_constraints": {
 //!         "max_password_length": 64,
 //!         "min_password_length": 6

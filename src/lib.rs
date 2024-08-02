@@ -181,7 +181,7 @@
 //! bind_address = "0.0.0.0:3001"
 //!
 //! [auth]
-//! secret_key = "MaxVerstappenWC2021"
+//! user_claim_token_pepper = "MaxVerstappenWC2021"
 //!
 //! [auth.password_constraints]
 //! min_password_length = 6

@@ -114,7 +114,7 @@ impl TestEnv {
 
                 "***".clone_into(&mut settings.mail.smtp.credentials.password);
 
-                "***".clone_into(&mut settings.auth.secret_key);
+                "***".clone_into(&mut settings.auth.user_claim_token_pepper);
 
                 Some(settings)
             }
