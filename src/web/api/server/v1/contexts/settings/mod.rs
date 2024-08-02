@@ -29,7 +29,11 @@
 //! ```json
 //! {
 //!   "data": {
-//!     "version": "2",
+//!     "metadata": {
+//!        "app": "torrust-index",
+//!        "purpose": "configuration",
+//!        "schema_version": "2.0.0"
+//!     },
 //!     "logging": {
 //!       "threshold": "info"
 //!     },

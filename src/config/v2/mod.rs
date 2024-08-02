@@ -31,7 +31,6 @@ use super::Metadata;
 pub struct Settings {
     /// Configuration metadata.
     #[serde(default = "Settings::default_metadata")]
-    #[serde(flatten)]
     pub metadata: Metadata,
 
     /// The logging configuration.
