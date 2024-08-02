@@ -49,7 +49,7 @@ pub type Threshold = v2::logging::Threshold;
 pub type Website = v2::website::Website;
 
 /// Configuration version
-const VERSION_2: &str = "2";
+const VERSION_2: &str = "2.0.0";
 
 /// Prefix for env vars that overwrite configuration options.
 const CONFIG_OVERRIDE_PREFIX: &str = "TORRUST_INDEX_CONFIG_OVERRIDE_";
@@ -64,41 +64,74 @@ pub const ENV_VAR_CONFIG_TOML: &str = "TORRUST_INDEX_CONFIG_TOML";
 /// The `index.toml` file location.
 pub const ENV_VAR_CONFIG_TOML_PATH: &str = "TORRUST_INDEX_CONFIG_TOML_PATH";
 
-pub const LATEST_VERSION: &str = "2";
+pub const LATEST_VERSION: &str = "2.0.0";
 
 /// Info about the configuration specification.
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Display, Clone)]
+#[display(fmt = "Metadata(app: {app}, purpose: {purpose}, schema_version: {schema_version})")]
 pub struct Metadata {
-    #[serde(default = "Metadata::default_version")]
+    /// The application this configuration is valid for.
+    #[serde(default = "Metadata::default_app")]
+    app: App,
+
+    /// The purpose of this parsed file.
+    #[serde(default = "Metadata::default_purpose")]
+    purpose: Purpose,
+
+    /// The schema version for the configuration.
+    #[serde(default = "Metadata::default_schema_version")]
     #[serde(flatten)]
-    version: Version,
+    schema_version: Version,
 }
 
 impl Default for Metadata {
     fn default() -> Self {
         Self {
-            version: Self::default_version(),
+            app: Self::default_app(),
+            purpose: Self::default_purpose(),
+            schema_version: Self::default_schema_version(),
         }
     }
 }
 
 impl Metadata {
-    fn default_version() -> Version {
+    fn default_app() -> App {
+        App::TorrustIndex
+    }
+
+    fn default_purpose() -> Purpose {
+        Purpose::Configuration
+    }
+
+    fn default_schema_version() -> Version {
         Version::latest()
     }
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Display, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub enum App {
+    TorrustIndex,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Display, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum Purpose {
+    Configuration,
+}
+
 /// The configuration version.
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Display, Clone)]
+#[serde(rename_all = "lowercase")]
 pub struct Version {
     #[serde(default = "Version::default_semver")]
-    version: String,
+    schema_version: String,
 }
 
 impl Default for Version {
     fn default() -> Self {
         Self {
-            version: Self::default_semver(),
+            schema_version: Self::default_semver(),
         }
     }
 }
@@ -106,13 +139,13 @@ impl Default for Version {
 impl Version {
     fn new(semver: &str) -> Self {
         Self {
-            version: semver.to_owned(),
+            schema_version: semver.to_owned(),
         }
     }
 
     fn latest() -> Self {
         Self {
-            version: LATEST_VERSION.to_string(),
+            schema_version: LATEST_VERSION.to_string(),
         }
     }
 
@@ -284,9 +317,9 @@ impl Configuration {
 
         let settings: Settings = figment.extract()?;
 
-        if settings.metadata.version != Version::new(VERSION_2) {
+        if settings.metadata.schema_version != Version::new(VERSION_2) {
             return Err(Error::UnsupportedVersion {
-                version: settings.metadata.version,
+                version: settings.metadata.schema_version,
             });
         }
 
@@ -320,7 +353,10 @@ mod tests {
 
     #[cfg(test)]
     fn default_config_toml() -> String {
-        let config = r#"version = "2"
+        let config = r#"[metadata]
+                                app = "torrust-index"
+                                purpose = "configuration"
+                                schema_version = "2.0.0"
 
                                 [logging]
                                 threshold = "info"
