@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "tracker API token cannot be empty")]
-    fn secret_key_can_not_be_empty() {
+    fn apai_token_can_not_be_empty() {
         drop(ApiToken::new(""));
     }
 }

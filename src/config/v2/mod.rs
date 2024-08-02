@@ -15,7 +15,7 @@ use registration::Registration;
 use serde::{Deserialize, Serialize};
 
 use self::api::Api;
-use self::auth::{Auth, SecretKey};
+use self::auth::{Auth, ClaimTokenPepper};
 use self::database::Database;
 use self::image_cache::ImageCache;
 use self::mail::Mail;
@@ -104,7 +104,7 @@ impl Settings {
             let _ = self.database.connect_url.set_password(Some("***"));
         }
         "***".clone_into(&mut self.mail.smtp.credentials.password);
-        self.auth.secret_key = SecretKey::new("***");
+        self.auth.user_claim_token_pepper = ClaimTokenPepper::new("***");
     }
 
     /// Encodes the configuration to TOML.

@@ -133,7 +133,7 @@ impl Service {
         let settings = self.cfg.settings.read().await;
 
         // create verification JWT
-        let key = settings.auth.secret_key.as_bytes();
+        let key = settings.auth.user_claim_token_pepper.as_bytes();
 
         // Create non expiring token that is only valid for email-verification
         let claims = VerifyClaims {

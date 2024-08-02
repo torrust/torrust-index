@@ -134,7 +134,7 @@ impl JsonWebToken {
         let settings = self.cfg.settings.read().await;
 
         // Create JWT that expires in two weeks
-        let key = settings.auth.secret_key.as_bytes();
+        let key = settings.auth.user_claim_token_pepper.as_bytes();
 
         // todo: create config option for setting the token validity in seconds.
         let exp_date = clock::now() + 1_209_600; // two weeks from now
@@ -154,7 +154,7 @@ impl JsonWebToken {
 
         match decode::<UserClaims>(
             token,
-            &DecodingKey::from_secret(settings.auth.secret_key.as_bytes()),
+            &DecodingKey::from_secret(settings.auth.user_claim_token_pepper.as_bytes()),
             &Validation::new(Algorithm::HS256),
         ) {
             Ok(token_data) => {
