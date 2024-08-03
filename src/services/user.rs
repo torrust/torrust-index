@@ -229,6 +229,7 @@ impl ProfileService {
     /// * `ServiceError::PasswordTooLong` if the supplied password is too long.
     /// * An error if unable to successfully hash the password.
     /// * An error if unable to change the password in the database.
+    /// * An error if it is not possible to authorize the action
     pub async fn change_password(
         &self,
         user_id: UserId,
