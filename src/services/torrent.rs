@@ -433,7 +433,7 @@ impl Index {
         // Check if user is owner or administrator
         // todo: move this to an authorization service.
         if !(torrent_listing.uploader == updater.username || updater.administrator) {
-            return Err(ServiceError::Unauthorized);
+            return Err(ServiceError::UnauthorizedAction);
         }
 
         self.torrent_info_repository

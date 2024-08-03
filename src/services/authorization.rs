@@ -79,12 +79,14 @@ impl Service {
 
         let enforcer = self.casbin_enforcer.enforcer.read().await;
 
-        let authorize = enforcer.enforce((role, action)).map_err(|_| ServiceError::Unauthorized)?;
+        let authorize = enforcer
+            .enforce((role, action))
+            .map_err(|_| ServiceError::UnauthorizedAction)?;
 
         if authorize {
             Ok(())
         } else {
-            Err(ServiceError::Unauthorized)
+            Err(ServiceError::UnauthorizedAction)
         }
     }
 
