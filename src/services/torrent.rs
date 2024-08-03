@@ -132,10 +132,10 @@ impl Index {
     pub async fn add_torrent(
         &self,
         add_torrent_req: AddTorrentRequest,
-        user_id: UserId,
+        maybe_user_id: Option<UserId>,
     ) -> Result<AddTorrentResponse, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::AddTorrent, Some(user_id))
+            .authorize(ACTION::AddTorrent, maybe_user_id)
             .await?;
 
         let metadata = self.validate_and_build_metadata(&add_torrent_req).await?;
@@ -149,7 +149,7 @@ impl Index {
 
         let torrent_id = self
             .torrent_repository
-            .add(&original_info_hash, &torrent, &metadata, user_id)
+            .add(&original_info_hash, &torrent, &metadata, maybe_user_id.unwrap())
             .await?;
 
         // Synchronous secondary tasks

@@ -37,7 +37,7 @@ use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 #[allow(clippy::unused_async)]
 pub async fn upload_torrent_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
     multipart: Multipart,
 ) -> Response {
     let add_torrent_form = match build_add_torrent_request_from_payload(multipart).await {
@@ -45,7 +45,7 @@ pub async fn upload_torrent_handler(
         Err(error) => return error.into_response(),
     };
 
-    match app_data.torrent_service.add_torrent(add_torrent_form, user_id).await {
+    match app_data.torrent_service.add_torrent(add_torrent_form, maybe_user_id).await {
         Ok(response) => new_torrent_response(&response).into_response(),
         Err(error) => error.into_response(),
     }
