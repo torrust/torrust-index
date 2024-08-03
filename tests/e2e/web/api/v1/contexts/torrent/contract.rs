@@ -442,7 +442,7 @@ mod for_guests {
 
         let response = client.upload_torrent(form.into()).await;
 
-        assert_eq!(response.status, 401);
+        assert_eq!(response.status, 403);
     }
 
     #[tokio::test]
