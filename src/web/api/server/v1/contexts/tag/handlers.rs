@@ -24,7 +24,10 @@ use crate::web::api::server::v1::responses::{self};
 ///
 /// # Errors
 ///
-/// It returns an error if there is a database error.
+/// It returns an error if:
+/// There is a database error
+/// There is a problem authorizing the action.
+/// The user is not authorized to perform the action
 #[allow(clippy::unused_async)]
 pub async fn get_all_handler(
     State(app_data): State<Arc<AppData>>,
