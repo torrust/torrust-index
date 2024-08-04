@@ -462,7 +462,7 @@ mod for_guests {
 
         let response = client.delete_torrent(&test_torrent.file_info_hash()).await;
 
-        assert_eq!(response.status, 401);
+        assert_eq!(response.status, 403);
     }
 }
 
