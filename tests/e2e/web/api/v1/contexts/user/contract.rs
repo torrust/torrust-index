@@ -231,6 +231,6 @@ mod banned_user_list {
 
         let response = client.ban_user(Username::new(registered_user.username.clone())).await;
 
-        assert_eq!(response.status, 401);
+        assert_eq!(response.status, 403);
     }
 }
