@@ -230,23 +230,23 @@ impl ProfileService {
     /// * An error if unable to successfully hash the password.
     /// * An error if unable to change the password in the database.
     /// * An error if it is not possible to authorize the action
+    #[allow(clippy::missing_panics_doc)]
     pub async fn change_password(
         &self,
-        user_id: UserId,
-        change_password_form: &ChangePasswordForm,
         maybe_user_id: Option<UserId>,
+        change_password_form: &ChangePasswordForm,
     ) -> Result<(), ServiceError> {
         self.authorization_service
             .authorize(ACTION::ChangePassword, maybe_user_id)
             .await?;
 
-        info!("changing user password for user ID: {user_id}");
+        info!("changing user password for user ID: {}", maybe_user_id.unwrap());
 
         let settings = self.configuration.settings.read().await;
 
         let user_authentication = self
             .user_authentication_repository
-            .get_user_authentication_from_id(&user_id)
+            .get_user_authentication_from_id(&maybe_user_id.unwrap())
             .await?;
 
         verify_password(change_password_form.current_password.as_bytes(), &user_authentication)?;
@@ -265,7 +265,7 @@ impl ProfileService {
         let password_hash = hash_password(&change_password_form.password)?;
 
         self.user_authentication_repository
-            .change_password(user_id, &password_hash)
+            .change_password(maybe_user_id.unwrap(), &password_hash)
             .await?;
 
         Ok(())

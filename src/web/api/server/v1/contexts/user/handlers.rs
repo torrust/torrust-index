@@ -132,19 +132,19 @@ pub async fn renew_token_handler(
 ///
 /// - The user account is not found.
 #[allow(clippy::unused_async)]
+#[allow(clippy::missing_panics_doc)]
 pub async fn change_password_handler(
     State(app_data): State<Arc<AppData>>,
     ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
-    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
     extract::Json(change_password_form): extract::Json<ChangePasswordForm>,
 ) -> Response {
     match app_data
         .profile_service
-        .change_password(user_id, &change_password_form, maybe_user_id)
+        .change_password(maybe_user_id, &change_password_form)
         .await
     {
         Ok(()) => Json(OkResponseData {
-            data: format!("Password changed for user with ID: {user_id}"),
+            data: format!("Password changed for user with ID: {}", maybe_user_id.unwrap()),
         })
         .into_response(),
         Err(error) => error.into_response(),
