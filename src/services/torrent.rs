@@ -297,9 +297,13 @@ impl Index {
     /// * The user does not have permission to delete the torrent.
     /// * Unable to get the torrent listing from it's ID.
     /// * Unable to delete the torrent from the database.
-    pub async fn delete_torrent(&self, info_hash: &InfoHash, user_id: &UserId) -> Result<DeletedTorrentResponse, ServiceError> {
+    pub async fn delete_torrent(
+        &self,
+        info_hash: &InfoHash,
+        maybe_user_id: Option<UserId>,
+    ) -> Result<DeletedTorrentResponse, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::DeleteTorrent, Some(*user_id))
+            .authorize(ACTION::DeleteTorrent, maybe_user_id)
             .await?;
 
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;

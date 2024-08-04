@@ -30,9 +30,9 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if the user does not have the required permissions.
-    pub async fn get_all(&self, user_id: &UserId) -> Result<Settings, ServiceError> {
+    pub async fn get_all(&self, maybe_user_id: Option<UserId>) -> Result<Settings, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::GetSettings, Some(*user_id))
+            .authorize(ACTION::GetSettings, maybe_user_id)
             .await?;
 
         let torrust_index_configuration = self.configuration.get_all().await;
@@ -45,9 +45,9 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if the user does not have the required permissions.
-    pub async fn get_all_masking_secrets(&self, user_id: &UserId) -> Result<Settings, ServiceError> {
+    pub async fn get_all_masking_secrets(&self, maybe_user_id: Option<UserId>) -> Result<Settings, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::GetSettingsSecret, Some(*user_id))
+            .authorize(ACTION::GetSettingsSecret, maybe_user_id)
             .await?;
 
         let mut torrust_index_configuration = self.configuration.get_all().await;

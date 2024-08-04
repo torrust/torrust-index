@@ -301,10 +301,14 @@ impl BanService {
     /// * `ServiceError::InternalServerError` if unable get user from the request.
     /// * An error if unable to get user profile from supplied username.
     /// * An error if unable to set the ban of the user in the database.
-    pub async fn ban_user(&self, username_to_be_banned: &str, user_id: &UserId) -> Result<(), ServiceError> {
-        debug!("user with ID {user_id} banning username: {username_to_be_banned}");
+    #[allow(clippy::missing_panics_doc)]
+    pub async fn ban_user(&self, username_to_be_banned: &str, maybe_user_id: Option<UserId>) -> Result<(), ServiceError> {
+        debug!(
+            "user with ID {} banning username: {username_to_be_banned}",
+            maybe_user_id.unwrap()
+        );
 
-        self.authorization_service.authorize(ACTION::BanUser, Some(*user_id)).await?;
+        self.authorization_service.authorize(ACTION::BanUser, maybe_user_id).await?;
 
         let user_profile = self
             .user_profile_repository

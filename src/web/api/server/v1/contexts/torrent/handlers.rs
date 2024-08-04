@@ -256,14 +256,14 @@ pub async fn update_torrent_info_handler(
 #[allow(clippy::unused_async)]
 pub async fn delete_torrent_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
         return errors::Request::InvalidInfoHashParam.into_response();
     };
 
-    match app_data.torrent_service.delete_torrent(&info_hash, &user_id).await {
+    match app_data.torrent_service.delete_torrent(&info_hash, maybe_user_id).await {
         Ok(deleted_torrent_response) => Json(OkResponseData {
             data: deleted_torrent_response,
         })
