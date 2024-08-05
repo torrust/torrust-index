@@ -61,7 +61,7 @@ async fn it_should_not_allow_adding_a_new_category_to_unauthenticated_users() {
         })
         .await;
 
-    assert_eq!(response.status, 403);
+    assert_eq!(response.status, 401);
 }
 
 #[tokio::test]
@@ -194,5 +194,5 @@ async fn it_should_not_allow_guests_to_delete_categories() {
         })
         .await;
 
-    assert_eq!(response.status, 403);
+    assert_eq!(response.status, 401);
 }

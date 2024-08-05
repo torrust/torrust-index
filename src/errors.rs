@@ -111,6 +111,11 @@ pub enum ServiceError {
     #[display(fmt = "Unauthorized action.")]
     UnauthorizedAction,
 
+    #[display(
+        fmt = "Unauthorized actions for guest users. Try logging in to check if you have permission to perform the action"
+    )]
+    UnauthorizedActionForGuests,
+
     #[display(fmt = "This torrent already exists in our database.")]
     InfoHashAlreadyExists,
 
@@ -301,6 +306,7 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::InvalidCategory => StatusCode::BAD_REQUEST,
         ServiceError::InvalidTag => StatusCode::BAD_REQUEST,
         ServiceError::UnauthorizedAction => StatusCode::FORBIDDEN,
+        ServiceError::UnauthorizedActionForGuests => StatusCode::UNAUTHORIZED,
         ServiceError::InfoHashAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::CanonicalInfoHashAlreadyExists => StatusCode::CONFLICT,
         ServiceError::OriginalInfoHashAlreadyExists => StatusCode::CONFLICT,

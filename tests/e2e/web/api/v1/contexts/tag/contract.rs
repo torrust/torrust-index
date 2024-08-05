@@ -63,7 +63,7 @@ async fn it_should_not_allow_adding_a_new_tag_to_unauthenticated_users() {
         })
         .await;
 
-    assert_eq!(response.status, 403);
+    assert_eq!(response.status, 401);
 }
 
 #[tokio::test]
@@ -174,5 +174,5 @@ async fn it_should_not_allow_guests_to_delete_tags() {
 
     let response = client.delete_tag(DeleteTagForm { tag_id }).await;
 
-    assert_eq!(response.status, 403);
+    assert_eq!(response.status, 401);
 }
