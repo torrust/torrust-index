@@ -8,7 +8,7 @@ use axum::response::{IntoResponse, Json, Response};
 use super::forms::{AddTagForm, DeleteTagForm};
 use super::responses::{added_tag, deleted_tag};
 use crate::common::AppData;
-use crate::web::api::server::v1::extractors::user_id::ExtractLoggedInUser;
+use crate::web::api::server::v1::extractors::optional_user_id::ExtractOptionalLoggedInUser;
 use crate::web::api::server::v1::responses::{self};
 
 /// It handles the request to get all the tags.
@@ -23,10 +23,16 @@ use crate::web::api::server::v1::responses::{self};
 ///
 /// # Errors
 ///
-/// It returns an error if there is a database error.
+/// It returns an error if:
+/// There is a database error
+/// There is a problem authorizing the action.
+/// The user is not authorized to perform the action
 #[allow(clippy::unused_async)]
-pub async fn get_all_handler(State(app_data): State<Arc<AppData>>) -> Response {
-    match app_data.tag_repository.get_all().await {
+pub async fn get_all_handler(
+    State(app_data): State<Arc<AppData>>,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+) -> Response {
+    match app_data.tag_service.get_tags(maybe_user_id).await {
         Ok(tags) => Json(responses::OkResponseData { data: tags }).into_response(),
         Err(error) => error.into_response(),
     }
@@ -43,10 +49,10 @@ pub async fn get_all_handler(State(app_data): State<Arc<AppData>>) -> Response {
 #[allow(clippy::unused_async)]
 pub async fn add_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
     extract::Json(add_tag_form): extract::Json<AddTagForm>,
 ) -> Response {
-    match app_data.tag_service.add_tag(&add_tag_form.name, &user_id).await {
+    match app_data.tag_service.add_tag(&add_tag_form.name, maybe_user_id).await {
         Ok(_) => added_tag(&add_tag_form.name).into_response(),
         Err(error) => error.into_response(),
     }
@@ -63,10 +69,10 @@ pub async fn add_handler(
 #[allow(clippy::unused_async)]
 pub async fn delete_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
     extract::Json(delete_tag_form): extract::Json<DeleteTagForm>,
 ) -> Response {
-    match app_data.tag_service.delete_tag(&delete_tag_form.tag_id, &user_id).await {
+    match app_data.tag_service.delete_tag(&delete_tag_form.tag_id, maybe_user_id).await {
         Ok(()) => deleted_tag(delete_tag_form.tag_id).into_response(),
         Err(error) => error.into_response(),
     }

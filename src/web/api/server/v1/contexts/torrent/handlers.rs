@@ -37,7 +37,7 @@ use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 #[allow(clippy::unused_async)]
 pub async fn upload_torrent_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
     multipart: Multipart,
 ) -> Response {
     let add_torrent_form = match build_add_torrent_request_from_payload(multipart).await {
@@ -45,7 +45,7 @@ pub async fn upload_torrent_handler(
         Err(error) => return error.into_response(),
     };
 
-    match app_data.torrent_service.add_torrent(add_torrent_form, user_id).await {
+    match app_data.torrent_service.add_torrent(add_torrent_form, maybe_user_id).await {
         Ok(response) => new_torrent_response(&response).into_response(),
         Err(error) => error.into_response(),
     }
@@ -68,7 +68,7 @@ impl InfoHashParam {
 #[allow(clippy::unused_async)]
 pub async fn download_torrent_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractOptionalLoggedInUser(opt_user_id): ExtractOptionalLoggedInUser,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
@@ -77,11 +77,13 @@ pub async fn download_torrent_handler(
 
     debug!("Downloading torrent: {:?}", info_hash.to_hex_string());
 
-    if let Some(redirect_response) = redirect_to_download_url_using_canonical_info_hash_if_needed(&app_data, &info_hash).await {
+    if let Some(redirect_response) =
+        redirect_to_download_url_using_canonical_info_hash_if_needed(&app_data, &info_hash, maybe_user_id).await
+    {
         debug!("Redirecting to URL with canonical info-hash");
         redirect_response
     } else {
-        let torrent = match app_data.torrent_service.get_torrent(&info_hash, opt_user_id).await {
+        let torrent = match app_data.torrent_service.get_torrent(&info_hash, maybe_user_id).await {
             Ok(torrent) => torrent,
             Err(error) => return error.into_response(),
         };
@@ -101,10 +103,11 @@ pub async fn download_torrent_handler(
 async fn redirect_to_download_url_using_canonical_info_hash_if_needed(
     app_data: &Arc<AppData>,
     info_hash: &InfoHash,
+    maybe_user_id: Option<i64>,
 ) -> Option<Response> {
     match app_data
-        .torrent_info_hash_repository
-        .find_canonical_info_hash_for(info_hash)
+        .torrent_service
+        .get_canonical_info_hash(info_hash, maybe_user_id)
         .await
     {
         Ok(Some(canonical_info_hash)) => {
@@ -132,8 +135,16 @@ async fn redirect_to_download_url_using_canonical_info_hash_if_needed(
 ///
 /// It returns an error if the database query fails.
 #[allow(clippy::unused_async)]
-pub async fn get_torrents_handler(State(app_data): State<Arc<AppData>>, Query(criteria): Query<ListingRequest>) -> Response {
-    match app_data.torrent_service.generate_torrent_info_listing(&criteria).await {
+pub async fn get_torrents_handler(
+    State(app_data): State<Arc<AppData>>,
+    Query(criteria): Query<ListingRequest>,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+) -> Response {
+    match app_data
+        .torrent_service
+        .generate_torrent_info_listing(&criteria, maybe_user_id)
+        .await
+    {
         Ok(torrents_response) => Json(OkResponseData { data: torrents_response }).into_response(),
         Err(error) => error.into_response(),
     }
@@ -150,17 +161,19 @@ pub async fn get_torrents_handler(State(app_data): State<Arc<AppData>>, Query(cr
 #[allow(clippy::unused_async)]
 pub async fn get_torrent_info_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractOptionalLoggedInUser(opt_user_id): ExtractOptionalLoggedInUser,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
         return errors::Request::InvalidInfoHashParam.into_response();
     };
 
-    if let Some(redirect_response) = redirect_to_details_url_using_canonical_info_hash_if_needed(&app_data, &info_hash).await {
+    if let Some(redirect_response) =
+        redirect_to_details_url_using_canonical_info_hash_if_needed(&app_data, &info_hash, maybe_user_id).await
+    {
         redirect_response
     } else {
-        match app_data.torrent_service.get_torrent_info(&info_hash, opt_user_id).await {
+        match app_data.torrent_service.get_torrent_info(&info_hash, maybe_user_id).await {
             Ok(torrent_response) => Json(OkResponseData { data: torrent_response }).into_response(),
             Err(error) => error.into_response(),
         }
@@ -170,10 +183,11 @@ pub async fn get_torrent_info_handler(
 async fn redirect_to_details_url_using_canonical_info_hash_if_needed(
     app_data: &Arc<AppData>,
     info_hash: &InfoHash,
+    maybe_user_id: Option<i64>,
 ) -> Option<Response> {
     match app_data
-        .torrent_info_hash_repository
-        .find_canonical_info_hash_for(info_hash)
+        .torrent_service
+        .get_canonical_info_hash(info_hash, maybe_user_id)
         .await
     {
         Ok(Some(canonical_info_hash)) => {
@@ -242,14 +256,14 @@ pub async fn update_torrent_info_handler(
 #[allow(clippy::unused_async)]
 pub async fn delete_torrent_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
         return errors::Request::InvalidInfoHashParam.into_response();
     };
 
-    match app_data.torrent_service.delete_torrent(&info_hash, &user_id).await {
+    match app_data.torrent_service.delete_torrent(&info_hash, maybe_user_id).await {
         Ok(deleted_torrent_response) => Json(OkResponseData {
             data: deleted_torrent_response,
         })

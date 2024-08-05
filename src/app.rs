@@ -18,7 +18,7 @@ use crate::services::torrent::{
     DbTorrentListingGenerator, DbTorrentRepository, DbTorrentTagRepository,
 };
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository, Repository};
-use crate::services::{authorization, proxy, settings, torrent};
+use crate::services::{about, authorization, proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::web::api::server::signals::Halted;
 use crate::web::api::server::v1::auth::Authentication;
@@ -101,7 +101,10 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         authorization_service.clone(),
     ));
     let tag_service = Arc::new(tag::Service::new(tag_repository.clone(), authorization_service.clone()));
-    let proxy_service = Arc::new(proxy::Service::new(image_cache_service.clone(), user_repository.clone()));
+    let proxy_service = Arc::new(proxy::Service::new(
+        image_cache_service.clone(),
+        authorization_service.clone(),
+    ));
     let settings_service = Arc::new(settings::Service::new(configuration.clone(), authorization_service.clone()));
     let torrent_index = Arc::new(torrent::Index::new(
         configuration.clone(),
@@ -127,6 +130,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let profile_service = Arc::new(user::ProfileService::new(
         configuration.clone(),
         user_authentication_repository.clone(),
+        authorization_service.clone(),
     ));
     let ban_service = Arc::new(user::BanService::new(
         user_profile_repository.clone(),
@@ -140,6 +144,8 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         user_profile_repository.clone(),
         user_authentication_repository.clone(),
     ));
+
+    let about_service = Arc::new(about::Service::new(authorization_service.clone()));
 
     // Build app container
 
@@ -174,6 +180,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         registration_service,
         profile_service,
         ban_service,
+        about_service,
     ));
 
     // Start cronjob to import tracker torrent data and updating

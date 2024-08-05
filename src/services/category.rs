@@ -31,9 +31,9 @@ impl Service {
     /// * The category name is empty.
     /// * The category already exists.
     /// * There is a database error.
-    pub async fn add_category(&self, category_name: &str, user_id: &UserId) -> Result<i64, ServiceError> {
+    pub async fn add_category(&self, category_name: &str, maybe_user_id: Option<UserId>) -> Result<i64, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::AddCategory, Some(*user_id))
+            .authorize(ACTION::AddCategory, maybe_user_id)
             .await?;
 
         let trimmed_name = category_name.trim();
@@ -65,9 +65,9 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is a database error.
-    pub async fn delete_category(&self, category_name: &str, user_id: &UserId) -> Result<(), ServiceError> {
+    pub async fn delete_category(&self, category_name: &str, maybe_user_id: Option<UserId>) -> Result<(), ServiceError> {
         self.authorization_service
-            .authorize(ACTION::DeleteCategory, Some(*user_id))
+            .authorize(ACTION::DeleteCategory, maybe_user_id)
             .await?;
 
         match self.category_repository.delete(category_name).await {
@@ -77,6 +77,25 @@ impl Service {
                 _ => Err(ServiceError::DatabaseError),
             },
         }
+    }
+
+    /// Returns all the categories from the database
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if:
+    ///
+    /// * The user does not have the required permissions.
+    /// * There is a database error retrieving the categories.
+    pub async fn get_categories(&self, maybe_user_id: Option<UserId>) -> Result<Vec<Category>, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GetCategories, maybe_user_id)
+            .await?;
+
+        self.category_repository
+            .get_all()
+            .await
+            .map_err(|_| ServiceError::DatabaseError)
     }
 }
 

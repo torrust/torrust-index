@@ -10,7 +10,7 @@ use serde::Deserialize;
 use super::forms::{ChangePasswordForm, JsonWebToken, LoginForm, RegistrationForm};
 use super::responses::{self};
 use crate::common::AppData;
-use crate::web::api::server::v1::extractors::user_id::ExtractLoggedInUser;
+use crate::web::api::server::v1::extractors::optional_user_id::ExtractOptionalLoggedInUser;
 use crate::web::api::server::v1::responses::OkResponseData;
 
 // Registration
@@ -131,14 +131,19 @@ pub async fn renew_token_handler(
 ///
 /// - The user account is not found.
 #[allow(clippy::unused_async)]
+#[allow(clippy::missing_panics_doc)]
 pub async fn change_password_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
     extract::Json(change_password_form): extract::Json<ChangePasswordForm>,
 ) -> Response {
-    match app_data.profile_service.change_password(user_id, &change_password_form).await {
+    match app_data
+        .profile_service
+        .change_password(maybe_user_id, &change_password_form)
+        .await
+    {
         Ok(()) => Json(OkResponseData {
-            data: format!("Password changed for user with ID: {user_id}"),
+            data: format!("Password changed for user with ID: {}", maybe_user_id.unwrap()),
         })
         .into_response(),
         Err(error) => error.into_response(),
@@ -157,11 +162,11 @@ pub async fn change_password_handler(
 pub async fn ban_handler(
     State(app_data): State<Arc<AppData>>,
     Path(to_be_banned_username): Path<UsernameParam>,
-    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
 ) -> Response {
     // todo: add reason and `date_expiry` parameters to request
 
-    match app_data.ban_service.ban_user(&to_be_banned_username.0, &user_id).await {
+    match app_data.ban_service.ban_user(&to_be_banned_username.0, maybe_user_id).await {
         Ok(()) => Json(OkResponseData {
             data: format!("Banned user: {}", to_be_banned_username.0),
         })

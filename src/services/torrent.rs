@@ -132,10 +132,11 @@ impl Index {
     pub async fn add_torrent(
         &self,
         add_torrent_req: AddTorrentRequest,
-        user_id: UserId,
+        maybe_user_id: Option<UserId>,
     ) -> Result<AddTorrentResponse, ServiceError> {
-        // Guard that the users exists
-        let _user = self.user_repository.get_compact(&user_id).await?;
+        self.authorization_service
+            .authorize(ACTION::AddTorrent, maybe_user_id)
+            .await?;
 
         let metadata = self.validate_and_build_metadata(&add_torrent_req).await?;
 
@@ -148,7 +149,7 @@ impl Index {
 
         let torrent_id = self
             .torrent_repository
-            .add(&original_info_hash, &torrent, &metadata, user_id)
+            .add(&original_info_hash, &torrent, &metadata, maybe_user_id.unwrap())
             .await?;
 
         // Synchronous secondary tasks
@@ -261,7 +262,11 @@ impl Index {
     ///
     /// This function will return an error if unable to get the torrent from the
     /// database.
-    pub async fn get_torrent(&self, info_hash: &InfoHash, opt_user_id: Option<UserId>) -> Result<Torrent, ServiceError> {
+    pub async fn get_torrent(&self, info_hash: &InfoHash, maybe_user_id: Option<UserId>) -> Result<Torrent, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GetTorrent, maybe_user_id)
+            .await?;
+
         let mut torrent = self.torrent_repository.get_by_info_hash(info_hash).await?;
 
         let tracker_url = self.get_tracker_url().await;
@@ -272,7 +277,7 @@ impl Index {
 
         if !tracker_is_private {
             torrent.include_url_as_main_tracker(&tracker_url);
-        } else if let Some(authenticated_user_id) = opt_user_id {
+        } else if let Some(authenticated_user_id) = maybe_user_id {
             let personal_announce_url = self.tracker_service.get_personal_announce_url(authenticated_user_id).await?;
             torrent.include_url_as_main_tracker(&personal_announce_url);
         } else {
@@ -292,9 +297,13 @@ impl Index {
     /// * The user does not have permission to delete the torrent.
     /// * Unable to get the torrent listing from it's ID.
     /// * Unable to delete the torrent from the database.
-    pub async fn delete_torrent(&self, info_hash: &InfoHash, user_id: &UserId) -> Result<DeletedTorrentResponse, ServiceError> {
+    pub async fn delete_torrent(
+        &self,
+        info_hash: &InfoHash,
+        maybe_user_id: Option<UserId>,
+    ) -> Result<DeletedTorrentResponse, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::DeleteTorrent, Some(*user_id))
+            .authorize(ACTION::DeleteTorrent, maybe_user_id)
             .await?;
 
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
@@ -328,12 +337,16 @@ impl Index {
     pub async fn get_torrent_info(
         &self,
         info_hash: &InfoHash,
-        opt_user_id: Option<UserId>,
+        maybe_user_id: Option<UserId>,
     ) -> Result<TorrentResponse, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GetTorrentInfo, maybe_user_id)
+            .await?;
+
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
 
         let torrent_response = self
-            .build_full_torrent_response(torrent_listing, info_hash, opt_user_id)
+            .build_full_torrent_response(torrent_listing, info_hash, maybe_user_id)
             .await?;
 
         Ok(torrent_response)
@@ -344,7 +357,15 @@ impl Index {
     /// # Errors
     ///
     /// Returns a `ServiceError::DatabaseError` if the database query fails.
-    pub async fn generate_torrent_info_listing(&self, request: &ListingRequest) -> Result<TorrentsResponse, ServiceError> {
+    pub async fn generate_torrent_info_listing(
+        &self,
+        request: &ListingRequest,
+        maybe_user_id: Option<UserId>,
+    ) -> Result<TorrentsResponse, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GenerateTorrentInfoListing, maybe_user_id)
+            .await?;
+
         let torrent_listing_specification = self.listing_specification_from_user_request(request).await;
 
         let torrents_response = self
@@ -416,7 +437,7 @@ impl Index {
         // Check if user is owner or administrator
         // todo: move this to an authorization service.
         if !(torrent_listing.uploader == updater.username || updater.administrator) {
-            return Err(ServiceError::Unauthorized);
+            return Err(ServiceError::UnauthorizedAction);
         }
 
         self.torrent_info_repository
@@ -469,7 +490,7 @@ impl Index {
         &self,
         torrent_listing: TorrentListing,
         info_hash: &InfoHash,
-        opt_user_id: Option<UserId>,
+        maybe_user_id: Option<UserId>,
     ) -> Result<TorrentResponse, ServiceError> {
         let torrent_id: i64 = torrent_listing.torrent_id;
 
@@ -500,7 +521,7 @@ impl Index {
 
         if self.tracker_is_private().await {
             // Add main tracker URL
-            match opt_user_id {
+            match maybe_user_id {
                 Some(user_id) => {
                     let personal_announce_url = self.tracker_service.get_personal_announce_url(user_id).await?;
 
@@ -543,6 +564,26 @@ impl Index {
         torrent_response.tags = self.torrent_tag_repository.get_tags_for_torrent(&torrent_id).await?;
 
         Ok(torrent_response)
+    }
+
+    /// Returns the canonical info-hash.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the user is not authorized or if there is a problem with the database.
+    pub async fn get_canonical_info_hash(
+        &self,
+        info_hash: &InfoHash,
+        maybe_user_id: Option<UserId>,
+    ) -> Result<Option<InfoHash>, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GetCanonicalInfoHash, maybe_user_id)
+            .await?;
+
+        self.torrent_info_hash_repository
+            .find_canonical_info_hash_for(info_hash)
+            .await
+            .map_err(|_| ServiceError::DatabaseError)
     }
 }
 

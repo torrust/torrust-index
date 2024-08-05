@@ -10,21 +10,21 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 
+use super::authorization::{self, ACTION};
 use crate::cache::image::manager::{Error, ImageCacheService};
 use crate::models::user::UserId;
-use crate::services::user::Repository;
 
 pub struct Service {
     image_cache_service: Arc<ImageCacheService>,
-    user_repository: Arc<Box<dyn Repository>>,
+    authorization_service: Arc<authorization::Service>,
 }
 
 impl Service {
     #[must_use]
-    pub fn new(image_cache_service: Arc<ImageCacheService>, user_repository: Arc<Box<dyn Repository>>) -> Self {
+    pub fn new(image_cache_service: Arc<ImageCacheService>, authorization_service: Arc<authorization::Service>) -> Self {
         Self {
             image_cache_service,
-            user_repository,
+            authorization_service,
         }
     }
 
@@ -38,9 +38,14 @@ impl Service {
     /// * The image URL is not an image.
     /// * The image is too big.
     /// * The user quota is met.
-    pub async fn get_image_by_url(&self, url: &str, user_id: &UserId) -> Result<Bytes, Error> {
-        let user = self.user_repository.get_compact(user_id).await.ok();
+    #[allow(clippy::missing_panics_doc)]
+    pub async fn get_image_by_url(&self, url: &str, maybe_user_id: Option<UserId>) -> Result<Bytes, Error> {
+        self.authorization_service
+            .authorize(ACTION::GetImageByUrl, maybe_user_id)
+            .await
+            .map_err(|_| Error::Unauthenticated)?;
 
-        self.image_cache_service.get_image_by_url(url, user).await
+        // The unwrap should never panic as if the maybe_user_id is none, an authorization error will be returned and handled at the method above
+        self.image_cache_service.get_image_by_url(url, maybe_user_id.unwrap()).await
     }
 }
