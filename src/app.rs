@@ -96,10 +96,8 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
             .and_then(|u| u.auth.as_ref())
             .and_then(|auth| auth.casbin.as_ref())
         {
-            println!("loading custom");
             CasbinEnforcer::with_configuration(CasbinConfiguration::new(&casbin.model, &casbin.policy)).await
         } else {
-            println!("loading default");
             CasbinEnforcer::with_default_configuration().await
         },
     );
