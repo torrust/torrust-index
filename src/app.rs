@@ -11,6 +11,7 @@ use crate::config::validator::Validator;
 use crate::config::Configuration;
 use crate::databases::database;
 use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
+use crate::services::authorization::{CasbinConfiguration, CasbinEnforcer};
 use crate::services::category::{self, DbCategoryRepository};
 use crate::services::tag::{self, DbTagRepository};
 use crate::services::torrent::{
@@ -62,6 +63,8 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     // From [net] config
     let config_bind_address = settings.net.bind_address;
     let opt_net_tsl = settings.net.tsl.clone();
+    // Unstable config
+    let unstable = settings.unstable.clone();
 
     // IMPORTANT: drop settings before starting server to avoid read locks that
     // leads to requests hanging.
@@ -87,7 +90,19 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let torrent_tag_repository = Arc::new(DbTorrentTagRepository::new(database.clone()));
     let torrent_listing_generator = Arc::new(DbTorrentListingGenerator::new(database.clone()));
     let banned_user_list = Arc::new(DbBannedUserList::new(database.clone()));
-    let casbin_enforcer = Arc::new(authorization::CasbinEnforcer::new().await);
+    let casbin_enforcer = Arc::new(
+        if let Some(casbin) = unstable
+            .as_ref()
+            .and_then(|u| u.auth.as_ref())
+            .and_then(|auth| auth.casbin.as_ref())
+        {
+            println!("loading custom");
+            CasbinEnforcer::with_configuration(CasbinConfiguration::new(&casbin.model, &casbin.policy)).await
+        } else {
+            println!("loading default");
+            CasbinEnforcer::with_default_configuration().await
+        },
+    );
 
     // Services
     let authorization_service = Arc::new(authorization::Service::new(user_repository.clone(), casbin_enforcer.clone()));

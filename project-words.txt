@@ -9,6 +9,7 @@ binascii
 btih
 buildx
 camino
+Casbin
 chrono
 clippy
 codecov
@@ -51,6 +52,7 @@ luckythelab
 mailcatcher
 mandelbrotset
 metainfo
+Mgmt
 migth
 nanos
 NCCA

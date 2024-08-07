@@ -132,40 +132,84 @@ pub struct CasbinEnforcer {
 impl CasbinEnforcer {
     /// # Panics
     ///
-    /// It panics if the policy and/or model file cannot be loaded
-    pub async fn new() -> Self {
-        let casbin_configuration = CasbinConfiguration::new();
+    /// Will panic if:
+    ///
+    /// - The enforcer can't be created.
+    /// - The policies can't be loaded.
+    pub async fn with_default_configuration() -> Self {
+        let casbin_configuration = CasbinConfiguration::default();
 
-        let model = DefaultModel::from_str(&casbin_configuration.model)
+        let mut enforcer = Enforcer::new(casbin_configuration.default_model().await, ())
             .await
-            .expect("Error loading the model");
+            .expect("Error creating the enforcer");
 
-        // Converts the policy from a string type to a vector
-        let policy = casbin_configuration
-            .policy
-            .lines()
-            .filter(|line| !line.trim().is_empty())
-            .map(|line| line.split(',').map(|s| s.trim().to_owned()).collect::<Vec<String>>())
-            .collect();
+        enforcer
+            .add_policies(casbin_configuration.policy_lines())
+            .await
+            .expect("Error loading the policy");
 
-        let mut enforcer = Enforcer::new(model, ()).await.expect("Error creating the enforcer");
+        let enforcer = Arc::new(RwLock::new(enforcer));
 
-        enforcer.add_policies(policy).await.expect("Error loading the policy");
+        Self { enforcer }
+    }
+
+    /// # Panics
+    ///
+    /// Will panic if:
+    ///
+    /// - The enforcer can't be created.
+    /// - The policies can't be loaded.
+    pub async fn with_configuration(casbin_configuration: CasbinConfiguration) -> Self {
+        let mut enforcer = Enforcer::new(casbin_configuration.default_model().await, ())
+            .await
+            .expect("Error creating the enforcer");
+
+        enforcer
+            .add_policies(casbin_configuration.policy_lines())
+            .await
+            .expect("Error loading the policy");
 
         let enforcer = Arc::new(RwLock::new(enforcer));
 
         Self { enforcer }
     }
 }
+
 #[allow(dead_code)]
-struct CasbinConfiguration {
+pub struct CasbinConfiguration {
     model: String,
     policy: String,
 }
 
 impl CasbinConfiguration {
-    pub fn new() -> Self {
-        CasbinConfiguration {
+    #[must_use]
+    pub fn new(model: &str, policy: &str) -> Self {
+        Self {
+            model: model.to_owned(),
+            policy: policy.to_owned(),
+        }
+    }
+
+    /// # Panics
+    ///
+    /// It panics if the model cannot be loaded.
+    async fn default_model(&self) -> DefaultModel {
+        DefaultModel::from_str(&self.model).await.expect("Error loading the model")
+    }
+
+    /// Converts the policy from a string type to a vector.
+    fn policy_lines(&self) -> Vec<Vec<String>> {
+        self.policy
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| line.split(',').map(|s| s.trim().to_owned()).collect::<Vec<String>>())
+            .collect()
+    }
+}
+
+impl Default for CasbinConfiguration {
+    fn default() -> Self {
+        Self {
             model: String::from(
                 "
                 [request_definition]
