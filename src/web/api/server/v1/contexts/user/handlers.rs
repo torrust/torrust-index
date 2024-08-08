@@ -130,6 +130,9 @@ pub async fn renew_token_handler(
 /// It returns an error if:
 ///
 /// - The user account is not found.
+/// # Panics
+///
+/// The function panics if the optional user id has no value
 #[allow(clippy::unused_async)]
 pub async fn change_password_handler(
     State(app_data): State<Arc<AppData>>,
@@ -142,7 +145,10 @@ pub async fn change_password_handler(
         .await
     {
         Ok(()) => Json(OkResponseData {
-            data: format!("Password changed for user with ID: {}", maybe_user_id.unwrap()),
+            data: format!(
+                "Password changed for user with ID: {}",
+                maybe_user_id.expect("There is no user id needed to perform the action")
+            ),
         })
         .into_response(),
         Err(error) => error.into_response(),

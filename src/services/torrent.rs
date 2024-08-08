@@ -129,6 +129,7 @@ impl Index {
     /// This function will panic if:
     ///
     /// * Unable to parse the torrent info-hash.
+    /// * The optional user id has no value
     pub async fn add_torrent(
         &self,
         add_torrent_req: AddTorrentRequest,
@@ -149,7 +150,12 @@ impl Index {
 
         let torrent_id = self
             .torrent_repository
-            .add(&original_info_hash, &torrent, &metadata, maybe_user_id.unwrap())
+            .add(
+                &original_info_hash,
+                &torrent,
+                &metadata,
+                maybe_user_id.expect("There is no user id needed to perform the action"),
+            )
             .await?;
 
         // Synchronous secondary tasks
