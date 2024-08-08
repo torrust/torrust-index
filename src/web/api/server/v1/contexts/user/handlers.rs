@@ -131,7 +131,6 @@ pub async fn renew_token_handler(
 ///
 /// - The user account is not found.
 #[allow(clippy::unused_async)]
-#[allow(clippy::missing_panics_doc)]
 pub async fn change_password_handler(
     State(app_data): State<Arc<AppData>>,
     ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,

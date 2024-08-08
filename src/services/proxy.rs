@@ -38,7 +38,6 @@ impl Service {
     /// * The image URL is not an image.
     /// * The image is too big.
     /// * The user quota is met.
-    #[allow(clippy::missing_panics_doc)]
     pub async fn get_image_by_url(&self, url: &str, maybe_user_id: Option<UserId>) -> Result<Bytes, Error> {
         self.authorization_service
             .authorize(ACTION::GetImageByUrl, maybe_user_id)
