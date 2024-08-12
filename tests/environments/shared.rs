@@ -1,6 +1,8 @@
 use crate::common::client::Client;
 
-/// Provides a shared test environment for testing. All tests shared the same
+const MAX_CHECK_RUNNING_ATTEMPTS: usize = 3;
+
+/// Provides a shared test environment for testing. All tests share the same
 /// application instance.
 pub struct TestEnv {
     pub authority: String,
@@ -11,15 +13,29 @@ impl TestEnv {
     ///
     /// # Panics
     ///
-    /// Will panic if the app is not running. This function requires the app to
-    /// be running to provide a valid environment.
+    /// Will panic if the app is not running after 3 attempts. This function
+    /// requires the app to be running to provide a valid environment.
     pub async fn running() -> Self {
         let env = Self::default();
         let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
-        match client.server_is_running().await {
-            Ok(()) => {}
-            Err(err) => panic!("Test server is not running on {}. Error: {err}", env.authority),
+
+        let mut attempts = 0;
+
+        while attempts < MAX_CHECK_RUNNING_ATTEMPTS {
+            match client.server_is_running().await {
+                Ok(()) => return env,
+                Err(err) => {
+                    attempts += 1;
+                    assert!(
+                        attempts >= MAX_CHECK_RUNNING_ATTEMPTS,
+                        "Test server is not running on {}. Error: {err}",
+                        env.authority
+                    );
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
+            }
         }
+
         env
     }
 
