@@ -68,12 +68,9 @@ impl AppStarter {
     }
 
     pub fn stop(&mut self) {
-        match &self.running_state {
-            Some(running_state) => {
-                running_state.app_handle.abort();
-                self.running_state = None;
-            }
-            None => {}
+        if let Some(running_state) = &self.running_state {
+            running_state.app_handle.abort();
+            self.running_state = None;
         }
     }
 
