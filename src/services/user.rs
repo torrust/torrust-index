@@ -235,20 +235,21 @@ impl ProfileService {
         maybe_user_id: Option<UserId>,
         change_password_form: &ChangePasswordForm,
     ) -> Result<(), ServiceError> {
+        let Some(user_id) = maybe_user_id else {
+            return Err(ServiceError::UnauthorizedActionForGuests);
+        };
+
         self.authorization_service
             .authorize(ACTION::ChangePassword, maybe_user_id)
             .await?;
 
-        info!(
-            "changing user password for user ID: {}",
-            maybe_user_id.expect("There is no user id needed to perform the action")
-        );
+        info!("changing user password for user ID: {}", user_id);
 
         let settings = self.configuration.settings.read().await;
 
         let user_authentication = self
             .user_authentication_repository
-            .get_user_authentication_from_id(&maybe_user_id.expect("There is no user id needed to perform the action"))
+            .get_user_authentication_from_id(&user_id)
             .await?;
 
         verify_password(change_password_form.current_password.as_bytes(), &user_authentication)?;
@@ -267,10 +268,7 @@ impl ProfileService {
         let password_hash = hash_password(&change_password_form.password)?;
 
         self.user_authentication_repository
-            .change_password(
-                maybe_user_id.expect("There is no user id needed to perform the action"),
-                &password_hash,
-            )
+            .change_password(user_id, &password_hash)
             .await?;
 
         Ok(())
@@ -310,12 +308,13 @@ impl BanService {
     ///
     /// The function panics if the optional user id has no value
     pub async fn ban_user(&self, username_to_be_banned: &str, maybe_user_id: Option<UserId>) -> Result<(), ServiceError> {
-        debug!(
-            "user with ID {} banning username: {username_to_be_banned}",
-            maybe_user_id.expect("There is no user id needed to perform the action")
-        );
+        let Some(user_id) = maybe_user_id else {
+            return Err(ServiceError::UnauthorizedActionForGuests);
+        };
 
         self.authorization_service.authorize(ACTION::BanUser, maybe_user_id).await?;
+
+        debug!("user with ID {} banning username: {username_to_be_banned}", user_id);
 
         let user_profile = self
             .user_profile_repository

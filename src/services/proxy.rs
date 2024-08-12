@@ -43,13 +43,15 @@ impl Service {
     ///
     /// The function panics if the optional user id has no value
     pub async fn get_image_by_url(&self, url: &str, maybe_user_id: Option<UserId>) -> Result<Bytes, Error> {
+        let Some(user_id) = maybe_user_id else {
+            return Err(Error::Unauthenticated);
+        };
+
         self.authorization_service
             .authorize(ACTION::GetImageByUrl, maybe_user_id)
             .await
             .map_err(|_| Error::Unauthenticated)?;
 
-        self.image_cache_service
-            .get_image_by_url(url, maybe_user_id.expect("There is no user id needed to perform the action"))
-            .await
+        self.image_cache_service.get_image_by_url(url, user_id).await
     }
 }

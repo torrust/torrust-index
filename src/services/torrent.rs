@@ -135,6 +135,10 @@ impl Index {
         add_torrent_req: AddTorrentRequest,
         maybe_user_id: Option<UserId>,
     ) -> Result<AddTorrentResponse, ServiceError> {
+        let Some(user_id) = maybe_user_id else {
+            return Err(ServiceError::UnauthorizedActionForGuests);
+        };
+
         self.authorization_service
             .authorize(ACTION::AddTorrent, maybe_user_id)
             .await?;
@@ -150,12 +154,7 @@ impl Index {
 
         let torrent_id = self
             .torrent_repository
-            .add(
-                &original_info_hash,
-                &torrent,
-                &metadata,
-                maybe_user_id.expect("There is no user id needed to perform the action"),
-            )
+            .add(&original_info_hash, &torrent, &metadata, user_id)
             .await?;
 
         // Synchronous secondary tasks

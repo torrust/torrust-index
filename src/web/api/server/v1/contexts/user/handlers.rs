@@ -145,10 +145,7 @@ pub async fn change_password_handler(
         .await
     {
         Ok(()) => Json(OkResponseData {
-            data: format!(
-                "Password changed for user with ID: {}",
-                maybe_user_id.expect("There is no user id needed to perform the action")
-            ),
+            data: format!("Password changed for user with ID: {}", maybe_user_id.unwrap()),
         })
         .into_response(),
         Err(error) => error.into_response(),
