@@ -340,7 +340,12 @@ impl Configuration {
     /// Will return an error if a mandatory configuration option is only
     /// obtained by default value (code), meaning the user hasn't overridden it.
     fn check_mandatory_options(figment: &Figment) -> Result<(), Error> {
-        let mandatory_options = ["metadata.schema_version", "logging.threshold"];
+        let mandatory_options = [
+            "auth.user_claim_token_pepper",
+            "logging.threshold",
+            "metadata.schema_version",
+            "tracker.token",
+        ];
 
         for mandatory_option in mandatory_options {
             figment
@@ -512,6 +517,12 @@ mod tests {
 
                 [logging]
                 threshold = "info"
+
+                [tracker]
+                token = "MyAccessToken"
+
+                [auth]
+                user_claim_token_pepper = "MaxVerstappenWC2021"
             "#,
             )?;
 
@@ -537,6 +548,12 @@ mod tests {
 
                 [logging]
                 threshold = "info"
+
+                [tracker]
+                token = "MyAccessToken"
+
+                [auth]
+                user_claim_token_pepper = "MaxVerstappenWC2021"
             "#
             .to_string();
 
