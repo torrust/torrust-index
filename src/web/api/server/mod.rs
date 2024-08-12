@@ -126,33 +126,30 @@ pub enum Error {
 }
 
 pub async fn make_rust_tls(tsl_config: &Option<Tsl>) -> Option<Result<RustlsConfig, Error>> {
-    match tsl_config {
-        Some(tsl) => {
-            if let (Some(cert), Some(key)) = (tsl.ssl_cert_path.clone(), tsl.ssl_key_path.clone()) {
-                info!("Using https. Cert path: {cert}.");
-                info!("Using https. Key path: {key}.");
+    if let Some(tsl) = tsl_config {
+        if let (Some(cert), Some(key)) = (tsl.ssl_cert_path.clone(), tsl.ssl_key_path.clone()) {
+            info!("Using https. Cert path: {cert}.");
+            info!("Using https. Key path: {key}.");
 
-                let ssl_cert_path = cert.clone().to_string();
-                let ssl_key_path = key.clone().to_string();
+            let ssl_cert_path = cert.clone().to_string();
+            let ssl_key_path = key.clone().to_string();
 
-                Some(
-                    RustlsConfig::from_pem_file(cert, key)
-                        .await
-                        .map_err(|err| Error::BadTlsConfig {
-                            source: (Arc::new(err) as DynError).into(),
-                            ssl_cert_path,
-                            ssl_key_path,
-                        }),
-                )
-            } else {
-                Some(Err(Error::MissingTlsConfig {
-                    location: Location::caller(),
-                }))
-            }
+            Some(
+                RustlsConfig::from_pem_file(cert, key)
+                    .await
+                    .map_err(|err| Error::BadTlsConfig {
+                        source: (Arc::new(err) as DynError).into(),
+                        ssl_cert_path,
+                        ssl_key_path,
+                    }),
+            )
+        } else {
+            Some(Err(Error::MissingTlsConfig {
+                location: Location::caller(),
+            }))
         }
-        None => {
-            info!("TLS not enabled");
-            None
-        }
+    } else {
+        info!("TLS not enabled");
+        None
     }
 }

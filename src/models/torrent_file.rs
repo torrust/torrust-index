@@ -80,21 +80,19 @@ impl Torrent {
         torrent_nodes: Vec<(String, i64)>,
     ) -> Self {
         let pieces_or_root_hash = if db_torrent.is_bep_30 == 0 {
-            match &db_torrent.pieces {
-                Some(pieces) => pieces.clone(),
-                None => {
-                    error!("Invalid torrent #{}. Null `pieces` in database", db_torrent.torrent_id);
-                    String::new()
-                }
+            if let Some(pieces) = &db_torrent.pieces {
+                pieces.clone()
+            } else {
+                error!("Invalid torrent #{}. Null `pieces` in database", db_torrent.torrent_id);
+                String::new()
             }
         } else {
             // A BEP-30 torrent
-            match &db_torrent.root_hash {
-                Some(root_hash) => root_hash.clone(),
-                None => {
-                    error!("Invalid torrent #{}. Null `root_hash` in database", db_torrent.torrent_id);
-                    String::new()
-                }
+            if let Some(root_hash) = &db_torrent.root_hash {
+                root_hash.clone()
+            } else {
+                error!("Invalid torrent #{}. Null `root_hash` in database", db_torrent.torrent_id);
+                String::new()
             }
         };
 
