@@ -227,9 +227,6 @@ impl ProfileService {
     /// * An error if unable to successfully hash the password.
     /// * An error if unable to change the password in the database.
     /// * An error if it is not possible to authorize the action
-    /// # Panics
-    ///
-    /// The function panics if the optional user id has no value
     pub async fn change_password(
         &self,
         maybe_user_id: Option<UserId>,
@@ -304,9 +301,6 @@ impl BanService {
     /// * `ServiceError::InternalServerError` if unable get user from the request.
     /// * An error if unable to get user profile from supplied username.
     /// * An error if unable to set the ban of the user in the database.
-    /// # Panics
-    ///
-    /// The function panics if the optional user id has no value
     pub async fn ban_user(&self, username_to_be_banned: &str, maybe_user_id: Option<UserId>) -> Result<(), ServiceError> {
         let Some(user_id) = maybe_user_id else {
             return Err(ServiceError::UnauthorizedActionForGuests);

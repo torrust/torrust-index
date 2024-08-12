@@ -38,10 +38,6 @@ impl Service {
     /// * The image URL is not an image.
     /// * The image is too big.
     /// * The user quota is met.
-    ///
-    /// # Panics
-    ///
-    /// The function panics if the optional user id has no value
     pub async fn get_image_by_url(&self, url: &str, maybe_user_id: Option<UserId>) -> Result<Bytes, Error> {
         let Some(user_id) = maybe_user_id else {
             return Err(Error::Unauthenticated);

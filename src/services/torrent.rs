@@ -129,7 +129,6 @@ impl Index {
     /// This function will panic if:
     ///
     /// * Unable to parse the torrent info-hash.
-    /// * The optional user id has no value
     pub async fn add_torrent(
         &self,
         add_torrent_req: AddTorrentRequest,
