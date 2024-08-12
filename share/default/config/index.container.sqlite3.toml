@@ -11,6 +11,12 @@ threshold = "info"
 #threshold = "debug"
 #threshold = "trace"
 
+[tracker]
+token = "MyAccessToken"
+
+[auth]
+user_claim_token_pepper = "MaxVerstappenWC2021"
+
 [database]
 connect_url = "sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc"
 
