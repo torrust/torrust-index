@@ -27,7 +27,7 @@ license = "AGPL-3.0-only"
 publish = true
 repository = "https://github.com/torrust/torrust-tracker"
 rust-version = "1.72"
-version = "3.0.0-alpha.12-develop"
+version = "3.0.0-beta-develop"
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3
@@ -41,6 +41,7 @@ axum-server = { version = "0", features = ["tls-rustls"] }
 binascii = "0"
 bytes = "1"
 camino = { version = "1.1.6", features = ["serde"] }
+casbin = "2.2.0"
 chrono = { version = "0", default-features = false, features = ["clock"] }
 clap = { version = "4.5.4", features = ["derive", "env"] }
 derive_more = "0"
@@ -56,7 +57,6 @@ hyper = "1"
 hyper-util = { version = "0.1.3", features = ["http1", "http2", "tokio"] }
 indexmap = "2"
 jsonwebtoken = "9"
-mockall = "0.12.1"
 lazy_static = "1.4.0"
 lettre = { version = "0", features = [
     "builder",
@@ -67,6 +67,7 @@ lettre = { version = "0", features = [
     "tokio1-rustls-tls",
 ] }
 log = "0"
+mockall = "0.12.1"
 pbkdf2 = { version = "0", features = ["simple"] }
 pin-project-lite = "0.2"
 rand = "0"
@@ -88,16 +89,15 @@ text-to-png = "0"
 thiserror = "1"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "0"
-torrust-index-located-error = { version = "3.0.0-alpha.12-develop", path = "packages/located-error" }
+torrust-index-located-error = { version = "3.0.0-beta-develop", path = "packages/located-error" }
 tower = { version = "0.4", features = ["timeout"] }
 tower-http = { version = "0", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
 trace = "0.1.7"
 tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["json"] }
 url = { version = "2.5.0", features = ["serde"] }
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
-tracing-subscriber = { version = "0.3.18", features = ["json"] }
-casbin = "2.2.0"
 
 [dev-dependencies]
 tempfile = "3"
