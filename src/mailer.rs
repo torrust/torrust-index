@@ -13,7 +13,7 @@ use tera::{try_get_value, Context, Tera};
 use crate::config::Configuration;
 use crate::errors::ServiceError;
 use crate::utils::clock;
-use crate::web::api::v1::routes::API_VERSION_URL_PREFIX;
+use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 
 lazy_static! {
     pub static ref TEMPLATES: Tera = {
@@ -70,19 +70,22 @@ impl Service {
     async fn get_mailer(cfg: &Configuration) -> Mailer {
         let settings = cfg.settings.read().await;
 
-        if !settings.mail.username.is_empty() && !settings.mail.password.is_empty() {
+        if !settings.mail.smtp.credentials.username.is_empty() && !settings.mail.smtp.credentials.password.is_empty() {
             // SMTP authentication
-            let creds = Credentials::new(settings.mail.username.clone(), settings.mail.password.clone());
+            let creds = Credentials::new(
+                settings.mail.smtp.credentials.username.clone(),
+                settings.mail.smtp.credentials.password.clone(),
+            );
 
-            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&settings.mail.server)
-                .port(settings.mail.port)
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&settings.mail.smtp.server)
+                .port(settings.mail.smtp.port)
                 .credentials(creds)
                 .authentication(vec![Mechanism::Login, Mechanism::Xoauth2, Mechanism::Plain])
                 .build()
         } else {
             // SMTP without authentication
-            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&settings.mail.server)
-                .port(settings.mail.port)
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&settings.mail.smtp.server)
+                .port(settings.mail.smtp.port)
                 .build()
         }
     }
@@ -121,8 +124,8 @@ impl Service {
         let settings = self.cfg.settings.read().await;
 
         Message::builder()
-            .from(settings.mail.from.parse().unwrap())
-            .reply_to(settings.mail.reply_to.parse().unwrap())
+            .from(settings.mail.from.clone())
+            .reply_to(settings.mail.reply_to.clone())
             .to(to.parse().unwrap())
     }
 
@@ -130,7 +133,7 @@ impl Service {
         let settings = self.cfg.settings.read().await;
 
         // create verification JWT
-        let key = settings.auth.secret_key.as_bytes();
+        let key = settings.auth.user_claim_token_pepper.as_bytes();
 
         // Create non expiring token that is only valid for email-verification
         let claims = VerifyClaims {
@@ -141,10 +144,10 @@ impl Service {
 
         let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(key)).unwrap();
 
-        let mut base_url = &base_url.to_string();
-        if let Some(cfg_base_url) = &settings.net.base_url {
-            base_url = cfg_base_url;
-        }
+        let base_url = match &settings.net.base_url {
+            Some(url) => url.to_string(),
+            None => base_url.to_string(),
+        };
 
         format!("{base_url}/{API_VERSION_URL_PREFIX}/user/email/verify/{token}")
     }
@@ -152,7 +155,7 @@ impl Service {
 
 fn build_letter(verification_url: &str, username: &str, builder: MessageBuilder) -> Result<Message, ServiceError> {
     let (plain_body, html_body) = build_content(verification_url, username).map_err(|e| {
-        log::error!("{e}");
+        tracing::error!("{e}");
         ServiceError::InternalServerError
     })?;
 

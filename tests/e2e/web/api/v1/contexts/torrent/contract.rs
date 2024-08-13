@@ -172,7 +172,7 @@ mod for_guests {
 
         let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
 
-        let tracker_url = env.server_settings().unwrap().tracker.url;
+        let tracker_url = env.server_settings().unwrap().tracker.url.to_string();
         let encoded_tracker_url = urlencoding::encode(&tracker_url);
 
         let expected_torrent = TorrentDetails {
@@ -182,7 +182,7 @@ mod for_guests {
             title: test_torrent.index_info.title.clone(),
             description: test_torrent.index_info.description,
             category: Category {
-                category_id: software_predefined_category_id(),
+                id: software_predefined_category_id(),
                 name: test_torrent.index_info.category,
                 num_torrents: 19, // Ignored in assertion
             },
@@ -194,25 +194,23 @@ mod for_guests {
                 path: vec![test_torrent.file_info.files[0].clone()],
                 // Using one file torrent for testing: content_size = first file size
                 length: test_torrent.file_info.content_size,
-                md5sum: None,
+                md5sum: None, // DevSkim: ignore DS126858
             }],
-            // code-review: why is this duplicated? It seems that is adding the
-            // same tracker twice because first ti adds all trackers and then
-            // it adds the tracker with the personal announce url, if the user
-            // is logged in. If the user is not logged in, it adds the default
-            // tracker again, and it ends up with two trackers.
-            trackers: vec![tracker_url.clone(), tracker_url.clone()],
+            trackers: vec![tracker_url.clone().to_string()],
             magnet_link: format!(
                 // cspell:disable-next-line
-                "magnet:?xt=urn:btih:{}&dn={}&tr={}&tr={}",
+                "magnet:?xt=urn:btih:{}&dn={}&tr={}",
                 test_torrent.file_info.info_hash.to_lowercase(),
                 urlencoding::encode(&test_torrent.index_info.title),
-                encoded_tracker_url,
                 encoded_tracker_url
             ),
             tags: vec![],
             name: test_torrent.index_info.name.clone(),
             comment: test_torrent.file_info.comment.clone(),
+            creation_date: test_torrent.file_info.creation_date,
+            created_by: test_torrent.file_info.created_by.clone(),
+            encoding: test_torrent.file_info.encoding.clone(),
+            canonical_info_hash_group: vec![test_torrent.file_info.info_hash.to_lowercase()],
         };
 
         assert_expected_torrent_details(&torrent_details_response.data, &expected_torrent);
@@ -240,7 +238,7 @@ mod for_guests {
 
         // Upload the first torrent
         let mut first_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 01");
-        first_torrent.index_info.title = title.clone();
+        first_torrent.index_info.title.clone_from(&title);
 
         let first_torrent_canonical_info_hash = upload_test_torrent(&client, &first_torrent)
             .await
@@ -378,7 +376,7 @@ mod for_guests {
 
         // Upload the first torrent
         let mut first_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 01");
-        first_torrent.index_info.title = title.clone();
+        first_torrent.index_info.title.clone_from(&title);
 
         let first_torrent_canonical_info_hash = upload_test_torrent(&client, &first_torrent)
             .await
@@ -470,15 +468,6 @@ mod for_guests {
 
 mod for_authenticated_users {
 
-    use torrust_index::utils::parse_torrent::decode_torrent;
-    use torrust_index::web::api;
-
-    use crate::common::client::Client;
-    use crate::e2e::environment::TestEnv;
-    use crate::e2e::web::api::v1::contexts::torrent::asserts::{build_announce_url, get_user_tracker_key};
-    use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
-    use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
-
     mod uploading_a_torrent {
 
         use torrust_index::web::api;
@@ -515,7 +504,7 @@ mod for_authenticated_users {
             let uploaded_torrent_response: UploadedTorrentResponse = serde_json::from_str(&response.body).unwrap();
 
             assert_eq!(
-                uploaded_torrent_response.data.info_hash.to_lowercase(),
+                uploaded_torrent_response.data.canonical_info_hash.to_lowercase(),
                 info_hash.to_lowercase()
             );
             assert!(response.is_json_and_ok());
@@ -739,7 +728,7 @@ mod for_authenticated_users {
             let form: UploadTorrentMultipartForm = first_torrent_clone.index_info.into();
             let response = client.upload_torrent(form.into()).await;
 
-            assert_eq!(response.status, 400);
+            assert_eq!(response.status, 409);
         }
 
         #[tokio::test]
@@ -772,44 +761,49 @@ mod for_authenticated_users {
             let form: UploadTorrentMultipartForm = torrent_with_the_same_canonical_info_hash.index_info.into();
             let response = client.upload_torrent(form.into()).await;
 
-            assert_eq!(response.status, 400);
+            assert_eq!(response.status, 409);
         }
     }
 
-    #[tokio::test]
-    async fn it_should_allow_authenticated_users_to_download_a_torrent_with_a_personal_announce_url() {
-        let mut env = TestEnv::new();
-        env.start(api::Version::V1).await;
+    mod downloading_a_torrent {
 
-        if !env.provides_a_tracker() {
-            println!("test skipped. It requires a tracker to be running.");
-            return;
+        use regex::Regex;
+        use torrust_index::utils::parse_torrent::decode_torrent;
+        use torrust_index::web::api;
+        use url::Url;
+
+        use crate::common::client::Client;
+        use crate::e2e::environment::TestEnv;
+        use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
+        use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
+
+        #[tokio::test]
+        async fn it_should_include_the_tracker_key_when_the_tracker_is_running_in_private_mode() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_private_tracker() {
+                println!("test skipped. It requires a private tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+            // Upload
+            let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            // Download
+            let response = client.download_torrent(&test_torrent.file_info_hash()).await;
+
+            let torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
+
+            let announce_url = Url::parse(&torrent.announce.unwrap()).unwrap();
+
+            let re = Regex::new(r"^http://tracker:7070/[a-zA-Z0-9]{32}$").unwrap(); // DevSkim: ignore DS137138
+
+            assert!(re.is_match(announce_url.as_ref()), "Invalid announce URL: '{announce_url}'.");
         }
-
-        // Given a previously uploaded torrent
-        let uploader = new_logged_in_user(&env).await;
-        let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
-
-        // And a logged in user who is going to download the torrent
-        let downloader = new_logged_in_user(&env).await;
-        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &downloader.token);
-
-        // When the user downloads the torrent
-        let response = client.download_torrent(&test_torrent.file_info_hash()).await;
-
-        let torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
-
-        // Then the torrent should have the personal announce URL
-        let tracker_key = get_user_tracker_key(&downloader, &env)
-            .await
-            .expect("uploader should have a valid tracker key");
-
-        let tracker_url = env.server_settings().unwrap().tracker.url;
-
-        assert_eq!(
-            torrent.announce.unwrap(),
-            build_announce_url(&tracker_url, &Some(tracker_key))
-        );
     }
 
     mod and_non_admins {

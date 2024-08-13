@@ -6,7 +6,7 @@
 //! used with by the [Torrust Tracker Index Gui](https://github.com/torrust/torrust-index-gui).
 //!
 //! If you are looking for information on how to use the API, please see the
-//! [API v1](crate::web::api::v1) section of the documentation.
+//! [API v1](crate::web::api::server::v1) section of the documentation.
 //!
 //! # Table of contents
 //!
@@ -37,7 +37,7 @@
 //!
 //! From the end-user perspective the Torrust Tracker exposes three different services.
 //!
-//! - A REST [API](crate::web::api::v1)
+//! - A REST [API](crate::web::api::server::v1)
 //!
 //! From the administrator perspective, the Torrust Index exposes:
 //!
@@ -53,13 +53,13 @@
 //! ## Prerequisites
 //!
 //! In order the run the index you will need a running torrust tracker. In the
-//! configuration you need to fill the `index` section with the following:
+//! configuration you need to fill the `tracker` section with the following:
 //!
 //! ```toml
 //! [tracker]
 //! url = "udp://localhost:6969"
-//! mode = "Public"
-//! api_url = "http://localhost:1212"
+//!
+//! api_url = "http://localhost:1212/"
 //! token = "MyAccessToken"
 //! token_valid_seconds = 7257600
 //! ```
@@ -70,6 +70,16 @@
 //! or you can use the docker to run both the tracker and the index. Refer to the
 //! [Run with docker](#run-with-docker) section for more information.
 //!
+//! You will also need to install this dependency:
+//!
+//! ```text
+//! sudo apt-get install libssl-dev
+//! ```
+//!
+//! We needed because we are using native TLS support instead of [rustls](https://github.com/rustls/rustls).
+//!
+//! More info: <https://github.com/torrust/torrust-index/issues/463>.
+//!
 //! If you are using `SQLite3` as database driver, you will need to install the
 //! following dependency:
 //!
@@ -78,8 +88,8 @@
 //! ```
 //!
 //! > **NOTICE**: those are the commands for `Ubuntu`. If you are using a
-//! different OS, you will need to install the equivalent packages. Please
-//! refer to the documentation of your OS.
+//! > different OS, you will need to install the equivalent packages. Please
+//! > refer to the documentation of your OS.
 //!
 //! With the default configuration you will need to create the `storage` directory:
 //!
@@ -110,9 +120,9 @@
 //!
 //! ```text
 //! mkdir -p ./storage/database \
-//!   && export TORRUST_IDX_BACK_USER_UID=1000 \
+//!   && export USER_ID=1000 \
 //!   && docker run -it \
-//!     --user="$TORRUST_IDX_BACK_USER_UID" \
+//!     --user="$USER_ID" \
 //!     --publish 3001:3001/tcp \
 //!     --volume "$(pwd)/storage":"/app/storage" \
 //!     torrust/index
@@ -144,7 +154,7 @@
 //! > **WARNING**: The `.env` file is also used by docker-compose.
 //!
 //! > **NOTICE**: Refer to the [sqlx-cli](https://github.com/launchbadge/sqlx/tree/main/sqlx-cli)
-//! documentation for other commands to create new migrations or run them.
+//! > documentation for other commands to create new migrations or run them.
 //!
 //! > **NOTICE**: You can run the index with [tmux](https://github.com/tmux/tmux/wiki) with `tmux new -s torrust-index`.
 //!
@@ -160,32 +170,37 @@
 //! name = "Torrust"
 //!
 //! [tracker]
-//! url = "udp://localhost:6969"
-//! mode = "Public"
-//! api_url = "http://localhost:1212"
+//! api_url = "http://localhost:1212/"
+//! listed = false
+//! private = false
 //! token = "MyAccessToken"
 //! token_valid_seconds = 7257600
+//! url = "udp://localhost:6969"
 //!
 //! [net]
-//! port = 3001
+//! bind_address = "0.0.0.0:3001"
 //!
 //! [auth]
-//! email_on_signup = "Optional"
+//! user_claim_token_pepper = "MaxVerstappenWC2021"
+//!
+//! [auth.password_constraints]
 //! min_password_length = 6
 //! max_password_length = 64
-//! secret_key = "MaxVerstappenWC2021"
 //!
 //! [database]
 //! connect_url = "sqlite://data.db?mode=rwc"
 //!
 //! [mail]
-//! email_verification_enabled = false
 //! from = "example@email.com"
 //! reply_to = "noreply@email.com"
-//! username = ""
-//! password = ""
-//! server = ""
+//!
+//! [mail.smtp]
 //! port = 25
+//! server = ""
+//!
+//! [mail.smtp.credentials]
+//! password = ""
+//! username = ""
 //!
 //! [image_cache]
 //! max_request_timeout_ms = 1000
@@ -200,14 +215,15 @@
 //!
 //! [tracker_statistics_importer]
 //! torrent_info_update_interval = 3600
+//! port = 3002
 //! ```
 //!
 //! For more information about configuration you can visit the documentation for the [`config`]) module.
 //!
-//! Alternatively to the `config.toml` file you can use one environment variable `TORRUST_IDX_BACK_CONFIG` to pass the configuration to the tracker:
+//! Alternatively to the `config.toml` file you can use one environment variable `TORRUST_INDEX_CONFIG_TOML` to pass the configuration to the tracker:
 //!
 //! ```text
-//! TORRUST_IDX_BACK_CONFIG=$(cat config.toml)
+//! TORRUST_INDEX_CONFIG_TOML=$(cat config.toml)
 //! cargo run
 //! ```
 //!
@@ -215,9 +231,9 @@
 //!
 //! The env var contains the same data as the `config.toml`. It's particularly useful in you are [running the index with docker](https://github.com/torrust/torrust-index/tree/develop/docker).
 //!
-//! > **NOTICE**: The `TORRUST_IDX_BACK_CONFIG` env var has priority over the `config.toml` file.
+//! > **NOTICE**: The `TORRUST_INDEX_CONFIG_TOML` env var has priority over the `config.toml` file.
 //!
-//! > **NOTICE**: You can also change the location for the configuration file with the `TORRUST_IDX_BACK_CONFIG_PATH` env var.
+//! > **NOTICE**: You can also change the location for the configuration file with the `TORRUST_INDEX_CONFIG_PATH` env var.
 //!
 //! # Usage
 //!
@@ -230,7 +246,7 @@
 //! This console command allows you to manually import the tracker statistics.
 //!
 //! For more information about this command you can visit the documentation for
-//! the [`Import tracker statistics`](crate::console::commands::import_tracker_statistics) module.
+//! the [`Import tracker statistics`](crate::console::commands::tracker_statistics_importer) module.
 //!
 //! ## Upgrader
 //!

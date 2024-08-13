@@ -1,6 +1,7 @@
 use async_trait::async_trait;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 use crate::databases::mysql::Mysql;
 use crate::databases::sqlite::Sqlite;
@@ -81,7 +82,6 @@ pub enum Error {
     UsernameTaken,
     EmailTaken,
     UserNotFound,
-    CategoryAlreadyExists,
     CategoryNotFound,
     TagAlreadyExists,
     TagNotFound,
@@ -130,6 +130,9 @@ pub trait Database: Sync + Send {
 
     /// Add new user and return the newly inserted `user_id`.
     async fn insert_user_and_get_id(&self, username: &str, email: &str, password: &str) -> Result<UserId, Error>;
+
+    /// Change user's password.
+    async fn change_user_password(&self, user_id: i64, new_password: &str) -> Result<(), Error>;
 
     /// Get `User` from `user_id`.
     async fn get_user_from_id(&self, user_id: i64) -> Result<User, Error>;
@@ -207,7 +210,17 @@ pub trait Database: Sync + Send {
 
         let torrent_announce_urls = self.get_torrent_announce_urls_from_id(db_torrent.torrent_id).await?;
 
-        Ok(Torrent::from_database(&db_torrent, &torrent_files, torrent_announce_urls))
+        let torrent_http_seed_urls = self.get_torrent_http_seed_urls_from_id(db_torrent.torrent_id).await?;
+
+        let torrent_nodes = self.get_torrent_nodes_from_id(db_torrent.torrent_id).await?;
+
+        Ok(Torrent::from_database(
+            &db_torrent,
+            &torrent_files,
+            torrent_announce_urls,
+            torrent_http_seed_urls,
+            torrent_nodes,
+        ))
     }
 
     /// Get `Torrent` from `torrent_id`.
@@ -218,7 +231,17 @@ pub trait Database: Sync + Send {
 
         let torrent_announce_urls = self.get_torrent_announce_urls_from_id(torrent_id).await?;
 
-        Ok(Torrent::from_database(&db_torrent, &torrent_files, torrent_announce_urls))
+        let torrent_http_seed_urls = self.get_torrent_http_seed_urls_from_id(db_torrent.torrent_id).await?;
+
+        let torrent_nodes = self.get_torrent_nodes_from_id(db_torrent.torrent_id).await?;
+
+        Ok(Torrent::from_database(
+            &db_torrent,
+            &torrent_files,
+            torrent_announce_urls,
+            torrent_http_seed_urls,
+            torrent_nodes,
+        ))
     }
 
     /// It returns the list of all infohashes producing the same canonical
@@ -258,6 +281,12 @@ pub trait Database: Sync + Send {
     /// Get all torrent's announce urls as `Vec<Vec<String>>` from `torrent_id`.
     async fn get_torrent_announce_urls_from_id(&self, torrent_id: i64) -> Result<Vec<Vec<String>>, Error>;
 
+    /// Get all torrent's HTTP seed urls as `Vec<Vec<String>>` from `torrent_id`.
+    async fn get_torrent_http_seed_urls_from_id(&self, torrent_id: i64) -> Result<Vec<String>, Error>;
+
+    /// Get all torrent's nodes as `Vec<(String, i64)>` from `torrent_id`.
+    async fn get_torrent_nodes_from_id(&self, torrent_id: i64) -> Result<Vec<(String, i64)>, Error>;
+
     /// Get `TorrentListing` from `torrent_id`.
     async fn get_torrent_listing_from_id(&self, torrent_id: i64) -> Result<TorrentListing, Error>;
 
@@ -266,6 +295,13 @@ pub trait Database: Sync + Send {
 
     /// Get all torrents as `Vec<TorrentCompact>`.
     async fn get_all_torrents_compact(&self) -> Result<Vec<TorrentCompact>, Error>;
+
+    /// Get torrents whose stats have not been imported from the tracker at least since a given datetime.
+    async fn get_torrents_with_stats_not_updated_since(
+        &self,
+        datetime: DateTime<Utc>,
+        limit: i64,
+    ) -> Result<Vec<TorrentCompact>, Error>;
 
     /// Update a torrent's title with `torrent_id` and `title`.
     async fn update_torrent_title(&self, torrent_id: i64, title: &str) -> Result<(), Error>;
@@ -304,7 +340,7 @@ pub trait Database: Sync + Send {
     async fn get_tags_for_torrent_id(&self, torrent_id: i64) -> Result<Vec<TorrentTag>, Error>;
 
     /// Update the seeders and leechers info for a torrent with `torrent_id`, `tracker_url`, `seeders` and `leechers`.
-    async fn update_tracker_info(&self, torrent_id: i64, tracker_url: &str, seeders: i64, leechers: i64) -> Result<(), Error>;
+    async fn update_tracker_info(&self, torrent_id: i64, tracker_url: &Url, seeders: i64, leechers: i64) -> Result<(), Error>;
 
     /// Delete a torrent with `torrent_id`.
     async fn delete_torrent(&self, torrent_id: i64) -> Result<(), Error>;

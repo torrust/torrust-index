@@ -1,7 +1,11 @@
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
 use tempfile::TempDir;
 use torrust_index::config;
-use torrust_index::config::FREE_PORT;
+use torrust_index::config::v2::registration::{Email, Registration};
+use torrust_index::config::{Threshold, FREE_PORT};
 use torrust_index::web::api::Version;
+use url::Url;
 
 use super::app_starter::AppStarter;
 use crate::common::random;
@@ -33,12 +37,8 @@ impl TestEnv {
         let temp_dir = TempDir::new().expect("failed to create a temporary directory");
 
         let configuration = ephemeral(&temp_dir);
-        // Even if we load the configuration from the environment variable, we
-        // still need to provide a path to save the configuration when the
-        // configuration is updated via the `POST /settings` endpoints.
-        let config_path = format!("{}/config.toml", temp_dir.path().to_string_lossy());
 
-        let app_starter = AppStarter::with_custom_configuration(configuration, Some(config_path));
+        let app_starter = AppStarter::with_custom_configuration(configuration);
 
         Self { app_starter, temp_dir }
     }
@@ -50,7 +50,7 @@ impl TestEnv {
 
     /// Provides the whole server configuration.
     #[must_use]
-    pub fn server_configuration(&self) -> config::TorrustIndex {
+    pub fn server_configuration(&self) -> config::Settings {
         self.app_starter.server_configuration()
     }
 
@@ -73,17 +73,28 @@ impl Default for TestEnv {
 }
 
 /// Provides a configuration with ephemeral data for testing.
-fn ephemeral(temp_dir: &TempDir) -> config::TorrustIndex {
-    let mut configuration = config::TorrustIndex {
-        log_level: Some("off".to_owned()), // Change to `debug` for tests debugging
-        ..config::TorrustIndex::default()
-    };
+fn ephemeral(temp_dir: &TempDir) -> config::Settings {
+    let mut configuration = config::Settings::default();
+
+    configuration.logging.threshold = Threshold::Off; // Change to `debug` for tests debugging
 
     // Ephemeral API port
-    configuration.net.port = FREE_PORT;
+    configuration.net.bind_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), FREE_PORT);
+
+    // Ephemeral Importer API port
+    configuration.tracker_statistics_importer.port = FREE_PORT;
 
     // Ephemeral SQLite database
-    configuration.database.connect_url = format!("sqlite://{}?mode=rwc", random_database_file_path_in(temp_dir));
+    configuration.database.connect_url =
+        Url::parse(&format!("sqlite://{}?mode=rwc", random_database_file_path_in(temp_dir))).unwrap();
+
+    // Enable user registration
+    configuration.registration = Some(Registration {
+        email: Some(Email {
+            required: false,
+            verification_required: false,
+        }),
+    });
 
     configuration
 }

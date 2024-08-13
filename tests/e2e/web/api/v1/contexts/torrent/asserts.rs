@@ -26,14 +26,6 @@ pub async fn canonical_torrent_for(
     uploaded_torrent.announce = Some(build_announce_url(&tracker_url, &tracker_key));
     uploaded_torrent.announce_list = Some(build_announce_list(&tracker_url, &tracker_key));
 
-    // These fields are not persisted in the database yet.
-    // See https://github.com/torrust/torrust-index/issues/284
-    // They are ignore when the user uploads the torrent. So the stored
-    // canonical torrent does not contain them.
-    uploaded_torrent.encoding = None;
-    uploaded_torrent.creation_date = None;
-    uploaded_torrent.created_by = None;
-
     uploaded_torrent
 }
 

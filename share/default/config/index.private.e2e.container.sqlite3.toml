@@ -1,0 +1,32 @@
+[metadata]
+app = "torrust-index"
+purpose = "configuration"
+schema_version = "2.0.0"
+
+[logging]
+#threshold = "off"
+#threshold = "error"
+#threshold = "warn"
+threshold = "info"
+#threshold = "debug"
+#threshold = "trace"
+
+[tracker]
+api_url = "http://tracker:1212"
+listed = false
+private = true
+token = "MyAccessToken"
+url = "http://tracker:7070"
+
+[auth]
+user_claim_token_pepper = "MaxVerstappenWC2021"
+
+[database]
+connect_url = "sqlite:///var/lib/torrust/index/database/e2e_testing_sqlite3.db?mode=rwc"
+
+[mail.smtp]
+port = 1025
+server = "mailcatcher"
+
+[registration]
+[registration.email]

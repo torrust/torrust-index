@@ -1,11 +1,11 @@
 #!/bin/bash
 
-TORRUST_IDX_BACK_USER_UID=${TORRUST_IDX_BACK_USER_UID:-1000}
-TORRUST_IDX_BACK_CONFIG=$(cat config.toml)
+USER_ID=${USER_ID:-1000}
+TORRUST_INDEX_CONFIG_TOML=$(cat config.toml)
 
 docker run -it \
-    --user="$TORRUST_IDX_BACK_USER_UID" \
+    --user="$USER_ID" \
     --publish 3001:3001/tcp \
-    --env TORRUST_IDX_BACK_CONFIG="$TORRUST_IDX_BACK_CONFIG" \
+    --env TORRUST_INDEX_CONFIG_TOML="$TORRUST_INDEX_CONFIG_TOML" \
     --volume "$(pwd)/storage":"/app/storage" \
     torrust-index

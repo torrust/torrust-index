@@ -1,31 +1,53 @@
+use std::time::Duration;
+
 use reqwest::{Error, Response};
+use url::Url;
 pub struct ConnectionInfo {
-    /// The URL of the tracker. Eg: <https://tracker:7070> or <udp://tracker:6969>
-    pub url: String,
+    /// The URL of the tracker API. Eg: <https://tracker:1212>.
+    pub url: Url,
     /// The token used to authenticate with the tracker API.
     pub token: String,
 }
 
 impl ConnectionInfo {
     #[must_use]
-    pub fn new(url: String, token: String) -> Self {
+    pub fn new(url: Url, token: String) -> Self {
         Self { url, token }
     }
 }
 
+const TOKEN_PARAM_NAME: &str = "token";
+const API_PATH: &str = "api/v1";
+const TOTAL_REQUEST_TIMEOUT_IN_SECS: u64 = 5;
+
 pub struct Client {
     pub connection_info: ConnectionInfo,
-    base_url: String,
+    api_base_url: Url,
+    client: reqwest::Client,
+    token_param: [(String, String); 1],
 }
 
 impl Client {
-    #[must_use]
-    pub fn new(connection_info: ConnectionInfo) -> Self {
-        let base_url = format!("{}/api/v1", connection_info.url);
-        Self {
+    /// # Errors
+    ///
+    /// Will fails if it can't build a HTTP client with a timeout.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the API base URL is not valid.
+    pub fn new(connection_info: ConnectionInfo) -> Result<Self, Error> {
+        let api_base_url = connection_info.url.join(API_PATH).expect("valid URL API path");
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(TOTAL_REQUEST_TIMEOUT_IN_SECS))
+            .build()?;
+        let token_param = [(TOKEN_PARAM_NAME.to_string(), connection_info.token.to_string())];
+
+        Ok(Self {
             connection_info,
-            base_url,
-        }
+            api_base_url,
+            client,
+            token_param,
+        })
     }
 
     /// Add a torrent to the tracker whitelist.
@@ -34,14 +56,9 @@ impl Client {
     ///
     /// Will return an error if the HTTP request fails.
     pub async fn whitelist_torrent(&self, info_hash: &str) -> Result<Response, Error> {
-        let request_url = format!(
-            "{}/whitelist/{}?token={}",
-            self.base_url, info_hash, self.connection_info.token
-        );
+        let request_url = format!("{}/whitelist/{}", self.api_base_url, info_hash);
 
-        let client = reqwest::Client::new();
-
-        client.post(request_url).send().await
+        self.client.post(request_url).query(&self.token_param).send().await
     }
 
     /// Remove a torrent from the tracker whitelist.
@@ -50,14 +67,9 @@ impl Client {
     ///
     /// Will return an error if the HTTP request fails.
     pub async fn remove_torrent_from_whitelist(&self, info_hash: &str) -> Result<Response, Error> {
-        let request_url = format!(
-            "{}/whitelist/{}?token={}",
-            self.base_url, info_hash, self.connection_info.token
-        );
+        let request_url = format!("{}/whitelist/{}", self.api_base_url, info_hash);
 
-        let client = reqwest::Client::new();
-
-        client.delete(request_url).send().await
+        self.client.delete(request_url).query(&self.token_param).send().await
     }
 
     /// Retrieve a new tracker key.
@@ -66,26 +78,38 @@ impl Client {
     ///
     /// Will return an error if the HTTP request fails.
     pub async fn retrieve_new_tracker_key(&self, token_valid_seconds: u64) -> Result<Response, Error> {
-        let request_url = format!(
-            "{}/key/{}?token={}",
-            self.base_url, token_valid_seconds, self.connection_info.token
-        );
+        let request_url = format!("{}/key/{}", self.api_base_url, token_valid_seconds);
 
-        let client = reqwest::Client::new();
-
-        client.post(request_url).send().await
+        self.client.post(request_url).query(&self.token_param).send().await
     }
 
-    /// Retrieve the info for a torrent.
+    /// Retrieve the info for one torrent.
     ///
     /// # Errors
     ///
     /// Will return an error if the HTTP request fails.
     pub async fn get_torrent_info(&self, info_hash: &str) -> Result<Response, Error> {
-        let request_url = format!("{}/torrent/{}?token={}", self.base_url, info_hash, self.connection_info.token);
+        let request_url = format!("{}/torrent/{}", self.api_base_url, info_hash);
 
-        let client = reqwest::Client::new();
+        self.client.get(request_url).query(&self.token_param).send().await
+    }
 
-        client.get(request_url).send().await
+    /// Retrieve the info for multiple torrents at the same time.
+    ///
+    /// # Errors
+    ///
+    /// Will return an error if the HTTP request fails.
+    pub async fn get_torrents_info(&self, info_hashes: &[String]) -> Result<Response, Error> {
+        let request_url = format!("{}/torrents", self.api_base_url);
+
+        let mut query_params: Vec<(String, String)> = Vec::with_capacity(info_hashes.len() + 1);
+
+        query_params.push((TOKEN_PARAM_NAME.to_string(), self.connection_info.token.clone()));
+
+        for info_hash in info_hashes {
+            query_params.push(("info_hash".to_string(), info_hash.clone()));
+        }
+
+        self.client.get(request_url).query(&query_params).send().await
     }
 }

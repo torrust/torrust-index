@@ -35,3 +35,10 @@ impl Username {
         Self { value }
     }
 }
+
+#[derive(Serialize)]
+pub struct ChangePasswordForm {
+    pub current_password: String,
+    pub password: String,
+    pub confirm_password: String,
+}

@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use url::Url;
 
 use super::Settings;
 
@@ -15,8 +16,9 @@ pub struct PublicSettingsResponse {
 #[derive(Deserialize, PartialEq, Debug)]
 pub struct Public {
     pub website_name: String,
-    pub tracker_url: String,
-    pub tracker_mode: String,
+    pub tracker_url: Url,
+    pub tracker_listed: bool,
+    pub tracker_private: bool,
     pub email_on_signup: String,
 }
 

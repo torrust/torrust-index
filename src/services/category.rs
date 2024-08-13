@@ -1,7 +1,7 @@
 //! Category service.
 use std::sync::Arc;
 
-use super::user::DbUserRepository;
+use super::authorization::{self, ACTION};
 use crate::databases::database::{Category, Database, Error as DatabaseError};
 use crate::errors::ServiceError;
 use crate::models::category::CategoryId;
@@ -9,15 +9,15 @@ use crate::models::user::UserId;
 
 pub struct Service {
     category_repository: Arc<DbCategoryRepository>,
-    user_repository: Arc<DbUserRepository>,
+    authorization_service: Arc<authorization::Service>,
 }
 
 impl Service {
     #[must_use]
-    pub fn new(category_repository: Arc<DbCategoryRepository>, user_repository: Arc<DbUserRepository>) -> Service {
+    pub fn new(category_repository: Arc<DbCategoryRepository>, authorization_service: Arc<authorization::Service>) -> Service {
         Service {
             category_repository,
-            user_repository,
+            authorization_service,
         }
     }
 
@@ -28,15 +28,13 @@ impl Service {
     /// It returns an error if:
     ///
     /// * The user does not have the required permissions.
+    /// * The category name is empty.
+    /// * The category already exists.
     /// * There is a database error.
-    pub async fn add_category(&self, category_name: &str, user_id: &UserId) -> Result<i64, ServiceError> {
-        let user = self.user_repository.get_compact(user_id).await?;
-
-        // Check if user is administrator
-        // todo: extract authorization service
-        if !user.administrator {
-            return Err(ServiceError::Unauthorized);
-        }
+    pub async fn add_category(&self, category_name: &str, maybe_user_id: Option<UserId>) -> Result<i64, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::AddCategory, maybe_user_id)
+            .await?;
 
         let trimmed_name = category_name.trim();
 
@@ -44,10 +42,16 @@ impl Service {
             return Err(ServiceError::CategoryNameEmpty);
         }
 
-        match self.category_repository.add(trimmed_name).await {
-            Ok(id) => Ok(id),
+        // Try to get the category by name to check if it already exists
+        match self.category_repository.get_by_name(trimmed_name).await {
+            // Return ServiceError::CategoryAlreadyExists if the category exists
+            Ok(_) => Err(ServiceError::CategoryAlreadyExists),
             Err(e) => match e {
-                DatabaseError::CategoryAlreadyExists => Err(ServiceError::CategoryAlreadyExists),
+                // Otherwise try to create it
+                DatabaseError::CategoryNotFound => match self.category_repository.add(trimmed_name).await {
+                    Ok(id) => Ok(id),
+                    Err(_) => Err(ServiceError::DatabaseError),
+                },
                 _ => Err(ServiceError::DatabaseError),
             },
         }
@@ -61,14 +65,10 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is a database error.
-    pub async fn delete_category(&self, category_name: &str, user_id: &UserId) -> Result<(), ServiceError> {
-        let user = self.user_repository.get_compact(user_id).await?;
-
-        // Check if user is administrator
-        // todo: extract authorization service
-        if !user.administrator {
-            return Err(ServiceError::Unauthorized);
-        }
+    pub async fn delete_category(&self, category_name: &str, maybe_user_id: Option<UserId>) -> Result<(), ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::DeleteCategory, maybe_user_id)
+            .await?;
 
         match self.category_repository.delete(category_name).await {
             Ok(()) => Ok(()),
@@ -77,6 +77,25 @@ impl Service {
                 _ => Err(ServiceError::DatabaseError),
             },
         }
+    }
+
+    /// Returns all the categories from the database
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if:
+    ///
+    /// * The user does not have the required permissions.
+    /// * There is a database error retrieving the categories.
+    pub async fn get_categories(&self, maybe_user_id: Option<UserId>) -> Result<Vec<Category>, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GetCategories, maybe_user_id)
+            .await?;
+
+        self.category_repository
+            .get_all()
+            .await
+            .map_err(|_| ServiceError::DatabaseError)
     }
 }
 

@@ -41,6 +41,9 @@ pub struct ListItem {
     pub leechers: i64,
     pub name: String,
     pub comment: Option<String>,
+    pub creation_date: Option<i64>,
+    pub created_by: Option<String>,
+    pub encoding: Option<String>,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
@@ -66,11 +69,15 @@ pub struct TorrentDetails {
     pub tags: Vec<Tag>,
     pub name: String,
     pub comment: Option<String>,
+    pub creation_date: Option<i64>,
+    pub created_by: Option<String>,
+    pub encoding: Option<String>,
+    pub canonical_info_hash_group: Vec<String>,
 }
 
 #[derive(Deserialize, PartialEq, Debug)]
 pub struct Category {
-    pub category_id: CategoryId,
+    pub id: CategoryId,
     pub name: String,
     pub num_torrents: u64,
 }
@@ -96,6 +103,7 @@ pub struct UploadedTorrentResponse {
 #[derive(Deserialize, PartialEq, Debug)]
 pub struct UploadedTorrent {
     pub torrent_id: Id,
+    pub canonical_info_hash: String,
     pub info_hash: String,
 }
 

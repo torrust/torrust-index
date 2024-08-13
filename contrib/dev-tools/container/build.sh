@@ -1,13 +1,10 @@
 #!/bin/bash
 
-TORRUST_IDX_BACK_USER_UID=${TORRUST_IDX_BACK_USER_UID:-1000}
-TORRUST_IDX_BACK_RUN_AS_USER=${TORRUST_IDX_BACK_RUN_AS_USER:-appuser}
+USER_ID=${USER_ID:-1000}
 
 echo "Building docker image ..."
-echo "TORRUST_IDX_BACK_USER_UID: $TORRUST_IDX_BACK_USER_UID"
-echo "TORRUST_IDX_BACK_RUN_AS_USER: $TORRUST_IDX_BACK_RUN_AS_USER"
+echo "USER_ID: $USER_ID"
 
 docker build \
-    --build-arg UID="$TORRUST_IDX_BACK_USER_UID" \
-    --build-arg RUN_AS_USER="$TORRUST_IDX_BACK_RUN_AS_USER" \
+    --build-arg UID="$USER_ID" \
     -t torrust-index .

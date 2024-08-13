@@ -25,6 +25,9 @@ pub struct TorrentListing {
     pub leechers: i64,
     pub name: String,
     pub comment: Option<String>,
+    pub creation_date: Option<i64>,
+    pub created_by: Option<String>,
+    pub encoding: Option<String>,
 }
 
 #[derive(Debug, Display, PartialEq, Eq, Error)]

@@ -5,17 +5,18 @@ use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use pbkdf2::Pbkdf2;
 
-use super::user::{DbUserProfileRepository, DbUserRepository};
+use super::user::DbUserProfileRepository;
 use crate::config::Configuration;
 use crate::databases::database::{Database, Error};
 use crate::errors::ServiceError;
 use crate::models::user::{UserAuthentication, UserClaims, UserCompact, UserId};
+use crate::services::user::Repository;
 use crate::utils::clock;
 
 pub struct Service {
     configuration: Arc<Configuration>,
     json_web_token: Arc<JsonWebToken>,
-    user_repository: Arc<DbUserRepository>,
+    user_repository: Arc<Box<dyn Repository>>,
     user_profile_repository: Arc<DbUserProfileRepository>,
     user_authentication_repository: Arc<DbUserAuthenticationRepository>,
 }
@@ -24,7 +25,7 @@ impl Service {
     pub fn new(
         configuration: Arc<Configuration>,
         json_web_token: Arc<JsonWebToken>,
-        user_repository: Arc<DbUserRepository>,
+        user_repository: Arc<Box<dyn Repository>>,
         user_profile_repository: Arc<DbUserProfileRepository>,
         user_authentication_repository: Arc<DbUserAuthenticationRepository>,
     ) -> Self {
@@ -64,13 +65,17 @@ impl Service {
             .await
             .map_err(|_| ServiceError::InternalServerError)?;
 
-        verify_password(password.as_bytes(), &user_authentication)?;
+        verify_password(password.as_bytes(), &user_authentication).map_err(|_| ServiceError::WrongPasswordOrUsername)?;
 
         let settings = self.configuration.settings.read().await;
 
         // Fail login if email verification is required and this email is not verified
-        if settings.mail.email_verification_enabled && !user_profile.email_verified {
-            return Err(ServiceError::EmailNotVerified);
+        if let Some(registration) = &settings.registration {
+            if let Some(email) = &registration.email {
+                if email.verification_required && !user_profile.email_verified {
+                    return Err(ServiceError::EmailNotVerified);
+                }
+            }
         }
 
         // Drop read lock on settings
@@ -129,7 +134,7 @@ impl JsonWebToken {
         let settings = self.cfg.settings.read().await;
 
         // Create JWT that expires in two weeks
-        let key = settings.auth.secret_key.as_bytes();
+        let key = settings.auth.user_claim_token_pepper.as_bytes();
 
         // todo: create config option for setting the token validity in seconds.
         let exp_date = clock::now() + 1_209_600; // two weeks from now
@@ -149,7 +154,7 @@ impl JsonWebToken {
 
         match decode::<UserClaims>(
             token,
-            &DecodingKey::from_secret(settings.auth.secret_key.as_bytes()),
+            &DecodingKey::from_secret(settings.auth.user_claim_token_pepper.as_bytes()),
             &Validation::new(Algorithm::HS256),
         ) {
             Ok(token_data) => {
@@ -182,6 +187,15 @@ impl DbUserAuthenticationRepository {
     pub async fn get_user_authentication_from_id(&self, user_id: &UserId) -> Result<UserAuthentication, Error> {
         self.database.get_user_authentication_from_id(*user_id).await
     }
+
+    /// It changes the user's password.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn change_password(&self, user_id: UserId, password_hash: &str) -> Result<(), Error> {
+        self.database.change_user_password(user_id, password_hash).await
+    }
 }
 
 /// Verify if the user supplied and the database supplied passwords match
@@ -189,27 +203,27 @@ impl DbUserAuthenticationRepository {
 /// # Errors
 ///
 /// This function will return an error if unable to parse password hash from the stored user authentication value.
-/// This function will return a `ServiceError::WrongPasswordOrUsername` if unable to match the password with either `argon2id` or `pbkdf2-sha256`.
-fn verify_password(password: &[u8], user_authentication: &UserAuthentication) -> Result<(), ServiceError> {
+/// This function will return a `ServiceError::InvalidPassword` if unable to match the password with either `argon2id` or `pbkdf2-sha256`.
+pub fn verify_password(password: &[u8], user_authentication: &UserAuthentication) -> Result<(), ServiceError> {
     // wrap string of the hashed password into a PasswordHash struct for verification
     let parsed_hash = PasswordHash::new(&user_authentication.password_hash)?;
 
     match parsed_hash.algorithm.as_str() {
         "argon2id" => {
             if Argon2::default().verify_password(password, &parsed_hash).is_err() {
-                return Err(ServiceError::WrongPasswordOrUsername);
+                return Err(ServiceError::InvalidPassword);
             }
 
             Ok(())
         }
         "pbkdf2-sha256" => {
             if Pbkdf2.verify_password(password, &parsed_hash).is_err() {
-                return Err(ServiceError::WrongPasswordOrUsername);
+                return Err(ServiceError::InvalidPassword);
             }
 
             Ok(())
         }
-        _ => Err(ServiceError::WrongPasswordOrUsername),
+        _ => Err(ServiceError::InvalidPassword),
     }
 }
 

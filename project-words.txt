@@ -8,6 +8,8 @@ Benoit
 binascii
 btih
 buildx
+camino
+Casbin
 chrono
 clippy
 codecov
@@ -25,6 +27,7 @@ Dont
 dotless
 dtolnay
 elif
+Eray
 grcov
 Grünwald
 hasher
@@ -39,6 +42,7 @@ indexmap
 infohash
 Intermodal
 jsonwebtoken
+Karatay
 leechers
 Leechers
 LEECHERS
@@ -48,6 +52,7 @@ luckythelab
 mailcatcher
 mandelbrotset
 metainfo
+Mgmt
 migth
 nanos
 NCCA
@@ -59,6 +64,7 @@ oneshot
 openbittorrent
 opentrackr
 ppassword
+programatik
 proxied
 rapppid
 reqwest
@@ -68,6 +74,8 @@ rowid
 RUSTDOCFLAGS
 RUSTFLAGS
 rustfmt
+rustls
+rustversion
 serde
 sgxj
 singlepart
@@ -91,6 +99,7 @@ upgrader
 Uragqm
 urlencoding
 uroot
+uuidgen
 Verstappen
 waivable
 webseeding

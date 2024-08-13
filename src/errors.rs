@@ -6,6 +6,7 @@ use hyper::StatusCode;
 
 use crate::databases::database;
 use crate::models::torrent::MetadataError;
+use crate::tracker::service::TrackerAPIError;
 use crate::utils::parse_torrent::DecodeTorrentFileError;
 
 pub type ServiceResult<V> = Result<V, ServiceError>;
@@ -29,6 +30,8 @@ pub enum ServiceError {
 
     #[display(fmt = "Invalid username/email or password")]
     WrongPasswordOrUsername,
+    #[display(fmt = "Invalid password")]
+    InvalidPassword,
     #[display(fmt = "Username not found")]
     UsernameNotFound,
     #[display(fmt = "User not found")]
@@ -61,7 +64,7 @@ pub enum ServiceError {
     #[display(fmt = "Username not available")]
     UsernameTaken,
 
-    #[display(fmt = "Username contains illegal characters")]
+    #[display(fmt = "Invalid username. Usernames must consist of 1-20 alphanumeric characters, dashes, or underscore")]
     UsernameInvalid,
 
     /// email is already taken
@@ -83,9 +86,6 @@ pub enum ServiceError {
     #[display(fmt = "Token invalid.")]
     /// token invalid
     TokenInvalid,
-
-    #[display(fmt = "Torrent not found.")]
-    TorrentNotFound,
 
     #[display(fmt = "Uploaded torrent is not valid.")]
     InvalidTorrentFile,
@@ -109,7 +109,12 @@ pub enum ServiceError {
     InvalidTag,
 
     #[display(fmt = "Unauthorized action.")]
-    Unauthorized,
+    UnauthorizedAction,
+
+    #[display(
+        fmt = "Unauthorized actions for guest users. Try logging in to check if you have permission to perform the action"
+    )]
+    UnauthorizedActionForGuests,
 
     #[display(fmt = "This torrent already exists in our database.")]
     InfoHashAlreadyExists,
@@ -117,11 +122,11 @@ pub enum ServiceError {
     #[display(fmt = "A torrent with the same canonical infohash already exists in our database.")]
     CanonicalInfoHashAlreadyExists,
 
+    #[display(fmt = "A torrent with the same original infohash already exists in our database.")]
+    OriginalInfoHashAlreadyExists,
+
     #[display(fmt = "This torrent title has already been used.")]
     TorrentTitleAlreadyExists,
-
-    #[display(fmt = "Sorry, we have an error with our tracker connection.")]
-    TrackerOffline,
 
     #[display(fmt = "Could not whitelist torrent.")]
     WhitelistingError,
@@ -141,6 +146,9 @@ pub enum ServiceError {
     #[display(fmt = "Tag name cannot be empty.")]
     TagNameEmpty,
 
+    #[display(fmt = "Torrent not found.")]
+    TorrentNotFound,
+
     #[display(fmt = "Category not found.")]
     CategoryNotFound,
 
@@ -149,6 +157,26 @@ pub enum ServiceError {
 
     #[display(fmt = "Database error.")]
     DatabaseError,
+
+    #[display(fmt = "Authentication error, please sign in")]
+    LoggedInUserNotFound,
+
+    // Begin tracker errors
+    #[display(fmt = "Sorry, we have an error with our tracker connection.")]
+    TrackerOffline,
+
+    #[display(fmt = "Tracker response error. The operation could not be performed.")]
+    TrackerResponseError,
+
+    #[display(fmt = "Tracker unknown response. Unexpected response from tracker. For example, if it can't be parsed.")]
+    TrackerUnknownResponse,
+
+    #[display(fmt = "Torrent not found in tracker.")]
+    TorrentNotFoundInTracker,
+
+    #[display(fmt = "Invalid tracker API token.")]
+    InvalidTrackerToken,
+    // End tracker errors
 }
 
 impl From<sqlx::Error> for ServiceError {
@@ -228,6 +256,22 @@ impl From<DecodeTorrentFileError> for ServiceError {
     }
 }
 
+impl From<TrackerAPIError> for ServiceError {
+    fn from(e: TrackerAPIError) -> Self {
+        eprintln!("{e}");
+        match e {
+            TrackerAPIError::TrackerOffline { error: _ } => ServiceError::TrackerOffline,
+            TrackerAPIError::InternalServerError | TrackerAPIError::NotFound => ServiceError::TrackerResponseError,
+            TrackerAPIError::TorrentNotFound => ServiceError::TorrentNotFoundInTracker,
+            TrackerAPIError::UnexpectedResponseStatus
+            | TrackerAPIError::MissingResponseBody
+            | TrackerAPIError::FailedToParseTrackerResponse { body: _ } => ServiceError::TrackerUnknownResponse,
+            TrackerAPIError::CannotSaveUserKey => ServiceError::DatabaseError,
+            TrackerAPIError::InvalidToken => ServiceError::InvalidTrackerToken,
+        }
+    }
+}
+
 #[must_use]
 pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
     #[allow(clippy::match_same_arms)]
@@ -236,6 +280,7 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::EmailInvalid => StatusCode::BAD_REQUEST,
         ServiceError::NotAUrl => StatusCode::BAD_REQUEST,
         ServiceError::WrongPasswordOrUsername => StatusCode::FORBIDDEN,
+        ServiceError::InvalidPassword => StatusCode::FORBIDDEN,
         ServiceError::UsernameNotFound => StatusCode::NOT_FOUND,
         ServiceError::UserNotFound => StatusCode::NOT_FOUND,
         ServiceError::AccountNotFound => StatusCode::NOT_FOUND,
@@ -260,11 +305,13 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::MissingMandatoryMetadataFields => StatusCode::BAD_REQUEST,
         ServiceError::InvalidCategory => StatusCode::BAD_REQUEST,
         ServiceError::InvalidTag => StatusCode::BAD_REQUEST,
-        ServiceError::Unauthorized => StatusCode::FORBIDDEN,
+        ServiceError::UnauthorizedAction => StatusCode::FORBIDDEN,
+        ServiceError::UnauthorizedActionForGuests => StatusCode::UNAUTHORIZED,
         ServiceError::InfoHashAlreadyExists => StatusCode::BAD_REQUEST,
-        ServiceError::CanonicalInfoHashAlreadyExists => StatusCode::BAD_REQUEST,
+        ServiceError::CanonicalInfoHashAlreadyExists => StatusCode::CONFLICT,
+        ServiceError::OriginalInfoHashAlreadyExists => StatusCode::CONFLICT,
         ServiceError::TorrentTitleAlreadyExists => StatusCode::BAD_REQUEST,
-        ServiceError::TrackerOffline => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::TrackerOffline => StatusCode::SERVICE_UNAVAILABLE,
         ServiceError::CategoryNameEmpty => StatusCode::BAD_REQUEST,
         ServiceError::CategoryAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::TagNameEmpty => StatusCode::BAD_REQUEST,
@@ -276,6 +323,11 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::DatabaseError => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::CategoryNotFound => StatusCode::NOT_FOUND,
         ServiceError::TagNotFound => StatusCode::NOT_FOUND,
+        ServiceError::TrackerResponseError => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::TrackerUnknownResponse => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::TorrentNotFoundInTracker => StatusCode::NOT_FOUND,
+        ServiceError::InvalidTrackerToken => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::LoggedInUserNotFound => StatusCode::UNAUTHORIZED,
     }
 }
 
@@ -288,7 +340,6 @@ pub fn map_database_error_to_service_error(error: &database::Error) -> ServiceEr
         database::Error::UsernameTaken => ServiceError::UsernameTaken,
         database::Error::EmailTaken => ServiceError::EmailTaken,
         database::Error::UserNotFound => ServiceError::UserNotFound,
-        database::Error::CategoryAlreadyExists => ServiceError::CategoryAlreadyExists,
         database::Error::CategoryNotFound => ServiceError::InvalidCategory,
         database::Error::TagAlreadyExists => ServiceError::TagAlreadyExists,
         database::Error::TagNotFound => ServiceError::InvalidTag,

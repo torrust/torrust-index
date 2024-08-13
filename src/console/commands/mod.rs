@@ -1,1 +1,3 @@
-pub mod import_tracker_statistics;
+//! Console commands that can be run manually.
+pub mod seeder;
+pub mod tracker_statistics_importer;

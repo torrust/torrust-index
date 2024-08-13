@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use serde_bencode::ser;
 use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
+use tracing::error;
+use url::Url;
 
 use super::info_hash::InfoHash;
 use crate::utils::hex::{from_bytes, into_bytes};
@@ -12,7 +14,7 @@ pub struct Torrent {
     #[serde(default)]
     pub announce: Option<String>,
     #[serde(default)]
-    pub nodes: Option<Vec<TorrentNode>>,
+    pub nodes: Option<Vec<(String, i64)>>,
     #[serde(default)]
     pub encoding: Option<String>,
     #[serde(default)]
@@ -29,9 +31,6 @@ pub struct Torrent {
     #[serde(rename = "created by")]
     pub created_by: Option<String>,
 }
-
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
-pub struct TorrentNode(String, i64);
 
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct TorrentInfoDictionary {
@@ -75,34 +74,91 @@ impl Torrent {
     #[must_use]
     pub fn from_database(
         db_torrent: &DbTorrent,
-        torrent_files: &Vec<TorrentFile>,
+        torrent_files: &[TorrentFile],
         torrent_announce_urls: Vec<Vec<String>>,
+        torrent_http_seed_urls: Vec<String>,
+        torrent_nodes: Vec<(String, i64)>,
     ) -> Self {
+        let pieces_or_root_hash = if db_torrent.is_bep_30 == 0 {
+            if let Some(pieces) = &db_torrent.pieces {
+                pieces.clone()
+            } else {
+                error!("Invalid torrent #{}. Null `pieces` in database", db_torrent.torrent_id);
+                String::new()
+            }
+        } else {
+            // A BEP-30 torrent
+            if let Some(root_hash) = &db_torrent.root_hash {
+                root_hash.clone()
+            } else {
+                error!("Invalid torrent #{}. Null `root_hash` in database", db_torrent.torrent_id);
+                String::new()
+            }
+        };
+
         let info_dict = TorrentInfoDictionary::with(
             &db_torrent.name,
             db_torrent.piece_length,
             db_torrent.private,
-            db_torrent.root_hash,
-            &db_torrent.pieces,
+            db_torrent.is_bep_30,
+            &pieces_or_root_hash,
             torrent_files,
         );
 
         Self {
             info: info_dict,
             announce: None,
-            nodes: None,
-            encoding: None,
-            httpseeds: None,
+            nodes: if torrent_nodes.is_empty() { None } else { Some(torrent_nodes) },
+            encoding: db_torrent.encoding.clone(),
+            httpseeds: if torrent_http_seed_urls.is_empty() {
+                None
+            } else {
+                Some(torrent_http_seed_urls)
+            },
             announce_list: Some(torrent_announce_urls),
-            creation_date: None,
+            creation_date: db_torrent.creation_date,
             comment: db_torrent.comment.clone(),
-            created_by: None,
+            created_by: db_torrent.created_by.clone(),
         }
     }
 
+    /// Includes the tracker URL a the main tracker in the torrent.
+    ///
+    /// It will be the URL in the `announce` field and also the first URL in the
+    /// `announce_list`.
+    pub fn include_url_as_main_tracker(&mut self, tracker_url: &Url) {
+        self.set_announce_to(tracker_url);
+        self.add_url_to_front_of_announce_list(tracker_url);
+    }
+
     /// Sets the announce url to the tracker url.
-    pub fn set_announce_to(&mut self, tracker_url: &str) {
-        self.announce = Some(tracker_url.to_owned());
+    pub fn set_announce_to(&mut self, tracker_url: &Url) {
+        self.announce = Some(tracker_url.to_owned().to_string());
+    }
+
+    /// Adds a new tracker URL to the front of the `announce_list`, removes duplicates,
+    /// and cleans up any empty inner lists.
+    ///
+    /// In practice, it's common for the `announce_list` to include the URL from
+    /// the `announce` field as one of its entries, often in the first tier,
+    /// to ensure that this primary tracker is always used. However, this is not
+    /// a strict requirement of the `BitTorrent` protocol; it's more of a
+    /// convention followed by some torrent creators for redundancy and to
+    /// ensure better availability of trackers.    
+    pub fn add_url_to_front_of_announce_list(&mut self, tracker_url: &Url) {
+        if let Some(list) = &mut self.announce_list {
+            // Remove the tracker URL from existing lists
+            for inner_list in list.iter_mut() {
+                inner_list.retain(|url| *url != tracker_url.to_string());
+            }
+
+            // Prepend a new vector containing the tracker_url
+            let vec = vec![tracker_url.to_owned().to_string()];
+            list.insert(0, vec);
+
+            // Remove any empty inner lists
+            list.retain(|inner_list| !inner_list.is_empty());
+        }
     }
 
     /// Removes all other trackers if the torrent is private.
@@ -202,9 +258,9 @@ impl TorrentInfoDictionary {
         name: &str,
         piece_length: i64,
         private: Option<u8>,
-        root_hash: i64,
-        pieces: &str,
-        files: &Vec<TorrentFile>,
+        is_bep_30: i64,
+        pieces_or_root_hash: &str,
+        files: &[TorrentFile],
     ) -> Self {
         let mut info_dict = Self {
             name: name.to_string(),
@@ -219,13 +275,13 @@ impl TorrentInfoDictionary {
             source: None,
         };
 
-        // a torrent file has a root hash or a pieces key, but not both.
-        if root_hash > 0 {
-            // If `root_hash` is true the `pieces` field contains the `root hash`
-            info_dict.root_hash = Some(pieces.to_owned());
-        } else {
-            let buffer = into_bytes(pieces).expect("variable `torrent_info.pieces` is not a valid hex string");
+        // BEP 30: <http://www.bittorrent.org/beps/bep_0030.html>.
+        // Torrent file can only hold a `pieces` key or a `root hash` key
+        if is_bep_30 == 0 {
+            let buffer = into_bytes(pieces_or_root_hash).expect("variable `torrent_info.pieces` is not a valid hex string");
             info_dict.pieces = Some(ByteBuf::from(buffer));
+        } else {
+            info_dict.root_hash = Some(pieces_or_root_hash.to_owned());
         }
 
         // either set the single file or the multiple files information
@@ -234,7 +290,7 @@ impl TorrentInfoDictionary {
                 .first()
                 .expect("vector `torrent_files` should have at least one element");
 
-            info_dict.md5sum = torrent_file.md5sum.clone();
+            info_dict.md5sum.clone_from(&torrent_file.md5sum); // DevSkim: ignore DS126858
 
             info_dict.length = Some(torrent_file.length);
 
@@ -252,7 +308,7 @@ impl TorrentInfoDictionary {
 
             info_dict.path = path;
         } else {
-            info_dict.files = Some(files.clone());
+            info_dict.files = Some(files.to_vec());
         }
 
         info_dict
@@ -268,20 +324,20 @@ impl TorrentInfoDictionary {
         }
     }
 
-    /// It returns the root hash as a `i64` value.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the root hash cannot be converted into a
-    /// `i64` value.
+    /// torrent file can only hold a pieces key or a root hash key:
+    /// [BEP 39](http://www.bittorrent.org/beps/bep_0030.html)
     #[must_use]
-    pub fn get_root_hash_as_i64(&self) -> i64 {
+    pub fn get_root_hash_as_string(&self) -> String {
         match &self.root_hash {
-            None => 0i64,
-            Some(root_hash) => root_hash
-                .parse::<i64>()
-                .expect("variable `root_hash` cannot be converted into a `i64`"),
+            None => String::new(),
+            Some(root_hash) => root_hash.clone(),
         }
+    }
+
+    /// It returns true if the torrent is a BEP-30 torrent.
+    #[must_use]
+    pub fn is_bep_30(&self) -> bool {
+        self.root_hash.is_some()
     }
 
     #[must_use]
@@ -300,12 +356,16 @@ pub struct DbTorrent {
     pub torrent_id: i64,
     pub info_hash: String,
     pub name: String,
-    pub pieces: String,
+    pub pieces: Option<String>,
+    pub root_hash: Option<String>,
     pub piece_length: i64,
     #[serde(default)]
     pub private: Option<u8>,
-    pub root_hash: i64,
+    pub is_bep_30: i64,
     pub comment: Option<String>,
+    pub creation_date: Option<i64>,
+    pub created_by: Option<String>,
+    pub encoding: Option<String>,
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -320,6 +380,17 @@ pub struct DbTorrentFile {
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DbTorrentAnnounceUrl {
     pub tracker_url: String,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DbTorrentHttpSeedUrl {
+    pub seed_url: String,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DbTorrentNode {
+    pub node_ip: String,
+    pub node_port: i64,
 }
 
 #[cfg(test)]

@@ -6,49 +6,61 @@
 //! - `Info`
 //! - `Debug`
 //! - `Trace`
-use std::str::FromStr;
 use std::sync::Once;
 
-use log::{info, LevelFilter};
+use tracing::info;
+use tracing::level_filters::LevelFilter;
+
+use crate::config::Threshold;
 
 static INIT: Once = Once::new();
 
-pub fn setup(log_level: &Option<String>) {
-    let level = config_level_or_default(log_level);
+pub fn setup(threshold: &Threshold) {
+    let tracing_level_filter: LevelFilter = threshold.clone().into();
 
-    if level == log::LevelFilter::Off {
+    if tracing_level_filter == LevelFilter::OFF {
         return;
     }
 
     INIT.call_once(|| {
-        stdout_config(level);
+        tracing_stdout_init(tracing_level_filter, &TraceStyle::Default);
     });
 }
 
-fn config_level_or_default(log_level: &Option<String>) -> LevelFilter {
-    match log_level {
-        None => log::LevelFilter::Info,
-        Some(level) => LevelFilter::from_str(level).unwrap(),
-    }
+fn tracing_stdout_init(filter: LevelFilter, style: &TraceStyle) {
+    let builder = tracing_subscriber::fmt().with_max_level(filter);
+
+    let () = match style {
+        TraceStyle::Default => builder.init(),
+        TraceStyle::Pretty(display_filename) => builder.pretty().with_file(*display_filename).init(),
+        TraceStyle::Compact => builder.compact().init(),
+        TraceStyle::Json => builder.json().init(),
+    };
+
+    info!("Logging initialized");
 }
 
-fn stdout_config(level: LevelFilter) {
-    if let Err(_err) = fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{} [{}][{}] {}",
-                chrono::Local::now().format("%+"),
-                record.target(),
-                record.level(),
-                message
-            ));
-        })
-        .level(level)
-        .chain(std::io::stdout())
-        .apply()
-    {
-        panic!("Failed to initialize logging.")
-    }
+#[derive(Debug)]
+pub enum TraceStyle {
+    Default,
+    Pretty(bool),
+    Compact,
+    Json,
+}
 
-    info!("logging initialized.");
+impl std::fmt::Display for TraceStyle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let style = match self {
+            TraceStyle::Default => "Default Style",
+            TraceStyle::Pretty(path) => match path {
+                true => "Pretty Style with File Paths",
+                false => "Pretty Style without File Paths",
+            },
+
+            TraceStyle::Compact => "Compact Style",
+            TraceStyle::Json => "Json Format",
+        };
+
+        f.write_str(style)
+    }
 }

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use torrust_index::models::info_hash::InfoHash;
-use torrust_index::web::api::v1::responses::ErrorResponseData;
+use torrust_index::web::api::server::v1::responses::ErrorResponseData;
 
 use crate::common::client::Client;
 use crate::common::contexts::torrent::fixtures::{random_torrent, TestTorrent, TorrentIndexInfo, TorrentListedInIndex};
@@ -28,7 +28,7 @@ pub async fn upload_torrent(uploader: &LoggedInUserData, torrent: &TorrentIndexI
     let res = serde_json::from_str::<UploadedTorrentResponse>(&response.body);
 
     if res.is_err() {
-        println!("Error deserializing response: {res:?}");
+        println!("Error deserializing response: {res:?}. Body: {0}", response.body);
     }
 
     TorrentListedInIndex::from(torrent.clone(), res.unwrap().data.torrent_id)
@@ -50,7 +50,7 @@ pub async fn upload_test_torrent(client: &Client, test_torrent: &TestTorrent) ->
     }
 
     let uploaded_torrent_response: UploadedTorrentResponse = serde_json::from_str(&response.body).unwrap();
-    let canonical_info_hash_hex = uploaded_torrent_response.data.info_hash.to_lowercase();
+    let canonical_info_hash_hex = uploaded_torrent_response.data.canonical_info_hash.to_lowercase();
 
     let canonical_info_hash = InfoHash::from_str(&canonical_info_hash_hex)
         .unwrap_or_else(|_| panic!("Invalid info-hash in database: {canonical_info_hash_hex}"));

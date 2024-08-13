@@ -1,9 +1,10 @@
 use std::env;
 
-use torrust_index::databases::database;
+use torrust_index::config::ApiToken;
 use torrust_index::web::api::Version;
+use url::Url;
 
-use super::config::{initialize_configuration, ENV_VAR_INDEX_SHARED};
+use super::config::{initialize_configuration, ENV_VAR_DB_CONNECT_URL, ENV_VAR_INDEX_SHARED};
 use crate::common::contexts::settings::Settings;
 use crate::environments::{isolated, shared};
 
@@ -74,16 +75,51 @@ impl TestEnv {
         }
     }
 
-    /// Some test requires the real tracker to be running, so they can only
-    /// be run in shared mode.
+    /// Some test requires a real tracker running.
     pub fn provides_a_tracker(&self) -> bool {
-        self.is_shared()
+        self.is_shared() && self.server_settings().is_some()
+    }
+
+    /// Some test requires a real tracker running in `private` mode.
+    pub fn provides_a_private_tracker(&self) -> bool {
+        if !self.is_shared() {
+            return false;
+        };
+
+        match self.server_settings() {
+            Some(settings) => settings.tracker.private,
+            None => false,
+        }
     }
 
     /// Returns the server starting settings if the servers was already started.
     /// We do not know the settings until we start the server.
     pub fn server_settings(&self) -> Option<Settings> {
-        self.starting_settings.as_ref().cloned()
+        self.starting_settings.clone()
+    }
+
+    /// Returns the server starting settings if the servers was already started,
+    /// masking secrets with asterisks.
+    pub fn server_settings_masking_secrets(&self) -> Option<Settings> {
+        match self.starting_settings.clone() {
+            Some(mut settings) => {
+                // Mask password in DB connect URL if present
+                let mut connect_url = Url::parse(&settings.database.connect_url).expect("valid database connect URL");
+                if let Some(_password) = connect_url.password() {
+                    let _ = connect_url.set_password(Some("***"));
+                    settings.database.connect_url = connect_url.to_string();
+                }
+
+                settings.tracker.token = ApiToken::new("***");
+
+                "***".clone_into(&mut settings.mail.smtp.credentials.password);
+
+                "***".clone_into(&mut settings.auth.user_claim_token_pepper);
+
+                Some(settings)
+            }
+            None => None,
+        }
     }
 
     /// Provides the API server socket address.
@@ -98,9 +134,10 @@ impl TestEnv {
 
     /// Provides a database connect URL to connect to the database. For example:
     ///
-    /// `sqlite://storage/database/torrust_index_e2e_testing.db?mode=rwc`.
+    /// - `sqlite://storage/database/torrust_index_e2e_testing.db?mode=rwc`.
+    /// - `mysql://root:root_secret_password@localhost:3306/torrust_index_e2e_testing`.
     ///
-    /// It's used to run SQL queries against the database needed for some tests.
+    /// It's used to run SQL queries against the E2E database needed for some tests.
     pub fn database_connect_url(&self) -> Option<String> {
         let internal_connect_url = self
             .starting_settings
@@ -109,40 +146,17 @@ impl TestEnv {
 
         match self.state() {
             State::RunningShared => {
-                if let Some(db_path) = internal_connect_url {
-                    let maybe_db_driver = database::get_driver(&db_path);
+                let connect_url_env_var = ENV_VAR_DB_CONNECT_URL;
 
-                    return match maybe_db_driver {
-                        Ok(db_driver) => match db_driver {
-                            database::Driver::Sqlite3 => Some(db_path),
-                            database::Driver::Mysql => Some(Self::overwrite_mysql_host(&db_path, "localhost")),
-                        },
-                        Err(_) => None,
-                    };
+                if let Ok(connect_url) = env::var(connect_url_env_var) {
+                    Some(connect_url)
+                } else {
+                    None
                 }
-                None
             }
             State::RunningIsolated => internal_connect_url,
             State::Stopped => None,
         }
-    }
-
-    /// It overrides the "Host" in a `SQLx` database connection URL. For example:
-    ///
-    /// For:
-    ///
-    /// `mysql://root:root_secret_password@mysql:3306/torrust_index_e2e_testing`.
-    ///
-    /// It changes the `mysql` host name to `localhost`:
-    ///
-    /// `mysql://root:root_secret_password@localhost:3306/torrust_index_e2e_testing`.
-    ///
-    /// For E2E tests, we use docker compose, internally the index connects to
-    /// the database using the "mysql" host, which is the docker compose service
-    /// name, but tests connects directly to the localhost since the `MySQL`
-    /// is exposed to the host.
-    fn overwrite_mysql_host(db_path: &str, new_host: &str) -> String {
-        db_path.replace("@mysql:", &format!("@{new_host}:"))
     }
 
     fn state(&self) -> State {

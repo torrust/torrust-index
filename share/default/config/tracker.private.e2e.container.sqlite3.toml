@@ -1,0 +1,25 @@
+[metadata]
+schema_version = "2.0.0"
+
+[logging]
+threshold = "info"
+
+[tracker]
+token = "MyAccessToken"
+
+[auth]
+user_claim_token_pepper = "MaxVerstappenWC2021"
+
+[core]
+listed = false
+private = true
+
+[core.database]
+driver = "sqlite3"
+path = "/var/lib/torrust/tracker/database/e2e_testing_sqlite3.db"
+
+[[udp_trackers]]
+bind_address = "0.0.0.0:6969"
+
+[http_api]
+bind_address = "0.0.0.0:1212"

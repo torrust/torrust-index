@@ -3,18 +3,24 @@ use std::sync::Arc;
 
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
+use async_trait::async_trait;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
-use log::{debug, info};
+#[cfg(test)]
+use mockall::automock;
 use pbkdf2::password_hash::rand_core::OsRng;
+use tracing::{debug, info};
 
-use crate::config::{Configuration, EmailOnSignup};
+use super::authentication::DbUserAuthenticationRepository;
+use super::authorization::{self, ACTION};
+use crate::config::{Configuration, PasswordConstraints};
 use crate::databases::database::{Database, Error};
 use crate::errors::ServiceError;
 use crate::mailer;
 use crate::mailer::VerifyClaims;
-use crate::models::user::{UserCompact, UserId, UserProfile};
+use crate::models::user::{UserCompact, UserId, UserProfile, Username};
+use crate::services::authentication::verify_password;
 use crate::utils::validation::validate_email_address;
-use crate::web::api::v1::contexts::user::forms::RegistrationForm;
+use crate::web::api::server::v1::contexts::user::forms::{ChangePasswordForm, RegistrationForm};
 
 /// Since user email could be optional, we need a way to represent "no email"
 /// in the database. This function returns the string that should be used for
@@ -26,7 +32,7 @@ fn no_email() -> String {
 pub struct RegistrationService {
     configuration: Arc<Configuration>,
     mailer: Arc<mailer::Service>,
-    user_repository: Arc<DbUserRepository>,
+    user_repository: Arc<Box<dyn Repository>>,
     user_profile_repository: Arc<DbUserProfileRepository>,
 }
 
@@ -35,7 +41,7 @@ impl RegistrationService {
     pub fn new(
         configuration: Arc<Configuration>,
         mailer: Arc<mailer::Service>,
-        user_repository: Arc<DbUserRepository>,
+        user_repository: Arc<Box<dyn Repository>>,
         user_profile_repository: Arc<DbUserProfileRepository>,
     ) -> Self {
         Self {
@@ -70,80 +76,85 @@ impl RegistrationService {
 
         let settings = self.configuration.settings.read().await;
 
-        let opt_email = match settings.auth.email_on_signup {
-            EmailOnSignup::Required => {
-                if registration_form.email.is_none() {
-                    return Err(ServiceError::EmailMissing);
+        match &settings.registration {
+            Some(registration) => {
+                let Ok(username) = registration_form.username.parse::<Username>() else {
+                    return Err(ServiceError::UsernameInvalid);
+                };
+
+                let opt_email = match &registration.email {
+                    Some(email) => {
+                        if email.required && registration_form.email.is_none() {
+                            return Err(ServiceError::EmailMissing);
+                        }
+                        match &registration_form.email {
+                            Some(email) => {
+                                if email.trim() == String::new() {
+                                    None
+                                } else {
+                                    Some(email.clone())
+                                }
+                            }
+                            None => None,
+                        }
+                    }
+                    None => None,
+                };
+
+                if let Some(email) = &opt_email {
+                    if !validate_email_address(email) {
+                        return Err(ServiceError::EmailInvalid);
+                    }
                 }
-                registration_form.email.clone()
-            }
-            EmailOnSignup::None => None,
-            EmailOnSignup::Optional => registration_form.email.clone(),
-        };
 
-        if let Some(email) = &registration_form.email {
-            if !validate_email_address(email) {
-                return Err(ServiceError::EmailInvalid);
-            }
-        }
+                let password_constraints = PasswordConstraints {
+                    min_password_length: settings.auth.password_constraints.min_password_length,
+                    max_password_length: settings.auth.password_constraints.max_password_length,
+                };
 
-        if registration_form.password != registration_form.confirm_password {
-            return Err(ServiceError::PasswordsDontMatch);
-        }
+                validate_password_constraints(
+                    &registration_form.password,
+                    &registration_form.confirm_password,
+                    &password_constraints,
+                )?;
 
-        let password_length = registration_form.password.len();
+                let password_hash = hash_password(&registration_form.password)?;
 
-        if password_length <= settings.auth.min_password_length {
-            return Err(ServiceError::PasswordTooShort);
-        }
+                let user_id = self
+                    .user_repository
+                    .add(
+                        &username.to_string(),
+                        &opt_email.clone().unwrap_or(no_email()),
+                        &password_hash,
+                    )
+                    .await?;
 
-        if password_length >= settings.auth.max_password_length {
-            return Err(ServiceError::PasswordTooLong);
-        }
-
-        let salt = SaltString::generate(&mut OsRng);
-
-        // Argon2 with default params (Argon2id v19)
-        let argon2 = Argon2::default();
-
-        // Hash password to PHC string ($argon2id$v=19$...)
-        let password_hash = argon2
-            .hash_password(registration_form.password.as_bytes(), &salt)?
-            .to_string();
-
-        if registration_form.username.contains('@') {
-            return Err(ServiceError::UsernameInvalid);
-        }
-
-        let user_id = self
-            .user_repository
-            .add(
-                &registration_form.username,
-                &opt_email.clone().unwrap_or(no_email()),
-                &password_hash,
-            )
-            .await?;
-
-        // If this is the first created account, give administrator rights
-        if user_id == 1 {
-            drop(self.user_repository.grant_admin_role(&user_id).await);
-        }
-
-        if settings.mail.email_verification_enabled {
-            if let Some(email) = opt_email {
-                let mail_res = self
-                    .mailer
-                    .send_verification_mail(&email, &registration_form.username, user_id, api_base_url)
-                    .await;
-
-                if mail_res.is_err() {
-                    drop(self.user_repository.delete(&user_id).await);
-                    return Err(ServiceError::FailedToSendVerificationEmail);
+                // If this is the first created account, give administrator rights
+                if user_id == 1 {
+                    drop(self.user_repository.grant_admin_role(&user_id).await);
                 }
-            }
-        }
 
-        Ok(user_id)
+                if let Some(email) = &registration.email {
+                    if email.verification_required {
+                        // Email verification is enabled
+                        if let Some(email) = opt_email {
+                            let mail_res = self
+                                .mailer
+                                .send_verification_mail(&email, &registration_form.username, user_id, api_base_url)
+                                .await;
+
+                            if mail_res.is_err() {
+                                drop(self.user_repository.delete(&user_id).await);
+                                return Err(ServiceError::FailedToSendVerificationEmail);
+                            }
+                        }
+                    }
+                }
+
+                Ok(user_id)
+            }
+            None => Err(ServiceError::ClosedForRegistration),
+        }
     }
 
     /// It verifies the email address of a user via the token sent to the
@@ -158,7 +169,7 @@ impl RegistrationService {
 
         let token_data = match decode::<VerifyClaims>(
             token,
-            &DecodingKey::from_secret(settings.auth.secret_key.as_bytes()),
+            &DecodingKey::from_secret(settings.auth.user_claim_token_pepper.as_bytes()),
             &Validation::new(Algorithm::HS256),
         ) {
             Ok(token_data) => {
@@ -183,23 +194,98 @@ impl RegistrationService {
     }
 }
 
+pub struct ProfileService {
+    configuration: Arc<Configuration>,
+    user_authentication_repository: Arc<DbUserAuthenticationRepository>,
+    authorization_service: Arc<authorization::Service>,
+}
+
+impl ProfileService {
+    #[must_use]
+    pub fn new(
+        configuration: Arc<Configuration>,
+        user_repository: Arc<DbUserAuthenticationRepository>,
+        authorization_service: Arc<authorization::Service>,
+    ) -> Self {
+        Self {
+            configuration,
+            user_authentication_repository: user_repository,
+            authorization_service,
+        }
+    }
+
+    /// It registers a new user.
+    ///
+    /// # Errors
+    ///
+    /// This function will return a:
+    ///
+    /// * `ServiceError::InvalidPassword` if the current password supplied is invalid.
+    /// * `ServiceError::PasswordsDontMatch` if the supplied passwords do not match.
+    /// * `ServiceError::PasswordTooShort` if the supplied password is too short.
+    /// * `ServiceError::PasswordTooLong` if the supplied password is too long.
+    /// * An error if unable to successfully hash the password.
+    /// * An error if unable to change the password in the database.
+    /// * An error if it is not possible to authorize the action
+    #[allow(clippy::missing_panics_doc)]
+    pub async fn change_password(
+        &self,
+        maybe_user_id: Option<UserId>,
+        change_password_form: &ChangePasswordForm,
+    ) -> Result<(), ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::ChangePassword, maybe_user_id)
+            .await?;
+
+        info!("changing user password for user ID: {}", maybe_user_id.unwrap());
+
+        let settings = self.configuration.settings.read().await;
+
+        let user_authentication = self
+            .user_authentication_repository
+            .get_user_authentication_from_id(&maybe_user_id.unwrap())
+            .await?;
+
+        verify_password(change_password_form.current_password.as_bytes(), &user_authentication)?;
+
+        let password_constraints = PasswordConstraints {
+            min_password_length: settings.auth.password_constraints.min_password_length,
+            max_password_length: settings.auth.password_constraints.max_password_length,
+        };
+
+        validate_password_constraints(
+            &change_password_form.password,
+            &change_password_form.confirm_password,
+            &password_constraints,
+        )?;
+
+        let password_hash = hash_password(&change_password_form.password)?;
+
+        self.user_authentication_repository
+            .change_password(maybe_user_id.unwrap(), &password_hash)
+            .await?;
+
+        Ok(())
+    }
+}
+
 pub struct BanService {
-    user_repository: Arc<DbUserRepository>,
     user_profile_repository: Arc<DbUserProfileRepository>,
     banned_user_list: Arc<DbBannedUserList>,
+    authorization_service: Arc<authorization::Service>,
 }
 
 impl BanService {
     #[must_use]
     pub fn new(
-        user_repository: Arc<DbUserRepository>,
         user_profile_repository: Arc<DbUserProfileRepository>,
         banned_user_list: Arc<DbBannedUserList>,
+        authorization_service: Arc<authorization::Service>,
     ) -> Self {
         Self {
-            user_repository,
             user_profile_repository,
             banned_user_list,
+            authorization_service,
         }
     }
 
@@ -212,15 +298,14 @@ impl BanService {
     /// * `ServiceError::InternalServerError` if unable get user from the request.
     /// * An error if unable to get user profile from supplied username.
     /// * An error if unable to set the ban of the user in the database.
-    pub async fn ban_user(&self, username_to_be_banned: &str, user_id: &UserId) -> Result<(), ServiceError> {
-        debug!("user with ID {user_id} banning username: {username_to_be_banned}");
+    #[allow(clippy::missing_panics_doc)]
+    pub async fn ban_user(&self, username_to_be_banned: &str, maybe_user_id: Option<UserId>) -> Result<(), ServiceError> {
+        debug!(
+            "user with ID {} banning username: {username_to_be_banned}",
+            maybe_user_id.unwrap()
+        );
 
-        let user = self.user_repository.get_compact(user_id).await?;
-
-        // Check if user is administrator
-        if !user.administrator {
-            return Err(ServiceError::Unauthorized);
-        }
+        self.authorization_service.authorize(ACTION::BanUser, maybe_user_id).await?;
 
         let user_profile = self
             .user_profile_repository
@@ -233,6 +318,15 @@ impl BanService {
     }
 }
 
+#[cfg_attr(test, automock)]
+#[async_trait]
+pub trait Repository: Sync + Send {
+    async fn get_compact(&self, user_id: &UserId) -> Result<UserCompact, ServiceError>;
+    async fn grant_admin_role(&self, user_id: &UserId) -> Result<(), Error>;
+    async fn delete(&self, user_id: &UserId) -> Result<(), Error>;
+    async fn add(&self, username: &str, email: &str, password_hash: &str) -> Result<UserId, Error>;
+}
+
 pub struct DbUserRepository {
     database: Arc<Box<dyn Database>>,
 }
@@ -242,13 +336,16 @@ impl DbUserRepository {
     pub fn new(database: Arc<Box<dyn Database>>) -> Self {
         Self { database }
     }
+}
 
+#[async_trait]
+impl Repository for DbUserRepository {
     /// It returns the compact user.
     ///
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn get_compact(&self, user_id: &UserId) -> Result<UserCompact, ServiceError> {
+    async fn get_compact(&self, user_id: &UserId) -> Result<UserCompact, ServiceError> {
         // todo: persistence layer should have its own errors instead of
         // returning a `ServiceError`.
         self.database
@@ -262,7 +359,7 @@ impl DbUserRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn grant_admin_role(&self, user_id: &UserId) -> Result<(), Error> {
+    async fn grant_admin_role(&self, user_id: &UserId) -> Result<(), Error> {
         self.database.grant_admin_role(*user_id).await
     }
 
@@ -271,7 +368,7 @@ impl DbUserRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn delete(&self, user_id: &UserId) -> Result<(), Error> {
+    async fn delete(&self, user_id: &UserId) -> Result<(), Error> {
         self.database.delete_user(*user_id).await
     }
 
@@ -280,7 +377,7 @@ impl DbUserRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    pub async fn add(&self, username: &str, email: &str, password_hash: &str) -> Result<UserId, Error> {
+    async fn add(&self, username: &str, email: &str, password_hash: &str) -> Result<UserId, Error> {
         self.database.insert_user_and_get_id(username, email, password_hash).await
     }
 }
@@ -348,4 +445,38 @@ impl DbBannedUserList {
 
         self.database.ban_user(*user_id, &reason, date_expiry).await
     }
+}
+
+fn validate_password_constraints(
+    password: &str,
+    confirm_password: &str,
+    password_rules: &PasswordConstraints,
+) -> Result<(), ServiceError> {
+    if password != confirm_password {
+        return Err(ServiceError::PasswordsDontMatch);
+    }
+
+    let password_length = password.len();
+
+    if password_length <= password_rules.min_password_length {
+        return Err(ServiceError::PasswordTooShort);
+    }
+
+    if password_length >= password_rules.max_password_length {
+        return Err(ServiceError::PasswordTooLong);
+    }
+
+    Ok(())
+}
+
+fn hash_password(password: &str) -> Result<String, ServiceError> {
+    let salt = SaltString::generate(&mut OsRng);
+
+    // Argon2 with default params (Argon2id v19)
+    let argon2 = Argon2::default();
+
+    // Hash password to PHC string ($argon2id$v=19$...)
+    let password_hash = argon2.hash_password(password.as_bytes(), &salt)?.to_string();
+
+    Ok(password_hash)
 }

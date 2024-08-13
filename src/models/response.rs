@@ -1,10 +1,13 @@
 use serde::{Deserialize, Serialize};
+use url::Url;
 
+use super::category::Category;
 use super::torrent::TorrentId;
-use crate::databases::database::Category;
+use crate::databases::database::Category as DatabaseCategory;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::TorrentFile;
 use crate::models::torrent_tag::TorrentTag;
+use crate::services::torrent::CanonicalInfoHashGroup;
 
 pub enum OkResponses {
     TokenResponse(TokenResponse),
@@ -63,18 +66,26 @@ pub struct TorrentResponse {
     pub tags: Vec<TorrentTag>,
     pub name: String,
     pub comment: Option<String>,
+    pub creation_date: Option<i64>,
+    pub created_by: Option<String>,
+    pub encoding: Option<String>,
+    pub canonical_info_hash_group: Vec<String>,
 }
 
 impl TorrentResponse {
     #[must_use]
-    pub fn from_listing(torrent_listing: TorrentListing, category: Option<Category>) -> TorrentResponse {
+    pub fn from_listing(
+        torrent_listing: TorrentListing,
+        category: Option<DatabaseCategory>,
+        canonical_info_hash_group: &CanonicalInfoHashGroup,
+    ) -> TorrentResponse {
         TorrentResponse {
             torrent_id: torrent_listing.torrent_id,
             uploader: torrent_listing.uploader,
             info_hash: torrent_listing.info_hash,
             title: torrent_listing.title,
             description: torrent_listing.description,
-            category,
+            category: category.map(std::convert::Into::into),
             upload_date: torrent_listing.date_uploaded,
             file_size: torrent_listing.file_size,
             seeders: torrent_listing.seeders,
@@ -85,7 +96,24 @@ impl TorrentResponse {
             tags: vec![],
             name: torrent_listing.name,
             comment: torrent_listing.comment,
+            creation_date: torrent_listing.creation_date,
+            created_by: torrent_listing.created_by,
+            encoding: torrent_listing.encoding,
+            canonical_info_hash_group: canonical_info_hash_group
+                .original_info_hashes
+                .iter()
+                .map(super::info_hash::InfoHash::to_hex_string)
+                .collect(),
         }
+    }
+
+    /// It adds the tracker URL in the first position of the tracker list.
+    pub fn include_url_as_main_tracker(&mut self, tracker_url: &Url) {
+        // Remove any existing instances of tracker_url
+        self.trackers.retain(|tracker| *tracker != tracker_url.to_string());
+
+        // Insert tracker_url at the first position
+        self.trackers.insert(0, tracker_url.to_owned().to_string());
     }
 }
 

@@ -1,6 +1,6 @@
 #![allow(clippy::missing_errors_doc)]
 
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqlitePoolOptions, SqliteQueryResult};
 use sqlx::{query, query_as, SqlitePool};
@@ -23,10 +23,11 @@ pub struct TorrentRecordV2 {
     pub info_hash: String,
     pub size: i64,
     pub name: String,
-    pub pieces: String,
+    pub pieces: Option<String>,
+    pub root_hash: Option<String>,
     pub piece_length: i64,
     pub private: Option<u8>,
-    pub root_hash: i64,
+    pub is_bep_30: i64,
     pub date_uploaded: String,
 }
 
@@ -40,10 +41,11 @@ impl TorrentRecordV2 {
             info_hash: torrent.info_hash.clone(),
             size: torrent.file_size,
             name: torrent_info.name.clone(),
-            pieces: torrent_info.get_pieces_as_string(),
+            pieces: Some(torrent_info.get_pieces_as_string()),
+            root_hash: Some(torrent_info.get_root_hash_as_string()),
             piece_length: torrent_info.piece_length,
             private: torrent_info.private,
-            root_hash: torrent_info.get_root_hash_as_i64(),
+            is_bep_30: i64::from(torrent_info.is_bep_30()),
             date_uploaded: convert_timestamp_to_datetime(torrent.upload_date),
         }
     }
@@ -59,11 +61,10 @@ pub fn convert_timestamp_to_datetime(timestamp: i64) -> String {
     // The expected format in database is: 2022-11-04 09:53:57
     // MySQL uses a DATETIME column and SQLite uses a TEXT column.
 
-    let naive_datetime = NaiveDateTime::from_timestamp_opt(timestamp, 0).expect("Overflow of i64 seconds, very future!");
-    let datetime_again: DateTime<Utc> = DateTime::from_naive_utc_and_offset(naive_datetime, Utc);
+    let datetime = DateTime::from_timestamp(timestamp, 0).expect("Overflow of i64 seconds, very future!");
 
     // Format without timezone
-    datetime_again.format("%Y-%m-%d %H:%M:%S").to_string()
+    datetime.format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
 pub struct SqliteDatabaseV2_0_0 {
@@ -116,16 +117,7 @@ impl SqliteDatabaseV2_0_0 {
             .execute(&self.pool)
             .await
             .map(|v| v.last_insert_rowid())
-            .map_err(|e| match e {
-                sqlx::Error::Database(err) => {
-                    if err.message().contains("UNIQUE") && err.message().contains("name") {
-                        database::Error::CategoryAlreadyExists
-                    } else {
-                        database::Error::Error
-                    }
-                }
-                _ => database::Error::Error,
-            })
+            .map_err(|_| database::Error::Error)
     }
 
     pub async fn insert_category(&self, category: &CategoryRecordV2) -> Result<i64, sqlx::Error> {
@@ -205,7 +197,7 @@ impl SqliteDatabaseV2_0_0 {
                 pieces,
                 piece_length,
                 private,
-                root_hash,
+                is_bep_30,
                 date_uploaded
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
@@ -218,7 +210,7 @@ impl SqliteDatabaseV2_0_0 {
         .bind(torrent.pieces.clone())
         .bind(torrent.piece_length)
         .bind(torrent.private.unwrap_or(0))
-        .bind(torrent.root_hash)
+        .bind(torrent.is_bep_30)
         .bind(torrent.date_uploaded.clone())
         .execute(&self.pool)
         .await

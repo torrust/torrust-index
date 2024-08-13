@@ -2,29 +2,34 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use tokio::task::JoinHandle;
+use tracing::info;
 
 use crate::bootstrap::logging;
 use crate::cache::image::manager::ImageCacheService;
 use crate::common::AppData;
+use crate::config::validator::Validator;
 use crate::config::Configuration;
 use crate::databases::database;
 use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
+use crate::services::authorization::{CasbinConfiguration, CasbinEnforcer};
 use crate::services::category::{self, DbCategoryRepository};
 use crate::services::tag::{self, DbTagRepository};
 use crate::services::torrent::{
     DbCanonicalInfoHashGroupRepository, DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository,
     DbTorrentListingGenerator, DbTorrentRepository, DbTorrentTagRepository,
 };
-use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
-use crate::services::{proxy, settings, torrent};
+use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository, Repository};
+use crate::services::{about, authorization, proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
-use crate::web::api::v1::auth::Authentication;
-use crate::web::api::{start, Version};
-use crate::{mailer, tracker};
+use crate::web::api::server::signals::Halted;
+use crate::web::api::server::v1::auth::Authentication;
+use crate::web::api::Version;
+use crate::{console, mailer, tracker, web};
 
 pub struct Running {
     pub api_socket_addr: SocketAddr,
-    pub api_server: Option<JoinHandle<std::result::Result<(), std::io::Error>>>,
+    pub api_server: JoinHandle<std::result::Result<(), std::io::Error>>,
+    pub api_server_halt_task: tokio::sync::oneshot::Sender<Halted>,
     pub tracker_data_importer_handle: tokio::task::JoinHandle<()>,
 }
 
@@ -35,9 +40,11 @@ pub struct Running {
 /// It panics if there is an error connecting to the database.
 #[allow(clippy::too_many_lines)]
 pub async fn run(configuration: Configuration, api_version: &Version) -> Running {
-    let log_level = configuration.settings.read().await.log_level.clone();
+    let threshold = configuration.settings.read().await.logging.threshold.clone();
 
-    logging::setup(&log_level);
+    logging::setup(&threshold);
+
+    log_configuration(&configuration).await;
 
     let configuration = Arc::new(configuration);
 
@@ -46,10 +53,18 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
 
     let settings = configuration.settings.read().await;
 
-    let database_connect_url = settings.database.connect_url.clone();
-    let torrent_info_update_interval = settings.tracker_statistics_importer.torrent_info_update_interval;
-    let net_ip = "0.0.0.0".to_string();
-    let net_port = settings.net.port;
+    settings.validate().expect("invalid settings");
+
+    // From [database] config
+    let database_connect_url = settings.database.connect_url.clone().to_string();
+    // From [importer] config
+    let importer_torrent_info_update_interval = settings.tracker_statistics_importer.torrent_info_update_interval;
+    let importer_port = settings.tracker_statistics_importer.port;
+    // From [net] config
+    let config_bind_address = settings.net.bind_address;
+    let opt_net_tsl = settings.net.tsl.clone();
+    // Unstable config
+    let unstable = settings.unstable.clone();
 
     // IMPORTANT: drop settings before starting server to avoid read locks that
     // leads to requests hanging.
@@ -64,7 +79,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     // Repositories
     let category_repository = Arc::new(DbCategoryRepository::new(database.clone()));
     let tag_repository = Arc::new(DbTagRepository::new(database.clone()));
-    let user_repository = Arc::new(DbUserRepository::new(database.clone()));
+    let user_repository: Arc<Box<dyn Repository>> = Arc::new(Box::new(DbUserRepository::new(database.clone())));
     let user_authentication_repository = Arc::new(DbUserAuthenticationRepository::new(database.clone()));
     let user_profile_repository = Arc::new(DbUserProfileRepository::new(database.clone()));
     let torrent_repository = Arc::new(DbTorrentRepository::new(database.clone()));
@@ -75,17 +90,35 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let torrent_tag_repository = Arc::new(DbTorrentTagRepository::new(database.clone()));
     let torrent_listing_generator = Arc::new(DbTorrentListingGenerator::new(database.clone()));
     let banned_user_list = Arc::new(DbBannedUserList::new(database.clone()));
+    let casbin_enforcer = Arc::new(
+        if let Some(casbin) = unstable
+            .as_ref()
+            .and_then(|u| u.auth.as_ref())
+            .and_then(|auth| auth.casbin.as_ref())
+        {
+            CasbinEnforcer::with_configuration(CasbinConfiguration::new(&casbin.model, &casbin.policy)).await
+        } else {
+            CasbinEnforcer::with_default_configuration().await
+        },
+    );
 
     // Services
+    let authorization_service = Arc::new(authorization::Service::new(user_repository.clone(), casbin_enforcer.clone()));
     let tracker_service = Arc::new(tracker::service::Service::new(configuration.clone(), database.clone()).await);
     let tracker_statistics_importer =
         Arc::new(StatisticsImporter::new(configuration.clone(), tracker_service.clone(), database.clone()).await);
     let mailer_service = Arc::new(mailer::Service::new(configuration.clone()).await);
     let image_cache_service: Arc<ImageCacheService> = Arc::new(ImageCacheService::new(configuration.clone()).await);
-    let category_service = Arc::new(category::Service::new(category_repository.clone(), user_repository.clone()));
-    let tag_service = Arc::new(tag::Service::new(tag_repository.clone(), user_repository.clone()));
-    let proxy_service = Arc::new(proxy::Service::new(image_cache_service.clone(), user_repository.clone()));
-    let settings_service = Arc::new(settings::Service::new(configuration.clone(), user_repository.clone()));
+    let category_service = Arc::new(category::Service::new(
+        category_repository.clone(),
+        authorization_service.clone(),
+    ));
+    let tag_service = Arc::new(tag::Service::new(tag_repository.clone(), authorization_service.clone()));
+    let proxy_service = Arc::new(proxy::Service::new(
+        image_cache_service.clone(),
+        authorization_service.clone(),
+    ));
+    let settings_service = Arc::new(settings::Service::new(configuration.clone(), authorization_service.clone()));
     let torrent_index = Arc::new(torrent::Index::new(
         configuration.clone(),
         tracker_statistics_importer.clone(),
@@ -99,6 +132,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         torrent_announce_url_repository.clone(),
         torrent_tag_repository.clone(),
         torrent_listing_generator.clone(),
+        authorization_service.clone(),
     ));
     let registration_service = Arc::new(user::RegistrationService::new(
         configuration.clone(),
@@ -106,10 +140,15 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         user_repository.clone(),
         user_profile_repository.clone(),
     ));
+    let profile_service = Arc::new(user::ProfileService::new(
+        configuration.clone(),
+        user_authentication_repository.clone(),
+        authorization_service.clone(),
+    ));
     let ban_service = Arc::new(user::BanService::new(
-        user_repository.clone(),
         user_profile_repository.clone(),
         banned_user_list.clone(),
+        authorization_service.clone(),
     ));
     let authentication_service = Arc::new(Service::new(
         configuration.clone(),
@@ -118,6 +157,8 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         user_profile_repository.clone(),
         user_authentication_repository.clone(),
     ));
+
+    let about_service = Arc::new(about::Service::new(authorization_service.clone()));
 
     // Build app container
 
@@ -150,35 +191,34 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         settings_service,
         torrent_index,
         registration_service,
+        profile_service,
         ban_service,
+        about_service,
     ));
 
-    // Start repeating task to import tracker torrent data and updating
+    // Start cronjob to import tracker torrent data and updating
     // seeders and leechers info.
-
-    let weak_tracker_statistics_importer = Arc::downgrade(&tracker_statistics_importer);
-
-    let tracker_statistics_importer_handle = tokio::spawn(async move {
-        let interval = std::time::Duration::from_secs(torrent_info_update_interval);
-        let mut interval = tokio::time::interval(interval);
-        interval.tick().await; // first tick is immediate...
-        loop {
-            interval.tick().await;
-            if let Some(tracker) = weak_tracker_statistics_importer.upgrade() {
-                drop(tracker.import_all_torrents_statistics().await);
-            } else {
-                break;
-            }
-        }
-    });
+    let tracker_statistics_importer_handle = console::cronjobs::tracker_statistics_importer::start(
+        importer_port,
+        importer_torrent_info_update_interval,
+        &tracker_statistics_importer,
+    );
 
     // Start API server
+    let running_api = web::api::start(app_data, config_bind_address, opt_net_tsl, api_version).await;
 
-    let running_api = start(app_data, &net_ip, net_port, api_version).await;
-
+    // Full running application
     Running {
         api_socket_addr: running_api.socket_addr,
-        api_server: running_api.api_server,
+        api_server: running_api.task,
+        api_server_halt_task: running_api.halt_task,
         tracker_data_importer_handle: tracker_statistics_importer_handle,
     }
+}
+
+/// It logs the final configuration removing secrets.
+async fn log_configuration(configuration: &Configuration) {
+    let mut setting = configuration.get_all().await.clone();
+    setting.remove_secrets();
+    info!("Configuration:\n{}", setting.to_json());
 }

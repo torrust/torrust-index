@@ -2,16 +2,21 @@
 //!
 //! Currently, the API has only one version: `v1`.
 //!
-//! Refer to the [`v1`]) module for more information.
+//! Refer to:
+//!
+//! - [`client::v1`]) module for more information about the API client.
+//! - [`server::v1`]) module for more information about the API server.
+pub mod client;
 pub mod server;
-pub mod v1;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use tokio::task::JoinHandle;
 
+use self::server::signals::Halted;
 use crate::common::AppData;
+use crate::config::Tsl;
 use crate::web::api;
 
 /// API versions.
@@ -23,20 +28,21 @@ pub enum Version {
 pub struct Running {
     /// The socket address the API server is listening on.
     pub socket_addr: SocketAddr,
+    /// The channel sender to send halt signal to the server.
+    pub halt_task: tokio::sync::oneshot::Sender<Halted>,
     /// The handle for the running API server.
-    pub api_server: Option<JoinHandle<Result<(), std::io::Error>>>,
-}
-
-#[must_use]
-#[derive(Debug)]
-pub struct ServerStartedMessage {
-    pub socket_addr: SocketAddr,
+    pub task: JoinHandle<Result<(), std::io::Error>>,
 }
 
 /// Starts the API server.
 #[must_use]
-pub async fn start(app_data: Arc<AppData>, net_ip: &str, net_port: u16, implementation: &Version) -> api::Running {
+pub async fn start(
+    app_data: Arc<AppData>,
+    config_bind_address: SocketAddr,
+    opt_tsl: Option<Tsl>,
+    implementation: &Version,
+) -> api::Running {
     match implementation {
-        Version::V1 => server::start(app_data, net_ip, net_port).await,
+        Version::V1 => server::start(app_data, config_bind_address, opt_tsl).await,
     }
 }

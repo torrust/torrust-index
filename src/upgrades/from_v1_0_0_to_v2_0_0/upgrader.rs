@@ -23,8 +23,8 @@
 //!
 //! - The database schema was changed.
 //! - The torrents are now stored entirely in the database. The torrent files
-//! are not stored in the filesystem anymore. This command reads the torrent
-//! files from the filesystem and store them in the database.
+//!   are not stored in the filesystem anymore. This command reads the torrent
+//!   files from the filesystem and store them in the database.
 //!
 //! We recommend to download your production database and the torrent files dir.
 //! And run the command in a local environment with the version `v2.0.0.`. Then,
@@ -36,13 +36,13 @@
 //! NOTES for `torrust_users` table transfer:
 //!
 //! - In v2, the table `torrust_user` contains a field `date_registered` non
-//! existing in v1. We changed that column to allow `NULL`. We also added the
-//! new column `date_imported` with the datetime when the upgrader was executed.
+//!   existing in v1. We changed that column to allow `NULL`. We also added the
+//!   new column `date_imported` with the datetime when the upgrader was executed.
 //!
 //! NOTES for `torrust_user_profiles` table transfer:
 //!
 //! - In v2, the table `torrust_user_profiles` contains two new fields: `bio`
-//! and `avatar`. Empty string is used as default value.
+//!   and `avatar`. Empty string is used as default value.
 //!
 //!
 //! If you want more information about this command you can read the [issue 56](https://github.com/torrust/torrust-index/issues/56).

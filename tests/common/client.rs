@@ -1,4 +1,6 @@
-use reqwest::multipart;
+use std::time::Duration;
+
+use reqwest::{multipart, Error};
 use serde::Serialize;
 
 use super::connection_info::ConnectionInfo;
@@ -6,7 +8,9 @@ use super::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};
 use super::contexts::tag::forms::{AddTagForm, DeleteTagForm};
 use super::contexts::torrent::forms::UpdateTorrentFrom;
 use super::contexts::torrent::requests::InfoHash;
-use super::contexts::user::forms::{LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username};
+use super::contexts::user::forms::{
+    ChangePasswordForm, LoginForm, RegistrationForm, TokenRenewalForm, TokenVerificationForm, Username,
+};
 use super::http::{Query, ReqwestQuery};
 use super::responses::{self, BinaryResponse, TextResponse};
 
@@ -19,15 +23,26 @@ impl Client {
     // todo: forms in POST requests can be passed by reference.
 
     fn base_path() -> String {
-        "/v1".to_string()
+        "v1".to_string()
+    }
+
+    /// Remove last '/' char in the address if present.
+    ///
+    /// For example: <https://localhost/> to <https://localhost/>.
+    fn base_url(bind_address: &str) -> String {
+        let mut url = bind_address.to_owned();
+        if url.ends_with('/') {
+            url.pop();
+        }
+        url
     }
 
     pub fn unauthenticated(bind_address: &str) -> Self {
-        Self::new(ConnectionInfo::anonymous(bind_address, &Self::base_path()))
+        Self::new(ConnectionInfo::anonymous(&Self::base_url(bind_address), &Self::base_path()))
     }
 
     pub fn authenticated(bind_address: &str, token: &str) -> Self {
-        Self::new(ConnectionInfo::new(bind_address, &Self::base_path(), token))
+        Self::new(ConnectionInfo::new(&Self::base_url(bind_address), &Self::base_path(), token))
     }
 
     pub fn new(connection_info: ConnectionInfo) -> Self {
@@ -37,9 +52,12 @@ impl Client {
     }
 
     /// It checks if the server is running.
-    pub async fn server_is_running(&self) -> bool {
+    pub async fn server_is_running(&self) -> Result<(), Error> {
         let response = self.http_client.inner_get("").await;
-        response.is_ok()
+        match response {
+            Ok(_) => Ok(()),
+            Err(err) => Err(err),
+        }
     }
 
     // Context: about
@@ -142,6 +160,12 @@ impl Client {
         self.http_client.post("/user/login", &registration_form).await
     }
 
+    pub async fn change_password(&self, username: Username, change_password_form: ChangePasswordForm) -> TextResponse {
+        self.http_client
+            .post(&format!("/user/{}/change-password", &username.value), &change_password_form)
+            .await
+    }
+
     pub async fn verify_token(&self, token_verification_form: TokenVerificationForm) -> TextResponse {
         self.http_client.post("/user/token/verify", &token_verification_form).await
     }
@@ -158,16 +182,23 @@ impl Client {
 /// Generic HTTP Client
 struct Http {
     connection_info: ConnectionInfo,
+    /// The timeout is applied from when the request starts connecting until the
+    /// response body has finished.
+    timeout: Duration,
 }
 
 impl Http {
     pub fn new(connection_info: ConnectionInfo) -> Self {
-        Self { connection_info }
+        Self {
+            connection_info,
+            timeout: Duration::from_secs(5),
+        }
     }
 
     pub async fn get(&self, path: &str, params: Query) -> TextResponse {
         let response = match &self.connection_info.token {
             Some(token) => reqwest::Client::builder()
+                .timeout(self.timeout)
                 .build()
                 .unwrap()
                 .get(self.base_url(path).clone())
@@ -177,6 +208,7 @@ impl Http {
                 .await
                 .unwrap(),
             None => reqwest::Client::builder()
+                .timeout(self.timeout)
                 .build()
                 .unwrap()
                 .get(self.base_url(path).clone())
@@ -191,6 +223,7 @@ impl Http {
     pub async fn get_binary(&self, path: &str, params: Query) -> BinaryResponse {
         let response = match &self.connection_info.token {
             Some(token) => reqwest::Client::builder()
+                .timeout(self.timeout)
                 .build()
                 .unwrap()
                 .get(self.base_url(path).clone())
@@ -200,6 +233,7 @@ impl Http {
                 .await
                 .unwrap(),
             None => reqwest::Client::builder()
+                .timeout(self.timeout)
                 .build()
                 .unwrap()
                 .get(self.base_url(path).clone())
@@ -217,6 +251,7 @@ impl Http {
 
     pub async fn inner_get(&self, path: &str) -> Result<reqwest::Response, reqwest::Error> {
         reqwest::Client::builder()
+            .timeout(self.timeout)
             .build()
             .unwrap()
             .get(self.base_url(path).clone())
@@ -246,6 +281,7 @@ impl Http {
     pub async fn post_multipart(&self, path: &str, form: multipart::Form) -> TextResponse {
         let response = match &self.connection_info.token {
             Some(token) => reqwest::Client::builder()
+                .timeout(self.timeout)
                 .build()
                 .unwrap()
                 .post(self.base_url(path).clone())
@@ -255,6 +291,7 @@ impl Http {
                 .await
                 .expect("failed to send multipart request with token"),
             None => reqwest::Client::builder()
+                .timeout(self.timeout)
                 .build()
                 .unwrap()
                 .post(self.base_url(path).clone())
@@ -323,7 +360,7 @@ impl Http {
 
     fn base_url(&self, path: &str) -> String {
         format!(
-            "http://{}{}{path}",
+            "http://{}/{}{path}", // DevSkim: ignore DS137138
             &self.connection_info.bind_address, &self.connection_info.base_path
         )
     }

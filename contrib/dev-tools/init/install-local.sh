@@ -1,12 +1,11 @@
 #!/bin/bash
 
-# This script is only intended to be used for local development or testing environments.
+# This script is only intended to be used for development environment.
 
-# Generate storage directory if it does not exist
+# Generate the Index sqlite database directory and file if it does not exist
 mkdir -p ./storage/index/lib/database
 
-# Generate the sqlite database if it does not exist
 if ! [ -f "./storage/index/lib/database/sqlite3.db" ]; then
-    # todo: it should get the path from tracker.toml and only do it when we use sqlite
-    sqlite3 ./storage/index/lib/database/sqlite3.db   "VACUUM;"
+    echo "Creating index database 'sqlite3.db'"
+    sqlite3 "./storage/index/lib/database/sqlite3.db" "VACUUM;"
 fi

@@ -1,16 +1,15 @@
 use std::net::SocketAddr;
 
-use log::info;
 use tokio::sync::{oneshot, RwLock};
 use tokio::task::JoinHandle;
 use torrust_index::config::Configuration;
 use torrust_index::web::api::Version;
 use torrust_index::{app, config};
+use tracing::info;
 
 /// It launches the app and provides a way to stop it.
 pub struct AppStarter {
-    configuration: config::TorrustIndex,
-    config_path: Option<String>,
+    configuration: config::Settings,
     /// The application binary state (started or not):
     ///  - `None`: if the app is not started,
     ///  - `RunningState`: if the app was started.
@@ -19,10 +18,9 @@ pub struct AppStarter {
 
 impl AppStarter {
     #[must_use]
-    pub fn with_custom_configuration(configuration: config::TorrustIndex, config_path: Option<String>) -> Self {
+    pub fn with_custom_configuration(configuration: config::Settings) -> Self {
         Self {
             configuration,
-            config_path,
             running_state: None,
         }
     }
@@ -35,7 +33,6 @@ impl AppStarter {
     pub async fn start(&mut self, api_version: Version) {
         let configuration = Configuration {
             settings: RwLock::new(self.configuration.clone()),
-            config_path: self.config_path.clone(),
         };
 
         // Open a channel to communicate back with this function
@@ -54,7 +51,7 @@ impl AppStarter {
             .expect("the app starter should not be dropped");
 
             match api_version {
-                Version::V1 => app.api_server.unwrap().await,
+                Version::V1 => app.api_server.await,
             }
         });
 
@@ -71,17 +68,14 @@ impl AppStarter {
     }
 
     pub fn stop(&mut self) {
-        match &self.running_state {
-            Some(running_state) => {
-                running_state.app_handle.abort();
-                self.running_state = None;
-            }
-            None => {}
+        if let Some(running_state) = &self.running_state {
+            running_state.app_handle.abort();
+            self.running_state = None;
         }
     }
 
     #[must_use]
-    pub fn server_configuration(&self) -> config::TorrustIndex {
+    pub fn server_configuration(&self) -> config::Settings {
         self.configuration.clone()
     }
 
@@ -92,7 +86,7 @@ impl AppStarter {
 
     #[must_use]
     pub fn database_connect_url(&self) -> String {
-        self.configuration.database.connect_url.clone()
+        self.configuration.database.connect_url.clone().to_string()
     }
 }
 

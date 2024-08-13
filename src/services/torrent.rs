@@ -1,11 +1,12 @@
 //! Torrent service.
 use std::sync::Arc;
 
-use log::debug;
 use serde_derive::{Deserialize, Serialize};
+use tracing::debug;
+use url::Url;
 
+use super::authorization::{self, ACTION};
 use super::category::DbCategoryRepository;
-use super::user::DbUserRepository;
 use crate::config::Configuration;
 use crate::databases::database::{Database, Error, Sorting};
 use crate::errors::ServiceError;
@@ -16,6 +17,7 @@ use crate::models::torrent::{Metadata, TorrentId, TorrentListing};
 use crate::models::torrent_file::{DbTorrent, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::user::UserId;
+use crate::services::user::Repository;
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::utils::parse_torrent::decode_and_validate_torrent_file;
 use crate::{tracker, AsCSV};
@@ -24,7 +26,7 @@ pub struct Index {
     configuration: Arc<Configuration>,
     tracker_statistics_importer: Arc<StatisticsImporter>,
     tracker_service: Arc<tracker::service::Service>,
-    user_repository: Arc<DbUserRepository>,
+    user_repository: Arc<Box<dyn Repository>>,
     category_repository: Arc<DbCategoryRepository>,
     torrent_repository: Arc<DbTorrentRepository>,
     torrent_info_hash_repository: Arc<DbCanonicalInfoHashGroupRepository>,
@@ -33,6 +35,7 @@ pub struct Index {
     torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
     torrent_tag_repository: Arc<DbTorrentTagRepository>,
     torrent_listing_generator: Arc<DbTorrentListingGenerator>,
+    authorization_service: Arc<authorization::Service>,
 }
 
 pub struct AddTorrentRequest {
@@ -45,8 +48,8 @@ pub struct AddTorrentRequest {
 
 pub struct AddTorrentResponse {
     pub torrent_id: TorrentId,
+    pub canonical_info_hash: String,
     pub info_hash: String,
-    pub original_info_hash: String,
 }
 
 /// User request to generate a torrent listing.
@@ -80,7 +83,7 @@ impl Index {
         configuration: Arc<Configuration>,
         tracker_statistics_importer: Arc<StatisticsImporter>,
         tracker_service: Arc<tracker::service::Service>,
-        user_repository: Arc<DbUserRepository>,
+        user_repository: Arc<Box<dyn Repository>>,
         category_repository: Arc<DbCategoryRepository>,
         torrent_repository: Arc<DbTorrentRepository>,
         torrent_info_hash_repository: Arc<DbCanonicalInfoHashGroupRepository>,
@@ -89,6 +92,7 @@ impl Index {
         torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
         torrent_tag_repository: Arc<DbTorrentTagRepository>,
         torrent_listing_repository: Arc<DbTorrentListingGenerator>,
+        authorization_service: Arc<authorization::Service>,
     ) -> Self {
         Self {
             configuration,
@@ -103,6 +107,7 @@ impl Index {
             torrent_announce_url_repository,
             torrent_tag_repository,
             torrent_listing_generator: torrent_listing_repository,
+            authorization_service,
         }
     }
 
@@ -127,10 +132,11 @@ impl Index {
     pub async fn add_torrent(
         &self,
         add_torrent_req: AddTorrentRequest,
-        user_id: UserId,
+        maybe_user_id: Option<UserId>,
     ) -> Result<AddTorrentResponse, ServiceError> {
-        // Guard that the users exists
-        let _user = self.user_repository.get_compact(&user_id).await?;
+        self.authorization_service
+            .authorize(ACTION::AddTorrent, maybe_user_id)
+            .await?;
 
         let metadata = self.validate_and_build_metadata(&add_torrent_req).await?;
 
@@ -143,7 +149,7 @@ impl Index {
 
         let torrent_id = self
             .torrent_repository
-            .add(&original_info_hash, &torrent, &metadata, user_id)
+            .add(&original_info_hash, &torrent, &metadata, maybe_user_id.unwrap())
             .await?;
 
         // Synchronous secondary tasks
@@ -165,15 +171,15 @@ impl Index {
         {
             // If the torrent can't be whitelisted somehow, remove the torrent from database
             drop(self.torrent_repository.delete(&torrent_id).await);
-            return Err(e);
+            return Err(e.into());
         }
 
         // Build response
 
         Ok(AddTorrentResponse {
             torrent_id,
-            info_hash: torrent.canonical_info_hash_hex(),
-            original_info_hash: original_info_hash.to_string(),
+            canonical_info_hash: torrent.canonical_info_hash_hex(),
+            info_hash: original_info_hash.to_string(),
         })
     }
 
@@ -209,6 +215,8 @@ impl Index {
             .await?;
 
         if !original_info_hashes.is_empty() {
+            // A previous torrent with the same canonical infohash has been uploaded before
+
             // Torrent with the same canonical infohash was already uploaded
             debug!("Canonical infohash found: {:?}", canonical_info_hash.to_hex_string());
 
@@ -216,7 +224,7 @@ impl Index {
                 // The exact original infohash was already uploaded
                 debug!("Original infohash found: {:?}", original_info_hash.to_hex_string());
 
-                return Err(ServiceError::InfoHashAlreadyExists);
+                return Err(ServiceError::OriginalInfoHashAlreadyExists);
             }
 
             // A new original infohash is being uploaded with a canonical infohash that already exists.
@@ -229,6 +237,7 @@ impl Index {
             return Err(ServiceError::CanonicalInfoHashAlreadyExists);
         }
 
+        // No other torrent with the same canonical infohash has been uploaded before
         Ok(())
     }
 
@@ -253,28 +262,26 @@ impl Index {
     ///
     /// This function will return an error if unable to get the torrent from the
     /// database.
-    pub async fn get_torrent(&self, info_hash: &InfoHash, opt_user_id: Option<UserId>) -> Result<Torrent, ServiceError> {
+    pub async fn get_torrent(&self, info_hash: &InfoHash, maybe_user_id: Option<UserId>) -> Result<Torrent, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GetTorrent, maybe_user_id)
+            .await?;
+
         let mut torrent = self.torrent_repository.get_by_info_hash(info_hash).await?;
 
         let tracker_url = self.get_tracker_url().await;
+        let tracker_is_private = self.tracker_is_private().await;
 
-        // Add personal tracker url or default tracker url
-        match opt_user_id {
-            Some(user_id) => {
-                let personal_announce_url = self
-                    .tracker_service
-                    .get_personal_announce_url(user_id)
-                    .await
-                    .unwrap_or(tracker_url);
-                torrent.announce = Some(personal_announce_url.clone());
-                if let Some(list) = &mut torrent.announce_list {
-                    let vec = vec![personal_announce_url];
-                    list.insert(0, vec);
-                }
-            }
-            None => {
-                torrent.announce = Some(tracker_url);
-            }
+        // code-review: should we remove all tracker URLs in the `announce_list`
+        // when the tracker is private?
+
+        if !tracker_is_private {
+            torrent.include_url_as_main_tracker(&tracker_url);
+        } else if let Some(authenticated_user_id) = maybe_user_id {
+            let personal_announce_url = self.tracker_service.get_personal_announce_url(authenticated_user_id).await?;
+            torrent.include_url_as_main_tracker(&personal_announce_url);
+        } else {
+            torrent.include_url_as_main_tracker(&tracker_url);
         }
 
         Ok(torrent)
@@ -290,21 +297,22 @@ impl Index {
     /// * The user does not have permission to delete the torrent.
     /// * Unable to get the torrent listing from it's ID.
     /// * Unable to delete the torrent from the database.
-    pub async fn delete_torrent(&self, info_hash: &InfoHash, user_id: &UserId) -> Result<DeletedTorrentResponse, ServiceError> {
-        let user = self.user_repository.get_compact(user_id).await?;
-
-        // Only administrator can delete torrents.
-        // todo: move this to an authorization service.
-        if !user.administrator {
-            return Err(ServiceError::Unauthorized);
-        }
+    pub async fn delete_torrent(
+        &self,
+        info_hash: &InfoHash,
+        maybe_user_id: Option<UserId>,
+    ) -> Result<DeletedTorrentResponse, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::DeleteTorrent, maybe_user_id)
+            .await?;
 
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
 
         self.torrent_repository.delete(&torrent_listing.torrent_id).await?;
 
         // Remove info-hash from tracker whitelist
-        let _ = self
+        // todo: handle the error when the tracker is offline or not well configured.
+        let _unused = self
             .tracker_service
             .remove_info_hash_from_whitelist(info_hash.to_string())
             .await;
@@ -329,82 +337,17 @@ impl Index {
     pub async fn get_torrent_info(
         &self,
         info_hash: &InfoHash,
-        opt_user_id: Option<UserId>,
+        maybe_user_id: Option<UserId>,
     ) -> Result<TorrentResponse, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GetTorrentInfo, maybe_user_id)
+            .await?;
+
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
 
-        let torrent_id = torrent_listing.torrent_id;
-
-        let category = match torrent_listing.category_id {
-            Some(category_id) => Some(self.category_repository.get_by_id(&category_id).await?),
-            None => None,
-        };
-
-        let mut torrent_response = TorrentResponse::from_listing(torrent_listing, category);
-
-        // Add files
-
-        torrent_response.files = self.torrent_file_repository.get_by_torrent_id(&torrent_id).await?;
-
-        if torrent_response.files.len() == 1 {
-            let torrent_info = self.torrent_info_repository.get_by_info_hash(info_hash).await?;
-
-            torrent_response
-                .files
-                .iter_mut()
-                .for_each(|v| v.path = vec![torrent_info.name.to_string()]);
-        }
-
-        // Add trackers
-
-        torrent_response.trackers = self.torrent_announce_url_repository.get_by_torrent_id(&torrent_id).await?;
-
-        let tracker_url = self.get_tracker_url().await;
-
-        // add tracker url
-        match opt_user_id {
-            Some(user_id) => {
-                // if no user owned tracker key can be found, use default tracker url
-                let personal_announce_url = self
-                    .tracker_service
-                    .get_personal_announce_url(user_id)
-                    .await
-                    .unwrap_or(tracker_url);
-                // add personal tracker url to front of vec
-                torrent_response.trackers.insert(0, personal_announce_url);
-            }
-            None => {
-                torrent_response.trackers.insert(0, tracker_url);
-            }
-        }
-
-        // Add magnet link
-
-        // todo: extract a struct or function to build the magnet links
-        let mut magnet = format!(
-            "magnet:?xt=urn:btih:{}&dn={}",
-            torrent_response.info_hash,
-            urlencoding::encode(&torrent_response.title)
-        );
-
-        // Add trackers from torrent file to magnet link
-        for tracker in &torrent_response.trackers {
-            magnet.push_str(&format!("&tr={}", urlencoding::encode(tracker)));
-        }
-
-        torrent_response.magnet_link = magnet;
-
-        // Get realtime seeders and leechers
-        if let Ok(torrent_info) = self
-            .tracker_statistics_importer
-            .import_torrent_statistics(torrent_response.torrent_id, &torrent_response.info_hash)
-            .await
-        {
-            torrent_response.seeders = torrent_info.seeders;
-            torrent_response.leechers = torrent_info.leechers;
-        }
-
-        torrent_response.tags = self.torrent_tag_repository.get_tags_for_torrent(&torrent_id).await?;
+        let torrent_response = self
+            .build_full_torrent_response(torrent_listing, info_hash, maybe_user_id)
+            .await?;
 
         Ok(torrent_response)
     }
@@ -414,7 +357,15 @@ impl Index {
     /// # Errors
     ///
     /// Returns a `ServiceError::DatabaseError` if the database query fails.
-    pub async fn generate_torrent_info_listing(&self, request: &ListingRequest) -> Result<TorrentsResponse, ServiceError> {
+    pub async fn generate_torrent_info_listing(
+        &self,
+        request: &ListingRequest,
+        maybe_user_id: Option<UserId>,
+    ) -> Result<TorrentsResponse, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GenerateTorrentInfoListing, maybe_user_id)
+            .await?;
+
         let torrent_listing_specification = self.listing_specification_from_user_request(request).await;
 
         let torrents_response = self
@@ -486,7 +437,7 @@ impl Index {
         // Check if user is owner or administrator
         // todo: move this to an authorization service.
         if !(torrent_listing.uploader == updater.username || updater.administrator) {
-            return Err(ServiceError::Unauthorized);
+            return Err(ServiceError::UnauthorizedAction);
         }
 
         self.torrent_info_repository
@@ -498,19 +449,141 @@ impl Index {
             .one_torrent_by_torrent_id(&torrent_listing.torrent_id)
             .await?;
 
+        let torrent_response = self.build_short_torrent_response(torrent_listing, info_hash).await?;
+
+        Ok(torrent_response)
+    }
+
+    async fn get_tracker_url(&self) -> Url {
+        let settings = self.configuration.settings.read().await;
+        settings.tracker.url.clone()
+    }
+
+    async fn tracker_is_private(&self) -> bool {
+        let settings = self.configuration.settings.read().await;
+        settings.tracker.private
+    }
+
+    async fn build_short_torrent_response(
+        &self,
+        torrent_listing: TorrentListing,
+        info_hash: &InfoHash,
+    ) -> Result<TorrentResponse, ServiceError> {
         let category = match torrent_listing.category_id {
             Some(category_id) => Some(self.category_repository.get_by_id(&category_id).await?),
             None => None,
         };
 
-        let torrent_response = TorrentResponse::from_listing(torrent_listing, category);
+        let canonical_info_hash_group = self
+            .torrent_info_hash_repository
+            .get_canonical_info_hash_group(info_hash)
+            .await?;
+
+        Ok(TorrentResponse::from_listing(
+            torrent_listing,
+            category,
+            &canonical_info_hash_group,
+        ))
+    }
+
+    async fn build_full_torrent_response(
+        &self,
+        torrent_listing: TorrentListing,
+        info_hash: &InfoHash,
+        maybe_user_id: Option<UserId>,
+    ) -> Result<TorrentResponse, ServiceError> {
+        let torrent_id: i64 = torrent_listing.torrent_id;
+
+        let mut torrent_response = self.build_short_torrent_response(torrent_listing, info_hash).await?;
+
+        // Add files
+
+        torrent_response.files = self.torrent_file_repository.get_by_torrent_id(&torrent_id).await?;
+
+        if torrent_response.files.len() == 1 {
+            let torrent_info = self.torrent_info_repository.get_by_info_hash(info_hash).await?;
+
+            torrent_response
+                .files
+                .iter_mut()
+                .for_each(|v| v.path = vec![torrent_info.name.to_string()]);
+        }
+
+        // Add trackers
+
+        // code-review: duplicate logic. We have to check the same in the
+        // download torrent file endpoint. Here he have only one list of tracker
+        // like the `announce_list` in the torrent file.
+
+        torrent_response.trackers = self.torrent_announce_url_repository.get_by_torrent_id(&torrent_id).await?;
+
+        let tracker_url = self.get_tracker_url().await;
+
+        if self.tracker_is_private().await {
+            // Add main tracker URL
+            match maybe_user_id {
+                Some(user_id) => {
+                    let personal_announce_url = self.tracker_service.get_personal_announce_url(user_id).await?;
+
+                    torrent_response.include_url_as_main_tracker(&personal_announce_url);
+                }
+                None => {
+                    torrent_response.include_url_as_main_tracker(&tracker_url);
+                }
+            }
+        } else {
+            torrent_response.include_url_as_main_tracker(&tracker_url);
+        }
+
+        // Add magnet link
+
+        // todo: extract a struct or function to build the magnet links
+        let mut magnet = format!(
+            "magnet:?xt=urn:btih:{}&dn={}",
+            torrent_response.info_hash,
+            urlencoding::encode(&torrent_response.title)
+        );
+
+        // Add trackers from torrent file to magnet link
+        for tracker in &torrent_response.trackers {
+            magnet.push_str(&format!("&tr={}", urlencoding::encode(tracker)));
+        }
+
+        torrent_response.magnet_link = magnet;
+
+        // Get realtime seeders and leechers
+        if let Ok(torrent_info) = self
+            .tracker_statistics_importer
+            .import_torrent_statistics(torrent_response.torrent_id, &torrent_response.info_hash)
+            .await
+        {
+            torrent_response.seeders = torrent_info.seeders;
+            torrent_response.leechers = torrent_info.leechers;
+        }
+
+        torrent_response.tags = self.torrent_tag_repository.get_tags_for_torrent(&torrent_id).await?;
 
         Ok(torrent_response)
     }
 
-    async fn get_tracker_url(&self) -> String {
-        let settings = self.configuration.settings.read().await;
-        settings.tracker.url.clone()
+    /// Returns the canonical info-hash.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the user is not authorized or if there is a problem with the database.
+    pub async fn get_canonical_info_hash(
+        &self,
+        info_hash: &InfoHash,
+        maybe_user_id: Option<UserId>,
+    ) -> Result<Option<InfoHash>, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GetCanonicalInfoHash, maybe_user_id)
+            .await?;
+
+        self.torrent_info_hash_repository
+            .find_canonical_info_hash_for(info_hash)
+            .await
+            .map_err(|_| ServiceError::DatabaseError)
     }
 }
 
@@ -575,6 +648,7 @@ pub struct DbTorrentInfoHash {
 /// This function returns the original infohashes of a canonical infohash.
 ///
 /// The relationship is 1 canonical infohash -> N original infohashes.
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct CanonicalInfoHashGroup {
     pub canonical_info_hash: InfoHash,
     /// The list of original infohashes associated to the canonical one.

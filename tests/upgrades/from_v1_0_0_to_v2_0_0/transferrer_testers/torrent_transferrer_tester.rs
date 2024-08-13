@@ -112,14 +112,15 @@ impl TorrentTester {
         assert_eq!(imported_torrent.info_hash, torrent.info_hash);
         assert_eq!(imported_torrent.size, torrent.file_size);
         assert_eq!(imported_torrent.name, torrent_file.info.name);
-        assert_eq!(imported_torrent.pieces, torrent_file.info.get_pieces_as_string());
+        assert_eq!(imported_torrent.pieces, Some(torrent_file.info.get_pieces_as_string()));
+        assert_eq!(imported_torrent.root_hash, None);
         assert_eq!(imported_torrent.piece_length, torrent_file.info.piece_length);
         if torrent_file.info.private.is_none() {
             assert_eq!(imported_torrent.private, Some(0));
         } else {
             assert_eq!(imported_torrent.private, torrent_file.info.private);
         }
-        assert_eq!(imported_torrent.root_hash, torrent_file.info.get_root_hash_as_i64());
+        assert_eq!(imported_torrent.is_bep_30, i64::from(torrent_file.info.is_bep_30()));
         assert_eq!(
             imported_torrent.date_uploaded,
             convert_timestamp_to_datetime(torrent.upload_date)

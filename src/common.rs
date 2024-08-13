@@ -10,11 +10,12 @@ use crate::services::torrent::{
     DbCanonicalInfoHashGroupRepository, DbTorrentAnnounceUrlRepository, DbTorrentFileRepository, DbTorrentInfoRepository,
     DbTorrentListingGenerator, DbTorrentRepository, DbTorrentTagRepository,
 };
-use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository};
-use crate::services::{proxy, settings, torrent};
+use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, Repository};
+use crate::services::{about, proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
-use crate::web::api::v1::auth::Authentication;
+use crate::web::api::server::v1::auth::Authentication;
 use crate::{mailer, tracker};
+
 pub type Username = String;
 
 pub struct AppData {
@@ -30,7 +31,7 @@ pub struct AppData {
     // Repositories
     pub category_repository: Arc<DbCategoryRepository>,
     pub tag_repository: Arc<DbTagRepository>,
-    pub user_repository: Arc<DbUserRepository>,
+    pub user_repository: Arc<Box<dyn Repository>>,
     pub user_authentication_repository: Arc<DbUserAuthenticationRepository>,
     pub user_profile_repository: Arc<DbUserProfileRepository>,
     pub torrent_repository: Arc<DbTorrentRepository>,
@@ -48,7 +49,9 @@ pub struct AppData {
     pub settings_service: Arc<settings::Service>,
     pub torrent_service: Arc<torrent::Index>,
     pub registration_service: Arc<user::RegistrationService>,
+    pub profile_service: Arc<user::ProfileService>,
     pub ban_service: Arc<user::BanService>,
+    pub about_service: Arc<about::Service>,
 }
 
 impl AppData {
@@ -66,7 +69,7 @@ impl AppData {
         // Repositories
         category_repository: Arc<DbCategoryRepository>,
         tag_repository: Arc<DbTagRepository>,
-        user_repository: Arc<DbUserRepository>,
+        user_repository: Arc<Box<dyn Repository>>,
         user_authentication_repository: Arc<DbUserAuthenticationRepository>,
         user_profile_repository: Arc<DbUserProfileRepository>,
         torrent_repository: Arc<DbTorrentRepository>,
@@ -84,7 +87,9 @@ impl AppData {
         settings_service: Arc<settings::Service>,
         torrent_service: Arc<torrent::Index>,
         registration_service: Arc<user::RegistrationService>,
+        profile_service: Arc<user::ProfileService>,
         ban_service: Arc<user::BanService>,
+        about_service: Arc<about::Service>,
     ) -> AppData {
         AppData {
             cfg,
@@ -117,7 +122,9 @@ impl AppData {
             settings_service,
             torrent_service,
             registration_service,
+            profile_service,
             ban_service,
+            about_service,
         }
     }
 }

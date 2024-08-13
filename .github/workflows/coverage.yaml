@@ -54,7 +54,7 @@ jobs:
         name: Install Tools
         uses: taiki-e/install-action@v2
         with:
-          tool: grcov
+          tool: cargo-llvm-cov, cargo-nextest, grcov
 
       - id: imdl
         name: Install Intermodal
@@ -68,13 +68,17 @@ jobs:
         name: Run Unit Tests
         run: cargo test --tests --benches --examples --workspace --all-targets --all-features
 
-      - id: coverage
-        name: Generate Coverage Report
+      - id: coverage-llvm
+        name: Generate Coverage Report with LLVM
+        run: cargo llvm-cov nextest --tests --benches --examples --workspace --all-targets --all-features        
+
+      - id: coverage-grcov
+        name: Generate Coverage Report with grcov
         uses: alekitto/grcov@v0.2
 
       - id: upload
         name: Upload Coverage Report
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ${{ steps.coverage.outputs.report }}
