@@ -67,7 +67,7 @@ lettre = { version = "0", features = [
     "tokio1-rustls-tls",
 ] }
 log = "0"
-mockall = "0.12.1"
+mockall = "0.13.0"
 pbkdf2 = { version = "0", features = ["simple"] }
 pin-project-lite = "0.2"
 rand = "0"
