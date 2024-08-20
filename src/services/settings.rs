@@ -76,8 +76,12 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if the user does not have the required permissions.
-    pub async fn get_site_name(&self) -> String {
-        self.configuration.get_site_name().await
+    pub async fn get_site_name(&self, maybe_user_id: Option<UserId>) -> Result<String, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GetSiteName, maybe_user_id)
+            .await?;
+
+        Ok(self.configuration.get_site_name().await)
     }
 }
 
