@@ -42,8 +42,12 @@ pub async fn get_public_handler(
 
 /// Get website name.
 #[allow(clippy::unused_async)]
-pub async fn get_site_name_handler(State(app_data): State<Arc<AppData>>) -> Response {
-    let site_name = app_data.settings_service.get_site_name().await;
-
-    Json(responses::OkResponseData { data: site_name }).into_response()
+pub async fn get_site_name_handler(
+    State(app_data): State<Arc<AppData>>,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+) -> Response {
+    match app_data.settings_service.get_site_name(maybe_user_id).await {
+        Ok(site_name) => Json(responses::OkResponseData { data: site_name }).into_response(),
+        Err(error) => error.into_response(),
+    }
 }

@@ -38,14 +38,16 @@ impl Service {
     /// * The image URL is not an image.
     /// * The image is too big.
     /// * The user quota is met.
-    #[allow(clippy::missing_panics_doc)]
     pub async fn get_image_by_url(&self, url: &str, maybe_user_id: Option<UserId>) -> Result<Bytes, Error> {
+        let Some(user_id) = maybe_user_id else {
+            return Err(Error::Unauthenticated);
+        };
+
         self.authorization_service
             .authorize(ACTION::GetImageByUrl, maybe_user_id)
             .await
             .map_err(|_| Error::Unauthenticated)?;
 
-        // The unwrap should never panic as if the maybe_user_id is none, an authorization error will be returned and handled at the method above
-        self.image_cache_service.get_image_by_url(url, maybe_user_id.unwrap()).await
+        self.image_cache_service.get_image_by_url(url, user_id).await
     }
 }

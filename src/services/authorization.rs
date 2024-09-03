@@ -40,6 +40,7 @@ pub enum ACTION {
     GetSettings,
     GetSettingsSecret,
     GetPublicSettings,
+    GetSiteName,
     AddTag,
     DeleteTag,
     GetTags,
@@ -236,6 +237,7 @@ impl Default for CasbinConfiguration {
                 admin, GetSettings
                 admin, GetSettingsSecret
                 admin, GetPublicSettings
+                admin, GetSiteName
                 admin, AddTag
                 admin, DeleteTag
                 admin, GetTags
@@ -252,6 +254,7 @@ impl Default for CasbinConfiguration {
                 registered, GetCategories
                 registered, GetImageByUrl
                 registered, GetPublicSettings
+                registered, GetSiteName
                 registered, GetTags
                 registered, AddTorrent
                 registered, GetTorrent
@@ -263,6 +266,7 @@ impl Default for CasbinConfiguration {
                 guest, GetLicensePage
                 guest, GetCategories
                 guest, GetPublicSettings
+                guest, GetSiteName
                 guest, GetTags
                 guest, GetTorrent
                 guest, GetTorrentInfo
