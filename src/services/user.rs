@@ -461,11 +461,11 @@ fn validate_password_constraints(
 
     let password_length = password.len();
 
-    if password_length <= password_rules.min_password_length {
+    if password_length < password_rules.min_password_length {
         return Err(ServiceError::PasswordTooShort);
     }
 
-    if password_length >= password_rules.max_password_length {
+    if password_length > password_rules.max_password_length {
         return Err(ServiceError::PasswordTooLong);
     }
 
