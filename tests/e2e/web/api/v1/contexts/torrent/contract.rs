@@ -817,8 +817,8 @@ mod for_authenticated_users {
         use crate::common::client::Client;
         use crate::common::contexts::category::fixtures::software_predefined_category_id;
         use crate::common::contexts::torrent::asserts::assert_expected_torrent_details;
-        use crate::common::contexts::torrent::fixtures::{random_torrent, TestTorrent};
-        use crate::common::contexts::torrent::forms::{UpdateTorrentFrom, UploadTorrentMultipartForm};
+        use crate::common::contexts::torrent::fixtures::TestTorrent;
+        use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
         use crate::common::contexts::torrent::responses::{
             Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
         };
@@ -1126,10 +1126,10 @@ mod for_authenticated_users {
             let mut env = TestEnv::new();
             env.start(api::Version::V1).await;
 
-            /* if !env.provides_a_tracker() {
+            if !env.provides_a_tracker() {
                 println!("test skipped. It requires a tracker to be running.");
                 return;
-            } */
+            }
 
             let uploader = new_logged_in_user(&env).await;
             let upload_client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
