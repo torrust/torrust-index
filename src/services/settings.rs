@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use super::authorization::{self, ACTION};
-use crate::config::{Configuration, Settings};
+use crate::config::{self, Configuration, Settings};
 use crate::errors::ServiceError;
 use crate::models::user::UserId;
 
@@ -106,6 +106,7 @@ fn extract_public_settings(settings: &Settings) -> ConfigurationPublic {
         tracker_listed: settings.tracker.listed,
         tracker_private: settings.tracker.private,
         email_on_signup,
+        website: settings.website.clone().into(),
     }
 }
 
@@ -118,6 +119,7 @@ pub struct ConfigurationPublic {
     tracker_listed: bool,
     tracker_private: bool,
     email_on_signup: EmailOnSignup,
+    website: Website,
 }
 
 /// Whether the email is required on signup or not.
@@ -164,6 +166,92 @@ impl FromStr for EmailOnSignup {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Website {
+    pub name: String,
+    pub demo: Option<Demo>,
+    pub terms: Terms,
+}
+
+impl From<config::Website> for Website {
+    fn from(website: config::Website) -> Self {
+        Self {
+            name: website.name,
+            demo: website.demo.map(std::convert::Into::into),
+            terms: website.terms.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Demo {
+    pub warning: String,
+}
+
+impl From<config::Demo> for Demo {
+    fn from(demo: config::Demo) -> Self {
+        Self { warning: demo.warning }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Terms {
+    pub page: TermsPage,
+    pub upload: TermsUpload,
+}
+
+impl From<config::Terms> for Terms {
+    fn from(terms: config::Terms) -> Self {
+        Self {
+            page: terms.page.into(),
+            upload: terms.upload.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TermsPage {
+    pub title: String,
+    pub content: Markdown,
+}
+
+impl From<config::TermsPage> for TermsPage {
+    fn from(terms_page: config::TermsPage) -> Self {
+        Self {
+            title: terms_page.title,
+            content: terms_page.content.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TermsUpload {
+    pub content_upload_agreement: Markdown,
+}
+
+impl From<config::TermsUpload> for TermsUpload {
+    fn from(terms_upload: config::TermsUpload) -> Self {
+        Self {
+            content_upload_agreement: terms_upload.content_upload_agreement.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Markdown(pub String);
+
+impl Markdown {
+    fn new(content: &str) -> Self {
+        Self(content.to_owned())
+    }
+}
+
+impl From<config::Markdown> for Markdown {
+    fn from(markdown: config::Markdown) -> Self {
+        Self::new(&markdown.source())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::config::Configuration;
@@ -191,11 +279,12 @@ mod tests {
         assert_eq!(
             extract_public_settings(&all_settings),
             ConfigurationPublic {
-                website_name: all_settings.website.name,
+                website_name: all_settings.website.name.clone(),
                 tracker_url: all_settings.tracker.url,
                 tracker_listed: all_settings.tracker.listed,
                 tracker_private: all_settings.tracker.private,
                 email_on_signup,
+                website: all_settings.website.into(),
             }
         );
     }
