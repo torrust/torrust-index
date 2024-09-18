@@ -58,7 +58,7 @@ pub async fn get_user_tracker_key(logged_in_user: &LoggedInUserData, env: &TestE
 
 pub fn build_announce_url(tracker_url: &str, tracker_key: &Option<TrackerKey>) -> String {
     if let Some(key) = &tracker_key {
-        format!("{tracker_url}/{}", key.key)
+        format!("{tracker_url}{}", key.key)
     } else {
         tracker_url.to_string()
     }
@@ -66,7 +66,7 @@ pub fn build_announce_url(tracker_url: &str, tracker_key: &Option<TrackerKey>) -
 
 fn build_announce_list(tracker_url: &str, tracker_key: &Option<TrackerKey>) -> Vec<Vec<String>> {
     if let Some(key) = &tracker_key {
-        vec![vec![format!("{tracker_url}/{}", key.key)], vec![format!("{tracker_url}")]]
+        vec![vec![format!("{tracker_url}{}", key.key)], vec![format!("{tracker_url}")]]
     } else {
         vec![vec![format!("{tracker_url}")]]
     }
