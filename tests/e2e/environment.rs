@@ -92,6 +92,19 @@ impl TestEnv {
         }
     }
 
+    #[allow(dead_code)]
+    /// Some test requires a real tracker running in `public` mode.
+    pub fn provides_a_public_tracker(&self) -> bool {
+        if !self.is_shared() {
+            return false;
+        };
+
+        match self.server_settings() {
+            Some(settings) => !settings.tracker.private,
+            None => false,
+        }
+    }
+
     /// Returns the server starting settings if the servers was already started.
     /// We do not know the settings until we start the server.
     pub fn server_settings(&self) -> Option<Settings> {
