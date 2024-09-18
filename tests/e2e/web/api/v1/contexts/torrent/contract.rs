@@ -1546,12 +1546,12 @@ mod for_authenticated_users {
             }
 
             #[tokio::test]
-            async fn the_downloaded_torrent_should_be_the_canonical_version_of_the_uploaded_one() {
+            async fn the_downloaded_torrent_should_be_the_canonical_version_of_the_uploaded_one_using_a_public_tracker() {
                 let mut env = TestEnv::new();
                 env.start(api::Version::V1).await;
 
-                if !env.provides_a_tracker() {
-                    println!("test skipped. It requires a tracker to be running.");
+                if !env.provides_a_public_tracker() {
+                    println!("test skipped. It requires a public tracker to be running.");
                     return;
                 }
 
@@ -1572,7 +1572,39 @@ mod for_authenticated_users {
 
                 let downloaded_torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
 
-                let expected_downloaded_torrent = canonical_torrent_for(uploaded_torrent, &env, &None).await;
+                let expected_downloaded_torrent = canonical_torrent_for(uploaded_torrent, &env, &Some(logged_in_admin)).await;
+
+                assert_eq!(downloaded_torrent, expected_downloaded_torrent);
+            }
+
+            #[tokio::test]
+            async fn the_downloaded_torrent_should_be_the_canonical_version_of_the_uploaded_one_using_a_private_tracker() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                if !env.provides_a_private_tracker() {
+                    println!("test skipped. It requires a public tracker to be running.");
+                    return;
+                }
+
+                let logged_in_admin = new_logged_in_admin(&env).await;
+
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+                let uploader = new_logged_in_user(&env).await;
+
+                // Upload
+                let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+                let uploaded_torrent =
+                    decode_torrent(&test_torrent.index_info.torrent_file.contents).expect("could not decode uploaded torrent");
+
+                // Download
+                let response = client.download_torrent(&test_torrent.file_info_hash()).await;
+
+                let downloaded_torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
+
+                let expected_downloaded_torrent = canonical_torrent_for(uploaded_torrent, &env, &Some(logged_in_admin)).await;
 
                 assert_eq!(downloaded_torrent, expected_downloaded_torrent);
             }
