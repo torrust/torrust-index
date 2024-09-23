@@ -32,7 +32,11 @@ pub fn load_error_images() {
     });
 }
 
+#[allow(static_mut_refs)]
 pub fn map_error_to_image(error: &Error) -> Bytes {
+    // todo: remove "#[allow(static_mut_refs)]" attribute by assigning a owner
+    // to the static mutable variables ERROR_IMAGE_*. Maybe the proxy service.
+
     load_error_images();
     unsafe {
         match error {
