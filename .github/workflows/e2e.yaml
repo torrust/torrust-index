@@ -1,0 +1,44 @@
+# Temporary execution of E2E tests using MySQL becuase it's failing
+# in the `testing.yml` workflows and affects deployments and releases.
+# See https://github.com/torrust/torrust-index/issues/580
+name: E2E Testing
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        toolchain: [stable, nightly]
+
+    steps:
+      - id: checkout
+        name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - id: setup
+        name: Setup Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+
+      - id: cache
+        name: Enable Job Cache
+        uses: Swatinem/rust-cache@v2
+
+      # Temporary Cleaning to avoid Rust Compiler Bug
+      - id: clean
+        name: Make Build Clean
+        run: cargo clean
+
+      - id: test-mysql
+        name: Run Integration Tests (MySQL)
+        run: ./contrib/dev-tools/container/e2e/mysql/run-e2e-tests.sh
