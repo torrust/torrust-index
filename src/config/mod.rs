@@ -47,6 +47,11 @@ pub type Logging = v2::logging::Logging;
 pub type Threshold = v2::logging::Threshold;
 
 pub type Website = v2::website::Website;
+pub type Demo = v2::website::Demo;
+pub type Terms = v2::website::Terms;
+pub type TermsPage = v2::website::TermsPage;
+pub type TermsUpload = v2::website::TermsUpload;
+pub type Markdown = v2::website::Markdown;
 
 /// Configuration version
 const VERSION_2: &str = "2.0.0";
@@ -192,6 +197,14 @@ impl Info {
             config_toml,
             config_toml_path,
         })
+    }
+
+    #[must_use]
+    pub fn from_toml(config_toml: &str) -> Self {
+        Self {
+            config_toml: Some(config_toml.to_owned()),
+            config_toml_path: String::new(),
+        }
     }
 }
 
@@ -385,88 +398,44 @@ mod tests {
 
     #[cfg(test)]
     fn default_config_toml() -> String {
-        let config = r#"[metadata]
-                                app = "torrust-index"
-                                purpose = "configuration"
-                                schema_version = "2.0.0"
+        use std::fs;
+        use std::path::PathBuf;
 
-                                [logging]
-                                threshold = "info"
+        // Get the path to the current Cargo.toml directory
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR environment variable not set");
 
-                                [website]
-                                name = "Torrust"
+        // Construct the path to the default configuration file relative to the Cargo.toml directory
+        let mut path = PathBuf::from(manifest_dir);
+        path.push("tests/fixtures/default_configuration.toml");
 
-                                [tracker]
-                                api_url = "http://localhost:1212/"
-                                listed = false
-                                private = false
-                                token = "MyAccessToken"
-                                token_valid_seconds = 7257600
-                                url = "udp://localhost:6969"
+        let config = fs::read_to_string(path)
+            .expect("Could not read default configuration TOML file: tests/fixtures/default_configuration.toml");
 
-                                [net]
-                                bind_address = "0.0.0.0:3001"
+        config.lines().map(str::trim_start).collect::<Vec<&str>>().join("\n");
 
-                                [auth]
-                                user_claim_token_pepper = "MaxVerstappenWC2021"
-
-                                [auth.password_constraints]
-                                max_password_length = 64
-                                min_password_length = 6
-
-                                [database]
-                                connect_url = "sqlite://data.db?mode=rwc"
-
-                                [mail]
-                                from = "example@email.com"
-                                reply_to = "noreply@email.com"
-
-                                [mail.smtp]
-                                port = 25
-                                server = ""
-
-                                [mail.smtp.credentials]
-                                password = ""
-                                username = ""
-
-                                [image_cache]
-                                capacity = 128000000
-                                entry_size_limit = 4000000
-                                max_request_timeout_ms = 1000
-                                user_quota_bytes = 64000000
-                                user_quota_period_seconds = 3600
-
-                                [api]
-                                default_torrent_page_size = 10
-                                max_torrent_page_size = 30
-
-                                [tracker_statistics_importer]
-                                port = 3002
-                                torrent_info_update_interval = 3600
-        "#
-        .lines()
-        .map(str::trim_start)
-        .collect::<Vec<&str>>()
-        .join("\n");
         config
     }
 
-    #[tokio::test]
-    async fn configuration_should_build_settings_with_default_values() {
-        let configuration = Configuration::default().get_all().await;
+    /// Build settings from default configuration fixture in TOML.
+    ///
+    /// We just want to load that file without overriding with env var or other
+    /// configuration loading behavior.
+    #[cfg(test)]
+    fn default_settings() -> Settings {
+        use figment::providers::{Format, Toml};
+        use figment::Figment;
 
-        let toml = toml::to_string(&configuration).expect("Could not encode TOML value for configuration");
+        let figment = Figment::from(Toml::string(&default_config_toml()));
+        let settings: Settings = figment.extract().expect("Invalid configuration");
 
-        assert_eq!(toml, default_config_toml());
+        settings
     }
 
     #[tokio::test]
-    async fn configuration_should_return_all_settings() {
-        let configuration = Configuration::default().get_all().await;
+    async fn configuration_should_have_a_default_constructor() {
+        let settings = Configuration::default().get_all().await;
 
-        let toml = toml::to_string(&configuration).expect("Could not encode TOML value for configuration");
-
-        assert_eq!(toml, default_config_toml());
+        assert_eq!(settings, default_settings());
     }
 
     #[tokio::test]

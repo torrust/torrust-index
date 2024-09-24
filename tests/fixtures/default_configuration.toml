@@ -1,0 +1,81 @@
+[metadata]
+app = "torrust-index"
+purpose = "configuration"
+schema_version = "2.0.0"
+
+[logging]
+threshold = "info"
+
+[website]
+name = "Torrust"
+
+[website.terms]
+
+[website.terms.upload]
+content_upload_agreement = """I confirm that the content I am uploading is authorized, and I have read and agree to the terms."""
+
+[website.terms.page]
+content = """
+
+# Usage Policies and Content Restrictions
+
+Our software is designed to support the distribution of legal, authorized content only. Users may only upload or share files that fall under the following categories:
+
+- **Open-Source Licenses:** Content licensed under recognized open-source licenses, allowing for free distribution and modification.
+- **Creative Commons Licenses:** Content released under Creative Commons licenses that permit sharing and distribution.
+- **Public Domain:** Content that is free of copyright restrictions and available for public use.
+
+**Prohibited Content:** Any content that infringes copyright, is subject to copyright protection, or is illegal under applicable laws is strictly prohibited. This includes but is not limited to copyrighted movies, music, software, books, and any other media.
+
+**Enforcement:** We reserve the right to remove any content that does not comply with these policies without notice. We may also take additional steps, including reporting violations to the relevant authorities, if necessary.
+
+"""
+title = "Usage Policies and Content Restrictions"
+
+[tracker]
+api_url = "http://localhost:1212/"
+listed = false
+private = false
+token = "MyAccessToken"
+token_valid_seconds = 7257600
+url = "udp://localhost:6969"
+
+[net]
+bind_address = "0.0.0.0:3001"
+
+[auth]
+user_claim_token_pepper = "MaxVerstappenWC2021"
+
+[auth.password_constraints]
+max_password_length = 64
+min_password_length = 6
+
+[database]
+connect_url = "sqlite://data.db?mode=rwc"
+
+[mail]
+from = "example@email.com"
+reply_to = "noreply@email.com"
+
+[mail.smtp]
+port = 25
+server = ""
+
+[mail.smtp.credentials]
+password = ""
+username = ""
+
+[image_cache]
+capacity = 128000000
+entry_size_limit = 4000000
+max_request_timeout_ms = 1000
+user_quota_bytes = 64000000
+user_quota_period_seconds = 3600
+
+[api]
+default_torrent_page_size = 10
+max_torrent_page_size = 30
+
+[tracker_statistics_importer]
+port = 3002
+torrent_info_update_interval = 3600
