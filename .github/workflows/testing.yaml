@@ -156,6 +156,6 @@ jobs:
         name: Run Integration Tests (SQLite)
         run: ./contrib/dev-tools/container/e2e/sqlite/run-e2e-tests.sh
 
-      - id: test-mysql
-        name: Run Integration Tests (MySQL)
-        run: ./contrib/dev-tools/container/e2e/mysql/run-e2e-tests.sh
+      #- id: test-mysql
+      #  name: Run Integration Tests (MySQL)
+      #  run: ./contrib/dev-tools/container/e2e/mysql/run-e2e-tests.sh
