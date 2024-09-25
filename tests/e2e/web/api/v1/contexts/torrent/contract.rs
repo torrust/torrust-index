@@ -1337,12 +1337,150 @@ mod for_authenticated_users {
         }
 
         #[tokio::test]
-        async fn it_should_allow_admin_users_to_get_torrent_details_searching_by_info_hash() {
+        async fn it_should_allow_admin_users_to_get_torrent_details_searching_by_info_hash_using_a_public_tracker() {
             let mut env = TestEnv::new();
             env.start(api::Version::V1).await;
 
-            if !env.provides_a_tracker() {
-                println!("test skipped. It requires a tracker to be running.");
+            if !env.provides_a_public_tracker() {
+                println!("test skipped. It requires a public tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            let logged_in_admin = new_logged_in_admin(&env).await;
+
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+            let response = client.get_torrent(&test_torrent.file_info_hash()).await;
+
+            let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
+
+            let tracker_url = env.server_settings().unwrap().tracker.url.to_string();
+            let encoded_tracker_url = urlencoding::encode(&tracker_url);
+
+            let expected_torrent = TorrentDetails {
+                torrent_id: uploaded_torrent.torrent_id,
+                uploader: uploader.username,
+                info_hash: test_torrent.file_info.info_hash.to_lowercase(),
+                title: test_torrent.index_info.title.clone(),
+                description: test_torrent.index_info.description,
+                category: Category {
+                    id: software_predefined_category_id(),
+                    name: test_torrent.index_info.category,
+                    num_torrents: 19, // Ignored in assertion
+                },
+                upload_date: "2023-04-27 07:56:08".to_string(), // Ignored in assertion
+                file_size: test_torrent.file_info.content_size,
+                seeders: 0,
+                leechers: 0,
+                files: vec![File {
+                    path: vec![test_torrent.file_info.files[0].clone()],
+                    // Using one file torrent for testing: content_size = first file size
+                    length: test_torrent.file_info.content_size,
+                    md5sum: None, // DevSkim: ignore DS126858
+                }],
+                trackers: vec![tracker_url.clone().to_string()],
+                magnet_link: format!(
+                    // cspell:disable-next-line
+                    "magnet:?xt=urn:btih:{}&dn={}&tr={}",
+                    test_torrent.file_info.info_hash.to_lowercase(),
+                    urlencoding::encode(&test_torrent.index_info.title),
+                    encoded_tracker_url
+                ),
+                tags: vec![],
+                name: test_torrent.index_info.name.clone(),
+                comment: test_torrent.file_info.comment.clone(),
+                creation_date: test_torrent.file_info.creation_date,
+                created_by: test_torrent.file_info.created_by.clone(),
+                encoding: test_torrent.file_info.encoding.clone(),
+                canonical_info_hash_group: vec![test_torrent.file_info.info_hash.to_lowercase()],
+            };
+
+            assert_expected_torrent_details(&torrent_details_response.data, &expected_torrent);
+            assert!(response.is_json_and_ok());
+        }
+
+        /* #[tokio::test]
+        async fn it_should_allow_admin_users_to_get_torrent_details_searching_by_info_hash_using_a_private_tracker() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_private_tracker() {
+                println!("test skipped. It requires a private tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            let logged_in_admin = new_logged_in_admin(&env).await;
+
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+            let response = client.get_torrent(&test_torrent.file_info_hash()).await;
+
+            let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
+
+            let tracker_url = env.server_settings().unwrap().tracker.url.to_string();
+            let encoded_tracker_url = urlencoding::encode(&tracker_url);
+
+            let expected_torrent_info = client.get_torrent(&test_torrent.file_info.info_hash.to_lowercase()).await;
+
+            //expected_torrent_info.body.
+
+            let parsed_response = serde_json::from_str(&expected_torrent_info.body);
+
+            let expected_torrent = TorrentDetails {
+                torrent_id: uploaded_torrent.torrent_id,
+                uploader: uploader.username,
+                info_hash: test_torrent.file_info.info_hash.to_lowercase(),
+                title: test_torrent.index_info.title.clone(),
+                description: test_torrent.index_info.description,
+                category: Category {
+                    id: software_predefined_category_id(),
+                    name: test_torrent.index_info.category,
+                    num_torrents: 19, // Ignored in assertion
+                },
+                upload_date: "2023-04-27 07:56:08".to_string(), // Ignored in assertion
+                file_size: test_torrent.file_info.content_size,
+                seeders: 0,
+                leechers: 0,
+                files: vec![File {
+                    path: vec![test_torrent.file_info.files[0].clone()],
+                    // Using one file torrent for testing: content_size = first file size
+                    length: test_torrent.file_info.content_size,
+                    md5sum: None, // DevSkim: ignore DS126858
+                }],
+                trackers: vec![tracker_url.clone().to_string()],
+                magnet_link: format!(
+                    // cspell:disable-next-line
+                    "magnet:?xt=urn:btih:{}&dn={}&tr={}",
+                    test_torrent.file_info.info_hash.to_lowercase(),
+                    urlencoding::encode(&test_torrent.index_info.title),
+                    encoded_tracker_url
+                ),
+                tags: vec![],
+                name: test_torrent.index_info.name.clone(),
+                comment: test_torrent.file_info.comment.clone(),
+                creation_date: test_torrent.file_info.creation_date,
+                created_by: test_torrent.file_info.created_by.clone(),
+                encoding: test_torrent.file_info.encoding.clone(),
+                canonical_info_hash_group: vec![test_torrent.file_info.info_hash.to_lowercase()],
+            };
+
+            assert_expected_torrent_details(&torrent_details_response.data, &expected_torrent);
+            assert!(response.is_json_and_ok());
+        } */
+
+        #[tokio::test]
+        async fn it_should_allow_admin_users_to_get_torrent_details_searching_by_info_hash_using_a_private_tracker() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_private_tracker() {
+                println!("test skipped. It requires a private tracker to be running.");
                 return;
             }
 
@@ -1583,7 +1721,7 @@ mod for_authenticated_users {
                 env.start(api::Version::V1).await;
 
                 if !env.provides_a_private_tracker() {
-                    println!("test skipped. It requires a public tracker to be running.");
+                    println!("test skipped. It requires a private tracker to be running.");
                     return;
                 }
 
