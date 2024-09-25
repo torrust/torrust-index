@@ -23,8 +23,7 @@ mod for_guests {
     use crate::common::client::Client;
     use crate::common::contexts::category::fixtures::software_predefined_category_id;
     use crate::common::contexts::torrent::asserts::assert_expected_torrent_details;
-    use crate::common::contexts::torrent::fixtures::{random_torrent, TestTorrent};
-    use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
+    use crate::common::contexts::torrent::fixtures::TestTorrent;
     use crate::common::contexts::torrent::requests::InfoHash;
     use crate::common::contexts::torrent::responses::{
         Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
@@ -430,22 +429,6 @@ mod for_guests {
     }
 
     #[tokio::test]
-    async fn it_should_not_allow_guests_to_upload_torrents() {
-        let mut env = TestEnv::new();
-        env.start(api::Version::V1).await;
-
-        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
-
-        let test_torrent = random_torrent();
-
-        let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
-
-        let response = client.upload_torrent(form.into()).await;
-
-        assert_eq!(response.status, 401);
-    }
-
-    #[tokio::test]
     async fn it_should_not_allow_guests_to_delete_torrents() {
         let mut env = TestEnv::new();
         env.start(api::Version::V1).await;
@@ -463,6 +446,31 @@ mod for_guests {
         let response = client.delete_torrent(&test_torrent.file_info_hash()).await;
 
         assert_eq!(response.status, 401);
+    }
+
+    mod authorization {
+        use torrust_index::web::api;
+
+        use crate::common::client::Client;
+        use crate::common::contexts::torrent::fixtures::random_torrent;
+        use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
+        use crate::e2e::environment::TestEnv;
+
+        #[tokio::test]
+        async fn it_should_not_allow_guests_to_upload_torrents() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+            let test_torrent = random_torrent();
+
+            let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
+
+            let response = client.upload_torrent(form.into()).await;
+
+            assert_eq!(response.status, 401);
+        }
     }
 }
 
