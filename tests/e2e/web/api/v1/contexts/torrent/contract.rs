@@ -428,26 +428,6 @@ mod for_guests {
         assert_eq!(response.status, 404);
     }
 
-    #[tokio::test]
-    async fn it_should_not_allow_guests_to_delete_torrents() {
-        let mut env = TestEnv::new();
-        env.start(api::Version::V1).await;
-
-        if !env.provides_a_tracker() {
-            println!("test skipped. It requires a tracker to be running.");
-            return;
-        }
-
-        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
-
-        let uploader = new_logged_in_user(&env).await;
-        let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
-
-        let response = client.delete_torrent(&test_torrent.file_info_hash()).await;
-
-        assert_eq!(response.status, 401);
-    }
-
     mod authorization {
         use torrust_index::web::api;
 
@@ -455,6 +435,8 @@ mod for_guests {
         use crate::common::contexts::torrent::fixtures::random_torrent;
         use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
         use crate::e2e::environment::TestEnv;
+        use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
+        use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
 
         #[tokio::test]
         async fn it_should_not_allow_guests_to_upload_torrents() {
@@ -468,6 +450,26 @@ mod for_guests {
             let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
             let response = client.upload_torrent(form.into()).await;
+
+            assert_eq!(response.status, 401);
+        }
+
+        #[tokio::test]
+        async fn it_should_not_allow_guests_to_delete_torrents() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+            let uploader = new_logged_in_user(&env).await;
+            let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            let response = client.delete_torrent(&test_torrent.file_info_hash()).await;
 
             assert_eq!(response.status, 401);
         }
