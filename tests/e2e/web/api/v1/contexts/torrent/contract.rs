@@ -473,6 +473,28 @@ mod for_guests {
 
             assert_eq!(response.status, 401);
         }
+
+        #[tokio::test]
+        async fn it_should_allow_guests_to_download_a_torrent_file_searching_by_info_hash() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+            let uploader = new_logged_in_user(&env).await;
+
+            // Upload
+            let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            // Download
+            let response = client.download_torrent(&test_torrent.file_info_hash()).await;
+
+            assert_eq!(response.status, 200);
+        }
     }
 }
 
