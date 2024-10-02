@@ -410,7 +410,7 @@ mod for_guests {
 
         use crate::common::client::Client;
         use crate::common::contexts::torrent::fixtures::random_torrent;
-        use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
+        use crate::common::contexts::torrent::forms::{UpdateTorrentFrom, UploadTorrentMultipartForm};
         use crate::common::contexts::torrent::responses::TorrentListResponse;
         use crate::common::http::Query;
         use crate::e2e::environment::TestEnv;
@@ -567,6 +567,39 @@ mod for_guests {
             let response = client.get_torrent(&canonical_infohash).await;
 
             assert_eq!(response.status, 200);
+        }
+
+        #[tokio::test]
+        async fn it_should_not_allow_guest_users_to_update_torrents() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+            let new_title = format!("{}-new-title", test_torrent.index_info.title);
+            let new_description = format!("{}-new-description", test_torrent.index_info.description);
+
+            let response = client
+                .update_torrent(
+                    &test_torrent.file_info_hash(),
+                    UpdateTorrentFrom {
+                        title: Some(new_title.clone()),
+                        description: Some(new_description.clone()),
+                        category: None,
+                        tags: None,
+                    },
+                )
+                .await;
+
+            assert_eq!(response.status, 401);
         }
     }
 }
