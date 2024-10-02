@@ -27,7 +27,7 @@ license = "AGPL-3.0-only"
 publish = true
 repository = "https://github.com/torrust/torrust-tracker"
 rust-version = "1.72"
-version = "3.0.0-develop"
+version = "3.0.0"
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3
@@ -89,7 +89,7 @@ text-to-png = "0"
 thiserror = "1"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "0"
-torrust-index-located-error = { version = "3.0.0-develop", path = "packages/located-error" }
+torrust-index-located-error = { version = "3.0.0", path = "packages/located-error" }
 tower = { version = "0.4", features = ["timeout"] }
 tower-http = { version = "0", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
 trace = "0.1.7"
