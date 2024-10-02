@@ -112,7 +112,7 @@
 //!   && mkdir -p ./storage/database
 //! ```
 //!
-//! Then you can run it with: `./target/release/main`
+//! Then you can run it with: `./target/release/torrust-index`
 //!
 //! ## Run with docker
 //!
