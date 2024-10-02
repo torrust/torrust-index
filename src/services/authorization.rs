@@ -74,7 +74,6 @@ impl Service {
     ///
     /// Will return an error if:
     /// - The user is not authorized to perform the action.
-
     pub async fn authorize(&self, action: ACTION, maybe_user_id: Option<UserId>) -> std::result::Result<(), ServiceError> {
         let role = self.get_role(maybe_user_id).await;
 

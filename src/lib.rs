@@ -112,20 +112,28 @@
 //!   && mkdir -p ./storage/database
 //! ```
 //!
-//! Then you can run it with: `./target/release/main`
+//! Then you can run it with: `./target/release/torrust-index`
 //!
 //! ## Run with docker
 //!
 //! You can run the index with a pre-built docker image:
 //!
 //! ```text
-//! mkdir -p ./storage/database \
+//! cd /tmp \
+//!   && mkdir torrust-index \
+//!   && cd torrust-index \
+//!   && mkdir -p ./storage/index/lib/database \
+//!   && mkdir -p ./storage/index/log \
+//!   && mkdir -p ./storage/index/etc \
+//!   && sqlite3 "./storage/index/lib/database/sqlite3.db" "VACUUM;" \
 //!   && export USER_ID=1000 \
 //!   && docker run -it \
-//!     --user="$USER_ID" \
+//!     --env USER_ID="$USER_ID" \
 //!     --publish 3001:3001/tcp \
-//!     --volume "$(pwd)/storage":"/app/storage" \
-//!     torrust/index
+//!     --volume "$(pwd)/storage/index/lib":"/var/lib/torrust/index" \
+//!     --volume "$(pwd)/storage/index/log":"/var/log/torrust/index" \
+//!     --volume "$(pwd)/storage/index/etc":"/etc/torrust/index" \
+//!     torrust/index:develop
 //! ```
 //!
 //! For more information about using docker visit the [tracker docker documentation](https://github.com/torrust/torrust-index/tree/develop/docker).
