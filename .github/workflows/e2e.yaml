@@ -17,7 +17,7 @@ jobs:
 
     strategy:
       matrix:
-        toolchain: [stable, nightly]
+        toolchain: [nightly, stable]
 
     steps:
       - id: checkout
@@ -33,11 +33,6 @@ jobs:
       - id: cache
         name: Enable Job Cache
         uses: Swatinem/rust-cache@v2
-
-      # Temporary Cleaning to avoid Rust Compiler Bug
-      - id: clean
-        name: Make Build Clean
-        run: cargo clean
 
       - id: test-mysql
         name: Run Integration Tests (MySQL)
