@@ -1016,6 +1016,7 @@ mod for_authenticated_users {
             use crate::common::contexts::torrent::fixtures::random_torrent;
             use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
             use crate::e2e::environment::TestEnv;
+            use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
             use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
 
             #[tokio::test]
@@ -1037,6 +1038,32 @@ mod for_authenticated_users {
                 let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
                 let response = client.upload_torrent(form.into()).await;
+
+                assert_eq!(response.status, 200);
+            }
+
+            #[tokio::test]
+            async fn it_should_allow_registered_users_to_download_a_torrent_file_searching_by_info_hash() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                if !env.provides_a_tracker() {
+                    println!("test skipped. It requires a tracker to be running.");
+                    return;
+                }
+
+                let uploader = new_logged_in_user(&env).await;
+
+                // Upload
+                let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+                // Download
+
+                let registered_user = new_logged_in_user(&env).await;
+
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &registered_user.token);
+
+                let response = client.download_torrent(&test_torrent.file_info_hash()).await;
 
                 assert_eq!(response.status, 200);
             }
