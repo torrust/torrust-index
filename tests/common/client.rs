@@ -177,6 +177,12 @@ impl Client {
     pub async fn ban_user(&self, username: Username) -> TextResponse {
         self.http_client.delete(&format!("/user/ban/{}", &username.value)).await
     }
+
+    // Context: proxy
+
+    /* pub async fn get_image_by_url(&self, url: &str) -> TextResponse {
+        self.http_client.get(&format!("/proxy/image/{url}"), Query::empty()).await
+    } */
 }
 
 /// Generic HTTP Client

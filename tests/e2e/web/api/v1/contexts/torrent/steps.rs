@@ -1,6 +1,9 @@
 use std::str::FromStr;
+use std::sync::Arc;
 
+use torrust_index::databases::database;
 use torrust_index::models::info_hash::InfoHash;
+use torrust_index::services::torrent::Index;
 use torrust_index::web::api::server::v1::responses::ErrorResponseData;
 
 use crate::common::client::Client;
@@ -57,3 +60,31 @@ pub async fn upload_test_torrent(client: &Client, test_torrent: &TestTorrent) ->
 
     Ok(canonical_info_hash)
 }
+
+/// Gets tracker announce urls.
+///
+/// # Errors
+///
+/// Returns an `ErrorResponseData` if the response is not a 200.
+pub async fn get_trackers(env: &TestEnv, user_id: i64, torrent_id: i64) -> () {
+    let database = Arc::new(
+        database::connect(&env.database_connect_url().unwrap())
+            .await
+            .expect("Database error."),
+    );
+
+    let announce_urls = database.get_torrent_announce_urls_from_id(torrent_id);
+
+    let user_tracker_key = database.get_user_tracker_key(user_id);
+
+    announce_urls.retain(|tracker| *tracker != tracker_url.to_string());
+}
+
+/*   /// It adds the tracker URL in the first position of the tracker list.
+   pub fn include_url_as_main_tracker(&mut self, tracker_url: &Url) {
+    // Remove any existing instances of tracker_url
+    self.trackers.retain(|tracker| *tracker != tracker_url.to_string());
+
+    // Insert tracker_url at the first position
+    self.trackers.insert(0, tracker_url.to_owned().to_string());
+} */

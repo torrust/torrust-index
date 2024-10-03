@@ -226,8 +226,10 @@ mod for_guests {
 
         let _result = upload_test_torrent(&client, &second_torrent).await;
 
+        let unauthenticated_client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
         // Get torrent details using the non-canonical info-hash (second torrent info-hash)
-        let response = client.get_torrent(&second_torrent.file_info_hash()).await;
+        let response = unauthenticated_client.get_torrent(&second_torrent.file_info_hash()).await;
         let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
 
         // The returned torrent info should be the same as the first torrent
@@ -842,12 +844,21 @@ mod for_authenticated_users {
 
     mod and_non_admins {
 
+        use torrust_index::utils::parse_torrent::decode_torrent;
         use torrust_index::web::api;
+        use uuid::Uuid;
 
         use crate::common::client::Client;
+        use crate::common::contexts::category::fixtures::software_predefined_category_id;
+        use crate::common::contexts::torrent::asserts::assert_expected_torrent_details;
+        use crate::common::contexts::torrent::fixtures::TestTorrent;
         use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
+        use crate::common::contexts::torrent::responses::{
+            Category, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
+        };
+        use crate::common::http::Query;
         use crate::e2e::environment::TestEnv;
-        use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
+        use crate::e2e::web::api::v1::contexts::torrent::steps::{upload_random_torrent_to_index, upload_test_torrent};
         use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
 
         #[tokio::test]
@@ -905,6 +916,294 @@ mod for_authenticated_users {
 
             assert_eq!(response.status, 403);
         }
+
+        #[tokio::test]
+        async fn it_should_allow_non_admin_users_to_get_torrent_details_searching_by_info_hash() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            let authenticated_user = new_logged_in_user(&env).await;
+
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &authenticated_user.token);
+
+            let response = client.get_torrent(&test_torrent.file_info_hash()).await;
+
+            let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
+
+            let tracker_url = env.server_settings().unwrap().tracker.url.to_string();
+            let encoded_tracker_url = urlencoding::encode(&tracker_url);
+
+            let expected_torrent = TorrentDetails {
+                torrent_id: uploaded_torrent.torrent_id,
+                uploader: uploader.username,
+                info_hash: test_torrent.file_info.info_hash.to_lowercase(),
+                title: test_torrent.index_info.title.clone(),
+                description: test_torrent.index_info.description,
+                category: Category {
+                    id: software_predefined_category_id(),
+                    name: test_torrent.index_info.category,
+                    num_torrents: 19, // Ignored in assertion
+                },
+                upload_date: "2023-04-27 07:56:08".to_string(), // Ignored in assertion
+                file_size: test_torrent.file_info.content_size,
+                seeders: 0,
+                leechers: 0,
+                files: vec![File {
+                    path: vec![test_torrent.file_info.files[0].clone()],
+                    // Using one file torrent for testing: content_size = first file size
+                    length: test_torrent.file_info.content_size,
+                    md5sum: None, // DevSkim: ignore DS126858
+                }],
+                trackers: vec![tracker_url.clone().to_string()],
+                magnet_link: format!(
+                    // cspell:disable-next-line
+                    "magnet:?xt=urn:btih:{}&dn={}&tr={}",
+                    test_torrent.file_info.info_hash.to_lowercase(),
+                    urlencoding::encode(&test_torrent.index_info.title),
+                    encoded_tracker_url
+                ),
+                tags: vec![],
+                name: test_torrent.index_info.name.clone(),
+                comment: test_torrent.file_info.comment.clone(),
+                creation_date: test_torrent.file_info.creation_date,
+                created_by: test_torrent.file_info.created_by.clone(),
+                encoding: test_torrent.file_info.encoding.clone(),
+                canonical_info_hash_group: vec![test_torrent.file_info.info_hash.to_lowercase()],
+            };
+
+            assert_expected_torrent_details(&torrent_details_response.data, &expected_torrent);
+            assert!(response.is_json_and_ok());
+        }
+
+        #[tokio::test]
+        async fn it_should_allow_non_admin_users_to_find_torrent_details_using_a_non_canonical_info_hash() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+            // Sample data needed to build two torrents with the same canonical info-hash.
+            // Those torrents belong to the same Canonical Infohash Group.
+            let id = Uuid::new_v4();
+            let title = format!("title-{id}");
+            let file_contents = "data".to_string();
+
+            // Upload the first torrent
+            let mut first_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 01");
+            first_torrent.index_info.title.clone_from(&title);
+
+            let first_torrent_canonical_info_hash = upload_test_torrent(&client, &first_torrent)
+                .await
+                .expect("first torrent should be uploaded");
+
+            // Upload the second torrent with the same canonical info-hash
+            let mut second_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 02");
+            second_torrent.index_info.title = format!("{title}-clone");
+
+            let _result = upload_test_torrent(&client, &second_torrent).await;
+
+            // Get torrent details using the non-canonical info-hash (second torrent info-hash)
+            let response = client.get_torrent(&second_torrent.file_info_hash()).await;
+            let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
+
+            // The returned torrent info should be the same as the first torrent
+            assert_eq!(response.status, 200);
+            assert_eq!(
+                torrent_details_response.data.info_hash,
+                first_torrent_canonical_info_hash.to_hex_string()
+            );
+        }
+
+        #[tokio::test]
+        async fn it_should_allow_non_admin_users_to_get_torrents() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let (_test_torrent, _indexed_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            let authenticated_user = new_logged_in_user(&env).await;
+
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &authenticated_user.token);
+
+            let response = client.get_torrents(Query::empty()).await;
+
+            let torrent_list_response: TorrentListResponse = serde_json::from_str(&response.body).unwrap();
+
+            assert!(torrent_list_response.data.total > 0);
+            assert!(response.is_json_and_ok());
+        }
+
+        mod it_should_allow_non_admin_users_to_download_a_torrent_file_searching_by_info_hash {
+
+            use torrust_index::utils::parse_torrent::{calculate_info_hash, decode_torrent};
+            use torrust_index::web::api;
+
+            use crate::common::client::Client;
+            use crate::e2e::environment::TestEnv;
+            use crate::e2e::web::api::v1::contexts::torrent::asserts::canonical_torrent_for;
+            use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
+            use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
+
+            #[tokio::test]
+            async fn returning_a_bittorrent_binary_ok_response() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                if !env.provides_a_tracker() {
+                    println!("test skipped. It requires a tracker to be running.");
+                    return;
+                }
+
+                let authenticated_user = new_logged_in_user(&env).await;
+
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &authenticated_user.token);
+
+                let uploader = new_logged_in_user(&env).await;
+
+                // Upload
+                let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+                // Download
+                let response = client.download_torrent(&test_torrent.file_info_hash()).await;
+
+                assert!(response.is_a_bit_torrent_file());
+            }
+
+            #[tokio::test]
+            async fn the_downloaded_torrent_should_keep_the_same_info_hash_if_the_torrent_does_not_have_non_standard_fields_in_the_info_dict(
+            ) {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                if !env.provides_a_tracker() {
+                    println!("test skipped. It requires a tracker to be running.");
+                    return;
+                }
+
+                let authenticated_user = new_logged_in_user(&env).await;
+
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &authenticated_user.token);
+
+                let uploader = new_logged_in_user(&env).await;
+
+                // Upload
+                let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+                // Download
+                let response = client.download_torrent(&test_torrent.file_info_hash()).await;
+
+                let downloaded_torrent_info_hash =
+                    calculate_info_hash(&response.bytes).expect("failed to calculate info-hash of the downloaded torrent");
+
+                assert_eq!(
+                    downloaded_torrent_info_hash.to_hex_string(),
+                    test_torrent.file_info_hash(),
+                    "downloaded torrent info-hash does not match uploaded torrent info-hash"
+                );
+            }
+
+            #[tokio::test]
+            async fn the_downloaded_torrent_should_be_the_canonical_version_of_the_uploaded_one() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                if !env.provides_a_tracker() {
+                    println!("test skipped. It requires a tracker to be running.");
+                    return;
+                }
+
+                let authenticated_user = new_logged_in_user(&env).await;
+
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &authenticated_user.token);
+
+                let uploader = new_logged_in_user(&env).await;
+
+                // Upload
+                let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+                let uploaded_torrent =
+                    decode_torrent(&test_torrent.index_info.torrent_file.contents).expect("could not decode uploaded torrent");
+
+                // Download
+                let response = client.download_torrent(&test_torrent.file_info_hash()).await;
+
+                let downloaded_torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
+
+                let expected_downloaded_torrent = canonical_torrent_for(uploaded_torrent, &env, &None).await;
+
+                assert_eq!(downloaded_torrent, expected_downloaded_torrent);
+            }
+        }
+
+        #[tokio::test]
+        async fn it_should_allow_non_admin_users_to_download_a_torrent_using_a_non_canonical_info_hash() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let upload_client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+            // Sample data needed to build two torrents with the same canonical info-hash.
+            // Those torrents belong to the same Canonical Infohash Group.
+            let id = Uuid::new_v4();
+            let title = format!("title-{id}");
+            let file_contents = "data".to_string();
+
+            // Upload the first torrent
+            let mut first_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 01");
+            first_torrent.index_info.title.clone_from(&title);
+
+            let first_torrent_canonical_info_hash = upload_test_torrent(&upload_client, &first_torrent)
+                .await
+                .expect("first torrent should be uploaded");
+
+            // Upload the second torrent with the same canonical info-hash
+            let mut second_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 02");
+            second_torrent.index_info.title = format!("{title}-clone");
+
+            let _result = upload_test_torrent(&upload_client, &second_torrent).await;
+
+            let authenticated_user = new_logged_in_user(&env).await;
+
+            let download_client = Client::authenticated(&env.server_socket_addr().unwrap(), &authenticated_user.token);
+
+            // Download the torrent using the non-canonical info-hash (second torrent info-hash)
+            let response = download_client.download_torrent(&second_torrent.file_info_hash()).await;
+
+            let torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
+
+            // The returned torrent info-hash should be the same as the first torrent
+            assert_eq!(response.status, 200);
+            assert_eq!(
+                torrent.canonical_info_hash_hex(),
+                first_torrent_canonical_info_hash.to_hex_string()
+            );
+        }
     }
 
     mod and_torrent_owners {
@@ -960,13 +1259,22 @@ mod for_authenticated_users {
 
     mod and_admins {
 
+        use torrust_index::utils::parse_torrent::decode_torrent;
         use torrust_index::web::api;
+        use uuid::Uuid;
 
         use crate::common::client::Client;
-        use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
-        use crate::common::contexts::torrent::responses::{DeletedTorrentResponse, UpdatedTorrentResponse};
+        use crate::common::contexts::category::fixtures::software_predefined_category_id;
+        use crate::common::contexts::torrent::asserts::assert_expected_torrent_details;
+        use crate::common::contexts::torrent::fixtures::{random_torrent, TestTorrent};
+        use crate::common::contexts::torrent::forms::{UpdateTorrentFrom, UploadTorrentMultipartForm};
+        use crate::common::contexts::torrent::responses::{
+            Category, DeletedTorrentResponse, File, TorrentDetails, TorrentDetailsResponse, TorrentListResponse,
+            UpdatedTorrentResponse, UploadedTorrentResponse,
+        };
+        use crate::common::http::Query;
         use crate::e2e::environment::TestEnv;
-        use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
+        use crate::e2e::web::api::v1::contexts::torrent::steps::{upload_random_torrent_to_index, upload_test_torrent};
         use crate::e2e::web::api::v1::contexts::user::steps::{new_logged_in_admin, new_logged_in_user};
 
         #[tokio::test]
@@ -1031,6 +1339,497 @@ mod for_authenticated_users {
             assert_eq!(torrent.title, new_title);
             assert_eq!(torrent.description, new_description);
             assert!(response.is_json_and_ok());
+        }
+
+        #[tokio::test]
+        async fn it_should_allow_admin_users_to_upload_new_torrents() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let logged_in_admin = new_logged_in_admin(&env).await;
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+            let test_torrent = random_torrent();
+            let info_hash = test_torrent.file_info_hash().clone();
+
+            let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
+
+            let response = client.upload_torrent(form.into()).await;
+
+            let uploaded_torrent_response: UploadedTorrentResponse = serde_json::from_str(&response.body).unwrap();
+
+            assert_eq!(
+                uploaded_torrent_response.data.canonical_info_hash.to_lowercase(),
+                info_hash.to_lowercase()
+            );
+            assert!(response.is_json_and_ok());
+        }
+
+        #[tokio::test]
+        async fn it_should_allow_admin_users_to_get_torrent_details_searching_by_info_hash_using_a_public_tracker() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_public_tracker() {
+                println!("test skipped. It requires a public tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            let logged_in_admin = new_logged_in_admin(&env).await;
+
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+            let response = client.get_torrent(&test_torrent.file_info_hash()).await;
+
+            let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
+
+            let tracker_url = env.server_settings().unwrap().tracker.url.to_string();
+            let encoded_tracker_url = urlencoding::encode(&tracker_url);
+
+            let expected_torrent = TorrentDetails {
+                torrent_id: uploaded_torrent.torrent_id,
+                uploader: uploader.username,
+                info_hash: test_torrent.file_info.info_hash.to_lowercase(),
+                title: test_torrent.index_info.title.clone(),
+                description: test_torrent.index_info.description,
+                category: Category {
+                    id: software_predefined_category_id(),
+                    name: test_torrent.index_info.category,
+                    num_torrents: 19, // Ignored in assertion
+                },
+                upload_date: "2023-04-27 07:56:08".to_string(), // Ignored in assertion
+                file_size: test_torrent.file_info.content_size,
+                seeders: 0,
+                leechers: 0,
+                files: vec![File {
+                    path: vec![test_torrent.file_info.files[0].clone()],
+                    // Using one file torrent for testing: content_size = first file size
+                    length: test_torrent.file_info.content_size,
+                    md5sum: None, // DevSkim: ignore DS126858
+                }],
+                trackers: vec![tracker_url.clone().to_string()],
+                magnet_link: format!(
+                    // cspell:disable-next-line
+                    "magnet:?xt=urn:btih:{}&dn={}&tr={}",
+                    test_torrent.file_info.info_hash.to_lowercase(),
+                    urlencoding::encode(&test_torrent.index_info.title),
+                    encoded_tracker_url
+                ),
+                tags: vec![],
+                name: test_torrent.index_info.name.clone(),
+                comment: test_torrent.file_info.comment.clone(),
+                creation_date: test_torrent.file_info.creation_date,
+                created_by: test_torrent.file_info.created_by.clone(),
+                encoding: test_torrent.file_info.encoding.clone(),
+                canonical_info_hash_group: vec![test_torrent.file_info.info_hash.to_lowercase()],
+            };
+
+            assert_expected_torrent_details(&torrent_details_response.data, &expected_torrent);
+            assert!(response.is_json_and_ok());
+        }
+
+        /* #[tokio::test]
+        async fn it_should_allow_admin_users_to_get_torrent_details_searching_by_info_hash_using_a_private_tracker() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_private_tracker() {
+                println!("test skipped. It requires a private tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            let logged_in_admin = new_logged_in_admin(&env).await;
+
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+            let response = client.get_torrent(&test_torrent.file_info_hash()).await;
+
+            let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
+
+            let tracker_url = env.server_settings().unwrap().tracker.url.to_string();
+            let encoded_tracker_url = urlencoding::encode(&tracker_url);
+
+            let expected_torrent_info = client.get_torrent(&test_torrent.file_info.info_hash.to_lowercase()).await;
+
+            //expected_torrent_info.body.
+
+            let parsed_response = serde_json::from_str(&expected_torrent_info.body);
+
+            let expected_torrent = TorrentDetails {
+                torrent_id: uploaded_torrent.torrent_id,
+                uploader: uploader.username,
+                info_hash: test_torrent.file_info.info_hash.to_lowercase(),
+                title: test_torrent.index_info.title.clone(),
+                description: test_torrent.index_info.description,
+                category: Category {
+                    id: software_predefined_category_id(),
+                    name: test_torrent.index_info.category,
+                    num_torrents: 19, // Ignored in assertion
+                },
+                upload_date: "2023-04-27 07:56:08".to_string(), // Ignored in assertion
+                file_size: test_torrent.file_info.content_size,
+                seeders: 0,
+                leechers: 0,
+                files: vec![File {
+                    path: vec![test_torrent.file_info.files[0].clone()],
+                    // Using one file torrent for testing: content_size = first file size
+                    length: test_torrent.file_info.content_size,
+                    md5sum: None, // DevSkim: ignore DS126858
+                }],
+                trackers: vec![tracker_url.clone().to_string()],
+                magnet_link: format!(
+                    // cspell:disable-next-line
+                    "magnet:?xt=urn:btih:{}&dn={}&tr={}",
+                    test_torrent.file_info.info_hash.to_lowercase(),
+                    urlencoding::encode(&test_torrent.index_info.title),
+                    encoded_tracker_url
+                ),
+                tags: vec![],
+                name: test_torrent.index_info.name.clone(),
+                comment: test_torrent.file_info.comment.clone(),
+                creation_date: test_torrent.file_info.creation_date,
+                created_by: test_torrent.file_info.created_by.clone(),
+                encoding: test_torrent.file_info.encoding.clone(),
+                canonical_info_hash_group: vec![test_torrent.file_info.info_hash.to_lowercase()],
+            };
+
+            assert_expected_torrent_details(&torrent_details_response.data, &expected_torrent);
+            assert!(response.is_json_and_ok());
+        } */
+
+        #[tokio::test]
+        async fn it_should_allow_admin_users_to_get_torrent_details_searching_by_info_hash_using_a_private_tracker() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_private_tracker() {
+                println!("test skipped. It requires a private tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            let logged_in_admin = new_logged_in_admin(&env).await;
+
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+            let response = client.get_torrent(&test_torrent.file_info_hash()).await;
+
+            let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
+
+            let tracker_url = env.server_settings().unwrap().tracker.url.to_string();
+            let encoded_tracker_url = urlencoding::encode(&tracker_url);
+
+            let expected_torrent = TorrentDetails {
+                torrent_id: uploaded_torrent.torrent_id,
+                uploader: uploader.username,
+                info_hash: test_torrent.file_info.info_hash.to_lowercase(),
+                title: test_torrent.index_info.title.clone(),
+                description: test_torrent.index_info.description,
+                category: Category {
+                    id: software_predefined_category_id(),
+                    name: test_torrent.index_info.category,
+                    num_torrents: 19, // Ignored in assertion
+                },
+                upload_date: "2023-04-27 07:56:08".to_string(), // Ignored in assertion
+                file_size: test_torrent.file_info.content_size,
+                seeders: 0,
+                leechers: 0,
+                files: vec![File {
+                    path: vec![test_torrent.file_info.files[0].clone()],
+                    // Using one file torrent for testing: content_size = first file size
+                    length: test_torrent.file_info.content_size,
+                    md5sum: None, // DevSkim: ignore DS126858
+                }],
+                trackers: vec![tracker_url.clone().to_string()],
+                magnet_link: format!(
+                    // cspell:disable-next-line
+                    "magnet:?xt=urn:btih:{}&dn={}&tr={}",
+                    test_torrent.file_info.info_hash.to_lowercase(),
+                    urlencoding::encode(&test_torrent.index_info.title),
+                    encoded_tracker_url
+                ),
+                tags: vec![],
+                name: test_torrent.index_info.name.clone(),
+                comment: test_torrent.file_info.comment.clone(),
+                creation_date: test_torrent.file_info.creation_date,
+                created_by: test_torrent.file_info.created_by.clone(),
+                encoding: test_torrent.file_info.encoding.clone(),
+                canonical_info_hash_group: vec![test_torrent.file_info.info_hash.to_lowercase()],
+            };
+
+            assert_expected_torrent_details(&torrent_details_response.data, &expected_torrent);
+            assert!(response.is_json_and_ok());
+        }
+
+        #[tokio::test]
+        async fn it_should_allow_admin_users_to_find_torrent_details_using_a_non_canonical_info_hash() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+            // Sample data needed to build two torrents with the same canonical info-hash.
+            // Those torrents belong to the same Canonical Infohash Group.
+            let id = Uuid::new_v4();
+            let title = format!("title-{id}");
+            let file_contents = "data".to_string();
+
+            // Upload the first torrent
+            let mut first_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 01");
+            first_torrent.index_info.title.clone_from(&title);
+
+            let first_torrent_canonical_info_hash = upload_test_torrent(&client, &first_torrent)
+                .await
+                .expect("first torrent should be uploaded");
+
+            // Upload the second torrent with the same canonical info-hash
+            let mut second_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 02");
+            second_torrent.index_info.title = format!("{title}-clone");
+
+            let _result = upload_test_torrent(&client, &second_torrent).await;
+
+            let logged_in_admin = new_logged_in_admin(&env).await;
+
+            let logged_in_admin_client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+            // Get torrent details using the non-canonical info-hash (second torrent info-hash)
+            let response = logged_in_admin_client.get_torrent(&second_torrent.file_info_hash()).await;
+            let torrent_details_response: TorrentDetailsResponse = serde_json::from_str(&response.body).unwrap();
+
+            // The returned torrent info should be the same as the first torrent
+            assert_eq!(response.status, 200);
+            assert_eq!(
+                torrent_details_response.data.info_hash,
+                first_torrent_canonical_info_hash.to_hex_string()
+            );
+        }
+
+        #[tokio::test]
+        async fn it_should_allow_admin_users_to_get_torrents() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+
+            let (_test_torrent, _indexed_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+            let logged_in_admin = new_logged_in_admin(&env).await;
+
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+            let response = client.get_torrents(Query::empty()).await;
+
+            let torrent_list_response: TorrentListResponse = serde_json::from_str(&response.body).unwrap();
+
+            assert!(torrent_list_response.data.total > 0);
+            assert!(response.is_json_and_ok());
+        }
+        mod it_should_allow_admin_users_to_download_a_torrent_file_searching_by_info_hash {
+
+            use torrust_index::utils::parse_torrent::{calculate_info_hash, decode_torrent};
+            use torrust_index::web::api;
+
+            use crate::common::client::Client;
+            use crate::e2e::environment::TestEnv;
+            use crate::e2e::web::api::v1::contexts::torrent::asserts::canonical_torrent_for;
+            use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
+            use crate::e2e::web::api::v1::contexts::user::steps::{new_logged_in_admin, new_logged_in_user};
+
+            #[tokio::test]
+            async fn returning_a_bittorrent_binary_ok_response() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                if !env.provides_a_tracker() {
+                    println!("test skipped. It requires a tracker to be running.");
+                    return;
+                }
+
+                let logged_in_admin = new_logged_in_admin(&env).await;
+
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+                let uploader = new_logged_in_user(&env).await;
+
+                // Upload
+                let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+                // Download
+                let response = client.download_torrent(&test_torrent.file_info_hash()).await;
+
+                assert!(response.is_a_bit_torrent_file());
+            }
+
+            #[tokio::test]
+            async fn the_downloaded_torrent_should_keep_the_same_info_hash_if_the_torrent_does_not_have_non_standard_fields_in_the_info_dict(
+            ) {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                if !env.provides_a_tracker() {
+                    println!("test skipped. It requires a tracker to be running.");
+                    return;
+                }
+
+                let logged_in_admin = new_logged_in_admin(&env).await;
+
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+                let uploader = new_logged_in_user(&env).await;
+
+                // Upload
+                let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+                // Download
+                let response = client.download_torrent(&test_torrent.file_info_hash()).await;
+
+                let downloaded_torrent_info_hash =
+                    calculate_info_hash(&response.bytes).expect("failed to calculate info-hash of the downloaded torrent");
+
+                assert_eq!(
+                    downloaded_torrent_info_hash.to_hex_string(),
+                    test_torrent.file_info_hash(),
+                    "downloaded torrent info-hash does not match uploaded torrent info-hash"
+                );
+            }
+
+            #[tokio::test]
+            async fn the_downloaded_torrent_should_be_the_canonical_version_of_the_uploaded_one_using_a_public_tracker() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                if !env.provides_a_public_tracker() {
+                    println!("test skipped. It requires a public tracker to be running.");
+                    return;
+                }
+
+                let logged_in_admin = new_logged_in_admin(&env).await;
+
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+                let uploader = new_logged_in_user(&env).await;
+
+                // Upload
+                let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+                let uploaded_torrent =
+                    decode_torrent(&test_torrent.index_info.torrent_file.contents).expect("could not decode uploaded torrent");
+
+                // Download
+                let response = client.download_torrent(&test_torrent.file_info_hash()).await;
+
+                let downloaded_torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
+
+                let expected_downloaded_torrent = canonical_torrent_for(uploaded_torrent, &env, &None).await;
+
+                assert_eq!(downloaded_torrent, expected_downloaded_torrent);
+            }
+
+            #[tokio::test]
+            async fn the_downloaded_torrent_should_be_the_canonical_version_of_the_uploaded_one_using_a_private_tracker() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                if !env.provides_a_private_tracker() {
+                    println!("test skipped. It requires a private tracker to be running.");
+                    return;
+                }
+
+                let logged_in_admin = new_logged_in_admin(&env).await;
+
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+                let uploader = new_logged_in_user(&env).await;
+
+                // Upload
+                let (test_torrent, _torrent_listed_in_index) = upload_random_torrent_to_index(&uploader, &env).await;
+
+                let uploaded_torrent =
+                    decode_torrent(&test_torrent.index_info.torrent_file.contents).expect("could not decode uploaded torrent");
+
+                // Download
+                let response = client.download_torrent(&test_torrent.file_info_hash()).await;
+
+                let downloaded_torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
+
+                let expected_downloaded_torrent = canonical_torrent_for(uploaded_torrent, &env, &Some(logged_in_admin)).await;
+
+                assert_eq!(downloaded_torrent, expected_downloaded_torrent);
+            }
+        }
+
+        #[tokio::test]
+        async fn it_should_allow_admin_users_to_download_a_torrent_using_a_non_canonical_info_hash() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let uploader = new_logged_in_user(&env).await;
+            let upload_client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+            // Sample data needed to build two torrents with the same canonical info-hash.
+            // Those torrents belong to the same Canonical Infohash Group.
+            let id = Uuid::new_v4();
+            let title = format!("title-{id}");
+            let file_contents = "data".to_string();
+
+            // Upload the first torrent
+            let mut first_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 01");
+            first_torrent.index_info.title.clone_from(&title);
+
+            let first_torrent_canonical_info_hash = upload_test_torrent(&upload_client, &first_torrent)
+                .await
+                .expect("first torrent should be uploaded");
+
+            // Upload the second torrent with the same canonical info-hash
+            let mut second_torrent = TestTorrent::with_custom_info_dict_field(id, &file_contents, "custom 02");
+            second_torrent.index_info.title = format!("{title}-clone");
+
+            let _result = upload_test_torrent(&upload_client, &second_torrent).await;
+
+            let logged_in_admin = new_logged_in_admin(&env).await;
+
+            let download_client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+            // Download the torrent using the non-canonical info-hash (second torrent info-hash)
+            let response = download_client.download_torrent(&second_torrent.file_info_hash()).await;
+
+            let torrent = decode_torrent(&response.bytes).expect("could not decode downloaded torrent");
+
+            // The returned torrent info-hash should be the same as the first torrent
+            assert_eq!(response.status, 200);
+            assert_eq!(
+                torrent.canonical_info_hash_hex(),
+                first_torrent_canonical_info_hash.to_hex_string()
+            );
         }
     }
 }
