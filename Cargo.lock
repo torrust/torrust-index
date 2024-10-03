@@ -1009,15 +1009,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fern"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9f0c14694cbd524c8720dd69b0e3179344f04ebb5f90f2e4a440c6ea3b2f1ee"
-dependencies = [
- "log",
-]
-
-[[package]]
 name = "figment"
 version = "0.10.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3840,7 +3831,6 @@ dependencies = [
  "clap",
  "derive_more",
  "email_address",
- "fern",
  "figment",
  "futures",
  "futures-util",
@@ -3861,7 +3851,6 @@ dependencies = [
  "rand_core",
  "regex",
  "reqwest",
- "rustversion",
  "serde",
  "serde_bencode",
  "serde_bytes",
@@ -3878,9 +3867,8 @@ dependencies = [
  "tokio",
  "toml",
  "torrust-index-located-error",
- "tower 0.4.13",
+ "tower 0.5.1",
  "tower-http",
- "trace",
  "tracing",
  "tracing-subscriber",
  "url",
@@ -3895,7 +3883,6 @@ version = "3.0.0-develop"
 dependencies = [
  "thiserror",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -3962,17 +3949,6 @@ name = "tower-service"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
-
-[[package]]
-name = "trace"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ad0c048e114d19d1140662762bfdb10682f3bc806d8be18af846600214dd9af"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
 
 [[package]]
 name = "tracing"
