@@ -103,3 +103,14 @@ uuid = { version = "1", features = ["v4"] }
 tempfile = "3"
 uuid = { version = "1", features = ["v4"] }
 which = "6"
+
+[lints.clippy]
+complexity = { level = "deny", priority = -1 }
+correctness = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }
+style = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+
+# temp allow this lint
+needless_return = "allow"
