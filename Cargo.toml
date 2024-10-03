@@ -99,11 +99,10 @@ uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 tempfile = "3"
-uuid = { version = "1", features = ["v4"] }
 which = "6"
 
 [package.metadata.cargo-machete]
-ignored = ["sha-1"]
+ignored = ["sha-1", "futures"]
 
 [lints.clippy]
 complexity = { level = "deny", priority = -1 }
