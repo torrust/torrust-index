@@ -28,11 +28,6 @@ jobs:
         name: Enable Workflow Cache
         uses: Swatinem/rust-cache@v2
 
-      # Temporary Cleaning to avoid Rust Compiler Bug
-      - id: clean
-        name: Make Build Clean
-        run: cargo clean
-
       - id: format
         name: Run Formatting-Checks
         run: cargo fmt --check
@@ -44,7 +39,7 @@ jobs:
 
     strategy:
       matrix:
-        toolchain: [stable, nightly]
+        toolchain: [nightly, stable]
 
     steps:
       - id: checkout
@@ -62,10 +57,11 @@ jobs:
         name: Enable Workflow Cache
         uses: Swatinem/rust-cache@v2
 
-      # Temporary Cleaning to avoid Rust Compiler Bug
-      - id: clean
-        name: Make Build Clean
-        run: cargo clean
+      - id: tools
+        name: Install Tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-machete
 
       - id: check
         name: Run Build Checks
@@ -81,6 +77,14 @@ jobs:
           RUSTDOCFLAGS: "-D warnings"
         run: cargo doc --no-deps --bins --examples --workspace --all-features
 
+      - id: clean
+        name: Clean Build Directory
+        run: cargo clean
+
+      - id: deps
+        name: Check Unused Dependencies
+        run: cargo machete
+
   unit:
     name: Units
     runs-on: ubuntu-latest
@@ -88,7 +92,7 @@ jobs:
 
     strategy:
       matrix:
-        toolchain: [stable, nightly]
+        toolchain: [nightly, stable]
 
     steps:
       - id: checkout
@@ -105,11 +109,6 @@ jobs:
       - id: cache
         name: Enable Job Cache
         uses: Swatinem/rust-cache@v2
-
-      # Temporary Cleaning to avoid Rust Compiler Bug
-      - id: clean
-        name: Make Build Clean
-        run: cargo clean
 
       - id: imdl
         name: Install Intermodal
@@ -130,7 +129,7 @@ jobs:
 
     strategy:
       matrix:
-        toolchain: [stable, nightly]
+        toolchain: [nightly, stable]
 
     steps:
       - id: checkout
@@ -146,11 +145,6 @@ jobs:
       - id: cache
         name: Enable Job Cache
         uses: Swatinem/rust-cache@v2
-
-      # Temporary Cleaning to avoid Rust Compiler Bug
-      - id: clean
-        name: Make Build Clean
-        run: cargo clean
 
       - id: test-sqlite
         name: Run Integration Tests (SQLite)

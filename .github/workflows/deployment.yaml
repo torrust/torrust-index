@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        toolchain: [stable, nightly]
+        toolchain: [nightly, stable]
 
     steps:
       - id: checkout
