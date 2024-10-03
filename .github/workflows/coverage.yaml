@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CARGO_INCREMENTAL: "0"
-      RUSTFLAGS: "-Z profile -C codegen-units=1 -C inline-threshold=0 -C link-dead-code -C overflow-checks=off -C panic=abort -Z panic_abort_tests"
-      RUSTDOCFLAGS: "-Z profile -C codegen-units=1 -C inline-threshold=0 -C link-dead-code -C overflow-checks=off -C panic=abort -Z panic_abort_tests"
+      RUSTFLAGS: "-Z profile -C codegen-units=1 -C opt-level=0 -C link-dead-code -C overflow-checks=off -Z panic_abort_tests -C panic=abort"
+      RUSTDOCFLAGS: "-Z profile -C codegen-units=1 -C opt-level=0 -C link-dead-code -C overflow-checks=off -Z panic_abort_tests -C panic=abort"
 
     steps:
       - id: checkout_push
@@ -36,7 +36,7 @@ jobs:
 
       - id: setup
         name: Setup Toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@nightly
         with:
           toolchain: nightly
           components: llvm-tools-preview
@@ -45,16 +45,11 @@ jobs:
         name: Enable Workflow Cache
         uses: Swatinem/rust-cache@v2
 
-      # Temporary Cleaning to avoid Rust Compiler Bug
-      - id: clean
-        name: Make Build Clean
-        run: cargo clean
-
       - id: tools
         name: Install Tools
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-llvm-cov, cargo-nextest, grcov
+          tool: grcov
 
       - id: imdl
         name: Install Intermodal
@@ -64,16 +59,24 @@ jobs:
         name: Run Build Checks
         run: cargo check --tests --benches --examples --workspace --all-targets --all-features
 
+      - id: clean
+        name: Clean Build Directory
+        run: cargo clean
+
+      - id: build
+        name: Pre-build Main Project
+        run: cargo build --workspace --all-targets --all-features --jobs 2
+
+      - id: build_tests
+        name: Pre-build Tests
+        run: cargo build --workspace --all-targets --all-features --tests --jobs 2
+
       - id: test
         name: Run Unit Tests
-        run: cargo test --tests --benches --examples --workspace --all-targets --all-features
+        run: cargo test --tests --workspace --all-targets --all-features
 
-      - id: coverage-llvm
-        name: Generate Coverage Report with LLVM
-        run: cargo llvm-cov nextest --tests --benches --examples --workspace --all-targets --all-features        
-
-      - id: coverage-grcov
-        name: Generate Coverage Report with grcov
+      - id: coverage
+        name: Generate Coverage Report
         uses: alekitto/grcov@v0.2
 
       - id: upload
