@@ -1043,6 +1043,28 @@ mod for_authenticated_users {
             }
 
             #[tokio::test]
+            async fn it_should_not_allow_registered_users_to_delete_torrents() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                if !env.provides_a_tracker() {
+                    println!("test skipped. It requires a tracker to be running.");
+                    return;
+                }
+
+                let uploader = new_logged_in_user(&env).await;
+                let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+                let registered_user = new_logged_in_user(&env).await;
+
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &registered_user.token);
+
+                let response = client.delete_torrent(&test_torrent.file_info_hash()).await;
+
+                assert_eq!(response.status, 403);
+            }
+
+            #[tokio::test]
             async fn it_should_allow_registered_users_to_download_a_torrent_file_searching_by_info_hash() {
                 let mut env = TestEnv::new();
                 env.start(api::Version::V1).await;
