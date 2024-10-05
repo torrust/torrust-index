@@ -1016,7 +1016,7 @@ mod for_authenticated_users {
             use crate::common::contexts::torrent::fixtures::random_torrent;
             use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
             use crate::e2e::environment::TestEnv;
-            use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
+            use crate::e2e::web::api::v1::contexts::torrent::steps::{upload_random_torrent_to_index, upload_test_torrent};
             use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
 
             #[tokio::test]
@@ -1064,6 +1064,35 @@ mod for_authenticated_users {
                 let client = Client::authenticated(&env.server_socket_addr().unwrap(), &registered_user.token);
 
                 let response = client.download_torrent(&test_torrent.file_info_hash()).await;
+
+                assert_eq!(response.status, 200);
+            }
+
+            #[tokio::test]
+            async fn it_should_allow_registered_users_to_download_a_torrent_file_searching_by_canonical_info_hash() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                if !env.provides_a_tracker() {
+                    println!("test skipped. It requires a tracker to be running.");
+                    return;
+                }
+
+                let registered_user = new_logged_in_user(&env).await;
+
+                let download_client = Client::authenticated(&env.server_socket_addr().unwrap(), &registered_user.token);
+
+                let uploader = new_logged_in_user(&env).await;
+
+                let upload_client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+                // Upload
+                let test_torrent = random_torrent();
+
+                let canonical_infohash = upload_test_torrent(&upload_client, &test_torrent).await.unwrap().to_string();
+
+                // Download
+                let response = download_client.download_torrent(&canonical_infohash).await;
 
                 assert_eq!(response.status, 200);
             }
