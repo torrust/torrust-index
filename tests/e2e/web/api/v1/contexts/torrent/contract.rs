@@ -1169,6 +1169,33 @@ mod for_authenticated_users {
 
                 assert_eq!(response.status, 200);
             }
+
+            #[tokio::test]
+            async fn it_should_allow_registered_users_to_get_torrent_details_searching_by_canonical_info_hash() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                if !env.provides_a_tracker() {
+                    println!("test skipped. It requires a tracker to be running.");
+                    return;
+                }
+
+                let registered_user = new_logged_in_user(&env).await;
+
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &registered_user.token);
+
+                let uploader = new_logged_in_user(&env).await;
+
+                let upload_client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+                let test_torrent = random_torrent();
+
+                let canonical_infohash = upload_test_torrent(&upload_client, &test_torrent).await.unwrap().to_string();
+
+                let response = client.get_torrent(&canonical_infohash).await;
+
+                assert_eq!(response.status, 200);
+            }
         }
     }
 
