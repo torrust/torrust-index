@@ -1015,6 +1015,8 @@ mod for_authenticated_users {
             use crate::common::client::Client;
             use crate::common::contexts::torrent::fixtures::random_torrent;
             use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
+            use crate::common::contexts::torrent::responses::TorrentListResponse;
+            use crate::common::http::Query;
             use crate::e2e::environment::TestEnv;
             use crate::e2e::web::api::v1::contexts::torrent::steps::{upload_random_torrent_to_index, upload_test_torrent};
             use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
@@ -1117,6 +1119,27 @@ mod for_authenticated_users {
                 let response = download_client.download_torrent(&canonical_infohash).await;
 
                 assert_eq!(response.status, 200);
+            }
+
+            #[tokio::test]
+            async fn it_should_allow_registered_users_to_get_torrents() {
+                let mut env = TestEnv::new();
+                env.start(api::Version::V1).await;
+
+                let registered_user = new_logged_in_user(&env).await;
+
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &registered_user.token);
+
+                let uploader = new_logged_in_user(&env).await;
+
+                let (_test_torrent, _indexed_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+                let response = client.get_torrents(Query::empty()).await;
+
+                let torrent_list_response: TorrentListResponse = serde_json::from_str(&response.body).unwrap();
+
+                assert!(torrent_list_response.data.total > 0);
+                assert!(response.is_json_and_ok());
             }
         }
     }
