@@ -1126,6 +1126,11 @@ mod for_authenticated_users {
                 let mut env = TestEnv::new();
                 env.start(api::Version::V1).await;
 
+                if !env.provides_a_tracker() {
+                    println!("test skipped. It requires a tracker to be running.");
+                    return;
+                }
+
                 let registered_user = new_logged_in_user(&env).await;
 
                 let client = Client::authenticated(&env.server_socket_addr().unwrap(), &registered_user.token);
