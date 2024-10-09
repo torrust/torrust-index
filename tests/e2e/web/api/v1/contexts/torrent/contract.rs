@@ -949,7 +949,7 @@ mod for_authenticated_users {
         use torrust_index::web::api;
 
         use crate::common::client::Client;
-        use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
+
         use crate::e2e::environment::TestEnv;
         use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
         use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
@@ -974,47 +974,12 @@ mod for_authenticated_users {
             assert_eq!(response.status, 403);
         }
 
-        #[tokio::test]
-        async fn it_should_not_allow_non_admin_users_to_update_someone_elses_torrents() {
-            let mut env = TestEnv::new();
-            env.start(api::Version::V1).await;
-
-            if !env.provides_a_tracker() {
-                println!("test skipped. It requires a tracker to be running.");
-                return;
-            }
-
-            // Given a users uploads a torrent
-            let uploader = new_logged_in_user(&env).await;
-            let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
-
-            // Then another non admin user should not be able to update the torrent
-            let not_the_uploader = new_logged_in_user(&env).await;
-            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &not_the_uploader.token);
-
-            let new_title = format!("{}-new-title", test_torrent.index_info.title);
-            let new_description = format!("{}-new-description", test_torrent.index_info.description);
-
-            let response = client
-                .update_torrent(
-                    &test_torrent.file_info_hash(),
-                    UpdateTorrentFrom {
-                        title: Some(new_title.clone()),
-                        description: Some(new_description.clone()),
-                        category: None,
-                        tags: None,
-                    },
-                )
-                .await;
-
-            assert_eq!(response.status, 403);
-        }
         mod authorization {
             use torrust_index::web::api;
 
             use crate::common::client::Client;
             use crate::common::contexts::torrent::fixtures::random_torrent;
-            use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
+            use crate::common::contexts::torrent::forms::{UpdateTorrentFrom, UploadTorrentMultipartForm};
             use crate::common::contexts::torrent::responses::TorrentListResponse;
             use crate::common::http::Query;
             use crate::e2e::environment::TestEnv;
@@ -1198,7 +1163,7 @@ mod for_authenticated_users {
             }
 
             #[tokio::test]
-            async fn it_should_not_allow_guest_users_to_update_torrents() {
+            async fn it_should_not_allow_registered_users_to_update_someone_elses_torrents() {
                 let mut env = TestEnv::new();
                 env.start(api::Version::V1).await;
 
@@ -1207,10 +1172,13 @@ mod for_authenticated_users {
                     return;
                 }
 
+                // Given a users uploads a torrent
                 let uploader = new_logged_in_user(&env).await;
                 let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
 
-                let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+                // Then another non admin user should not be able to update the torrent
+                let not_the_uploader = new_logged_in_user(&env).await;
+                let client = Client::authenticated(&env.server_socket_addr().unwrap(), &not_the_uploader.token);
 
                 let new_title = format!("{}-new-title", test_torrent.index_info.title);
                 let new_description = format!("{}-new-description", test_torrent.index_info.description);
@@ -1227,136 +1195,135 @@ mod for_authenticated_users {
                     )
                     .await;
 
-                assert_eq!(response.status, 500);
+                assert_eq!(response.status, 403);
             }
-        }
         }
     }
+}
 
-    mod and_torrent_owners {
+mod and_torrent_owners {
 
-        use torrust_index::web::api;
+    use torrust_index::web::api;
 
-        use crate::common::client::Client;
-        use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
-        use crate::common::contexts::torrent::responses::UpdatedTorrentResponse;
-        use crate::e2e::environment::TestEnv;
-        use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
-        use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
+    use crate::common::client::Client;
+    use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
+    use crate::common::contexts::torrent::responses::UpdatedTorrentResponse;
+    use crate::e2e::environment::TestEnv;
+    use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
+    use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
 
-        #[tokio::test]
-        async fn it_should_allow_torrent_owners_to_update_their_torrents() {
-            let mut env = TestEnv::new();
-            env.start(api::Version::V1).await;
+    #[tokio::test]
+    async fn it_should_allow_torrent_owners_to_update_their_torrents() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
 
-            if !env.provides_a_tracker() {
-                println!("test skipped. It requires a tracker to be running.");
-                return;
-            }
-
-            let uploader = new_logged_in_user(&env).await;
-            let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
-
-            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
-
-            let new_title = format!("{}-new-title", test_torrent.index_info.title);
-            let new_description = format!("{}-new-description", test_torrent.index_info.description);
-
-            let response = client
-                .update_torrent(
-                    &test_torrent.file_info_hash(),
-                    UpdateTorrentFrom {
-                        title: Some(new_title.clone()),
-                        description: Some(new_description.clone()),
-                        category: None,
-                        tags: None,
-                    },
-                )
-                .await;
-
-            let updated_torrent_response: UpdatedTorrentResponse = serde_json::from_str(&response.body).unwrap();
-
-            let torrent = updated_torrent_response.data;
-
-            assert_eq!(torrent.title, new_title);
-            assert_eq!(torrent.description, new_description);
-            assert!(response.is_json_and_ok());
+        if !env.provides_a_tracker() {
+            println!("test skipped. It requires a tracker to be running.");
+            return;
         }
+
+        let uploader = new_logged_in_user(&env).await;
+        let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &uploader.token);
+
+        let new_title = format!("{}-new-title", test_torrent.index_info.title);
+        let new_description = format!("{}-new-description", test_torrent.index_info.description);
+
+        let response = client
+            .update_torrent(
+                &test_torrent.file_info_hash(),
+                UpdateTorrentFrom {
+                    title: Some(new_title.clone()),
+                    description: Some(new_description.clone()),
+                    category: None,
+                    tags: None,
+                },
+            )
+            .await;
+
+        let updated_torrent_response: UpdatedTorrentResponse = serde_json::from_str(&response.body).unwrap();
+
+        let torrent = updated_torrent_response.data;
+
+        assert_eq!(torrent.title, new_title);
+        assert_eq!(torrent.description, new_description);
+        assert!(response.is_json_and_ok());
+    }
+}
+
+mod and_admins {
+
+    use torrust_index::web::api;
+
+    use crate::common::client::Client;
+    use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
+    use crate::common::contexts::torrent::responses::{DeletedTorrentResponse, UpdatedTorrentResponse};
+    use crate::e2e::environment::TestEnv;
+    use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
+    use crate::e2e::web::api::v1::contexts::user::steps::{new_logged_in_admin, new_logged_in_user};
+
+    #[tokio::test]
+    async fn it_should_allow_admins_to_delete_torrents_searching_by_info_hash() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
+
+        if !env.provides_a_tracker() {
+            println!("test skipped. It requires a tracker to be running.");
+            return;
+        }
+
+        let uploader = new_logged_in_user(&env).await;
+        let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+        let admin = new_logged_in_admin(&env).await;
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &admin.token);
+
+        let response = client.delete_torrent(&test_torrent.file_info_hash()).await;
+
+        let deleted_torrent_response: DeletedTorrentResponse = serde_json::from_str(&response.body).unwrap();
+
+        assert_eq!(deleted_torrent_response.data.torrent_id, uploaded_torrent.torrent_id);
+        assert!(response.is_json_and_ok());
     }
 
-    mod and_admins {
+    #[tokio::test]
+    async fn it_should_allow_admins_to_update_someone_elses_torrents() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
 
-        use torrust_index::web::api;
-
-        use crate::common::client::Client;
-        use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
-        use crate::common::contexts::torrent::responses::{DeletedTorrentResponse, UpdatedTorrentResponse};
-        use crate::e2e::environment::TestEnv;
-        use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
-        use crate::e2e::web::api::v1::contexts::user::steps::{new_logged_in_admin, new_logged_in_user};
-
-        #[tokio::test]
-        async fn it_should_allow_admins_to_delete_torrents_searching_by_info_hash() {
-            let mut env = TestEnv::new();
-            env.start(api::Version::V1).await;
-
-            if !env.provides_a_tracker() {
-                println!("test skipped. It requires a tracker to be running.");
-                return;
-            }
-
-            let uploader = new_logged_in_user(&env).await;
-            let (test_torrent, uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
-
-            let admin = new_logged_in_admin(&env).await;
-            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &admin.token);
-
-            let response = client.delete_torrent(&test_torrent.file_info_hash()).await;
-
-            let deleted_torrent_response: DeletedTorrentResponse = serde_json::from_str(&response.body).unwrap();
-
-            assert_eq!(deleted_torrent_response.data.torrent_id, uploaded_torrent.torrent_id);
-            assert!(response.is_json_and_ok());
+        if !env.provides_a_tracker() {
+            println!("test skipped. It requires a tracker to be running.");
+            return;
         }
 
-        #[tokio::test]
-        async fn it_should_allow_admins_to_update_someone_elses_torrents() {
-            let mut env = TestEnv::new();
-            env.start(api::Version::V1).await;
+        let uploader = new_logged_in_user(&env).await;
+        let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
 
-            if !env.provides_a_tracker() {
-                println!("test skipped. It requires a tracker to be running.");
-                return;
-            }
+        let logged_in_admin = new_logged_in_admin(&env).await;
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
 
-            let uploader = new_logged_in_user(&env).await;
-            let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+        let new_title = format!("{}-new-title", test_torrent.index_info.title);
+        let new_description = format!("{}-new-description", test_torrent.index_info.description);
 
-            let logged_in_admin = new_logged_in_admin(&env).await;
-            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+        let response = client
+            .update_torrent(
+                &test_torrent.file_info_hash(),
+                UpdateTorrentFrom {
+                    title: Some(new_title.clone()),
+                    description: Some(new_description.clone()),
+                    category: None,
+                    tags: None,
+                },
+            )
+            .await;
 
-            let new_title = format!("{}-new-title", test_torrent.index_info.title);
-            let new_description = format!("{}-new-description", test_torrent.index_info.description);
+        let updated_torrent_response: UpdatedTorrentResponse = serde_json::from_str(&response.body).unwrap();
 
-            let response = client
-                .update_torrent(
-                    &test_torrent.file_info_hash(),
-                    UpdateTorrentFrom {
-                        title: Some(new_title.clone()),
-                        description: Some(new_description.clone()),
-                        category: None,
-                        tags: None,
-                    },
-                )
-                .await;
+        let torrent = updated_torrent_response.data;
 
-            let updated_torrent_response: UpdatedTorrentResponse = serde_json::from_str(&response.body).unwrap();
-
-            let torrent = updated_torrent_response.data;
-
-            assert_eq!(torrent.title, new_title);
-            assert_eq!(torrent.description, new_description);
-            assert!(response.is_json_and_ok());
-        }
+        assert_eq!(torrent.title, new_title);
+        assert_eq!(torrent.description, new_description);
+        assert!(response.is_json_and_ok());
     }
 }
