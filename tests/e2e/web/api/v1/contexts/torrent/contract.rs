@@ -1359,4 +1359,38 @@ mod and_admins {
         assert_eq!(torrent.description, new_description);
         assert!(response.is_json_and_ok());
     }
+
+    mod authorization {
+        use torrust_index::web::api;
+
+        use crate::{
+            common::{
+                client::Client,
+                contexts::torrent::{fixtures::random_torrent, forms::UploadTorrentMultipartForm},
+            },
+            e2e::{environment::TestEnv, web::api::v1::contexts::user::steps::new_logged_in_admin},
+        };
+
+        #[tokio::test]
+        async fn it_should_allow_admin_users_to_upload_torrents() {
+            let mut env = TestEnv::new();
+            env.start(api::Version::V1).await;
+
+            if !env.provides_a_tracker() {
+                println!("test skipped. It requires a tracker to be running.");
+                return;
+            }
+
+            let admin = new_logged_in_admin(&env).await;
+            let client = Client::authenticated(&env.server_socket_addr().unwrap(), &admin.token);
+
+            let test_torrent = random_torrent();
+
+            let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
+
+            let response = client.upload_torrent(form.into()).await;
+
+            assert_eq!(response.status, 200);
+        }
+    }
 }
