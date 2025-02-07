@@ -73,6 +73,15 @@ pub enum Sorting {
     SizeDesc,
 }
 
+/// Sorting options for users.
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub enum UsersSorting {
+    DateRegisteredNewest,
+    DateRegisteredOldest,
+    UsernameAZ,
+    UsernameZA,
+}
+
 /// Database errors.
 #[derive(Debug)]
 pub enum Error {
@@ -143,10 +152,12 @@ pub trait Database: Sync + Send {
     /// Get `UserProfile` from `username`.
     async fn get_user_profile_from_username(&self, username: &str) -> Result<UserProfile, Error>;
 
-    /// Get all user profiles in a paginated and sorted form as `UserProfilesResponse` from `search`,`offset` and `page_size`.
+    /// Get all user profiles in a paginated and sorted form as `UserProfilesResponse` from `search`, `filters`, `sort`, `offset` and `page_size`.
     async fn get_user_profiles_search_paginated(
         &self,
         search: &Option<String>,
+        filters: &Option<Vec<String>>,
+        sort: &UsersSorting,
         offset: u64,
         page_size: u8,
     ) -> Result<UserProfilesResponse, Error>;

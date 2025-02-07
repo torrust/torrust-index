@@ -8,7 +8,7 @@ use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions};
 use sqlx::{query, query_as, Acquire, ConnectOptions, MySqlPool};
 use url::Url;
 
-use super::database::TABLES_TO_TRUNCATE;
+use super::database::{UsersSorting, TABLES_TO_TRUNCATE};
 use crate::databases::database;
 use crate::databases::database::{Category, Database, Driver, Sorting, TorrentCompact};
 use crate::models::category::CategoryId;
@@ -158,6 +158,8 @@ impl Database for Mysql {
     async fn get_user_profiles_search_paginated(
         &self,
         search: &Option<String>,
+        filters: &Option<Vec<String>>,
+        sort: &UsersSorting,
         offset: u64,
         limit: u8,
     ) -> Result<UserProfilesResponse, database::Error> {
@@ -166,7 +168,25 @@ impl Database for Mysql {
             Some(v) => format!("%{v}%"),
         };
 
-        let mut query_string = "SELECT * FROM torrust_user_profiles WHERE username LIKE ?".to_string();
+        let sort_query: String = match sort {
+            UsersSorting::DateRegisteredNewest => "date_registered ASC".to_string(),
+            UsersSorting::DateRegisteredOldest => "date_registered DESC".to_string(),
+            UsersSorting::UsernameAZ => "username ASC".to_string(),
+            UsersSorting::UsernameZA => "username DESC".to_string(),
+        };
+
+        let mut query_string = "SELECT 
+        tp.user_id,
+        tp.username,
+        tp.email,
+        tp.email_verified,
+        tu.date_registered,
+        tu.administrator
+        FROM torrust_user_profiles tp 
+        INNER JOIN torrust_users tu 
+        ON tp.user_id = tu.user_id 
+        WHERE username LIKE ?"
+            .to_string();
 
         let count_query = format!("SELECT COUNT(*) as count FROM ({query_string}) AS count_table");
 
@@ -179,7 +199,7 @@ impl Database for Mysql {
 
         let count = count_result?;
 
-        query_string = format!("{query_string}  LIMIT ?, ?");
+        query_string = format!("{query_string} ORDER BY {sort_query} LIMIT ?, ?");
 
         let res: Vec<UserProfile> = sqlx::query_as::<_, UserProfile>(&query_string)
             .bind(user_name.clone())
