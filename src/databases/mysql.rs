@@ -8,7 +8,7 @@ use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions};
 use sqlx::{query, query_as, Acquire, ConnectOptions, MySqlPool};
 use url::Url;
 
-use super::database::{UsersSorting, TABLES_TO_TRUNCATE};
+use super::database::{UsersFilters, UsersSorting, TABLES_TO_TRUNCATE};
 use crate::databases::database;
 use crate::databases::database::{Category, Database, Driver, Sorting, TorrentCompact};
 use crate::models::category::CategoryId;
@@ -175,7 +175,57 @@ impl Database for Mysql {
             UsersSorting::UsernameZA => "username DESC".to_string(),
         };
 
-        let mut query_string = "SELECT 
+        let join_filters_query = if let Some(filters) = filters {
+            let mut join_filters = String::new();
+            for filter in filters {
+                // don't take user input in the db query to smt join filter query
+                if let Some(sanitized_filter) = self.get_filters_from_name(filter).await {
+                    match sanitized_filter {
+                        UsersFilters::TorrentUploader => join_filters.push_str(
+                            "INNER JOIN torrust_torrents tt
+                    ON tu.user_id = tt_uploader_id",
+                        ),
+                        _ => break,
+                    }
+                }
+            }
+            join_filters
+        } else {
+            String::new()
+        };
+
+        let where_filters_query = if let Some(filters) = filters {
+            let mut i = 0;
+            let mut where_filters = String::new();
+            for filter in filters {
+                // don't take user input in the db query
+                if let Some(sanitized_filter) = self.get_filters_from_name(filter).await {
+                    let mut filter_query = String::new();
+                    match sanitized_filter {
+                        UsersFilters::EmailNotVerified => filter_query.push_str("email_verified = false"),
+                        UsersFilters::EmailVerified => filter_query.push_str("email_verified = true"),
+                        _ => break,
+                    };
+
+                    let mut str = format!("'{}'", filter_query);
+                    if i > 0 {
+                        str = format!(" AND {str}");
+                    }
+                    where_filters.push_str(&str);
+                    i += 1;
+                }
+            }
+            if where_filters.is_empty() {
+                String::new()
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+
+        let mut query_string = format!(
+            "SELECT 
         tp.user_id,
         tp.username,
         tp.email,
@@ -183,10 +233,13 @@ impl Database for Mysql {
         tu.date_registered,
         tu.administrator
         FROM torrust_user_profiles tp 
-        INNER JOIN torrust_users tu 
+        INNER JOIN torrust_users tu
         ON tp.user_id = tu.user_id 
-        WHERE username LIKE ?"
-            .to_string();
+        {join_filters_query}
+        WHERE username LIKE ?
+        {where_filters_query}
+        "
+        );
 
         let count_query = format!("SELECT COUNT(*) as count FROM ({query_string}) AS count_table");
 
@@ -221,6 +274,15 @@ impl Database for Mysql {
             .fetch_one(&self.pool)
             .await
             .map_err(|_| database::Error::UserNotFound)
+    }
+
+    async fn get_filters_from_name(&self, filter_name: &str) -> Option<UsersFilters> {
+        match filter_name {
+            "torrentUploader" => Some(UsersFilters::TorrentUploader),
+            "emailNotVerified" => Some(UsersFilters::EmailNotVerified),
+            "emailVerified" => Some(UsersFilters::EmailVerified),
+            _ => None,
+        }
     }
 
     /// Gets User Tracker Key

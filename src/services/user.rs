@@ -14,15 +14,15 @@ use tracing::{debug, info};
 use super::authentication::DbUserAuthenticationRepository;
 use super::authorization::{self, ACTION};
 use crate::config::{Configuration, PasswordConstraints};
-use crate::databases::database::{Database, Error};
+use crate::databases::database::{Database, Error, UsersSorting};
 use crate::errors::ServiceError;
-use crate::mailer;
 use crate::mailer::VerifyClaims;
 use crate::models::response::UserProfilesResponse;
 use crate::models::user::{UserCompact, UserId, UserProfile, Username};
 use crate::services::authentication::verify_password;
 use crate::utils::validation::validate_email_address;
 use crate::web::api::server::v1::contexts::user::forms::{ChangePasswordForm, RegistrationForm};
+use crate::{mailer, AsCSV};
 
 /// Since user email could be optional, we need a way to represent "no email"
 /// in the database. This function returns the string that should be used for
@@ -34,6 +34,9 @@ fn no_email() -> String {
 /// User request to generate a user profile listing.
 #[derive(Debug, Deserialize)]
 pub struct ListingRequest {
+    /// Expects comma separated string
+    pub filters: Option<String>,
+    pub sort: Option<UsersSorting>,
     pub page_size: Option<u8>,
     pub page: Option<u32>,
     pub search: Option<String>,
@@ -43,6 +46,9 @@ pub struct ListingRequest {
 #[derive(Debug, Deserialize)]
 pub struct ListingSpecification {
     pub offset: u64,
+    /// Expects comma separated string
+    pub filters: Option<Vec<String>>,
+    pub sort: UsersSorting,
     pub page_size: u8,
     pub search: Option<String>,
 }
@@ -403,10 +409,16 @@ impl ListingService {
 
         let offset = u64::from(page * u32::from(page_size));
 
+        let sort = request.sort.unwrap_or(UsersSorting::UsernameAZ);
+
+        let filters = request.filters.as_csv::<String>().unwrap_or(None);
+
         ListingSpecification {
-            search: request.search.clone(),
             offset,
+            filters,
+            sort,
             page_size,
+            search: request.search.clone(),
         }
     }
 }
@@ -510,7 +522,13 @@ impl DbUserProfileRepository {
     /// It returns an error if there is a database error.
     pub async fn generate_listing(&self, specification: &ListingSpecification) -> Result<UserProfilesResponse, Error> {
         self.database
-            .get_user_profiles_search_paginated(&specification.search, specification.offset, specification.page_size)
+            .get_user_profiles_search_paginated(
+                &specification.search,
+                &specification.filters,
+                &specification.sort,
+                specification.offset,
+                specification.page_size,
+            )
             .await
     }
 }

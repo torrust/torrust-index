@@ -82,6 +82,14 @@ pub enum UsersSorting {
     UsernameZA,
 }
 
+/// Sorting options for users.
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub enum UsersFilters {
+    EmailVerified,
+    EmailNotVerified,
+    TorrentUploader,
+}
+
 /// Database errors.
 #[derive(Debug)]
 pub enum Error {
@@ -164,6 +172,9 @@ pub trait Database: Sync + Send {
 
     /// Get `UserCompact` from `user_id`.
     async fn get_user_compact_from_id(&self, user_id: i64) -> Result<UserCompact, Error>;
+
+    /// Get `UsersFilter` from `filter_name`.
+    async fn get_filters_from_name(&self, filter_name: &str) -> Option<UsersFilters>;
 
     /// Get a user's `TrackerKey`.
     async fn get_user_tracker_key(&self, user_id: i64) -> Option<TrackerKey>;

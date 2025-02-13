@@ -8,7 +8,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{query, query_as, Acquire, ConnectOptions, SqlitePool};
 use url::Url;
 
-use super::database::TABLES_TO_TRUNCATE;
+use super::database::{UsersFilters, UsersSorting, TABLES_TO_TRUNCATE};
 use crate::databases::database;
 use crate::databases::database::{Category, Database, Driver, Sorting, TorrentCompact};
 use crate::models::category::CategoryId;
@@ -159,6 +159,8 @@ impl Database for Sqlite {
     async fn get_user_profiles_search_paginated(
         &self,
         search: &Option<String>,
+        filters: &Option<Vec<String>>,
+        sort: &UsersSorting,
         offset: u64,
         limit: u8,
     ) -> Result<UserProfilesResponse, database::Error> {
@@ -167,7 +169,78 @@ impl Database for Sqlite {
             Some(v) => format!("%{v}%"),
         };
 
-        let mut query_string = "SELECT * FROM torrust_user_profiles WHERE username LIKE ?".to_string();
+        let sort_query: String = match sort {
+            UsersSorting::DateRegisteredNewest => "date_registered ASC".to_string(),
+            UsersSorting::DateRegisteredOldest => "date_registered DESC".to_string(),
+            UsersSorting::UsernameAZ => "username ASC".to_string(),
+            UsersSorting::UsernameZA => "username DESC".to_string(),
+        };
+
+        let join_filters_query = if let Some(filters) = filters {
+            let mut join_filters = String::new();
+            for filter in filters {
+                // don't take user input in the db query
+                if let Some(sanitized_filter) = self.get_filters_from_name(filter).await {
+                    match sanitized_filter {
+                        UsersFilters::TorrentUploader => join_filters.push_str(
+                            "INNER JOIN torrust_torrents tt
+                    ON tu.user_id = tt_uploader_id",
+                        ),
+                        _ => break,
+                    }
+                }
+            }
+            join_filters
+        } else {
+            String::new()
+        };
+
+        let where_filters_query = if let Some(filters) = filters {
+            let mut i = 0;
+            let mut where_filters = String::new();
+            for filter in filters {
+                // don't take user input in the db query
+                if let Some(sanitized_filter) = self.get_filters_from_name(filter).await {
+                    let mut filter_query = String::new();
+                    match sanitized_filter {
+                        UsersFilters::EmailNotVerified => filter_query.push_str("email_verified = false"),
+                        UsersFilters::EmailVerified => filter_query.push_str("email_verified = true"),
+                        _ => break,
+                    };
+
+                    let mut str = format!("'{}'", filter_query);
+                    if i > 0 {
+                        str = format!(" AND {str}");
+                    }
+                    where_filters.push_str(&str);
+                    i += 1;
+                }
+            }
+            if where_filters.is_empty() {
+                String::new()
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+
+        let mut query_string = format!(
+            "SELECT 
+        tp.user_id,
+        tp.username,
+        tp.email,
+        tp.email_verified,
+        tu.date_registered,
+        tu.administrator
+        FROM torrust_user_profiles tp 
+        INNER JOIN torrust_users tu
+        ON tp.user_id = tu.user_id 
+        {join_filters_query}
+        WHERE username LIKE ?
+        {where_filters_query}
+        "
+        );
 
         let count_query = format!("SELECT COUNT(*) as count FROM ({query_string}) AS count_table");
 
@@ -180,7 +253,7 @@ impl Database for Sqlite {
 
         let count = count_result?;
 
-        query_string = format!("{query_string}  LIMIT ?, ?");
+        query_string = format!("{query_string} ORDER BY {sort_query} LIMIT ?, ?");
 
         let res: Vec<UserProfile> = sqlx::query_as::<_, UserProfile>(&query_string)
             .bind(user_name.clone())
@@ -202,6 +275,15 @@ impl Database for Sqlite {
             .fetch_one(&self.pool)
             .await
             .map_err(|_| database::Error::UserNotFound)
+    }
+
+    async fn get_filters_from_name(&self, filter_name: &str) -> Option<UsersFilters> {
+        match filter_name {
+            "torrentUploader" => Some(UsersFilters::TorrentUploader),
+            "emailNotVerified" => Some(UsersFilters::EmailNotVerified),
+            "emailVerified" => Some(UsersFilters::EmailVerified),
+            _ => None,
+        }
     }
 
     async fn get_user_tracker_key(&self, user_id: i64) -> Option<TrackerKey> {
