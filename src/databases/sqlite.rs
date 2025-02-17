@@ -19,7 +19,7 @@ use crate::models::torrent_file::{
 };
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
-use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
+use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserListing, UserProfile};
 use crate::services::torrent::{CanonicalInfoHashGroup, DbTorrentInfoHash};
 use crate::utils::clock::{self, datetime_now, DATETIME_FORMAT};
 use crate::utils::hex::from_bytes;
@@ -205,10 +205,10 @@ impl Database for Sqlite {
                     match sanitized_filter {
                         UsersFilters::EmailNotVerified => filter_query.push_str("email_verified = false"),
                         UsersFilters::EmailVerified => filter_query.push_str("email_verified = true"),
-                        _ => break,
+                        _ => continue,
                     };
 
-                    let mut str = format!("'{}'", filter_query);
+                    let mut str = format!("AND {}", filter_query);
                     if i > 0 {
                         str = format!(" AND {str}");
                     }
@@ -216,11 +216,7 @@ impl Database for Sqlite {
                     i += 1;
                 }
             }
-            if where_filters.is_empty() {
-                String::new()
-            } else {
-                String::new()
-            }
+            where_filters
         } else {
             String::new()
         };
@@ -255,13 +251,16 @@ impl Database for Sqlite {
 
         query_string = format!("{query_string} ORDER BY {sort_query} LIMIT ?, ?");
 
-        let res: Vec<UserProfile> = sqlx::query_as::<_, UserProfile>(&query_string)
+        let res: Vec<UserListing> = sqlx::query_as::<_, UserListing>(&query_string)
             .bind(user_name.clone())
             .bind(i64::saturating_add_unsigned(0, offset))
             .bind(limit)
             .fetch_all(&self.pool)
             .await
-            .map_err(|_| database::Error::Error)?;
+            .map_err(|e| {
+                eprintln!("Database error: {:?}", e);
+                database::Error::Error
+            })?;
 
         Ok(UserProfilesResponse {
             total: u32::try_from(count).expect("variable `count` is larger than u32"),

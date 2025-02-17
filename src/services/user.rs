@@ -36,7 +36,7 @@ fn no_email() -> String {
 pub struct ListingRequest {
     /// Expects comma separated string
     pub filters: Option<String>,
-    pub sort: Option<UsersSorting>,
+    pub sort: Option<String>,
     pub page_size: Option<u8>,
     pub page: Option<u32>,
     pub search: Option<String>,
@@ -409,7 +409,15 @@ impl ListingService {
 
         let offset = u64::from(page * u32::from(page_size));
 
-        let sort = request.sort.unwrap_or(UsersSorting::UsernameAZ);
+        let sort = request.sort.clone().unwrap_or("UsernameAZ".to_string());
+
+        let sort = match sort.as_str() {
+            "dateRegisteredASC" => UsersSorting::DateRegisteredNewest,
+            "dateRegisteredDESC" => UsersSorting::DateRegisteredOldest,
+            "usernameASC" => UsersSorting::UsernameAZ,
+            "usernameDESC" => UsersSorting::UsernameZA,
+            _ => UsersSorting::UsernameAZ,
+        };
 
         let filters = request.filters.as_csv::<String>().unwrap_or(None);
 
