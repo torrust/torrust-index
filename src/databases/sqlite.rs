@@ -208,7 +208,7 @@ impl Database for Sqlite {
                         _ => continue,
                     };
 
-                    let mut str = format!("AND {}", filter_query);
+                    let mut str = format!("AND {filter_query}");
                     if i > 0 {
                         str = format!(" AND {str}");
                     }
@@ -258,7 +258,7 @@ impl Database for Sqlite {
             .fetch_all(&self.pool)
             .await
             .map_err(|e| {
-                eprintln!("Database error: {:?}", e);
+                eprintln!("Database error: {e:?}");
                 database::Error::Error
             })?;
 

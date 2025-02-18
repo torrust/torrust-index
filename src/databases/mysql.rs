@@ -207,7 +207,7 @@ impl Database for Mysql {
                         _ => continue,
                     };
 
-                    let mut str = format!("AND {}", filter_query);
+                    let mut str = format!("AND {filter_query}");
                     if i > 0 {
                         str = format!(" AND {str}");
                     }
