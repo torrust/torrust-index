@@ -257,10 +257,7 @@ impl Database for Sqlite {
             .bind(limit)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| {
-                eprintln!("Database error: {e:?}");
-                database::Error::Error
-            })?;
+            .map_err(|_| database::Error::Error)?;
 
         Ok(UserProfilesResponse {
             total: u32::try_from(count).expect("variable `count` is larger than u32"),
