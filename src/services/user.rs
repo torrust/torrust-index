@@ -409,7 +409,7 @@ impl ListingService {
 
         let offset = u64::from(page * u32::from(page_size));
 
-        let sort = request.sort.clone().unwrap_or("UsernameAZ".to_string());
+        let sort = request.sort.clone().unwrap_or("usernameASC".to_string());
 
         let sort = match sort.as_str() {
             "dateRegisteredASC" => UsersSorting::DateRegisteredNewest,

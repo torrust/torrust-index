@@ -184,7 +184,7 @@ impl Database for Sqlite {
                     match sanitized_filter {
                         UsersFilters::TorrentUploader => join_filters.push_str(
                             "INNER JOIN torrust_torrents tt
-                    ON tu.user_id = tt_uploader_id",
+                    ON tu.user_id = tt.uploader_id ",
                         ),
                         _ => break,
                     }
@@ -196,7 +196,6 @@ impl Database for Sqlite {
         };
 
         let where_filters_query = if let Some(filters) = filters {
-            let mut i = 0;
             let mut where_filters = String::new();
             for filter in filters {
                 // don't take user input in the db query
@@ -208,12 +207,9 @@ impl Database for Sqlite {
                         _ => continue,
                     };
 
-                    let mut str = format!("AND {filter_query}");
-                    if i > 0 {
-                        str = format!(" AND {str}");
-                    }
+                    let str = format!("AND {filter_query} ");
+
                     where_filters.push_str(&str);
-                    i += 1;
                 }
             }
             where_filters
