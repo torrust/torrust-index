@@ -175,6 +175,8 @@ pub enum ServiceError {
     #[display("Invalid tracker API token.")]
     InvalidTrackerToken,
     // End tracker errors
+    #[display("Invalid user listing fields in the URL params.")]
+    InvalidUserListing,
 }
 
 impl From<sqlx::Error> for ServiceError {
@@ -326,6 +328,7 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
         ServiceError::TorrentNotFoundInTracker => StatusCode::NOT_FOUND,
         ServiceError::InvalidTrackerToken => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::LoggedInUserNotFound => StatusCode::UNAUTHORIZED,
+        ServiceError::InvalidUserListing => StatusCode::BAD_REQUEST,
     }
 }
 
