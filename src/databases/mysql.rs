@@ -158,8 +158,8 @@ impl Database for Mysql {
     async fn get_user_profiles_search_paginated(
         &self,
         search: &Option<String>,
-        filters: &Option<Vec<String>>,
-        sort: &UsersSorting,
+        filters: &Option<Vec<UsersFilters>>,
+        sort: Option<UsersSorting>,
         offset: u64,
         limit: u8,
     ) -> Result<UserProfilesResponse, database::Error> {
@@ -169,26 +169,27 @@ impl Database for Mysql {
         };
 
         let sort_query: String = match sort {
-            UsersSorting::DateRegisteredNewest => "date_registered ASC".to_string(),
-            UsersSorting::DateRegisteredOldest => "date_registered DESC".to_string(),
-            UsersSorting::UsernameAZ => "username ASC".to_string(),
-            UsersSorting::UsernameZA => "username DESC".to_string(),
+            Some(UsersSorting::DateRegisteredNewest) => "date_registered ASC".to_string(),
+            Some(UsersSorting::DateRegisteredOldest) => "date_registered DESC".to_string(),
+            Some(UsersSorting::UsernameAZ) => "username ASC".to_string(),
+            Some(UsersSorting::UsernameZA) => "username DESC".to_string(),
+            None => "username ASC".to_string(),
         };
 
         let join_filters_query = if let Some(filters) = filters {
             let mut join_filters = String::new();
             for filter in filters {
                 // don't take user input in the db query to smt join filter query
-                if let Some(sanitized_filter) = self.get_filters_from_name(filter).await {
-                    match sanitized_filter {
-                        UsersFilters::TorrentUploader => join_filters.push_str(
-                            "INNER JOIN torrust_torrents tt
+                /* if let Some(sanitized_filter) = self.get_filters_from_name(filter).await { */
+                match filter {
+                    UsersFilters::TorrentUploader => join_filters.push_str(
+                        "INNER JOIN torrust_torrents tt
                     ON tu.user_id = tt.uploader_id",
-                        ),
-                        _ => break,
-                    }
+                    ),
+                    _ => break,
                 }
             }
+            //}
             join_filters
         } else {
             String::new()
@@ -198,19 +199,19 @@ impl Database for Mysql {
             let mut where_filters = String::new();
             for filter in filters {
                 // don't take user input in the db query
-                if let Some(sanitized_filter) = self.get_filters_from_name(filter).await {
-                    let mut filter_query = String::new();
-                    match sanitized_filter {
-                        UsersFilters::EmailNotVerified => filter_query.push_str("email_verified = false"),
-                        UsersFilters::EmailVerified => filter_query.push_str("email_verified = true"),
-                        _ => continue,
-                    };
+                /* if let Some(sanitized_filter) = self.get_filters_from_name(filter).await { */
+                let mut filter_query = String::new();
+                match filter {
+                    UsersFilters::EmailNotVerified => filter_query.push_str("email_verified = false"),
+                    UsersFilters::EmailVerified => filter_query.push_str("email_verified = true"),
+                    _ => continue,
+                };
 
-                    let str = format!("AND {filter_query} ");
+                let str = format!("AND {filter_query} ");
 
-                    where_filters.push_str(&str);
-                }
+                where_filters.push_str(&str);
             }
+            //}
             where_filters
         } else {
             String::new()

@@ -1,3 +1,6 @@
+use std::fmt;
+use std::str::FromStr;
+
 use async_trait::async_trait;
 use bittorrent_primitives::info_hash::InfoHash;
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -82,6 +85,32 @@ pub enum UsersSorting {
     UsernameZA,
 }
 
+impl FromStr for UsersSorting {
+    type Err = UsersSortingParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "date_registered_newest" => Ok(UsersSorting::DateRegisteredNewest),
+            "date_registered_oldest" => Ok(UsersSorting::DateRegisteredOldest),
+            "username_az" => Ok(UsersSorting::UsernameAZ),
+            "username_za" => Ok(UsersSorting::UsernameZA),
+            _ => Err(UsersSortingParseError),
+        }
+    }
+}
+
+// Custom error type for parsing failures
+#[derive(Debug)]
+pub struct UsersSortingParseError;
+
+impl fmt::Display for UsersSortingParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid sorting option")
+    }
+}
+
+impl std::error::Error for UsersSortingParseError {}
+
 /// Sorting options for users.
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub enum UsersFilters {
@@ -89,6 +118,31 @@ pub enum UsersFilters {
     EmailNotVerified,
     TorrentUploader,
 }
+
+impl FromStr for UsersFilters {
+    type Err = UsersFiltersParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "email_verified" => Ok(UsersFilters::EmailVerified),
+            "email_not_verified" => Ok(UsersFilters::EmailNotVerified),
+            "torrent_uploader" => Ok(UsersFilters::TorrentUploader),
+            _ => Err(UsersFiltersParseError),
+        }
+    }
+}
+
+// Custom error type for parsing failures
+#[derive(Debug)]
+pub struct UsersFiltersParseError;
+
+impl fmt::Display for UsersFiltersParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid filter option")
+    }
+}
+
+impl std::error::Error for UsersFiltersParseError {}
 
 /// Database errors.
 #[derive(Debug)]
@@ -164,8 +218,8 @@ pub trait Database: Sync + Send {
     async fn get_user_profiles_search_paginated(
         &self,
         search: &Option<String>,
-        filters: &Option<Vec<String>>,
-        sort: &UsersSorting,
+        filters: &Option<Vec<UsersFilters>>,
+        sort: Option<UsersSorting>,
         offset: u64,
         page_size: u8,
     ) -> Result<UserProfilesResponse, Error>;

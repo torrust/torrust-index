@@ -1,4 +1,5 @@
 //! User services.
+use std::str::FromStr;
 use std::sync::Arc;
 
 use argon2::password_hash::SaltString;
@@ -14,7 +15,7 @@ use tracing::{debug, info};
 use super::authentication::DbUserAuthenticationRepository;
 use super::authorization::{self, ACTION};
 use crate::config::{Configuration, PasswordConstraints};
-use crate::databases::database::{Database, Error, UsersSorting};
+use crate::databases::database::{Database, Error, UsersFilters, UsersSorting};
 use crate::errors::ServiceError;
 use crate::mailer::VerifyClaims;
 use crate::models::response::UserProfilesResponse;
@@ -47,8 +48,8 @@ pub struct ListingRequest {
 pub struct ListingSpecification {
     pub offset: u64,
     /// Expects comma separated string
-    pub filters: Option<Vec<String>>,
-    pub sort: UsersSorting,
+    pub filters: Option<Vec<UsersFilters>>,
+    pub sort: Option<UsersSorting>,
     pub page_size: u8,
     pub search: Option<String>,
 }
@@ -372,26 +373,24 @@ impl ListingService {
     /// Returns a `ServiceError::DatabaseError` if the database query fails.
     pub async fn generate_user_profile_listing(
         &self,
-        request: &ListingRequest,
+        listing: &ListingSpecification,
         maybe_user_id: Option<UserId>,
     ) -> Result<UserProfilesResponse, ServiceError> {
         self.authorization_service
             .authorize(ACTION::GenerateUserProfilesListing, maybe_user_id)
             .await?;
 
-        let user_profile_listing_specification = self.listing_specification_from_user_request(request).await;
-
-        let user_profiles_response = self
-            .user_profile_repository
-            .generate_listing(&user_profile_listing_specification)
-            .await?;
+        let user_profiles_response = self.user_profile_repository.generate_listing(&listing).await?;
 
         Ok(user_profiles_response)
     }
 
     /// It converts the user listing request into an internal listing
     /// specification.
-    async fn listing_specification_from_user_request(&self, request: &ListingRequest) -> ListingSpecification {
+    pub async fn listing_specification_from_user_request(
+        &self,
+        request: &ListingRequest,
+    ) -> Result<ListingSpecification, ServiceError> {
         let settings = self.configuration.settings.read().await;
         let default_user_profile_page_size = settings.api.default_user_profile_page_size;
         let max_user_profile_page_size = settings.api.max_user_profile_page_size;
@@ -409,25 +408,35 @@ impl ListingService {
 
         let offset = u64::from(page * u32::from(page_size));
 
-        let sort = request.sort.clone().unwrap_or("usernameASC".to_string());
-
-        let sort = match sort.as_str() {
-            "dateRegisteredASC" => UsersSorting::DateRegisteredNewest,
-            "dateRegisteredDESC" => UsersSorting::DateRegisteredOldest,
-            "usernameASC" => UsersSorting::UsernameAZ,
-            "usernameDESC" => UsersSorting::UsernameZA,
-            _ => UsersSorting::UsernameAZ,
+        let sort = match &request.sort {
+            Some(sort_value) => Some(UsersSorting::from_str(&sort_value).map_err(|_| ServiceError::InvalidUserListing)?),
+            None => None,
         };
 
-        let filters = request.filters.as_csv::<String>().unwrap_or(None);
+        let filter_values = request.filters.as_csv::<String>().unwrap_or(None);
 
-        ListingSpecification {
+        let filters = if let Some(filter_values) = filter_values {
+            let mut sanitized_filters: Vec<UsersFilters> = Vec::new();
+            for filter in filter_values {
+                match filter.as_str() {
+                    "torrent_uploader" => sanitized_filters.push(UsersFilters::TorrentUploader),
+                    "email_not_verified" => sanitized_filters.push(UsersFilters::EmailNotVerified),
+                    "email_verified" => sanitized_filters.push(UsersFilters::EmailVerified),
+                    _ => (),
+                }
+            }
+            Some(sanitized_filters)
+        } else {
+            None
+        };
+
+        Ok(ListingSpecification {
             offset,
             filters,
             sort,
             page_size,
             search: request.search.clone(),
-        }
+        })
     }
 }
 
@@ -533,7 +542,7 @@ impl DbUserProfileRepository {
             .get_user_profiles_search_paginated(
                 &specification.search,
                 &specification.filters,
-                &specification.sort,
+                specification.sort,
                 specification.offset,
                 specification.page_size,
             )

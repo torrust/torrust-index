@@ -199,9 +199,18 @@ pub async fn get_user_profiles_handler(
     Query(criteria): Query<ListingRequest>,
     ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
 ) -> Response {
+    let listing = match app_data
+        .listing_service
+        .listing_specification_from_user_request(&criteria)
+        .await
+    {
+        Ok(listing_value) => listing_value,
+        Err(err) => return err.into_response(),
+    };
+
     match app_data
         .listing_service
-        .generate_user_profile_listing(&criteria, maybe_user_id)
+        .generate_user_profile_listing(&listing, maybe_user_id)
         .await
     {
         Ok(users) => Json(crate::web::api::server::v1::responses::OkResponseData { data: users }).into_response(),
