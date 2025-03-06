@@ -413,16 +413,22 @@ impl ListingService {
             None => None,
         };
 
-        let filter_values = request.filters.as_csv::<String>().unwrap_or(None);
+        let filter_values = request
+            .filters
+            .as_csv::<String>()
+            .map_err(|_| ServiceError::InvalidUserListing)?;
 
         let filters = if let Some(filter_values) = filter_values {
             let mut sanitized_filters: Vec<UsersFilters> = Vec::new();
             for filter in filter_values {
                 match filter.as_str() {
-                    "torrent_uploader" => sanitized_filters.push(UsersFilters::TorrentUploader),
-                    "email_not_verified" => sanitized_filters.push(UsersFilters::EmailNotVerified),
-                    "email_verified" => sanitized_filters.push(UsersFilters::EmailVerified),
-                    _ => (),
+                    "torrent_uploader" => sanitized_filters
+                        .push(UsersFilters::from_str("torrent_uploader").map_err(|_| ServiceError::InvalidUserListing)?),
+                    "email_not_verified" => sanitized_filters
+                        .push(UsersFilters::from_str("email_not_verified").map_err(|_| ServiceError::InvalidUserListing)?),
+                    "email_verified" => sanitized_filters
+                        .push(UsersFilters::from_str("email_verified").map_err(|_| ServiceError::InvalidUserListing)?),
+                    _ => return Err(ServiceError::InvalidUserListing),
                 }
             }
             Some(sanitized_filters)

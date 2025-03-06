@@ -177,64 +177,21 @@ impl Database for Sqlite {
             None => "username ASC".to_string(),
         };
 
-        /* let (join_filters, where_filters) = if let Some(filters) = filters {
-            let (join_filters_query, where_filters_query) = (String::new(), String::new());
+        let (join_filters, where_filters) = if let Some(filters) = filters {
+            let (mut join_filters_query, mut where_filters_query) = (String::new(), String::new());
             for filter in filters {
                 match filter {
                     UsersFilters::TorrentUploader => join_filters_query.push_str(
                         "INNER JOIN torrust_torrents tt
                     ON tu.user_id = tt.uploader_id ",
                     ),
-                    UsersFilters::EmailNotVerified => where_filters_query.push_str("email_verified = false"),
-                    UsersFilters::EmailVerified => where_filters_query.push_str("email_verified = true"),
-                    _ => continue,
+                    UsersFilters::EmailNotVerified => where_filters_query.push_str(" AND email_verified = false"),
+                    UsersFilters::EmailVerified => where_filters_query.push_str(" AND email_verified = true"),
                 }
             }
             (join_filters_query, where_filters_query)
         } else {
             (String::new(), String::new())
-        }; */
-
-        let join_filters_query = if let Some(filters) = filters {
-            let mut join_filters = String::new();
-            for filter in filters {
-                // don't take user input in the db query
-                /* if let Some(sanitized_filter) = self.get_filters_from_name(filter).await { */
-                //match sanitized_filter {
-                match filter {
-                    UsersFilters::TorrentUploader => join_filters.push_str(
-                        "INNER JOIN torrust_torrents tt
-                    ON tu.user_id = tt.uploader_id ",
-                    ),
-                    _ => continue,
-                }
-            }
-            //}
-            join_filters
-        } else {
-            String::new()
-        };
-
-        let where_filters_query = if let Some(filters) = filters {
-            let mut where_filters = String::new();
-            for filter in filters {
-                // don't take user input in the db query
-                // if let Some(sanitized_filter) = self.get_filters_from_name(filter).await {
-                let mut filter_query = String::new();
-                match filter {
-                    UsersFilters::EmailNotVerified => filter_query.push_str("email_verified = false"),
-                    UsersFilters::EmailVerified => filter_query.push_str("email_verified = true"),
-                    _ => continue,
-                };
-
-                let str = format!("AND {filter_query} ");
-
-                where_filters.push_str(&str);
-            }
-            //}
-            where_filters
-        } else {
-            String::new()
         };
 
         let mut query_string = format!(
@@ -248,9 +205,9 @@ impl Database for Sqlite {
         FROM torrust_user_profiles tp 
         INNER JOIN torrust_users tu
         ON tp.user_id = tu.user_id 
-        {join_filters_query}
+        {join_filters}
         WHERE username LIKE ?
-        {where_filters_query}
+        {where_filters}
         "
         );
 
