@@ -380,13 +380,16 @@ impl ListingService {
             .authorize(ACTION::GenerateUserProfilesListing, maybe_user_id)
             .await?;
 
-        let user_profiles_response = self.user_profile_repository.generate_listing(&listing).await?;
+        let user_profiles_response = self.user_profile_repository.generate_listing(listing).await?;
 
         Ok(user_profiles_response)
     }
 
-    /// It converts the user listing request into an internal listing
-    /// specification.
+    /// It converts the user listing request into an internal listing specification.
+    ///    
+    /// # Errors
+    ///
+    /// Returns a `ServiceError::InvalidUserListing` if there is an incorrect value in the url params for the listing request.
     pub async fn listing_specification_from_user_request(
         &self,
         request: &ListingRequest,
@@ -409,14 +412,14 @@ impl ListingService {
         let offset = u64::from(page * u32::from(page_size));
 
         let sort = match &request.sort {
-            Some(sort_value) => Some(UsersSorting::from_str(&sort_value).map_err(|_| ServiceError::InvalidUserListing)?),
+            Some(sort_value) => Some(UsersSorting::from_str(sort_value).map_err(|_| ServiceError::InvalidUserListing)?),
             None => None,
         };
 
         let filter_values = request
             .filters
             .as_csv::<String>()
-            .map_err(|_| ServiceError::InvalidUserListing)?;
+            .map_err(|()| ServiceError::InvalidUserListing)?;
 
         let filters = if let Some(filter_values) = filter_values {
             let mut sanitized_filters: Vec<UsersFilters> = Vec::new();

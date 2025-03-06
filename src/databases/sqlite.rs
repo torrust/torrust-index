@@ -172,9 +172,8 @@ impl Database for Sqlite {
         let sort_query: String = match sort {
             Some(UsersSorting::DateRegisteredNewest) => "date_registered ASC".to_string(),
             Some(UsersSorting::DateRegisteredOldest) => "date_registered DESC".to_string(),
-            Some(UsersSorting::UsernameAZ) => "username ASC".to_string(),
+            Some(UsersSorting::UsernameAZ) | None => "username ASC".to_string(),
             Some(UsersSorting::UsernameZA) => "username DESC".to_string(),
-            None => "username ASC".to_string(),
         };
 
         let (join_filters, where_filters) = if let Some(filters) = filters {
