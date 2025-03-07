@@ -249,7 +249,7 @@ impl Default for CasbinConfiguration {
                 admin, GetCanonicalInfoHash
                 admin, ChangePassword
                 admin, BanUser
-                admin, GenerateUserProfilesListing
+                admin, GenerateUserProfileSpecification
                 registered, GetAboutPage
                 registered, GetLicensePage
                 registered, GetCategories

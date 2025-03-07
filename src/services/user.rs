@@ -366,25 +366,6 @@ impl ListingService {
         }
     }
 
-    /// Returns a list of all the user profiles matching the search criteria.
-    ///
-    /// # Errors
-    ///
-    /// Returns a `ServiceError::DatabaseError` if the database query fails.
-    pub async fn generate_user_profile_listing(
-        &self,
-        listing: &ListingSpecification,
-        maybe_user_id: Option<UserId>,
-    ) -> Result<UserProfilesResponse, ServiceError> {
-        self.authorization_service
-            .authorize(ACTION::GenerateUserProfilesListing, maybe_user_id)
-            .await?;
-
-        let user_profiles_response = self.user_profile_repository.generate_listing(listing).await?;
-
-        Ok(user_profiles_response)
-    }
-
     /// It converts the user listing request into an internal listing specification.
     ///    
     /// # Errors
@@ -392,8 +373,13 @@ impl ListingService {
     /// Returns a `ServiceError::InvalidUserListing` if there is an incorrect value in the url params for the listing request.
     pub async fn listing_specification_from_user_request(
         &self,
+        maybe_user_id: Option<UserId>,
         request: &ListingRequest,
     ) -> Result<ListingSpecification, ServiceError> {
+        self.authorization_service
+            .authorize(ACTION::GenerateUserProfilesListing, maybe_user_id)
+            .await?;
+
         let settings = self.configuration.settings.read().await;
         let default_user_profile_page_size = settings.api.default_user_profile_page_size;
         let max_user_profile_page_size = settings.api.max_user_profile_page_size;
@@ -446,6 +432,20 @@ impl ListingService {
             page_size,
             search: request.search.clone(),
         })
+    }
+
+    /// Returns a list of all the user profiles matching the search criteria.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ServiceError::DatabaseError` if the database query fails.
+    pub async fn generate_user_profile_listing(
+        &self,
+        listing: &ListingSpecification,
+    ) -> Result<UserProfilesResponse, ServiceError> {
+        let user_profiles_response = self.user_profile_repository.generate_listing(listing).await?;
+
+        Ok(user_profiles_response)
     }
 }
 

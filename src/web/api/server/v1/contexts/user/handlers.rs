@@ -201,18 +201,14 @@ pub async fn get_user_profiles_handler(
 ) -> Response {
     let listing = match app_data
         .listing_service
-        .listing_specification_from_user_request(&criteria)
+        .listing_specification_from_user_request(maybe_user_id, &criteria)
         .await
     {
         Ok(listing_value) => listing_value,
         Err(err) => return err.into_response(),
     };
 
-    match app_data
-        .listing_service
-        .generate_user_profile_listing(&listing, maybe_user_id)
-        .await
-    {
+    match app_data.listing_service.generate_user_profile_listing(&listing).await {
         Ok(users) => Json(crate::web::api::server::v1::responses::OkResponseData { data: users }).into_response(),
         Err(error) => error.into_response(),
     }
