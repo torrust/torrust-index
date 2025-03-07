@@ -244,15 +244,6 @@ impl Database for Mysql {
             .map_err(|_| database::Error::UserNotFound)
     }
 
-    async fn get_filters_from_name(&self, filter_name: &str) -> Option<UsersFilters> {
-        match filter_name {
-            "torrentUploader" => Some(UsersFilters::TorrentUploader),
-            "emailNotVerified" => Some(UsersFilters::EmailNotVerified),
-            "emailVerified" => Some(UsersFilters::EmailVerified),
-            _ => None,
-        }
-    }
-
     /// Gets User Tracker Key
     ///
     /// # Panics

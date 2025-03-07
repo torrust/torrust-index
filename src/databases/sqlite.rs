@@ -245,15 +245,6 @@ impl Database for Sqlite {
             .map_err(|_| database::Error::UserNotFound)
     }
 
-    async fn get_filters_from_name(&self, filter_name: &str) -> Option<UsersFilters> {
-        match filter_name {
-            "torrentUploader" => Some(UsersFilters::TorrentUploader),
-            "emailNotVerified" => Some(UsersFilters::EmailNotVerified),
-            "emailVerified" => Some(UsersFilters::EmailVerified),
-            _ => None,
-        }
-    }
-
     async fn get_user_tracker_key(&self, user_id: i64) -> Option<TrackerKey> {
         const HOUR_IN_SECONDS: i64 = 3600;
 
