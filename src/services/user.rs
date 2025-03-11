@@ -377,7 +377,7 @@ impl ListingService {
         request: &ListingRequest,
     ) -> Result<ListingSpecification, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::GenerateUserProfilesListing, maybe_user_id)
+            .authorize(ACTION::GenerateUserProfileSpecification, maybe_user_id)
             .await?;
 
         let settings = self.configuration.settings.read().await;

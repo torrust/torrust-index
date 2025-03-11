@@ -52,7 +52,7 @@ pub enum ACTION {
     GetCanonicalInfoHash,
     ChangePassword,
     BanUser,
-    GenerateUserProfilesListing,
+    GenerateUserProfileSpecification,
 }
 
 pub struct Service {
