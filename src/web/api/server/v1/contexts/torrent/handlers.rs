@@ -336,28 +336,28 @@ async fn build_add_torrent_request_from_payload(mut payload: Multipart) -> Resul
                 let data = field.bytes().await.unwrap();
                 if data.is_empty() {
                     continue;
-                };
+                }
                 title = String::from_utf8(data.to_vec()).map_err(|_| errors::Request::TitleIsNotValidUtf8)?;
             }
             "description" => {
                 let data = field.bytes().await.unwrap();
                 if data.is_empty() {
                     continue;
-                };
+                }
                 description = String::from_utf8(data.to_vec()).map_err(|_| errors::Request::DescriptionIsNotValidUtf8)?;
             }
             "category" => {
                 let data = field.bytes().await.unwrap();
                 if data.is_empty() {
                     continue;
-                };
+                }
                 category = String::from_utf8(data.to_vec()).map_err(|_| errors::Request::CategoryIsNotValidUtf8)?;
             }
             "tags" => {
                 let data = field.bytes().await.unwrap();
                 if data.is_empty() {
                     continue;
-                };
+                }
                 let string_data = String::from_utf8(data.to_vec()).map_err(|_| errors::Request::TagsArrayIsNotValidUtf8)?;
                 tags = serde_json::from_str(&string_data).map_err(|_| errors::Request::TagsArrayIsNotValidJson)?;
             }

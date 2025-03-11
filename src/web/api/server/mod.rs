@@ -107,7 +107,7 @@ async fn start_server(
             .serve(router.into_make_service_with_connect_info::<std::net::SocketAddr>())
             .await
             .expect("API server should be running"),
-    };
+    }
 }
 
 #[derive(Error, Debug)]

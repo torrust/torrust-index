@@ -206,7 +206,7 @@ impl RegistrationService {
 
         if self.user_profile_repository.verify_email(&user_id).await.is_err() {
             return Err(ServiceError::DatabaseError);
-        };
+        }
 
         Ok(true)
     }
