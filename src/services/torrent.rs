@@ -1,4 +1,5 @@
 //! Torrent service.
+use std::fmt::Write as _;
 use std::sync::Arc;
 
 use bittorrent_primitives::info_hash::InfoHash;
@@ -550,7 +551,7 @@ impl Index {
 
         // Add trackers from torrent file to magnet link
         for tracker in &torrent_response.trackers {
-            magnet.push_str(&format!("&tr={}", urlencoding::encode(tracker)));
+            let _ = write!(&mut magnet, "&tr={}", urlencoding::encode(tracker));
         }
 
         torrent_response.magnet_link = magnet;
