@@ -60,15 +60,13 @@ fn main() {
             // Attempt to create and write to the file
             let mut file = match File::create(&file_path) {
                 Ok(file) => file,
-                Err(e) => panic!("Failed to create file {file_path:?}: {e}"),
+                Err(e) => panic!("Failed to create file {}: {e}", file_path.display()),
             };
 
             if let Err(e) = file.write_all(&bytes) {
-                panic!("Failed to write to file {file_path:?}: {e}");
+                panic!("Failed to write to file {}: {e}", file_path.display());
             }
-
-            println!("File successfully written to {file_path:?}");
         }
         Err(e) => panic!("Error encoding torrent: {e}"),
-    };
+    }
 }
