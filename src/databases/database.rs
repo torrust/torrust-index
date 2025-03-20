@@ -90,10 +90,10 @@ impl FromStr for UsersSorting {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "date_registered_newest" => Ok(UsersSorting::DateRegisteredNewest),
-            "date_registered_oldest" => Ok(UsersSorting::DateRegisteredOldest),
-            "username_az" => Ok(UsersSorting::UsernameAZ),
-            "username_za" => Ok(UsersSorting::UsernameZA),
+            "DateRegisteredNewest" => Ok(UsersSorting::DateRegisteredNewest),
+            "DateRegisteredOldest" => Ok(UsersSorting::DateRegisteredOldest),
+            "UsernameAZ" => Ok(UsersSorting::UsernameAZ),
+            "UsernameZA" => Ok(UsersSorting::UsernameZA),
             _ => Err(UsersSortingParseError),
         }
     }
@@ -124,9 +124,9 @@ impl FromStr for UsersFilters {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "email_verified" => Ok(UsersFilters::EmailVerified),
-            "email_not_verified" => Ok(UsersFilters::EmailNotVerified),
-            "torrent_uploader" => Ok(UsersFilters::TorrentUploader),
+            "EmailVerified" => Ok(UsersFilters::EmailVerified),
+            "EmailNotVerified" => Ok(UsersFilters::EmailNotVerified),
+            "TorrentUploader" => Ok(UsersFilters::TorrentUploader),
             _ => Err(UsersFiltersParseError),
         }
     }

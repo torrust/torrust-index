@@ -411,12 +411,12 @@ impl ListingService {
             let mut sanitized_filters: Vec<UsersFilters> = Vec::new();
             for filter in filter_values {
                 match filter.as_str() {
-                    "torrent_uploader" => sanitized_filters
-                        .push(UsersFilters::from_str("torrent_uploader").map_err(|_| ServiceError::InvalidUserListing)?),
-                    "email_not_verified" => sanitized_filters
-                        .push(UsersFilters::from_str("email_not_verified").map_err(|_| ServiceError::InvalidUserListing)?),
-                    "email_verified" => sanitized_filters
-                        .push(UsersFilters::from_str("email_verified").map_err(|_| ServiceError::InvalidUserListing)?),
+                    "TorrentUploader" => sanitized_filters
+                        .push(UsersFilters::from_str("TorrentUploader").map_err(|_| ServiceError::InvalidUserListing)?),
+                    "EmailNotVerified" => sanitized_filters
+                        .push(UsersFilters::from_str("EmailNotVerified").map_err(|_| ServiceError::InvalidUserListing)?),
+                    "EmailVerified" => sanitized_filters
+                        .push(UsersFilters::from_str("EmailVerified").map_err(|_| ServiceError::InvalidUserListing)?),
                     _ => return Err(ServiceError::InvalidUserListing),
                 }
             }
