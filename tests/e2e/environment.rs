@@ -84,7 +84,7 @@ impl TestEnv {
     pub fn provides_a_private_tracker(&self) -> bool {
         if !self.is_shared() {
             return false;
-        };
+        }
 
         match self.server_settings() {
             Some(settings) => settings.tracker.private,
@@ -148,11 +148,7 @@ impl TestEnv {
             State::RunningShared => {
                 let connect_url_env_var = ENV_VAR_DB_CONNECT_URL;
 
-                if let Ok(connect_url) = env::var(connect_url_env_var) {
-                    Some(connect_url)
-                } else {
-                    None
-                }
+                env::var(connect_url_env_var).ok()
             }
             State::RunningIsolated => internal_connect_url,
             State::Stopped => None,

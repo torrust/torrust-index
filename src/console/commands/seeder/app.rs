@@ -196,7 +196,7 @@ pub async fn run() -> anyhow::Result<()> {
                 info!(target:"seeder", "Uploaded torrent: {}", json.yellow());
             }
             Err(err) => print!("Error uploading torrent {err:?}"),
-        };
+        }
 
         if i != args.number_of_torrents {
             sleep(Duration::from_secs(args.interval));
