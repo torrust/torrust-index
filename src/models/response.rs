@@ -3,7 +3,7 @@ use url::Url;
 
 use super::category::Category;
 use super::torrent::TorrentId;
-use super::user::UserProfile;
+use super::user::UserListing;
 use crate::databases::database::Category as DatabaseCategory;
 use crate::models::torrent::TorrentListing;
 use crate::models::torrent_file::TorrentFile;
@@ -129,5 +129,5 @@ pub struct TorrentsResponse {
 #[derive(Serialize, Deserialize, Debug, sqlx::FromRow)]
 pub struct UserProfilesResponse {
     pub total: u32,
-    pub results: Vec<UserProfile>,
+    pub results: Vec<UserListing>,
 }

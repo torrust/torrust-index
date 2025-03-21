@@ -1,3 +1,6 @@
+use std::fmt;
+use std::str::FromStr;
+
 use async_trait::async_trait;
 use bittorrent_primitives::info_hash::InfoHash;
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -73,6 +76,74 @@ pub enum Sorting {
     SizeDesc,
 }
 
+/// Sorting options for users.
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub enum UsersSorting {
+    DateRegisteredNewest,
+    DateRegisteredOldest,
+    UsernameAZ,
+    UsernameZA,
+}
+
+impl FromStr for UsersSorting {
+    type Err = UsersSortingParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "DateRegisteredNewest" => Ok(UsersSorting::DateRegisteredNewest),
+            "DateRegisteredOldest" => Ok(UsersSorting::DateRegisteredOldest),
+            "UsernameAZ" => Ok(UsersSorting::UsernameAZ),
+            "UsernameZA" => Ok(UsersSorting::UsernameZA),
+            _ => Err(UsersSortingParseError),
+        }
+    }
+}
+
+// Custom error type for parsing failures
+#[derive(Debug)]
+pub struct UsersSortingParseError;
+
+impl fmt::Display for UsersSortingParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid sorting option")
+    }
+}
+
+impl std::error::Error for UsersSortingParseError {}
+
+/// Sorting options for users.
+#[derive(Clone, Copy, Debug, Deserialize)]
+pub enum UsersFilters {
+    EmailVerified,
+    EmailNotVerified,
+    TorrentUploader,
+}
+
+impl FromStr for UsersFilters {
+    type Err = UsersFiltersParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "EmailVerified" => Ok(UsersFilters::EmailVerified),
+            "EmailNotVerified" => Ok(UsersFilters::EmailNotVerified),
+            "TorrentUploader" => Ok(UsersFilters::TorrentUploader),
+            _ => Err(UsersFiltersParseError),
+        }
+    }
+}
+
+// Custom error type for parsing failures
+#[derive(Debug)]
+pub struct UsersFiltersParseError;
+
+impl fmt::Display for UsersFiltersParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Invalid filter option")
+    }
+}
+
+impl std::error::Error for UsersFiltersParseError {}
+
 /// Database errors.
 #[derive(Debug)]
 pub enum Error {
@@ -143,10 +214,12 @@ pub trait Database: Sync + Send {
     /// Get `UserProfile` from `username`.
     async fn get_user_profile_from_username(&self, username: &str) -> Result<UserProfile, Error>;
 
-    /// Get all user profiles in a paginated and sorted form as `UserProfilesResponse` from `search`,`offset` and `page_size`.
+    /// Get all user profiles in a paginated and sorted form as `UserProfilesResponse` from `search`, `filters`, `sort`, `offset` and `page_size`.
     async fn get_user_profiles_search_paginated(
         &self,
         search: &Option<String>,
+        filters: &Option<Vec<UsersFilters>>,
+        sort: Option<UsersSorting>,
         offset: u64,
         page_size: u8,
     ) -> Result<UserProfilesResponse, Error>;

@@ -1,4 +1,5 @@
 //! User services.
+use std::str::FromStr;
 use std::sync::Arc;
 
 use argon2::password_hash::SaltString;
@@ -14,15 +15,15 @@ use tracing::{debug, info};
 use super::authentication::DbUserAuthenticationRepository;
 use super::authorization::{self, ACTION};
 use crate::config::{Configuration, PasswordConstraints};
-use crate::databases::database::{Database, Error};
+use crate::databases::database::{Database, Error, UsersFilters, UsersSorting};
 use crate::errors::ServiceError;
-use crate::mailer;
 use crate::mailer::VerifyClaims;
 use crate::models::response::UserProfilesResponse;
 use crate::models::user::{UserCompact, UserId, UserProfile, Username};
 use crate::services::authentication::verify_password;
 use crate::utils::validation::validate_email_address;
 use crate::web::api::server::v1::contexts::user::forms::{ChangePasswordForm, RegistrationForm};
+use crate::{mailer, AsCSV};
 
 /// Since user email could be optional, we need a way to represent "no email"
 /// in the database. This function returns the string that should be used for
@@ -34,6 +35,9 @@ fn no_email() -> String {
 /// User request to generate a user profile listing.
 #[derive(Debug, Deserialize)]
 pub struct ListingRequest {
+    /// Expects comma separated string
+    pub filters: Option<String>,
+    pub sort: Option<String>,
     pub page_size: Option<u8>,
     pub page: Option<u32>,
     pub search: Option<String>,
@@ -43,6 +47,9 @@ pub struct ListingRequest {
 #[derive(Debug, Deserialize)]
 pub struct ListingSpecification {
     pub offset: u64,
+    /// Expects comma separated string
+    pub filters: Option<Vec<UsersFilters>>,
+    pub sort: Option<UsersSorting>,
     pub page_size: u8,
     pub search: Option<String>,
 }
@@ -359,33 +366,20 @@ impl ListingService {
         }
     }
 
-    /// Returns a list of all the user profiles matching the search criteria.
-    ///
+    /// It converts the user listing request into an internal listing specification.
+    ///    
     /// # Errors
     ///
-    /// Returns a `ServiceError::DatabaseError` if the database query fails.
-    pub async fn generate_user_profile_listing(
+    /// Returns a `ServiceError::InvalidUserListing` if there is an incorrect value in the url params for the listing request.
+    pub async fn listing_specification_from_user_request(
         &self,
-        request: &ListingRequest,
         maybe_user_id: Option<UserId>,
-    ) -> Result<UserProfilesResponse, ServiceError> {
+        request: &ListingRequest,
+    ) -> Result<ListingSpecification, ServiceError> {
         self.authorization_service
-            .authorize(ACTION::GenerateUserProfilesListing, maybe_user_id)
+            .authorize(ACTION::GenerateUserProfileSpecification, maybe_user_id)
             .await?;
 
-        let user_profile_listing_specification = self.listing_specification_from_user_request(request).await;
-
-        let user_profiles_response = self
-            .user_profile_repository
-            .generate_listing(&user_profile_listing_specification)
-            .await?;
-
-        Ok(user_profiles_response)
-    }
-
-    /// It converts the user listing request into an internal listing
-    /// specification.
-    async fn listing_specification_from_user_request(&self, request: &ListingRequest) -> ListingSpecification {
         let settings = self.configuration.settings.read().await;
         let default_user_profile_page_size = settings.api.default_user_profile_page_size;
         let max_user_profile_page_size = settings.api.max_user_profile_page_size;
@@ -403,11 +397,55 @@ impl ListingService {
 
         let offset = u64::from(page * u32::from(page_size));
 
-        ListingSpecification {
-            search: request.search.clone(),
+        let sort = match &request.sort {
+            Some(sort_value) => Some(UsersSorting::from_str(sort_value).map_err(|_| ServiceError::InvalidUserListing)?),
+            None => None,
+        };
+
+        let filter_values = request
+            .filters
+            .as_csv::<String>()
+            .map_err(|()| ServiceError::InvalidUserListing)?;
+
+        let filters = if let Some(filter_values) = filter_values {
+            let mut sanitized_filters: Vec<UsersFilters> = Vec::new();
+            for filter in filter_values {
+                match filter.as_str() {
+                    "TorrentUploader" => sanitized_filters
+                        .push(UsersFilters::from_str("TorrentUploader").map_err(|_| ServiceError::InvalidUserListing)?),
+                    "EmailNotVerified" => sanitized_filters
+                        .push(UsersFilters::from_str("EmailNotVerified").map_err(|_| ServiceError::InvalidUserListing)?),
+                    "EmailVerified" => sanitized_filters
+                        .push(UsersFilters::from_str("EmailVerified").map_err(|_| ServiceError::InvalidUserListing)?),
+                    _ => return Err(ServiceError::InvalidUserListing),
+                }
+            }
+            Some(sanitized_filters)
+        } else {
+            None
+        };
+
+        Ok(ListingSpecification {
             offset,
+            filters,
+            sort,
             page_size,
-        }
+            search: request.search.clone(),
+        })
+    }
+
+    /// Returns a list of all the user profiles matching the search criteria.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ServiceError::DatabaseError` if the database query fails.
+    pub async fn generate_user_profile_listing(
+        &self,
+        listing: &ListingSpecification,
+    ) -> Result<UserProfilesResponse, ServiceError> {
+        let user_profiles_response = self.user_profile_repository.generate_listing(listing).await?;
+
+        Ok(user_profiles_response)
     }
 }
 
@@ -510,7 +548,13 @@ impl DbUserProfileRepository {
     /// It returns an error if there is a database error.
     pub async fn generate_listing(&self, specification: &ListingSpecification) -> Result<UserProfilesResponse, Error> {
         self.database
-            .get_user_profiles_search_paginated(&specification.search, specification.offset, specification.page_size)
+            .get_user_profiles_search_paginated(
+                &specification.search,
+                &specification.filters,
+                specification.sort,
+                specification.offset,
+                specification.page_size,
+            )
             .await
     }
 }

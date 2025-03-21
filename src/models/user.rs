@@ -56,6 +56,17 @@ pub struct UserFull {
 }
 
 #[allow(clippy::module_name_repetitions)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, sqlx::FromRow)]
+pub struct UserListing {
+    pub user_id: UserId,
+    pub username: String,
+    pub email: String,
+    pub email_verified: bool,
+    pub date_registered: String,
+    pub administrator: bool,
+}
+
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UserClaims {
     pub user: UserCompact,

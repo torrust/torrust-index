@@ -8,7 +8,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{query, query_as, Acquire, ConnectOptions, SqlitePool};
 use url::Url;
 
-use super::database::TABLES_TO_TRUNCATE;
+use super::database::{UsersFilters, UsersSorting, TABLES_TO_TRUNCATE};
 use crate::databases::database;
 use crate::databases::database::{Category, Database, Driver, Sorting, TorrentCompact};
 use crate::models::category::CategoryId;
@@ -19,7 +19,7 @@ use crate::models::torrent_file::{
 };
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
-use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserProfile};
+use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserListing, UserProfile};
 use crate::services::torrent::{CanonicalInfoHashGroup, DbTorrentInfoHash};
 use crate::utils::clock::{self, datetime_now, DATETIME_FORMAT};
 use crate::utils::hex::from_bytes;
@@ -159,6 +159,8 @@ impl Database for Sqlite {
     async fn get_user_profiles_search_paginated(
         &self,
         search: &Option<String>,
+        filters: &Option<Vec<UsersFilters>>,
+        sort: Option<UsersSorting>,
         offset: u64,
         limit: u8,
     ) -> Result<UserProfilesResponse, database::Error> {
@@ -167,7 +169,46 @@ impl Database for Sqlite {
             Some(v) => format!("%{v}%"),
         };
 
-        let mut query_string = "SELECT * FROM torrust_user_profiles WHERE username LIKE ?".to_string();
+        let sort_query: String = match sort {
+            Some(UsersSorting::DateRegisteredNewest) => "date_registered ASC".to_string(),
+            Some(UsersSorting::DateRegisteredOldest) => "date_registered DESC".to_string(),
+            Some(UsersSorting::UsernameAZ) | None => "username ASC".to_string(),
+            Some(UsersSorting::UsernameZA) => "username DESC".to_string(),
+        };
+
+        let (join_filters, where_filters) = if let Some(filters) = filters {
+            let (mut join_filters_query, mut where_filters_query) = (String::new(), String::new());
+            for filter in filters {
+                match filter {
+                    UsersFilters::TorrentUploader => join_filters_query.push_str(
+                        "INNER JOIN torrust_torrents tt
+                    ON tu.user_id = tt.uploader_id ",
+                    ),
+                    UsersFilters::EmailNotVerified => where_filters_query.push_str(" AND email_verified = false"),
+                    UsersFilters::EmailVerified => where_filters_query.push_str(" AND email_verified = true"),
+                }
+            }
+            (join_filters_query, where_filters_query)
+        } else {
+            (String::new(), String::new())
+        };
+
+        let mut query_string = format!(
+            "SELECT 
+        tp.user_id,
+        tp.username,
+        tp.email,
+        tp.email_verified,
+        tu.date_registered,
+        tu.administrator
+        FROM torrust_user_profiles tp 
+        INNER JOIN torrust_users tu
+        ON tp.user_id = tu.user_id 
+        {join_filters}
+        WHERE username LIKE ?
+        {where_filters}
+        "
+        );
 
         let count_query = format!("SELECT COUNT(*) as count FROM ({query_string}) AS count_table");
 
@@ -180,9 +221,9 @@ impl Database for Sqlite {
 
         let count = count_result?;
 
-        query_string = format!("{query_string}  LIMIT ?, ?");
+        query_string = format!("{query_string} ORDER BY {sort_query} LIMIT ?, ?");
 
-        let res: Vec<UserProfile> = sqlx::query_as::<_, UserProfile>(&query_string)
+        let res: Vec<UserListing> = sqlx::query_as::<_, UserListing>(&query_string)
             .bind(user_name.clone())
             .bind(i64::saturating_add_unsigned(0, offset))
             .bind(limit)
