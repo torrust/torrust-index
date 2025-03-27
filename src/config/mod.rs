@@ -27,6 +27,11 @@ pub type Email = v2::registration::Email;
 pub type Auth = v2::auth::Auth;
 pub type SecretKey = v2::auth::ClaimTokenPepper;
 pub type PasswordConstraints = v2::auth::PasswordConstraints;
+pub type ThrottlePolicy = v2::auth::ThrottlePolicy;
+/// Convenience alias — the password-reset flow uses a [`ThrottlePolicy`].
+pub type PasswordResetPolicy = ThrottlePolicy;
+/// Convenience alias — the email-verification flow uses a [`ThrottlePolicy`].
+pub type EmailVerificationPolicy = ThrottlePolicy;
 
 pub type Database = v2::database::Database;
 
@@ -464,10 +469,7 @@ mod tests {
     #[tokio::test]
     #[allow(clippy::result_large_err)]
     async fn configuration_could_be_loaded_from_a_toml_string() {
-        figment::Jail::expect_with(|jail| {
-            jail.create_dir("templates")?;
-            jail.create_file("templates/verify.html", "EMAIL TEMPLATE")?;
-
+        figment::Jail::expect_with(|_jail| {
             let info = Info {
                 config_toml: Some(default_config_toml()),
                 config_toml_path: String::new(),
@@ -551,9 +553,6 @@ mod tests {
     #[allow(clippy::result_large_err)]
     async fn configuration_should_allow_to_override_the_tracker_api_token_provided_in_the_toml_file() {
         figment::Jail::expect_with(|jail| {
-            jail.create_dir("templates")?;
-            jail.create_file("templates/verify.html", "EMAIL TEMPLATE")?;
-
             jail.set_env("TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN", "OVERRIDDEN API TOKEN");
 
             let info = Info {
@@ -573,9 +572,6 @@ mod tests {
     #[allow(clippy::result_large_err)]
     async fn configuration_should_allow_to_override_the_authentication_user_claim_token_pepper_provided_in_the_toml_file() {
         figment::Jail::expect_with(|jail| {
-            jail.create_dir("templates")?;
-            jail.create_file("templates/verify.html", "EMAIL TEMPLATE")?;
-
             jail.set_env(
                 "TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__USER_CLAIM_TOKEN_PEPPER",
                 "OVERRIDDEN AUTH SECRET KEY",

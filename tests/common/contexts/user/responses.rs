@@ -10,6 +10,7 @@ pub struct AddedUserResponse {
 #[derive(Deserialize, Debug)]
 pub struct NewUserData {
     pub user_id: i64,
+    pub verification_expiry: String,
 }
 
 #[derive(Deserialize, Debug)]

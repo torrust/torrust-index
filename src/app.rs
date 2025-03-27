@@ -138,7 +138,6 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         configuration.clone(),
         mailer_service.clone(),
         user_repository.clone(),
-        user_profile_repository.clone(),
     ));
     let profile_service = Arc::new(user::ProfileService::new(
         configuration.clone(),
@@ -162,6 +161,21 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
 
     let listing_service = Arc::new(user::ListingService::new(
         configuration.clone(),
+        user_profile_repository.clone(),
+        authorization_service.clone(),
+    ));
+
+    let password_reset_service = Arc::new(user::PasswordResetService::new(
+        configuration.clone(),
+        mailer_service.clone(),
+        user_profile_repository.clone(),
+        user_authentication_repository.clone(),
+        authorization_service.clone(),
+    ));
+
+    let email_verification_service = Arc::new(user::EmailVerificationService::new(
+        configuration.clone(),
+        mailer_service.clone(),
         user_profile_repository.clone(),
         authorization_service.clone(),
     ));
@@ -201,6 +215,8 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         ban_service,
         about_service,
         listing_service,
+        password_reset_service,
+        email_verification_service,
     ));
 
     // Start cronjob to import tracker torrent data and updating

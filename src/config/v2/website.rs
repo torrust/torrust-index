@@ -14,6 +14,20 @@ pub struct Website {
     /// The legal information.
     #[serde(default = "Website::default_terms")]
     pub terms: Terms,
+
+    /// The URL prefix the frontend uses for email verification links.
+    /// The backend appends `/<token>` to this prefix when generating the
+    /// verification email. For example: `https://mysite.com/verify-email`.
+    /// If not set, the backend API URL is used as a fallback.
+    #[serde(default = "Website::default_email_verification_url_prefix")]
+    pub email_verification_url_prefix: Option<String>,
+
+    /// The URL prefix the frontend uses for password reset links.
+    /// The backend appends `/<token>` to this prefix when generating the
+    /// reset email. For example: `https://mysite.com/reset-password`.
+    /// If not set, the backend API URL is used as a fallback.
+    #[serde(default = "Website::default_password_reset_url_prefix")]
+    pub password_reset_url_prefix: Option<String>,
 }
 
 impl Default for Website {
@@ -22,6 +36,8 @@ impl Default for Website {
             name: Self::default_name(),
             demo: Self::default_demo(),
             terms: Self::default_terms(),
+            email_verification_url_prefix: Self::default_email_verification_url_prefix(),
+            password_reset_url_prefix: Self::default_password_reset_url_prefix(),
         }
     }
 }
@@ -37,6 +53,14 @@ impl Website {
 
     fn default_terms() -> Terms {
         Terms::default()
+    }
+
+    const fn default_email_verification_url_prefix() -> Option<String> {
+        None
+    }
+
+    const fn default_password_reset_url_prefix() -> Option<String> {
+        None
     }
 }
 

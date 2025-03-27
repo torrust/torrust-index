@@ -53,6 +53,8 @@ pub struct AppData {
     pub ban_service: Arc<user::BanService>,
     pub about_service: Arc<about::Service>,
     pub listing_service: Arc<user::ListingService>,
+    pub password_reset_service: Arc<user::PasswordResetService>,
+    pub email_verification_service: Arc<user::EmailVerificationService>,
 }
 
 impl AppData {
@@ -92,6 +94,8 @@ impl AppData {
         ban_service: Arc<user::BanService>,
         about_service: Arc<about::Service>,
         listing_service: Arc<user::ListingService>,
+        password_reset_service: Arc<user::PasswordResetService>,
+        email_verification_service: Arc<user::EmailVerificationService>,
     ) -> Self {
         Self {
             cfg,
@@ -128,6 +132,8 @@ impl AppData {
             ban_service,
             about_service,
             listing_service,
+            password_reset_service,
+            email_verification_service,
         }
     }
 }

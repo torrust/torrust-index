@@ -156,6 +156,22 @@ impl Database for Sqlite {
             .map_err(|_| database::Error::UserNotFound)
     }
 
+    async fn get_user_profile_from_email(&self, email: &str) -> Result<UserProfile, database::Error> {
+        query_as::<_, UserProfile>("SELECT * FROM torrust_user_profiles WHERE email = ?")
+            .bind(email)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|_| database::Error::UserNotFound)
+    }
+
+    async fn get_user_profile_from_id(&self, user_id: UserId) -> Result<UserProfile, database::Error> {
+        query_as::<_, UserProfile>("SELECT * FROM torrust_user_profiles WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|_| database::Error::UserNotFound)
+    }
+
     async fn get_user_profiles_search_paginated(
         &self,
         search: &Option<String>,

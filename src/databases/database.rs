@@ -214,6 +214,12 @@ pub trait Database: Sync + Send {
     /// Get `UserProfile` from `username`.
     async fn get_user_profile_from_username(&self, username: &str) -> Result<UserProfile, Error>;
 
+    /// Get `UserProfile` from `email`.
+    async fn get_user_profile_from_email(&self, email: &str) -> Result<UserProfile, Error>;
+
+    /// Get `UserProfile` from `user_id`.
+    async fn get_user_profile_from_id(&self, user_id: UserId) -> Result<UserProfile, Error>;
+
     /// Get all user profiles in a paginated and sorted form as `UserProfilesResponse` from `search`, `filters`, `sort`, `offset` and `page_size`.
     async fn get_user_profiles_search_paginated(
         &self,
