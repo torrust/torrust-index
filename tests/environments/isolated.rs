@@ -79,7 +79,7 @@ fn ephemeral(temp_dir: &TempDir) -> config::Settings {
     configuration.logging.threshold = Threshold::Off; // Change to `debug` for tests debugging
 
     // Ephemeral API port
-    configuration.net.bind_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), FREE_PORT);
+    configuration.net.bind_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), FREE_PORT);
 
     // Ephemeral Importer API port
     configuration.tracker_statistics_importer.port = FREE_PORT;
