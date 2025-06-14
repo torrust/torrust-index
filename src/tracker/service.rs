@@ -376,9 +376,7 @@ impl Service {
     /// It builds the announce url appending the user tracker key.
     /// Eg: <https://tracker:7070/USER_TRACKER_KEY>
     fn announce_url_with_key(&self, tracker_key: &TrackerKey) -> Url {
-        self.tracker_url
-            .join(&tracker_key.key)
-            .expect("a tracker key should be added to the tracker base URL")
+        build_announce_url_with_key(&self.tracker_url, &tracker_key.key)
     }
 
     fn invalid_token_body() -> String {
@@ -390,8 +388,94 @@ impl Service {
     }
 }
 
+/// Builds the announce URL by properly appending the tracker key to the base URL.
+///
+/// This function handles the case where the base URL ends with a path segment (like "/announce")
+/// and ensures the tracker key is appended as a new path segment rather than replacing the last one.
+///
+/// # Arguments
+/// * `base_url` - The base tracker URL (e.g., `<https://127.0.0.1:7070/announce>`)
+/// * `tracker_key` - The user's tracker key to append
+///
+/// # Returns
+/// A URL with the tracker key properly appended (e.g., `<https://127.0.0.1:7070/announce/mCGfCr8nvixxA0h8B4iz0sT8V3FIQLi7>`)
+fn build_announce_url_with_key(base_url: &Url, tracker_key: &str) -> Url {
+    let mut url = base_url.clone();
+
+    // Ensure the path ends with a trailing slash so join() appends rather than replaces
+    if !url.path().ends_with('/') {
+        url.set_path(&format!("{}/", url.path()));
+    }
+
+    url.join(tracker_key).expect("tracker key should be a valid URL segment")
+}
+
 /// Temporary patch to map `StatusCode` from crate `http` 0.2.11 to `http` v1.0.0
 /// until `reqwest` upgrades to hyper 1.0. See <https://github.com/seanmonstar/reqwest/issues/2039>
 fn map_status_code(status: reqwest::StatusCode) -> hyper::StatusCode {
     StatusCode::from_u16(status.as_u16()).unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_announce_url_with_key_with_announce_path() {
+        let base_url = Url::parse("https://127.0.0.1:7070/announce").unwrap();
+        let tracker_key = "mCGfCr8nvixxA0h8B4iz0sT8V3FIQLi7";
+
+        let result = build_announce_url_with_key(&base_url, tracker_key);
+
+        assert_eq!(
+            result.to_string(),
+            "https://127.0.0.1:7070/announce/mCGfCr8nvixxA0h8B4iz0sT8V3FIQLi7"
+        );
+    }
+
+    #[test]
+    fn test_build_announce_url_with_key_with_trailing_slash() {
+        let base_url = Url::parse("https://127.0.0.1:7070/announce/").unwrap();
+        let tracker_key = "mCGfCr8nvixxA0h8B4iz0sT8V3FIQLi7";
+
+        let result = build_announce_url_with_key(&base_url, tracker_key);
+
+        assert_eq!(
+            result.to_string(),
+            "https://127.0.0.1:7070/announce/mCGfCr8nvixxA0h8B4iz0sT8V3FIQLi7"
+        );
+    }
+
+    #[test]
+    fn test_build_announce_url_with_key_root_path() {
+        let base_url = Url::parse("https://tracker.example.com/").unwrap();
+        let tracker_key = "testkey123";
+
+        let result = build_announce_url_with_key(&base_url, tracker_key);
+
+        assert_eq!(result.to_string(), "https://tracker.example.com/testkey123");
+    }
+
+    #[test]
+    fn test_build_announce_url_with_key_no_path() {
+        let base_url = Url::parse("https://tracker.example.com").unwrap();
+        let tracker_key = "testkey123";
+
+        let result = build_announce_url_with_key(&base_url, tracker_key);
+
+        assert_eq!(result.to_string(), "https://tracker.example.com/testkey123");
+    }
+
+    #[test]
+    fn test_build_announce_url_with_key_multiple_path_segments() {
+        let base_url = Url::parse("https://tracker.example.com/api/v1/announce").unwrap();
+        let tracker_key = "complexkey456";
+
+        let result = build_announce_url_with_key(&base_url, tracker_key);
+
+        assert_eq!(
+            result.to_string(),
+            "https://tracker.example.com/api/v1/announce/complexkey456"
+        );
+    }
 }
