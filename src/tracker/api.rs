@@ -23,7 +23,7 @@ const TOTAL_REQUEST_TIMEOUT_IN_SECS: u64 = 5;
 pub struct Client {
     pub connection_info: ConnectionInfo,
     api_base_url: Url,
-    client: reqwest::Client,
+    http: reqwest::Client,
     token_param: [(String, String); 1],
 }
 
@@ -45,7 +45,7 @@ impl Client {
         Ok(Self {
             connection_info,
             api_base_url,
-            client,
+            http: client,
             token_param,
         })
     }
@@ -58,7 +58,7 @@ impl Client {
     pub async fn whitelist_torrent(&self, info_hash: &str) -> Result<Response, Error> {
         let request_url = format!("{}/whitelist/{}", self.api_base_url, info_hash);
 
-        self.client.post(request_url).query(&self.token_param).send().await
+        self.http.post(request_url).query(&self.token_param).send().await
     }
 
     /// Remove a torrent from the tracker whitelist.
@@ -69,7 +69,7 @@ impl Client {
     pub async fn remove_torrent_from_whitelist(&self, info_hash: &str) -> Result<Response, Error> {
         let request_url = format!("{}/whitelist/{}", self.api_base_url, info_hash);
 
-        self.client.delete(request_url).query(&self.token_param).send().await
+        self.http.delete(request_url).query(&self.token_param).send().await
     }
 
     /// Retrieve a new tracker key.
@@ -80,7 +80,7 @@ impl Client {
     pub async fn retrieve_new_tracker_key(&self, token_valid_seconds: u64) -> Result<Response, Error> {
         let request_url = format!("{}/key/{}", self.api_base_url, token_valid_seconds);
 
-        self.client.post(request_url).query(&self.token_param).send().await
+        self.http.post(request_url).query(&self.token_param).send().await
     }
 
     /// Retrieve the info for one torrent.
@@ -91,7 +91,7 @@ impl Client {
     pub async fn get_torrent_info(&self, info_hash: &str) -> Result<Response, Error> {
         let request_url = format!("{}/torrent/{}", self.api_base_url, info_hash);
 
-        self.client.get(request_url).query(&self.token_param).send().await
+        self.http.get(request_url).query(&self.token_param).send().await
     }
 
     /// Retrieve the info for multiple torrents at the same time.
@@ -110,6 +110,6 @@ impl Client {
             query_params.push(("info_hash".to_string(), info_hash.clone()));
         }
 
-        self.client.get(request_url).query(&query_params).send().await
+        self.http.get(request_url).query(&query_params).send().await
     }
 }
