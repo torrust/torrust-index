@@ -1,4 +1,3 @@
-use axum::async_trait;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::response::Response;
@@ -18,7 +17,6 @@ impl BearerToken {
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for Extract
 where
     S: Send + Sync,

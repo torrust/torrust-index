@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::RngExt;
 
 pub fn software_category_name() -> String {
     "software".to_string()
@@ -13,6 +13,6 @@ pub fn random_category_name() -> String {
 }
 
 fn random_id() -> u64 {
-    let mut rng = rand::thread_rng();
-    rng.gen_range(0..1_000_000)
+    let mut rng = rand::rng();
+    rng.random_range(0..1_000_000)
 }

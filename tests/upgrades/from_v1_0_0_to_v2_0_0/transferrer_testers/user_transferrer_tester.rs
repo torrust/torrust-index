@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
-use rand_core::OsRng;
 use torrust_index::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::UserRecordV1;
 
 use crate::upgrades::from_v1_0_0_to_v2_0_0::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
@@ -101,7 +100,7 @@ fn valid_password() -> String {
 }
 
 fn hash_password(plain_password: &str) -> String {
-    let salt = SaltString::generate(&mut OsRng);
+    let salt = SaltString::generate(&mut argon2::password_hash::rand_core::OsRng);
 
     // Argon2 with default params (Argon2id v19)
     let argon2 = Argon2::default();

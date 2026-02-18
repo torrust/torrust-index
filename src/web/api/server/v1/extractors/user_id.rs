@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use axum::extract::{FromRef, FromRequestParts};
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
@@ -12,7 +11,6 @@ use crate::models::user::UserId;
 
 pub struct ExtractLoggedInUser(pub UserId);
 
-#[async_trait]
 impl<S> FromRequestParts<S> for ExtractLoggedInUser
 where
     Arc<AppData>: FromRef<S>,

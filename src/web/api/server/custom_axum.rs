@@ -18,7 +18,7 @@
 //! If you want to know more about Axum and timeouts see <https://github.com/josecelano/axum-server-timeout>.
 use std::future::Ready;
 use std::io::ErrorKind;
-use std::net::TcpListener;
+use std::net::{SocketAddr, TcpListener};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -40,17 +40,24 @@ const HTTP1_HEADER_READ_TIMEOUT: Duration = Duration::from_secs(5);
 const HTTP2_KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(5);
 const HTTP2_KEEP_ALIVE_INTERVAL: Duration = Duration::from_secs(5);
 
-#[must_use]
-pub fn from_tcp_with_timeouts(socket: TcpListener) -> Server {
-    add_timeouts(axum_server::from_tcp(socket))
+/// # Errors
+///
+/// Will return an error if the TCP listener cannot be converted.
+pub fn from_tcp_with_timeouts(socket: TcpListener) -> std::io::Result<Server<SocketAddr>> {
+    Ok(add_timeouts(axum_server::from_tcp(socket)?))
 }
 
-#[must_use]
-pub fn from_tcp_rustls_with_timeouts(socket: TcpListener, tls: RustlsConfig) -> Server<RustlsAcceptor> {
-    add_timeouts(axum_server::from_tcp_rustls(socket, tls))
+/// # Errors
+///
+/// Will return an error if the TCP listener cannot be converted.
+pub fn from_tcp_rustls_with_timeouts(
+    socket: TcpListener,
+    tls: RustlsConfig,
+) -> std::io::Result<Server<SocketAddr, RustlsAcceptor>> {
+    Ok(add_timeouts(axum_server::from_tcp_rustls(socket, tls)?))
 }
 
-fn add_timeouts<A>(mut server: Server<A>) -> Server<A> {
+fn add_timeouts<A: axum_server::Address, Acc>(mut server: Server<A, Acc>) -> Server<A, Acc> {
     server.http_builder().http1().timer(TokioTimer::new());
     server.http_builder().http2().timer(TokioTimer::new());
 

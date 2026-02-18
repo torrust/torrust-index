@@ -7,7 +7,6 @@ use std::panic::Location;
 use std::sync::Arc;
 
 use axum_server::tls_rustls::RustlsConfig;
-use axum_server::Handle;
 use thiserror::Error;
 use tokio::sync::oneshot::{Receiver, Sender};
 use torrust_index_located_error::LocatedError;
@@ -73,9 +72,12 @@ async fn start_server(
 ) {
     let router = router(app_data);
     let socket = std::net::TcpListener::bind(config_socket_addr).expect("Could not bind tcp_listener to address.");
+    socket
+        .set_nonblocking(true)
+        .expect("Could not set tcp_listener to non-blocking mode.");
     let address = socket.local_addr().expect("Could not get local_addr from tcp_listener.");
 
-    let handle = Handle::new();
+    let handle = axum_server::Handle::<std::net::SocketAddr>::new();
 
     tokio::task::spawn(graceful_shutdown(
         handle.clone(),
@@ -94,6 +96,7 @@ async fn start_server(
 
     match tls {
         Some(tls) => custom_axum::from_tcp_rustls_with_timeouts(socket, tls)
+            .expect("Could not create rustls server from tcp listener")
             .handle(handle)
             // The TimeoutAcceptor is commented because TSL does not work with it.
             // See: https://github.com/torrust/torrust-index/issues/204
@@ -102,6 +105,7 @@ async fn start_server(
             .await
             .expect("API server should be running"),
         None => custom_axum::from_tcp_with_timeouts(socket)
+            .expect("Could not create server from tcp listener")
             .handle(handle)
             .acceptor(TimeoutAcceptor)
             .serve(router.into_make_service_with_connect_info::<std::net::SocketAddr>())
