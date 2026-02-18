@@ -25,7 +25,7 @@ impl Logging {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Clone, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Threshold {
     /// A level lower than all log security levels.
@@ -35,17 +35,12 @@ pub enum Threshold {
     /// Corresponds to the `Warn` log security level.
     Warn,
     /// Corresponds to the `Info` log security level.
+    #[default]
     Info,
     /// Corresponds to the `Debug` log security level.
     Debug,
     /// Corresponds to the `Trace` log security level.
     Trace,
-}
-
-impl Default for Threshold {
-    fn default() -> Self {
-        Self::Info
-    }
 }
 
 impl fmt::Display for Threshold {

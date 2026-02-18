@@ -102,7 +102,7 @@ tempfile = "3"
 which = "6"
 
 [package.metadata.cargo-machete]
-ignored = ["futures", "sha-1"]
+ignored = ["futures"]
 
 [lints.clippy]
 complexity = { level = "deny", priority = -1 }

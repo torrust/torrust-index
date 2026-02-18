@@ -183,10 +183,7 @@ pub async fn transfer_torrents(
 }
 
 pub fn read_torrent_from_file(path: &str) -> Result<Torrent, Box<dyn error::Error>> {
-    let contents = match fs::read(path) {
-        Ok(contents) => contents,
-        Err(e) => return Err(e.into()),
-    };
+    let contents = fs::read(path)?;
 
     match decode_torrent(&contents) {
         Ok(torrent) => Ok(torrent),

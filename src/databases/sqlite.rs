@@ -564,7 +564,7 @@ impl Database for Sqlite {
         .bind(metadata.category_id)
         .bind(info_hash.to_lowercase())
         .bind(torrent.file_size())
-        .bind(torrent.info.name.to_string())
+        .bind(torrent.info.name.clone())
         .bind(pieces)
         .bind(root_hash)
         .bind(torrent.info.piece_length)
@@ -886,7 +886,7 @@ impl Database for Sqlite {
             .bind(torrent_id)
             .fetch_all(&self.pool)
             .await
-            .map(|v| v.iter().map(|a| vec![a.tracker_url.to_string()]).collect())
+            .map(|v| v.iter().map(|a| vec![a.tracker_url.clone()]).collect())
             .map_err(|_| database::Error::TorrentNotFound)
     }
 
@@ -895,7 +895,7 @@ impl Database for Sqlite {
             .bind(torrent_id)
             .fetch_all(&self.pool)
             .await
-            .map(|v| v.iter().map(|a| a.seed_url.to_string()).collect())
+            .map(|v| v.iter().map(|a| a.seed_url.clone()).collect())
             .map_err(|_| database::Error::TorrentNotFound)
     }
 
@@ -904,7 +904,7 @@ impl Database for Sqlite {
             .bind(torrent_id)
             .fetch_all(&self.pool)
             .await
-            .map(|v| v.iter().map(|a| (a.node_ip.to_string(), a.node_port)).collect())
+            .map(|v| v.iter().map(|a| (a.node_ip.clone(), a.node_port)).collect())
             .map_err(|_| database::Error::TorrentNotFound)
     }
 

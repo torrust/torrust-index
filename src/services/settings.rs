@@ -123,21 +123,16 @@ pub struct ConfigurationPublic {
 }
 
 /// Whether the email is required on signup or not.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum EmailOnSignup {
     /// The email is required on signup.
     Required,
     /// The email is optional on signup.
+    #[default]
     Optional,
     /// The email is not allowed on signup. It will only be ignored if provided.
     NotIncluded,
-}
-
-impl Default for EmailOnSignup {
-    fn default() -> Self {
-        Self::Optional
-    }
 }
 
 impl fmt::Display for EmailOnSignup {

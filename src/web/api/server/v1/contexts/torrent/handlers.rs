@@ -371,11 +371,11 @@ async fn build_add_torrent_request_from_payload(mut payload: Multipart) -> Resul
                 while let Some(chunk) = field
                     .chunk()
                     .await
-                    .map_err(|_| (errors::Request::CannotReadChunkFromUploadedBinary))?
+                    .map_err(|_| errors::Request::CannotReadChunkFromUploadedBinary)?
                 {
                     torrent_cursor
                         .write_all(&chunk)
-                        .map_err(|_| (errors::Request::CannotWriteChunkFromUploadedBinary))?;
+                        .map_err(|_| errors::Request::CannotWriteChunkFromUploadedBinary)?;
                 }
             }
             _ => {}

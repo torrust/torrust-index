@@ -5,11 +5,6 @@ pub type CategoryId = i64;
 pub type TagId = i64;
 pub type UtcDateTime = String; // %Y-%m-%d %H:%M:%S
 
-#[derive(Deserialize, PartialEq, Debug)]
-pub struct ErrorResponse {
-    pub error: String,
-}
-
 #[derive(Deserialize)]
 pub struct TorrentListResponse {
     pub data: TorrentList,

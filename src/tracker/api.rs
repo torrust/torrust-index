@@ -40,7 +40,7 @@ impl Client {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(TOTAL_REQUEST_TIMEOUT_IN_SECS))
             .build()?;
-        let token_param = [(TOKEN_PARAM_NAME.to_string(), connection_info.token.to_string())];
+        let token_param = [(TOKEN_PARAM_NAME.to_string(), connection_info.token.clone())];
 
         Ok(Self {
             connection_info,

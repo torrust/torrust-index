@@ -511,7 +511,7 @@ impl Index {
             torrent_response
                 .files
                 .iter_mut()
-                .for_each(|v| v.path = vec![torrent_info.name.to_string()]);
+                .for_each(|v| v.path = vec![torrent_info.name.clone()]);
         }
 
         // Add trackers

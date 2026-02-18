@@ -83,7 +83,7 @@ jobs:
 
       - id: deps
         name: Check Unused Dependencies
-        run: cargo machete
+        run: cargo machete --with-metadata
 
   unit:
     name: Units
