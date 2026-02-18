@@ -85,7 +85,7 @@ sqlx = { version = "0", features = ["migrate", "mysql", "runtime-tokio-native-tl
 tera = { version = "1", default-features = false }
 text-colorizer = "1"
 text-to-png = "0"
-thiserror = "1"
+thiserror = "2"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "0"
 tower = { version = "0", features = ["timeout"] }
