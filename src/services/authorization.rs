@@ -53,6 +53,11 @@ pub enum ACTION {
     ChangePassword,
     BanUser,
     GenerateUserProfileSpecification,
+    SendPasswordResetLink,
+    ResendVerificationLink,
+    /// Meta-action used solely to test whether the caller has admin
+    /// privileges.  Granted only to the `admin` role.
+    IsAdmin,
 }
 
 pub struct Service {
@@ -251,6 +256,9 @@ impl Default for CasbinConfiguration {
                 admin, ChangePassword
                 admin, BanUser
                 admin, GenerateUserProfileSpecification
+                admin, SendPasswordResetLink
+                admin, ResendVerificationLink
+                admin, IsAdmin
                 registered, GetAboutPage
                 registered, GetLicensePage
                 registered, GetCategories
@@ -264,6 +272,8 @@ impl Default for CasbinConfiguration {
                 registered, GenerateTorrentInfoListing
                 registered, GetCanonicalInfoHash
                 registered, ChangePassword
+                registered, SendPasswordResetLink
+                registered, ResendVerificationLink
                 guest, GetAboutPage
                 guest, GetLicensePage
                 guest, GetCategories
@@ -274,6 +284,8 @@ impl Default for CasbinConfiguration {
                 guest, GetTorrentInfo
                 guest, GenerateTorrentInfoListing
                 guest, GetCanonicalInfoHash
+                guest, SendPasswordResetLink
+                guest, ResendVerificationLink
                 ",
             ),
         }

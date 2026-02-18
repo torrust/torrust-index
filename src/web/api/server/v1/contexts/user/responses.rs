@@ -9,12 +9,17 @@ use crate::web::api::server::v1::responses::OkResponseData;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewUser {
     pub user_id: UserId,
+    /// ISO 8601 UTC expiry timestamp for the email-verification token.
+    pub verification_expiry: String,
 }
 
 /// Response after successfully creating a new user.
-pub const fn added_user(user_id: i64) -> Json<OkResponseData<NewUser>> {
+pub const fn added_user(user_id: i64, verification_expiry: String) -> Json<OkResponseData<NewUser>> {
     Json(OkResponseData {
-        data: NewUser { user_id },
+        data: NewUser {
+            user_id,
+            verification_expiry,
+        },
     })
 }
 

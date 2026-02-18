@@ -60,6 +60,21 @@ pub enum ServiceError {
     #[display("Passwords don't match")]
     PasswordsDontMatch,
 
+    #[display("Couldn't send new password to the user")]
+    FailedToSendResetPassword,
+
+    #[display("Too many password reset requests. Try again in {remaining_secs} seconds.")]
+    PasswordResetLocked { remaining_secs: u64 },
+
+    #[display("Password reset locked after too many attempts. Please contact an administrator.")]
+    PasswordResetMaxAttemptsReached,
+
+    #[display("Too many verification email requests. Try again in {remaining_secs} seconds.")]
+    VerificationResendLocked { remaining_secs: u64 },
+
+    #[display("Verification email resend locked after too many attempts. Please contact an administrator.")]
+    VerificationResendMaxAttemptsReached,
+
     /// when the a username is already taken
     #[display("Username not available")]
     UsernameTaken,
@@ -290,6 +305,11 @@ pub const fn http_status_code_for_service_error(error: &ServiceError) -> StatusC
         ServiceError::PasswordTooShort => StatusCode::BAD_REQUEST,
         ServiceError::PasswordTooLong => StatusCode::BAD_REQUEST,
         ServiceError::PasswordsDontMatch => StatusCode::BAD_REQUEST,
+        ServiceError::FailedToSendResetPassword => StatusCode::INTERNAL_SERVER_ERROR,
+        ServiceError::PasswordResetLocked { .. } => StatusCode::TOO_MANY_REQUESTS,
+        ServiceError::PasswordResetMaxAttemptsReached => StatusCode::TOO_MANY_REQUESTS,
+        ServiceError::VerificationResendLocked { .. } => StatusCode::TOO_MANY_REQUESTS,
+        ServiceError::VerificationResendMaxAttemptsReached => StatusCode::TOO_MANY_REQUESTS,
         ServiceError::UsernameTaken => StatusCode::BAD_REQUEST,
         ServiceError::UsernameInvalid => StatusCode::BAD_REQUEST,
         ServiceError::EmailTaken => StatusCode::BAD_REQUEST,

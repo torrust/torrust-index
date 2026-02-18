@@ -39,8 +39,16 @@ mod tests {
 
     #[test]
     fn it_should_load_with_default_config() {
-        use crate::bootstrap::config::initialize_configuration;
-
-        drop(initialize_configuration());
+        // Use an absolute path derived from CARGO_MANIFEST_DIR so this test
+        // is not affected by figment::Jail tests that change the process-wide
+        // current working directory in parallel.
+        let config_path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/share/default/config/index.development.sqlite3.toml"
+        );
+        let config_content = std::fs::read_to_string(config_path)
+            .unwrap_or_else(|e| panic!("Could not read default config at {config_path}: {e}"));
+        let info = crate::config::Info::from_toml(&config_content);
+        drop(crate::config::Configuration::load(&info).unwrap());
     }
 }

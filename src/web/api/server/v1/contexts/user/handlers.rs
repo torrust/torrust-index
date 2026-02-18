@@ -3,15 +3,19 @@
 use std::sync::Arc;
 
 use axum::extract::{self, Path, Query, State};
-use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 
-use super::forms::{ChangePasswordForm, JsonWebToken, LoginForm, RegistrationForm};
+use super::forms::{
+    ChangePasswordForm, JsonWebToken, LoginForm, RegistrationForm, ResendVerificationForm, ResetPasswordForm,
+    SendPasswordLinkForm,
+};
 use super::responses::{self};
 use crate::common::AppData;
+use crate::mailer::{expiry_timestamp, RESET_TOKEN_EXPIRY_SECS, VERIFY_TOKEN_EXPIRY_SECS};
 use crate::services::user::ListingRequest;
+use crate::web::api::server::v1::extractors::api_base_url::ExtractApiBaseUrl;
 use crate::web::api::server::v1::extractors::optional_user_id::ExtractOptionalLoggedInUser;
 use crate::web::api::server::v1::responses::OkResponseData;
 
@@ -25,27 +29,15 @@ use crate::web::api::server::v1::responses::OkResponseData;
 #[allow(clippy::unused_async)]
 pub async fn registration_handler(
     State(app_data): State<Arc<AppData>>,
-    headers: HeaderMap,
+    ExtractApiBaseUrl(api_base_url): ExtractApiBaseUrl,
     extract::Json(registration_form): extract::Json<RegistrationForm>,
 ) -> Response {
-    let host_from_header = headers
-        .get("host")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default()
-        .to_string();
-
-    let api_base_url = app_data
-        .cfg
-        .get_api_base_url()
-        .await
-        .unwrap_or_else(|| api_base_url(&host_from_header));
-
     match app_data
         .registration_service
         .register_user(&registration_form, &api_base_url)
         .await
     {
-        Ok(user_id) => responses::added_user(user_id).into_response(),
+        Ok(user_id) => responses::added_user(user_id, expiry_timestamp(VERIFY_TOKEN_EXPIRY_SECS)).into_response(),
         Err(error) => error.into_response(),
     }
 }
@@ -56,9 +48,40 @@ pub struct TokenParam(String);
 /// It handles the verification of the email verification token.
 #[allow(clippy::unused_async)]
 pub async fn email_verification_handler(State(app_data): State<Arc<AppData>>, Path(token): Path<TokenParam>) -> String {
-    match app_data.registration_service.verify_email(&token.0).await {
+    match app_data.email_verification_service.verify_email(&token.0).await {
         Ok(_) => String::from("Email verified, you can close this page."),
         Err(error) => error.to_string(),
+    }
+}
+
+/// Resends a verification link to the given email address.
+///
+/// To prevent account enumeration, this endpoint always returns a success
+/// response regardless of whether the email exists or is already verified.
+///
+/// # Errors
+///
+/// It returns an error only for rate-limiting or authorization failures.
+#[allow(clippy::unused_async)]
+pub async fn resend_verification_handler(
+    State(app_data): State<Arc<AppData>>,
+    ExtractApiBaseUrl(api_base_url): ExtractApiBaseUrl,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+    extract::Json(form): extract::Json<ResendVerificationForm>,
+) -> Response {
+    match app_data
+        .email_verification_service
+        .resend_verification_link(maybe_user_id, &form.email, &api_base_url)
+        .await
+    {
+        Ok(()) => Json(OkResponseData {
+            data: serde_json::json!({
+                "message": "If the email is associated with an unverified account, a verification link has been sent.",
+                "expiry": expiry_timestamp(VERIFY_TOKEN_EXPIRY_SECS)
+            }),
+        })
+        .into_response(),
+        Err(error) => error.into_response(),
     }
 }
 
@@ -158,6 +181,63 @@ pub async fn change_password_handler(
     }
 }
 
+/// It sends a password reset link to the user's email address.
+///
+/// To prevent account enumeration, this endpoint always returns a success
+/// response regardless of whether the email exists or is verified.
+///
+/// # Errors
+///
+/// It returns an error only for server-side failures (e.g., authorization).
+#[allow(clippy::unused_async)]
+pub async fn send_reset_password_link_handler(
+    State(app_data): State<Arc<AppData>>,
+    ExtractApiBaseUrl(api_base_url): ExtractApiBaseUrl,
+    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+    extract::Json(send_password_link_form): extract::Json<SendPasswordLinkForm>,
+) -> Response {
+    match app_data
+        .password_reset_service
+        .send_reset_link(maybe_user_id, &send_password_link_form.email, &api_base_url)
+        .await
+    {
+        Ok(()) => Json(OkResponseData {
+            data: serde_json::json!({
+                "message": "If the email is associated with an account, a reset link has been sent.",
+                "expiry": expiry_timestamp(RESET_TOKEN_EXPIRY_SECS)
+            }),
+        })
+        .into_response(),
+        Err(error) => error.into_response(),
+    }
+}
+
+/// It completes a password reset using a token from a reset link.
+///
+/// # Errors
+///
+/// It returns an error if:
+///
+/// - The reset token is invalid or expired.
+/// - The new password does not meet constraints.
+#[allow(clippy::unused_async)]
+pub async fn complete_password_reset_handler(
+    State(app_data): State<Arc<AppData>>,
+    extract::Json(reset_form): extract::Json<ResetPasswordForm>,
+) -> Response {
+    match app_data
+        .password_reset_service
+        .complete_reset(&reset_form.token, &reset_form.password, &reset_form.confirm_password)
+        .await
+    {
+        Ok(()) => Json(OkResponseData {
+            data: "Password has been reset successfully.".to_string(),
+        })
+        .into_response(),
+        Err(error) => error.into_response(),
+    }
+}
+
 /// It bans a user from the index.
 ///
 /// # Errors
@@ -181,13 +261,6 @@ pub async fn ban_handler(
         .into_response(),
         Err(error) => error.into_response(),
     }
-}
-
-/// It returns the base API URL without the port. For example: `http://localhost`.
-fn api_base_url(host: &str) -> String {
-    // HTTPS is not supported yet.
-    // See https://github.com/torrust/torrust-index/issues/131
-    format!("http://{host}")
 }
 
 /// It handles the request to get all the user profiles.
