@@ -79,7 +79,7 @@ impl ImageCacheQuota {
     }
 
     #[must_use]
-    pub fn is_reached(&self) -> bool {
+    pub const fn is_reached(&self) -> bool {
         self.usage >= self.max_usage
     }
 }
@@ -185,6 +185,7 @@ impl ImageCacheService {
         if image_bytes.len() > settings.image_cache.entry_size_limit {
             return Err(Error::ImageTooBig);
         }
+        drop(settings);
 
         Ok(())
     }
@@ -207,17 +208,14 @@ impl ImageCacheService {
     async fn update_user_quota(&self, user_id: &UserId, amount: usize) -> Result<(), Error> {
         let settings = self.cfg.settings.read().await;
 
-        let mut quota = self
-            .user_quotas
-            .read()
-            .await
-            .get(user_id)
-            .cloned()
-            .unwrap_or(ImageCacheQuota::new(
+        let mut quota = self.user_quotas.read().await.get(user_id).cloned().unwrap_or_else(|| {
+            ImageCacheQuota::new(
                 *user_id,
                 settings.image_cache.user_quota_bytes,
                 settings.image_cache.user_quota_period_seconds,
-            ));
+            )
+        });
+        drop(settings);
 
         let _ = quota.add_usage(amount);
 

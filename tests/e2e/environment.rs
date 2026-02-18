@@ -47,11 +47,11 @@ impl TestEnv {
         Self::default()
     }
 
-    pub fn is_shared(&self) -> bool {
+    pub const fn is_shared(&self) -> bool {
         self.shared.is_some()
     }
 
-    pub fn is_isolated(&self) -> bool {
+    pub const fn is_isolated(&self) -> bool {
         self.isolated.is_some()
     }
 
@@ -155,7 +155,7 @@ impl TestEnv {
         }
     }
 
-    fn state(&self) -> State {
+    const fn state(&self) -> State {
         if self.is_shared() {
             return State::RunningShared;
         }

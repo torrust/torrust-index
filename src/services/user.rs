@@ -28,7 +28,7 @@ use crate::{mailer, AsCSV};
 /// Since user email could be optional, we need a way to represent "no email"
 /// in the database. This function returns the string that should be used for
 /// that purpose.
-fn no_email() -> String {
+const fn no_email() -> String {
     String::new()
 }
 
@@ -101,85 +101,87 @@ impl RegistrationService {
 
         let settings = self.configuration.settings.read().await;
 
-        match &settings.registration {
-            Some(registration) => {
-                let Ok(username) = registration_form.username.parse::<Username>() else {
-                    return Err(ServiceError::UsernameInvalid);
-                };
-
-                let opt_email = match &registration.email {
-                    Some(email) => {
-                        if email.required && registration_form.email.is_none() {
-                            return Err(ServiceError::EmailMissing);
-                        }
-                        match &registration_form.email {
-                            Some(email) => {
-                                if email.trim() == String::new() {
-                                    None
-                                } else {
-                                    Some(email.clone())
-                                }
-                            }
-                            None => None,
-                        }
-                    }
-                    None => None,
-                };
-
-                if let Some(email) = &opt_email {
-                    if !validate_email_address(email) {
-                        return Err(ServiceError::EmailInvalid);
-                    }
-                }
-
-                let password_constraints = PasswordConstraints {
-                    min_password_length: settings.auth.password_constraints.min_password_length,
-                    max_password_length: settings.auth.password_constraints.max_password_length,
-                };
-
-                validate_password_constraints(
-                    &registration_form.password,
-                    &registration_form.confirm_password,
-                    &password_constraints,
-                )?;
-
-                let password_hash = hash_password(&registration_form.password)?;
-
-                let user_id = self
-                    .user_repository
-                    .add(
-                        &username.to_string(),
-                        &opt_email.clone().unwrap_or(no_email()),
-                        &password_hash,
-                    )
-                    .await?;
-
-                // If this is the first created account, give administrator rights
-                if user_id == 1 {
-                    drop(self.user_repository.grant_admin_role(&user_id).await);
-                }
-
-                if let Some(email) = &registration.email {
-                    if email.verification_required {
-                        // Email verification is enabled
-                        if let Some(email) = opt_email {
-                            let mail_res = self
-                                .mailer
-                                .send_verification_mail(&email, &registration_form.username, user_id, api_base_url)
-                                .await;
-
-                            if mail_res.is_err() {
-                                drop(self.user_repository.delete(&user_id).await);
-                                return Err(ServiceError::FailedToSendVerificationEmail);
-                            }
-                        }
-                    }
-                }
-
-                Ok(user_id)
+        let registration = match &settings.registration {
+            Some(registration) => registration.clone(),
+            None => {
+                return Err(ServiceError::ClosedForRegistration);
             }
-            None => Err(ServiceError::ClosedForRegistration),
+        };
+
+        let password_constraints = PasswordConstraints {
+            min_password_length: settings.auth.password_constraints.min_password_length,
+            max_password_length: settings.auth.password_constraints.max_password_length,
+        };
+        drop(settings);
+
+        let Ok(username) = registration_form.username.parse::<Username>() else {
+            return Err(ServiceError::UsernameInvalid);
+        };
+
+        let opt_email = match &registration.email {
+            Some(email) => {
+                if email.required && registration_form.email.is_none() {
+                    return Err(ServiceError::EmailMissing);
+                }
+                registration_form.email.as_ref().and_then(
+                    |email| {
+                        if email.trim().is_empty() {
+                            None
+                        } else {
+                            Some(email.clone())
+                        }
+                    },
+                )
+            }
+            None => None,
+        };
+
+        if let Some(email) = &opt_email {
+            if !validate_email_address(email) {
+                return Err(ServiceError::EmailInvalid);
+            }
         }
+
+        validate_password_constraints(
+            &registration_form.password,
+            &registration_form.confirm_password,
+            &password_constraints,
+        )?;
+
+        let password_hash = hash_password(&registration_form.password)?;
+
+        let user_id = self
+            .user_repository
+            .add(
+                &username.to_string(),
+                &opt_email.clone().unwrap_or(no_email()),
+                &password_hash,
+            )
+            .await?;
+
+        // If this is the first created account, give administrator rights
+        if user_id == 1 {
+            drop(self.user_repository.grant_admin_role(&user_id).await);
+        }
+
+        if let Some(email) = &registration.email {
+            if email.verification_required {
+                // Email verification is enabled
+                if let Some(email) = opt_email {
+                    let mail_res = self
+                        .mailer
+                        .send_verification_mail(&email, &registration_form.username, user_id, api_base_url)
+                        .await;
+
+                    if mail_res.is_err() {
+                        drop(self.user_repository.delete(&user_id).await);
+                        return Err(ServiceError::FailedToSendVerificationEmail);
+                    }
+                }
+            }
+        }
+
+        Ok(user_id)
     }
 
     /// It verifies the email address of a user via the token sent to the
@@ -227,7 +229,7 @@ pub struct ProfileService {
 
 impl ProfileService {
     #[must_use]
-    pub fn new(
+    pub const fn new(
         configuration: Arc<Configuration>,
         user_repository: Arc<DbUserAuthenticationRepository>,
         authorization_service: Arc<authorization::Service>,
@@ -280,6 +282,7 @@ impl ProfileService {
             min_password_length: settings.auth.password_constraints.min_password_length,
             max_password_length: settings.auth.password_constraints.max_password_length,
         };
+        drop(settings);
 
         validate_password_constraints(
             &change_password_form.password,
@@ -305,7 +308,7 @@ pub struct BanService {
 
 impl BanService {
     #[must_use]
-    pub fn new(
+    pub const fn new(
         user_profile_repository: Arc<DbUserProfileRepository>,
         banned_user_list: Arc<DbBannedUserList>,
         authorization_service: Arc<authorization::Service>,
@@ -354,7 +357,7 @@ pub struct ListingService {
 
 impl ListingService {
     #[must_use]
-    pub fn new(
+    pub const fn new(
         configuration: Arc<Configuration>,
         user_profile_repository: Arc<DbUserProfileRepository>,
         authorization_service: Arc<authorization::Service>,

@@ -13,6 +13,6 @@ pub fn added_tag(tag_name: &str) -> Json<OkResponseData<String>> {
 }
 
 /// Response after successfully deleting a tag.
-pub fn deleted_tag(tag_id: TagId) -> Json<OkResponseData<TagId>> {
+pub const fn deleted_tag(tag_id: TagId) -> Json<OkResponseData<TagId>> {
     Json(OkResponseData { data: tag_id })
 }

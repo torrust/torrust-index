@@ -31,7 +31,7 @@ pub struct Username {
 }
 
 impl Username {
-    pub fn new(value: String) -> Self {
+    pub const fn new(value: String) -> Self {
         Self { value }
     }
 }

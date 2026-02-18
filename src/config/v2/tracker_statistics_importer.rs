@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Configuration for the tracker statistics importer.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TrackerStatisticsImporter {
     /// The port the Importer API is listening on. Default to `3002`.
     #[serde(default = "TrackerStatisticsImporter::default_port")]
@@ -22,11 +22,11 @@ impl Default for TrackerStatisticsImporter {
 }
 
 impl TrackerStatisticsImporter {
-    fn default_torrent_info_update_interval() -> u64 {
+    const fn default_torrent_info_update_interval() -> u64 {
         3600
     }
 
-    fn default_port() -> u16 {
+    const fn default_port() -> u16 {
         3002
     }
 }

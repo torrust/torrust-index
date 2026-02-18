@@ -51,14 +51,14 @@ pub enum TraceStyle {
 impl std::fmt::Display for TraceStyle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let style = match self {
-            TraceStyle::Default => "Default Style",
-            TraceStyle::Pretty(path) => match path {
+            Self::Default => "Default Style",
+            Self::Pretty(path) => match path {
                 true => "Pretty Style with File Paths",
                 false => "Pretty Style without File Paths",
             },
 
-            TraceStyle::Compact => "Compact Style",
-            TraceStyle::Json => "Json Format",
+            Self::Compact => "Compact Style",
+            Self::Json => "Json Format",
         };
 
         f.write_str(style)

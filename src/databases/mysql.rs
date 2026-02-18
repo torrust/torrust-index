@@ -163,10 +163,7 @@ impl Database for Mysql {
         offset: u64,
         limit: u8,
     ) -> Result<UserProfilesResponse, database::Error> {
-        let user_name = match search {
-            None => "%".to_string(),
-            Some(v) => format!("%{v}%"),
-        };
+        let user_name = search.as_ref().map_or_else(|| "%".to_string(), |v| format!("%{v}%"));
 
         let sort_query: String = match sort {
             Some(UsersSorting::DateRegisteredNewest) => "date_registered ASC".to_string(),
@@ -175,22 +172,23 @@ impl Database for Mysql {
             Some(UsersSorting::UsernameZA) => "username DESC".to_string(),
         };
 
-        let (join_filters, where_filters) = if let Some(filters) = filters {
-            let (mut join_filters_query, mut where_filters_query) = (String::new(), String::new());
-            for filter in filters {
-                match filter {
-                    UsersFilters::TorrentUploader => join_filters_query.push_str(
-                        "INNER JOIN torrust_torrents tt
+        let (join_filters, where_filters) = filters.as_ref().map_or_else(
+            || (String::new(), String::new()),
+            |filters| {
+                let (mut join_filters_query, mut where_filters_query) = (String::new(), String::new());
+                for filter in filters {
+                    match filter {
+                        UsersFilters::TorrentUploader => join_filters_query.push_str(
+                            "INNER JOIN torrust_torrents tt
                     ON tu.user_id = tt.uploader_id ",
-                    ),
-                    UsersFilters::EmailNotVerified => where_filters_query.push_str(" AND email_verified = false"),
-                    UsersFilters::EmailVerified => where_filters_query.push_str(" AND email_verified = true"),
+                        ),
+                        UsersFilters::EmailNotVerified => where_filters_query.push_str(" AND email_verified = false"),
+                        UsersFilters::EmailVerified => where_filters_query.push_str(" AND email_verified = true"),
+                    }
                 }
-            }
-            (join_filters_query, where_filters_query)
-        } else {
-            (String::new(), String::new())
-        };
+                (join_filters_query, where_filters_query)
+            },
+        );
 
         let mut query_string = format!(
             "SELECT 
@@ -402,10 +400,7 @@ impl Database for Mysql {
         offset: u64,
         limit: u8,
     ) -> Result<TorrentsResponse, database::Error> {
-        let title = match search {
-            None => "%".to_string(),
-            Some(v) => format!("%{v}%"),
-        };
+        let title = search.as_ref().map_or_else(|| "%".to_string(), |v| format!("%{v}%"));
 
         let sort_query: String = match sort {
             Sorting::UploadedAsc => "date_uploaded ASC".to_string(),
@@ -574,7 +569,7 @@ impl Database for Mysql {
         .bind(metadata.category_id)
         .bind(info_hash.to_lowercase())
         .bind(torrent.file_size())
-        .bind(torrent.info.name.to_string())
+        .bind(torrent.info.name.clone())
         .bind(pieces)
         .bind(root_hash)
         .bind(torrent.info.piece_length)
@@ -691,19 +686,18 @@ impl Database for Mysql {
 
         // add HTTP seeds
 
-        let insert_torrent_http_seeds_result: Result<(), database::Error> = if let Some(http_seeds) = &torrent.httpseeds {
-            for seed_url in http_seeds {
-                let () = query("INSERT INTO torrust_torrent_http_seeds (torrent_id, seed_url) VALUES (?, ?)")
-                    .bind(torrent_id)
-                    .bind(seed_url)
-                    .execute(&mut *tx)
-                    .await
-                    .map(|_| ())
-                    .map_err(|_| database::Error::Error)?;
+        let insert_torrent_http_seeds_result: Result<(), database::Error> = {
+            if let Some(http_seeds) = &torrent.httpseeds {
+                for seed_url in http_seeds {
+                    let () = query("INSERT INTO torrust_torrent_http_seeds (torrent_id, seed_url) VALUES (?, ?)")
+                        .bind(torrent_id)
+                        .bind(seed_url)
+                        .execute(&mut *tx)
+                        .await
+                        .map(|_| ())
+                        .map_err(|_| database::Error::Error)?;
+                }
             }
-
-            Ok(())
-        } else {
             Ok(())
         };
 
@@ -715,20 +709,19 @@ impl Database for Mysql {
 
         // add nodes
 
-        let insert_torrent_nodes_result: Result<(), database::Error> = if let Some(nodes) = &torrent.nodes {
-            for node in nodes {
-                let () = query("INSERT INTO torrust_torrent_nodes (torrent_id, node_ip, node_port) VALUES (?, ?, ?)")
-                    .bind(torrent_id)
-                    .bind(node.0.clone())
-                    .bind(node.1)
-                    .execute(&mut *tx)
-                    .await
-                    .map(|_| ())
-                    .map_err(|_| database::Error::Error)?;
+        let insert_torrent_nodes_result: Result<(), database::Error> = {
+            if let Some(nodes) = &torrent.nodes {
+                for node in nodes {
+                    let () = query("INSERT INTO torrust_torrent_nodes (torrent_id, node_ip, node_port) VALUES (?, ?, ?)")
+                        .bind(torrent_id)
+                        .bind(node.0.clone())
+                        .bind(node.1)
+                        .execute(&mut *tx)
+                        .await
+                        .map(|_| ())
+                        .map_err(|_| database::Error::Error)?;
+                }
             }
-
-            Ok(())
-        } else {
             Ok(())
         };
 
@@ -892,7 +885,7 @@ impl Database for Mysql {
             .bind(torrent_id)
             .fetch_all(&self.pool)
             .await
-            .map(|v| v.iter().map(|a| vec![a.tracker_url.to_string()]).collect())
+            .map(|v| v.iter().map(|a| vec![a.tracker_url.clone()]).collect())
             .map_err(|_| database::Error::TorrentNotFound)
     }
 
@@ -901,7 +894,7 @@ impl Database for Mysql {
             .bind(torrent_id)
             .fetch_all(&self.pool)
             .await
-            .map(|v| v.iter().map(|a| a.seed_url.to_string()).collect())
+            .map(|v| v.iter().map(|a| a.seed_url.clone()).collect())
             .map_err(|_| database::Error::TorrentNotFound)
     }
 
@@ -910,7 +903,7 @@ impl Database for Mysql {
             .bind(torrent_id)
             .fetch_all(&self.pool)
             .await
-            .map(|v| v.iter().map(|a| (a.node_ip.to_string(), a.node_port)).collect())
+            .map(|v| v.iter().map(|a| (a.node_ip.clone(), a.node_port)).collect())
             .map_err(|_| database::Error::TorrentNotFound)
     }
 

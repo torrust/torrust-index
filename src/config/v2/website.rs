@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Information displayed to the user in the website.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Website {
     /// The name of the website.
     #[serde(default = "Website::default_name")]
@@ -31,7 +31,7 @@ impl Website {
         "Torrust".to_string()
     }
 
-    fn default_demo() -> Option<Demo> {
+    const fn default_demo() -> Option<Demo> {
         None
     }
 
@@ -40,7 +40,7 @@ impl Website {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Demo {
     /// The fixed message to show when the index is running in demo mode.
     #[serde(default = "Demo::default_warning")]
@@ -53,7 +53,7 @@ impl Demo {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Terms {
     /// The terms page info.
     #[serde(default = "Terms::default_page")]
@@ -83,7 +83,7 @@ impl Default for Terms {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TermsPage {
     /// The terms page title.
     #[serde(default = "TermsPage::default_title")]
@@ -128,7 +128,7 @@ impl Default for TermsPage {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TermsUpload {
     /// The terms page content.
     #[serde(default = "TermsUpload::default_content_upload_agreement")]
@@ -149,7 +149,7 @@ impl Default for TermsUpload {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Markdown(String);
 
 impl Markdown {

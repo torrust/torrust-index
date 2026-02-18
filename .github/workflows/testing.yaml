@@ -65,11 +65,11 @@ jobs:
 
       - id: check
         name: Run Build Checks
-        run: cargo check --tests --benches --examples --workspace --all-targets --all-features
+        run: cargo check --workspace --all-targets --all-features
 
       - id: lint
         name: Run Lint Checks
-        run: cargo clippy --tests --benches --examples --workspace --all-targets --all-features
+        run: cargo clippy --workspace --all-targets --all-features
 
       - id: docs
         name: Lint Documentation
@@ -83,7 +83,7 @@ jobs:
 
       - id: deps
         name: Check Unused Dependencies
-        run: cargo machete
+        run: cargo machete --with-metadata
 
   unit:
     name: Units
@@ -120,7 +120,7 @@ jobs:
 
       - id: test
         name: Run Unit Tests
-        run: cargo test --tests --benches --examples --workspace --all-targets --all-features
+        run: cargo test --workspace --all-targets --all-features
 
   integration:
     name: Integrations

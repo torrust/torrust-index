@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use axum::extract::{FromRef, FromRequestParts};
 use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
@@ -12,7 +11,6 @@ use crate::models::user::UserId;
 
 pub struct ExtractLoggedInUser(pub UserId);
 
-#[async_trait]
 impl<S> FromRequestParts<S> for ExtractLoggedInUser
 where
     Arc<AppData>: FromRef<S>,
@@ -29,9 +27,12 @@ where
         //Extracts the app state
         let app_data = Arc::from_ref(state);
 
-        match app_data.auth.get_user_id_from_bearer_token(maybe_bearer_token).await {
-            Ok(user_id) => Ok(ExtractLoggedInUser(user_id)),
+        #[allow(clippy::option_if_let_else)]
+        let result = match app_data.auth.get_user_id_from_bearer_token(maybe_bearer_token).await {
+            Ok(user_id) => Ok(Self(user_id)),
             Err(_) => Err(ServiceError::LoggedInUserNotFound.into_response()),
-        }
+        };
+
+        result
     }
 }

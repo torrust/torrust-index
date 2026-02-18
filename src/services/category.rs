@@ -14,8 +14,8 @@ pub struct Service {
 
 impl Service {
     #[must_use]
-    pub fn new(category_repository: Arc<DbCategoryRepository>, authorization_service: Arc<authorization::Service>) -> Service {
-        Service {
+    pub const fn new(category_repository: Arc<DbCategoryRepository>, authorization_service: Arc<authorization::Service>) -> Self {
+        Self {
             category_repository,
             authorization_service,
         }
@@ -48,10 +48,11 @@ impl Service {
             Ok(_) => Err(ServiceError::CategoryAlreadyExists),
             Err(e) => match e {
                 // Otherwise try to create it
-                DatabaseError::CategoryNotFound => match self.category_repository.add(trimmed_name).await {
-                    Ok(id) => Ok(id),
-                    Err(_) => Err(ServiceError::DatabaseError),
-                },
+                DatabaseError::CategoryNotFound => self
+                    .category_repository
+                    .add(trimmed_name)
+                    .await
+                    .map_err(|_| ServiceError::DatabaseError),
                 _ => Err(ServiceError::DatabaseError),
             },
         }

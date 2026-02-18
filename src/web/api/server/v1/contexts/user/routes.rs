@@ -22,7 +22,7 @@ pub fn router(app_data: Arc<AppData>) -> Router {
         // - There should be an independent service (web app) serving the email verification page.
         //   The wep app can user this endpoint to verify the email and render the page accordingly.
         .route(
-            "/email/verify/:token",
+            "/email/verify/{token}",
             get(email_verification_handler).with_state(app_data.clone()),
         )
         // Authentication
@@ -31,12 +31,12 @@ pub fn router(app_data: Arc<AppData>) -> Router {
         .route("/token/renew", post(renew_token_handler).with_state(app_data.clone()))
         // Profile
         .route(
-            "/:user/change-password",
+            "/{user}/change-password",
             post(change_password_handler).with_state(app_data.clone()),
         )
         // User ban
         // code-review: should not this be a POST method? We add the user to the blacklist. We do not delete the user.
-        .route("/ban/:user", delete(ban_handler).with_state(app_data))
+        .route("/ban/{user}", delete(ban_handler).with_state(app_data))
 }
 
 /// Routes for the [`user`](crate::web::api::server::v1::contexts::user) API context.

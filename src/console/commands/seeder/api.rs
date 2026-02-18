@@ -39,7 +39,7 @@ pub async fn upload_torrent(client: &Client, upload_torrent_form: UploadTorrentM
     // have to restart the seeder manually.
 
     let response = client
-        .upload_torrent(upload_torrent_form.into())
+        .upload_torrent(upload_torrent_form.try_into().expect("multipart form should be valid"))
         .await
         .expect("API should return a response");
 

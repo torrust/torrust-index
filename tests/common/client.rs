@@ -45,7 +45,7 @@ impl Client {
         Self::new(ConnectionInfo::new(&Self::base_url(bind_address), &Self::base_path(), token))
     }
 
-    pub fn new(connection_info: ConnectionInfo) -> Self {
+    pub const fn new(connection_info: ConnectionInfo) -> Self {
         Self {
             http_client: Http::new(connection_info),
         }
@@ -188,7 +188,7 @@ struct Http {
 }
 
 impl Http {
-    pub fn new(connection_info: ConnectionInfo) -> Self {
+    pub const fn new(connection_info: ConnectionInfo) -> Self {
         Self {
             connection_info,
             timeout: Duration::from_secs(5),
@@ -259,7 +259,7 @@ impl Http {
             .await
     }
 
-    pub async fn post<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> TextResponse {
+    pub async fn post<T: Serialize + ?Sized + Sync>(&self, path: &str, form: &T) -> TextResponse {
         let response = match &self.connection_info.token {
             Some(token) => reqwest::Client::new()
                 .post(self.base_url(path).clone())
@@ -303,7 +303,7 @@ impl Http {
         TextResponse::from(response).await
     }
 
-    pub async fn put<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> TextResponse {
+    pub async fn put<T: Serialize + ?Sized + Sync>(&self, path: &str, form: &T) -> TextResponse {
         let response = match &self.connection_info.token {
             Some(token) => reqwest::Client::new()
                 .put(self.base_url(path).clone())
@@ -339,7 +339,7 @@ impl Http {
         TextResponse::from(response).await
     }
 
-    async fn delete_with_body<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> TextResponse {
+    async fn delete_with_body<T: Serialize + ?Sized + Sync>(&self, path: &str, form: &T) -> TextResponse {
         let response = match &self.connection_info.token {
             Some(token) => reqwest::Client::new()
                 .delete(self.base_url(path).clone())

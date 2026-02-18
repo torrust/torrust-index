@@ -100,11 +100,11 @@ impl Default for Metadata {
 }
 
 impl Metadata {
-    fn default_app() -> App {
+    const fn default_app() -> App {
         App::TorrustIndex
     }
 
-    fn default_purpose() -> Purpose {
+    const fn default_purpose() -> Purpose {
         Purpose::Configuration
     }
 
@@ -178,20 +178,21 @@ impl Info {
         let env_var_config_toml = ENV_VAR_CONFIG_TOML.to_string();
         let env_var_config_toml_path = ENV_VAR_CONFIG_TOML_PATH.to_string();
 
-        let config_toml = if let Ok(config_toml) = env::var(env_var_config_toml) {
+        let config_toml = env::var(env_var_config_toml).ok().map(|config_toml| {
             println!("Loading extra configuration from environment variable {config_toml} ...");
-            Some(config_toml)
-        } else {
-            None
-        };
+            config_toml
+        });
 
-        let config_toml_path = if let Ok(config_toml_path) = env::var(env_var_config_toml_path) {
-            println!("Loading extra configuration from file: `{config_toml_path}` ...");
-            config_toml_path
-        } else {
-            println!("Loading extra configuration from default configuration file: `{default_config_toml_path}` ...");
-            default_config_toml_path
-        };
+        let config_toml_path = env::var(env_var_config_toml_path).map_or_else(
+            |_| {
+                println!("Loading extra configuration from default configuration file: `{default_config_toml_path}` ...");
+                default_config_toml_path
+            },
+            |config_toml_path| {
+                println!("Loading extra configuration from file: `{config_toml_path}` ...");
+                config_toml_path
+            },
+        );
 
         Ok(Self {
             config_toml,
@@ -287,8 +288,8 @@ pub struct Configuration {
 }
 
 impl Default for Configuration {
-    fn default() -> Configuration {
-        Configuration {
+    fn default() -> Self {
+        Self {
             settings: RwLock::new(Settings::default()),
         }
     }
@@ -300,10 +301,10 @@ impl Configuration {
     /// # Errors
     ///
     /// Will return `Err` if the environment variable does not exist or has a bad configuration.
-    pub fn load(info: &Info) -> Result<Configuration, Error> {
+    pub fn load(info: &Info) -> Result<Self, Error> {
         let settings = Self::load_settings(info)?;
 
-        Ok(Configuration {
+        Ok(Self {
             settings: RwLock::new(settings),
         })
     }
@@ -318,13 +319,17 @@ impl Configuration {
     /// Will return `Err` if the environment variable does not exist or has a bad configuration.
     pub fn load_settings(info: &Info) -> Result<Settings, Error> {
         // Load configuration provided by the user, prioritizing env vars
-        let figment = if let Some(config_toml) = &info.config_toml {
-            // Config in env var has priority over config file path
-            Figment::from(Toml::string(config_toml)).merge(Env::prefixed(CONFIG_OVERRIDE_PREFIX).split(CONFIG_OVERRIDE_SEPARATOR))
-        } else {
-            Figment::from(Toml::file(&info.config_toml_path))
-                .merge(Env::prefixed(CONFIG_OVERRIDE_PREFIX).split(CONFIG_OVERRIDE_SEPARATOR))
-        };
+        let figment = info.config_toml.as_ref().map_or_else(
+            || {
+                Figment::from(Toml::file(&info.config_toml_path))
+                    .merge(Env::prefixed(CONFIG_OVERRIDE_PREFIX).split(CONFIG_OVERRIDE_SEPARATOR))
+            },
+            |config_toml| {
+                // Config in env var has priority over config file path
+                Figment::from(Toml::string(config_toml))
+                    .merge(Env::prefixed(CONFIG_OVERRIDE_PREFIX).split(CONFIG_OVERRIDE_SEPARATOR))
+            },
+        );
 
         // Make sure user has provided the mandatory options.
         Self::check_mandatory_options(&figment)?;
@@ -457,6 +462,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::result_large_err)]
     async fn configuration_could_be_loaded_from_a_toml_string() {
         figment::Jail::expect_with(|jail| {
             jail.create_dir("templates")?;
@@ -476,6 +482,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::result_large_err)]
     fn configuration_should_use_the_default_values_when_only_the_mandatory_options_are_provided_by_the_user_via_toml_file() {
         figment::Jail::expect_with(|jail| {
             jail.create_file(
@@ -509,6 +516,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::result_large_err)]
     fn configuration_should_use_the_default_values_when_only_the_mandatory_options_are_provided_by_the_user_via_toml_content() {
         figment::Jail::expect_with(|_jail| {
             let config_toml = r#"
@@ -540,6 +548,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::result_large_err)]
     async fn configuration_should_allow_to_override_the_tracker_api_token_provided_in_the_toml_file() {
         figment::Jail::expect_with(|jail| {
             jail.create_dir("templates")?;
@@ -561,6 +570,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::result_large_err)]
     async fn configuration_should_allow_to_override_the_authentication_user_claim_token_pepper_provided_in_the_toml_file() {
         figment::Jail::expect_with(|jail| {
             jail.create_dir("templates")?;
@@ -601,7 +611,10 @@ mod tests {
             settings_lock.tracker.private = true;
             settings_lock.tracker.url = Url::parse("udp://localhost:6969").unwrap();
 
-            assert!(settings_lock.validate().is_err());
+            let validation_result = settings_lock.validate();
+            drop(settings_lock);
+
+            assert!(validation_result.is_err());
         }
     }
 }

@@ -18,7 +18,7 @@ pub struct AppStarter {
 
 impl AppStarter {
     #[must_use]
-    pub fn with_custom_configuration(configuration: config::Settings) -> Self {
+    pub const fn with_custom_configuration(configuration: config::Settings) -> Self {
         Self {
             configuration,
             running_state: None,

@@ -21,19 +21,20 @@ async fn it_should_allow_guests_to_get_the_public_settings() {
     let res: PublicSettingsResponse = serde_json::from_str(&response.body)
         .unwrap_or_else(|_| panic!("response {:#?} should be a PublicSettingsResponse", response.body));
 
-    let email_on_signup = match &env.server_settings().unwrap().registration {
-        Some(registration) => match &registration.email {
-            Some(email) => {
-                if email.required {
-                    EmailOnSignup::Required
-                } else {
-                    EmailOnSignup::Optional
-                }
-            }
-            None => EmailOnSignup::NotIncluded,
-        },
-        None => EmailOnSignup::NotIncluded,
-    };
+    let email_on_signup =
+        env.server_settings()
+            .unwrap()
+            .registration
+            .as_ref()
+            .map_or(EmailOnSignup::NotIncluded, |registration| {
+                registration.email.as_ref().map_or(EmailOnSignup::NotIncluded, |email| {
+                    if email.required {
+                        EmailOnSignup::Required
+                    } else {
+                        EmailOnSignup::Optional
+                    }
+                })
+            });
 
     assert_eq!(
         res.data,

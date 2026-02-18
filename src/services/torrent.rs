@@ -247,8 +247,7 @@ impl Index {
     }
 
     async fn customize_announcement_info_for(&self, torrent: &mut Torrent) {
-        let settings = self.configuration.settings.read().await;
-        let tracker_url = settings.tracker.url.clone();
+        let tracker_url = self.configuration.settings.read().await.tracker.url.clone();
         torrent.set_announce_to(&tracker_url);
         torrent.reset_announce_list_if_private();
     }
@@ -511,7 +510,7 @@ impl Index {
             torrent_response
                 .files
                 .iter_mut()
-                .for_each(|v| v.path = vec![torrent_info.name.to_string()]);
+                .for_each(|v| v.path = vec![torrent_info.name.clone()]);
         }
 
         // Add trackers

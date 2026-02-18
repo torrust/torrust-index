@@ -6,7 +6,7 @@ use url::Url;
 use super::{ValidationError, Validator};
 
 /// Configuration for the associated tracker.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tracker {
     /// The url of the tracker API. For example: `http://localhost:1212/`.
     #[serde(default = "Tracker::default_api_url")]
@@ -65,11 +65,11 @@ impl Tracker {
         Url::parse("udp://localhost:6969").unwrap()
     }
 
-    fn default_listed() -> bool {
+    const fn default_listed() -> bool {
         false
     }
 
-    fn default_private() -> bool {
+    const fn default_private() -> bool {
         false
     }
 
@@ -81,12 +81,12 @@ impl Tracker {
         ApiToken::new("MyAccessToken")
     }
 
-    fn default_token_valid_seconds() -> u64 {
+    const fn default_token_valid_seconds() -> u64 {
         7_257_600
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApiToken(String);
 
 impl ApiToken {

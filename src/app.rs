@@ -164,8 +164,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         configuration.clone(),
         user_profile_repository.clone(),
         authorization_service.clone(),
-    ))
-    .clone();
+    ));
 
     // Build app container
 
@@ -226,7 +225,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
 
 /// It logs the final configuration removing secrets.
 async fn log_configuration(configuration: &Configuration) {
-    let mut setting = configuration.get_all().await.clone();
+    let mut setting = configuration.get_all().await;
     setting.remove_secrets();
     info!("Configuration:\n{}", setting.to_json());
 }

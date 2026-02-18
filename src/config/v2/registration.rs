@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// SMTP configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Registration {
     /// Whether or not to enable email verification on signup.
     #[serde(default = "Registration::default_email")]
@@ -17,13 +17,13 @@ impl Default for Registration {
 }
 
 impl Registration {
-    fn default_email() -> Option<Email> {
+    const fn default_email() -> Option<Email> {
         None
     }
 }
 
 /// SMTP configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Email {
     /// Whether or not email is required on signup.
     #[serde(default = "Email::default_required")]
@@ -44,11 +44,11 @@ impl Default for Email {
 }
 
 impl Email {
-    fn default_required() -> bool {
+    const fn default_required() -> bool {
         false
     }
 
-    fn default_verified() -> bool {
+    const fn default_verified() -> bool {
         false
     }
 }

@@ -29,7 +29,7 @@ use super::validator::{ValidationError, Validator};
 use super::Metadata;
 
 /// The whole configuration for the index.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Settings {
     /// Configuration metadata.
     #[serde(default = "Settings::default_metadata")]
@@ -174,7 +174,7 @@ impl Settings {
         Api::default()
     }
 
-    fn default_registration() -> Option<Registration> {
+    const fn default_registration() -> Option<Registration> {
         None
     }
 
@@ -182,7 +182,7 @@ impl Settings {
         TrackerStatisticsImporter::default()
     }
 
-    fn default_unstable() -> Option<Unstable> {
+    const fn default_unstable() -> Option<Unstable> {
         None
     }
 }

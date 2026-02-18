@@ -29,8 +29,8 @@ pub struct TorrentIndexInfo {
 }
 
 impl From<TorrentIndexInfo> for UploadTorrentMultipartForm {
-    fn from(indexed_torrent: TorrentIndexInfo) -> UploadTorrentMultipartForm {
-        UploadTorrentMultipartForm {
+    fn from(indexed_torrent: TorrentIndexInfo) -> Self {
+        Self {
             title: indexed_torrent.title,
             description: indexed_torrent.description,
             category: indexed_torrent.category,
@@ -99,7 +99,7 @@ impl TestTorrent {
         // Torrent temporary file path
         let contents_filename = contents_file_name(&id);
         let torrent_filename = format!("{contents_filename}.torrent");
-        let torrent_path = torrents_dir_path.join(torrent_filename.clone());
+        let torrent_path = torrents_dir_path.join(torrent_filename);
 
         // Write the torrent file to the temporary file
         let mut file = File::create(torrent_path.clone()).unwrap();
@@ -113,7 +113,7 @@ impl TestTorrent {
     }
 
     /// It builds a `TestTorrent` from a torrent file.
-    fn build_from_torrent_file(id: &Uuid, torrent_path: &Path) -> TestTorrent {
+    fn build_from_torrent_file(id: &Uuid, torrent_path: &Path) -> Self {
         // Load torrent binary file
         let torrent_file = BinaryFile::from_file_at_path(torrent_path);
 
@@ -132,7 +132,7 @@ impl TestTorrent {
             name: contents_file_name(id),
         };
 
-        TestTorrent {
+        Self {
             file_info: torrent_info,
             index_info: torrent_to_index,
         }
@@ -188,7 +188,7 @@ pub fn temp_dir() -> TempDir {
 /// ```
 ///
 /// Changing the value of the `custom` field will change the info-hash of the torrent.
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct TestTorrentWithCustomInfoField {
     pub info: InfoDictWithCustomField,
 }

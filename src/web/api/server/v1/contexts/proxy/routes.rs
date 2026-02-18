@@ -11,5 +11,5 @@ use crate::common::AppData;
 
 /// Routes for the [`about`](crate::web::api::server::v1::contexts::about) API context.
 pub fn router(app_data: Arc<AppData>) -> Router {
-    Router::new().route("/image/:url", get(get_proxy_image_handler).with_state(app_data))
+    Router::new().route("/image/{url}", get(get_proxy_image_handler).with_state(app_data))
 }

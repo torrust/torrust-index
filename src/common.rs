@@ -92,8 +92,8 @@ impl AppData {
         ban_service: Arc<user::BanService>,
         about_service: Arc<about::Service>,
         listing_service: Arc<user::ListingService>,
-    ) -> AppData {
-        AppData {
+    ) -> Self {
+        Self {
             cfg,
             database,
             json_web_token,

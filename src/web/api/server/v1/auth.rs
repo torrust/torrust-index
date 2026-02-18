@@ -94,7 +94,7 @@ pub struct Authentication {
 
 impl Authentication {
     #[must_use]
-    pub fn new(json_web_token: Arc<JsonWebToken>) -> Self {
+    pub const fn new(json_web_token: Arc<JsonWebToken>) -> Self {
         Self { json_web_token }
     }
 

@@ -2,7 +2,8 @@
 //! context.
 use std::sync::Arc;
 
-use axum::extract::{self, Host, Path, Query, State};
+use axum::extract::{self, Path, Query, State};
+use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
@@ -24,14 +25,20 @@ use crate::web::api::server::v1::responses::OkResponseData;
 #[allow(clippy::unused_async)]
 pub async fn registration_handler(
     State(app_data): State<Arc<AppData>>,
-    Host(host_from_header): Host,
+    headers: HeaderMap,
     extract::Json(registration_form): extract::Json<RegistrationForm>,
 ) -> Response {
+    let host_from_header = headers
+        .get("host")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default()
+        .to_string();
+
     let api_base_url = app_data
         .cfg
         .get_api_base_url()
         .await
-        .unwrap_or(api_base_url(&host_from_header));
+        .unwrap_or_else(|| api_base_url(&host_from_header));
 
     match app_data
         .registration_service

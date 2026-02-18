@@ -1,4 +1,3 @@
-use axum::async_trait;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::response::Response;
@@ -18,7 +17,6 @@ impl BearerToken {
     }
 }
 
-#[async_trait]
 impl<S> FromRequestParts<S> for Extract
 where
     S: Send + Sync,
@@ -28,9 +26,10 @@ where
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let header = parts.headers.get("Authorization");
 
+        #[allow(clippy::option_if_let_else)]
         match header {
-            Some(header_value) => Ok(Extract(Some(BearerToken(parse_token(header_value))))),
-            None => Ok(Extract(None)),
+            Some(header_value) => Ok(Self(Some(BearerToken(parse_token(header_value))))),
+            None => Ok(Self(None)),
         }
     }
 }

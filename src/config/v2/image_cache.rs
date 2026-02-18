@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// proxy. The proxy will not download new images if the user has reached the
 /// quota.
 #[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ImageCache {
     /// Cache size in bytes.
     #[serde(default = "ImageCache::default_capacity")]
@@ -46,23 +46,23 @@ impl Default for ImageCache {
 }
 
 impl ImageCache {
-    fn default_max_request_timeout_ms() -> u64 {
+    const fn default_max_request_timeout_ms() -> u64 {
         1000
     }
 
-    fn default_capacity() -> usize {
+    const fn default_capacity() -> usize {
         128_000_000
     }
 
-    fn default_entry_size_limit() -> usize {
+    const fn default_entry_size_limit() -> usize {
         4_000_000
     }
 
-    fn default_user_quota_period_seconds() -> u64 {
+    const fn default_user_quota_period_seconds() -> u64 {
         3600
     }
 
-    fn default_user_quota_bytes() -> usize {
+    const fn default_user_quota_bytes() -> usize {
         64_000_000
     }
 }

@@ -12,8 +12,8 @@ pub enum Scheme {
 impl fmt::Display for Scheme {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Scheme::Http => write!(f, "http"),
-            Scheme::Https => write!(f, "https"),
+            Self::Http => write!(f, "http"),
+            Self::Https => write!(f, "https"),
         }
     }
 }
@@ -23,8 +23,8 @@ impl FromStr for Scheme {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "http" => Ok(Scheme::Http),
-            "https" => Ok(Scheme::Https),
+            "http" => Ok(Self::Http),
+            "https" => Ok(Self::Https),
             _ => Err(()),
         }
     }

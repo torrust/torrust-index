@@ -30,7 +30,7 @@ impl TextResponse {
         false
     }
 
-    pub fn is_ok(&self) -> bool {
+    pub const fn is_ok(&self) -> bool {
         self.status == 200
     }
 }
@@ -71,7 +71,7 @@ impl BinaryResponse {
         false
     }
 
-    pub fn is_ok(&self) -> bool {
+    pub const fn is_ok(&self) -> bool {
         self.status == 200
     }
 }

@@ -172,7 +172,7 @@ mod for_guests {
                 length: test_torrent.file_info.content_size,
                 md5sum: None, // DevSkim: ignore DS126858
             }],
-            trackers: vec![tracker_url.clone().to_string()],
+            trackers: vec![tracker_url.clone()],
             magnet_link: format!(
                 // cspell:disable-next-line
                 "magnet:?xt=urn:btih:{}&dn={}&tr={}",
@@ -428,7 +428,9 @@ mod for_guests {
 
             let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
-            let response = client.upload_torrent(form.into()).await;
+            let response = client
+                .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                .await;
 
             assert_eq!(response.status, 401);
         }
@@ -637,7 +639,9 @@ mod for_authenticated_users {
 
             let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
-            let response = client.upload_torrent(form.into()).await;
+            let response = client
+                .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                .await;
 
             let uploaded_torrent_response: UploadedTorrentResponse = serde_json::from_str(&response.body).unwrap();
 
@@ -671,7 +675,9 @@ mod for_authenticated_users {
 
                 let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
-                let response = client.upload_torrent(form.into()).await;
+                let response = client
+                    .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                    .await;
 
                 assert_eq!(response.status, 400);
             }
@@ -690,7 +696,9 @@ mod for_authenticated_users {
 
                 let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
-                let response = client.upload_torrent(form.into()).await;
+                let response = client
+                    .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                    .await;
 
                 assert_eq!(response.status, 400);
             }
@@ -709,7 +717,9 @@ mod for_authenticated_users {
 
                 let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
-                let response = client.upload_torrent(form.into()).await;
+                let response = client
+                    .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                    .await;
 
                 assert_eq!(response.status, 400);
             }
@@ -741,7 +751,9 @@ mod for_authenticated_users {
 
                 let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
-                let response = client.upload_torrent(form.into()).await;
+                let response = client
+                    .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                    .await;
 
                 assert_eq!(response.status, 400);
             }
@@ -765,7 +777,9 @@ mod for_authenticated_users {
 
                 let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
-                let response = client.upload_torrent(form.into()).await;
+                let response = client
+                    .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                    .await;
 
                 assert_eq!(response.status, 400);
             }
@@ -786,7 +800,9 @@ mod for_authenticated_users {
 
                 let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
-                let response = client.upload_torrent(form.into()).await;
+                let response = client
+                    .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                    .await;
 
                 assert_eq!(response.status, 400);
             }
@@ -806,7 +822,9 @@ mod for_authenticated_users {
 
             let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
-            let response = client.upload_torrent(form.into()).await;
+            let response = client
+                .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                .await;
 
             assert_eq!(response.status, 400);
         }
@@ -828,13 +846,17 @@ mod for_authenticated_users {
             let first_torrent = random_torrent();
             let first_torrent_title = first_torrent.index_info.title.clone();
             let form: UploadTorrentMultipartForm = first_torrent.index_info.into();
-            let _response = client.upload_torrent(form.into()).await;
+            let _response = client
+                .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                .await;
 
             // Upload the second torrent with the same title as the first one
             let mut second_torrent = random_torrent();
             second_torrent.index_info.title = first_torrent_title;
             let form: UploadTorrentMultipartForm = second_torrent.index_info.into();
-            let response = client.upload_torrent(form.into()).await;
+            let response = client
+                .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                .await;
 
             assert_json_error_response(&response, "This torrent title has already been used.");
         }
@@ -857,14 +879,18 @@ mod for_authenticated_users {
             let mut first_torrent_clone = first_torrent.clone();
             let first_torrent_title = first_torrent.index_info.title.clone();
             let form: UploadTorrentMultipartForm = first_torrent.index_info.into();
-            let _response = client.upload_torrent(form.into()).await;
+            let _response = client
+                .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                .await;
 
             // Upload the second torrent with the same info-hash as the first one.
             // We need to change the title otherwise the torrent will be rejected
             // because of the duplicate title.
             first_torrent_clone.index_info.title = format!("{first_torrent_title}-clone");
             let form: UploadTorrentMultipartForm = first_torrent_clone.index_info.into();
-            let response = client.upload_torrent(form.into()).await;
+            let response = client
+                .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                .await;
 
             assert_eq!(response.status, 409);
         }
@@ -888,7 +914,9 @@ mod for_authenticated_users {
             let first_torrent = TestTorrent::with_custom_info_dict_field(id1, "data", "custom 01");
             let first_torrent_title = first_torrent.index_info.title.clone();
             let form: UploadTorrentMultipartForm = first_torrent.index_info.into();
-            let _response = client.upload_torrent(form.into()).await;
+            let _response = client
+                .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                .await;
 
             // Upload the second torrent with the same canonical info-hash as the first one.
             // We need to change the title otherwise the torrent will be rejected
@@ -897,7 +925,9 @@ mod for_authenticated_users {
                 TestTorrent::with_custom_info_dict_field(id1, "data", "custom 02");
             torrent_with_the_same_canonical_info_hash.index_info.title = format!("{first_torrent_title}-clone");
             let form: UploadTorrentMultipartForm = torrent_with_the_same_canonical_info_hash.index_info.into();
-            let response = client.upload_torrent(form.into()).await;
+            let response = client
+                .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                .await;
 
             assert_eq!(response.status, 409);
         }
@@ -1003,7 +1033,9 @@ mod for_authenticated_users {
 
                 let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
-                let response = client.upload_torrent(form.into()).await;
+                let response = client
+                    .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                    .await;
 
                 assert_eq!(response.status, 200);
             }
@@ -1388,7 +1420,9 @@ mod and_admins {
 
             let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
 
-            let response = client.upload_torrent(form.into()).await;
+            let response = client
+                .upload_torrent(form.try_into().expect("multipart form should be valid"))
+                .await;
 
             assert_eq!(response.status, 200);
         }

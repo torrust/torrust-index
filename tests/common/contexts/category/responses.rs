@@ -15,7 +15,7 @@ pub struct ListResponse {
     pub data: Vec<ListItem>,
 }
 
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Debug, PartialEq, Eq)]
 pub struct ListItem {
     pub category_id: i64,
     pub name: String,

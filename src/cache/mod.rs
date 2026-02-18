@@ -17,7 +17,7 @@ pub struct BytesCacheEntry {
 
 // Individual entry destined for the byte cache.
 impl BytesCacheEntry {
-    pub fn new(bytes: Bytes) -> Self {
+    pub const fn new(bytes: Bytes) -> Self {
         Self { bytes }
     }
 }

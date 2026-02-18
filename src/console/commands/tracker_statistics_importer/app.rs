@@ -35,7 +35,7 @@ use crate::tracker::statistics_importer::StatisticsImporter;
 
 const NUMBER_OF_ARGUMENTS: usize = 0;
 
-#[derive(Debug, Display, PartialEq, Error)]
+#[derive(Debug, Display, PartialEq, Eq, Error)]
 #[allow(dead_code)]
 pub enum ImportError {
     #[display("internal server error")]
@@ -107,6 +107,7 @@ pub async fn import() {
             .await
             .expect("unable to connect to db"),
     );
+    drop(settings);
 
     let tracker_service = Arc::new(Service::new(cfg.clone(), database.clone()).await);
     let tracker_statistics_importer =

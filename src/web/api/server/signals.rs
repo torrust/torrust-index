@@ -19,7 +19,11 @@ pub enum Halted {
     Normal,
 }
 
-pub async fn graceful_shutdown(handle: axum_server::Handle, rx_halt: tokio::sync::oneshot::Receiver<Halted>, message: String) {
+pub async fn graceful_shutdown(
+    handle: axum_server::Handle<std::net::SocketAddr>,
+    rx_halt: tokio::sync::oneshot::Receiver<Halted>,
+    message: String,
+) {
     shutdown_signal_with_message(rx_halt, message).await;
 
     info!("Sending graceful shutdown signal");

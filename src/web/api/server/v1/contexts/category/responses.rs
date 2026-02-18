@@ -31,7 +31,7 @@ pub fn deleted_category(category_name: &str) -> Json<OkResponseData<String>> {
 
 impl From<DatabaseCategory> for Category {
     fn from(db_category: DatabaseCategory) -> Self {
-        Category {
+        Self {
             id: db_category.category_id,
             category_id: db_category.category_id,
             name: db_category.name,

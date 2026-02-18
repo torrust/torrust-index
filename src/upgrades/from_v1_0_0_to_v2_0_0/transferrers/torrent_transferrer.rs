@@ -42,15 +42,8 @@ pub async fn transfer_torrents(
 
         let filepath = format!("{}/{}.torrent", upload_path, &torrent.torrent_id);
 
-        let torrent_from_file_result = read_torrent_from_file(&filepath);
-
-        assert!(
-            torrent_from_file_result.is_ok(),
-            "Error torrent file not found: {:?}",
-            &filepath
-        );
-
-        let torrent_from_file = torrent_from_file_result.unwrap();
+        let torrent_from_file =
+            read_torrent_from_file(&filepath).unwrap_or_else(|_| panic!("Error torrent file not found: {:?}", &filepath));
 
         let id = target_database
             .insert_torrent(&TorrentRecordV2::from_v1_data(torrent, &torrent_from_file.info, &uploader))
@@ -183,10 +176,7 @@ pub async fn transfer_torrents(
 }
 
 pub fn read_torrent_from_file(path: &str) -> Result<Torrent, Box<dyn error::Error>> {
-    let contents = match fs::read(path) {
-        Ok(contents) => contents,
-        Err(e) => return Err(e.into()),
-    };
+    let contents = fs::read(path)?;
 
     match decode_torrent(&contents) {
         Ok(torrent) => Ok(torrent),

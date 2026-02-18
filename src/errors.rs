@@ -187,16 +187,16 @@ impl From<sqlx::Error> for ServiceError {
             return if err.code() == Some(Cow::from("2067")) {
                 if err.message().contains("torrust_torrents.info_hash") {
                     println!("info_hash already exists {}", err.message());
-                    ServiceError::InfoHashAlreadyExists
+                    Self::InfoHashAlreadyExists
                 } else {
-                    ServiceError::InternalServerError
+                    Self::InternalServerError
                 }
             } else {
-                ServiceError::TorrentNotFound
+                Self::TorrentNotFound
             };
         }
 
-        ServiceError::InternalServerError
+        Self::InternalServerError
     }
 }
 
@@ -209,28 +209,28 @@ impl From<database::Error> for ServiceError {
 impl From<argon2::password_hash::Error> for ServiceError {
     fn from(e: argon2::password_hash::Error) -> Self {
         eprintln!("{e}");
-        ServiceError::InternalServerError
+        Self::InternalServerError
     }
 }
 
 impl From<std::io::Error> for ServiceError {
     fn from(e: std::io::Error) -> Self {
         eprintln!("{e}");
-        ServiceError::InternalServerError
+        Self::InternalServerError
     }
 }
 
 impl From<Box<dyn error::Error>> for ServiceError {
     fn from(e: Box<dyn error::Error>) -> Self {
         eprintln!("{e}");
-        ServiceError::InternalServerError
+        Self::InternalServerError
     }
 }
 
 impl From<serde_json::Error> for ServiceError {
     fn from(e: serde_json::Error) -> Self {
         eprintln!("{e}");
-        ServiceError::InternalServerError
+        Self::InternalServerError
     }
 }
 
@@ -238,8 +238,8 @@ impl From<MetadataError> for ServiceError {
     fn from(e: MetadataError) -> Self {
         eprintln!("{e}");
         match e {
-            MetadataError::MissingTorrentTitle => ServiceError::MissingMandatoryMetadataFields,
-            MetadataError::InvalidTorrentTitleLength => ServiceError::InvalidTorrentTitleLength,
+            MetadataError::MissingTorrentTitle => Self::MissingMandatoryMetadataFields,
+            MetadataError::InvalidTorrentTitleLength => Self::InvalidTorrentTitleLength,
         }
     }
 }
@@ -248,10 +248,10 @@ impl From<DecodeTorrentFileError> for ServiceError {
     fn from(e: DecodeTorrentFileError) -> Self {
         eprintln!("{e}");
         match e {
-            DecodeTorrentFileError::InvalidTorrentPiecesLength => ServiceError::InvalidTorrentTitleLength,
+            DecodeTorrentFileError::InvalidTorrentPiecesLength => Self::InvalidTorrentTitleLength,
             DecodeTorrentFileError::CannotBencodeInfoDict
             | DecodeTorrentFileError::InvalidInfoDictionary
-            | DecodeTorrentFileError::InvalidBencodeData => ServiceError::InvalidTorrentFile,
+            | DecodeTorrentFileError::InvalidBencodeData => Self::InvalidTorrentFile,
         }
     }
 }
@@ -260,20 +260,20 @@ impl From<TrackerAPIError> for ServiceError {
     fn from(e: TrackerAPIError) -> Self {
         eprintln!("{e}");
         match e {
-            TrackerAPIError::TrackerOffline { error: _ } => ServiceError::TrackerOffline,
-            TrackerAPIError::InternalServerError | TrackerAPIError::NotFound => ServiceError::TrackerResponseError,
-            TrackerAPIError::TorrentNotFound => ServiceError::TorrentNotFoundInTracker,
+            TrackerAPIError::TrackerOffline { error: _ } => Self::TrackerOffline,
+            TrackerAPIError::InternalServerError | TrackerAPIError::NotFound => Self::TrackerResponseError,
+            TrackerAPIError::TorrentNotFound => Self::TorrentNotFoundInTracker,
             TrackerAPIError::UnexpectedResponseStatus
             | TrackerAPIError::MissingResponseBody
-            | TrackerAPIError::FailedToParseTrackerResponse { body: _ } => ServiceError::TrackerUnknownResponse,
-            TrackerAPIError::CannotSaveUserKey => ServiceError::DatabaseError,
-            TrackerAPIError::InvalidToken => ServiceError::InvalidTrackerToken,
+            | TrackerAPIError::FailedToParseTrackerResponse { body: _ } => Self::TrackerUnknownResponse,
+            TrackerAPIError::CannotSaveUserKey => Self::DatabaseError,
+            TrackerAPIError::InvalidToken => Self::InvalidTrackerToken,
         }
     }
 }
 
 #[must_use]
-pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
+pub const fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
     #[allow(clippy::match_same_arms)]
     match error {
         ServiceError::ClosedForRegistration => StatusCode::FORBIDDEN,
@@ -333,7 +333,7 @@ pub fn http_status_code_for_service_error(error: &ServiceError) -> StatusCode {
 }
 
 #[must_use]
-pub fn map_database_error_to_service_error(error: &database::Error) -> ServiceError {
+pub const fn map_database_error_to_service_error(error: &database::Error) -> ServiceError {
     #[allow(clippy::match_same_arms)]
     match error {
         database::Error::Error => ServiceError::InternalServerError,

@@ -44,7 +44,7 @@ impl IntoResponse for Request {
 }
 
 #[must_use]
-pub fn http_status_code_for_handler_error(error: &Request) -> StatusCode {
+pub const fn http_status_code_for_handler_error(error: &Request) -> StatusCode {
     #[allow(clippy::match_same_arms)]
     match error {
         Request::TitleIsNotValidUtf8 => StatusCode::BAD_REQUEST,

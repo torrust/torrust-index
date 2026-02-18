@@ -17,12 +17,12 @@ pub struct Query {
 
 impl Query {
     #[must_use]
-    pub fn empty() -> Self {
+    pub const fn empty() -> Self {
         Self { params: vec![] }
     }
 
     #[must_use]
-    pub fn with_params(params: Vec<QueryParam>) -> Self {
+    pub const fn with_params(params: Vec<QueryParam>) -> Self {
         Self { params }
     }
 
@@ -74,7 +74,7 @@ pub struct Http {
 
 impl Http {
     #[must_use]
-    pub fn new(connection_info: ConnectionInfo) -> Self {
+    pub const fn new(connection_info: ConnectionInfo) -> Self {
         Self {
             connection_info,
             timeout: Duration::from_secs(5),
@@ -162,7 +162,7 @@ impl Http {
     ///
     /// Will return an error if there was an error while sending request,
     /// redirect loop was detected or redirect limit was exhausted.
-    pub async fn post<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> Result<TextResponse, reqwest::Error> {
+    pub async fn post<T: Serialize + ?Sized + Sync>(&self, path: &str, form: &T) -> Result<TextResponse, reqwest::Error> {
         let response = match &self.connection_info.token {
             Some(token) => {
                 reqwest::Client::new()
@@ -218,7 +218,7 @@ impl Http {
     ///
     /// Will return an error if there was an error while sending request,
     /// redirect loop was detected or redirect limit was exhausted.
-    pub async fn put<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> Result<TextResponse, reqwest::Error> {
+    pub async fn put<T: Serialize + ?Sized + Sync>(&self, path: &str, form: &T) -> Result<TextResponse, reqwest::Error> {
         let response = match &self.connection_info.token {
             Some(token) => {
                 reqwest::Client::new()
@@ -263,7 +263,11 @@ impl Http {
     ///
     /// Will return an error if there was an error while sending request,
     /// redirect loop was detected or redirect limit was exhausted.
-    pub async fn delete_with_body<T: Serialize + ?Sized>(&self, path: &str, form: &T) -> Result<TextResponse, reqwest::Error> {
+    pub async fn delete_with_body<T: Serialize + ?Sized + Sync>(
+        &self,
+        path: &str,
+        form: &T,
+    ) -> Result<TextResponse, reqwest::Error> {
         let response = match &self.connection_info.token {
             Some(token) => {
                 reqwest::Client::new()

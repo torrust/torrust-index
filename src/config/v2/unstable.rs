@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Unstable configuration options.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Unstable {
     /// The casbin configuration used for authorization.
     #[serde(default = "Unstable::default_auth")]
@@ -17,13 +17,13 @@ impl Default for Unstable {
 }
 
 impl Unstable {
-    fn default_auth() -> Option<Auth> {
+    const fn default_auth() -> Option<Auth> {
         None
     }
 }
 
 /// Unstable auth configuration options.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Auth {
     /// The casbin configuration used for authorization.
     #[serde(default = "Auth::default_casbin")]
@@ -39,13 +39,13 @@ impl Default for Auth {
 }
 
 impl Auth {
-    fn default_casbin() -> Option<Casbin> {
+    const fn default_casbin() -> Option<Casbin> {
         None
     }
 }
 
 /// Authentication options.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Casbin {
     /// The model. See <https://casbin.org>.
     pub model: String,

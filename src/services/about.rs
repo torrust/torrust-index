@@ -12,8 +12,8 @@ pub struct Service {
 
 impl Service {
     #[must_use]
-    pub fn new(authorization_service: Arc<authorization::Service>) -> Service {
-        Service { authorization_service }
+    pub const fn new(authorization_service: Arc<authorization::Service>) -> Self {
+        Self { authorization_service }
     }
 
     /// Returns the html with the about page

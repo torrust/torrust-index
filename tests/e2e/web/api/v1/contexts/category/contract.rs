@@ -59,7 +59,7 @@ async fn it_should_allow_admins_to_add_new_categories() {
 
     let response = client
         .add_category(AddCategoryForm {
-            name: category_name.to_string(),
+            name: category_name.clone(),
             icon: None,
         })
         .await;
@@ -114,7 +114,7 @@ async fn it_should_allow_admins_to_delete_categories() {
 
     let response = client
         .delete_category(DeleteCategoryForm {
-            name: added_category_name.to_string(),
+            name: added_category_name.clone(),
             icon: None,
         })
         .await;
@@ -166,7 +166,7 @@ mod authorization {
 
             let response = client
                 .delete_category(DeleteCategoryForm {
-                    name: added_category_name.to_string(),
+                    name: added_category_name.clone(),
                     icon: None,
                 })
                 .await;
@@ -227,7 +227,7 @@ mod authorization {
 
         let response = client
             .delete_category(DeleteCategoryForm {
-                name: added_category_name.to_string(),
+                name: added_category_name.clone(),
                 icon: None,
             })
             .await;
@@ -273,7 +273,7 @@ mod authorization {
 
             let response = client
                 .add_category(AddCategoryForm {
-                    name: category_name.to_string(),
+                    name: category_name.clone(),
                     icon: None,
                 })
                 .await;
@@ -293,7 +293,7 @@ mod authorization {
 
             let response = client
                 .delete_category(DeleteCategoryForm {
-                    name: added_category_name.to_string(),
+                    name: added_category_name.clone(),
                     icon: None,
                 })
                 .await;

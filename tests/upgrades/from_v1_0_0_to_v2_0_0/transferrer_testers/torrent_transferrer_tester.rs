@@ -146,7 +146,7 @@ impl TorrentTester {
 
         let urls: Vec<String> = torrent_announce_urls
             .iter()
-            .map(|torrent_announce_url| torrent_announce_url.tracker_url.to_string())
+            .map(|torrent_announce_url| torrent_announce_url.tracker_url.clone())
             .collect();
 
         let expected_urls = torrent_file.announce_urls();
