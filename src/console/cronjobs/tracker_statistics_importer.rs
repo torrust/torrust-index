@@ -117,32 +117,35 @@ pub fn start(
                 error!("Failed to send heartbeat from importer cronjob: {}", e);
             }
 
-            match weak_tracker_statistics_importer.upgrade() { Some(statistics_importer) => {
-                let one_interval_ago = seconds_ago_utc(
-                    torrent_stats_update_interval
-                        .try_into()
-                        .expect("update interval should be a positive integer"),
-                );
-                let limit = 50;
+            match weak_tracker_statistics_importer.upgrade() {
+                Some(statistics_importer) => {
+                    let one_interval_ago = seconds_ago_utc(
+                        torrent_stats_update_interval
+                            .try_into()
+                            .expect("update interval should be a positive integer"),
+                    );
+                    let limit = 50;
 
-                debug!(
-                    "Importing torrents statistics not updated since {} limited to a maximum of {} torrents ...",
-                    one_interval_ago.to_string().yellow(),
-                    limit.to_string().yellow()
-                );
+                    debug!(
+                        "Importing torrents statistics not updated since {} limited to a maximum of {} torrents ...",
+                        one_interval_ago.to_string().yellow(),
+                        limit.to_string().yellow()
+                    );
 
-                match statistics_importer
-                    .import_torrents_statistics_not_updated_since(one_interval_ago, limit)
-                    .await
-                {
-                    Ok(()) => {}
-                    Err(e) => error!("Failed to import statistics: {:?}", e),
+                    match statistics_importer
+                        .import_torrents_statistics_not_updated_since(one_interval_ago, limit)
+                        .await
+                    {
+                        Ok(()) => {}
+                        Err(e) => error!("Failed to import statistics: {:?}", e),
+                    }
+
+                    drop(statistics_importer);
                 }
-
-                drop(statistics_importer);
-            } _ => {
-                break;
-            }}
+                _ => {
+                    break;
+                }
+            }
 
             execution_interval.tick().await;
         }

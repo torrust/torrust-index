@@ -86,15 +86,18 @@ impl Service {
 }
 
 fn extract_public_settings(settings: &Settings) -> ConfigurationPublic {
-    let email_on_signup = settings.registration.as_ref().map_or(EmailOnSignup::NotIncluded, |registration| {
-        registration.email.as_ref().map_or(EmailOnSignup::NotIncluded, |email| {
-            if email.required {
-                EmailOnSignup::Required
-            } else {
-                EmailOnSignup::Optional
-            }
-        })
-    });
+    let email_on_signup = settings
+        .registration
+        .as_ref()
+        .map_or(EmailOnSignup::NotIncluded, |registration| {
+            registration.email.as_ref().map_or(EmailOnSignup::NotIncluded, |email| {
+                if email.required {
+                    EmailOnSignup::Required
+                } else {
+                    EmailOnSignup::Optional
+                }
+            })
+        });
 
     ConfigurationPublic {
         website_name: settings.website.name.clone(),
@@ -253,15 +256,18 @@ mod tests {
         let configuration = Configuration::default();
         let all_settings = configuration.get_all().await;
 
-        let email_on_signup = all_settings.registration.as_ref().map_or(EmailOnSignup::NotIncluded, |registration| {
-            registration.email.as_ref().map_or(EmailOnSignup::NotIncluded, |email| {
-                if email.required {
-                    EmailOnSignup::Required
-                } else {
-                    EmailOnSignup::Optional
-                }
-            })
-        });
+        let email_on_signup = all_settings
+            .registration
+            .as_ref()
+            .map_or(EmailOnSignup::NotIncluded, |registration| {
+                registration.email.as_ref().map_or(EmailOnSignup::NotIncluded, |email| {
+                    if email.required {
+                        EmailOnSignup::Required
+                    } else {
+                        EmailOnSignup::Optional
+                    }
+                })
+            });
 
         assert_eq!(
             extract_public_settings(&all_settings),

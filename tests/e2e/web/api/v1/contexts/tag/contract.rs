@@ -78,11 +78,7 @@ async fn it_should_allow_admins_to_add_new_tags() {
 
     let tag_name = random_tag_name();
 
-    let response = client
-        .add_tag(AddTagForm {
-            name: tag_name.clone(),
-        })
-        .await;
+    let response = client.add_tag(AddTagForm { name: tag_name.clone() }).await;
 
     assert_added_tag_response(&response, &tag_name);
 }
@@ -273,11 +269,7 @@ mod authorization {
 
             let tag_name = random_tag_name();
 
-            let response = client
-                .add_tag(AddTagForm {
-                    name: tag_name.clone(),
-                })
-                .await;
+            let response = client.add_tag(AddTagForm { name: tag_name.clone() }).await;
 
             assert_eq!(response.status, 200);
         }

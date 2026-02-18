@@ -164,8 +164,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         configuration.clone(),
         user_profile_repository.clone(),
         authorization_service.clone(),
-    ))
-    ;
+    ));
 
     // Build app container
 

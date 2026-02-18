@@ -263,7 +263,11 @@ impl Http {
     ///
     /// Will return an error if there was an error while sending request,
     /// redirect loop was detected or redirect limit was exhausted.
-    pub async fn delete_with_body<T: Serialize + ?Sized + Sync>(&self, path: &str, form: &T) -> Result<TextResponse, reqwest::Error> {
+    pub async fn delete_with_body<T: Serialize + ?Sized + Sync>(
+        &self,
+        path: &str,
+        form: &T,
+    ) -> Result<TextResponse, reqwest::Error> {
         let response = match &self.connection_info.token {
             Some(token) => {
                 reqwest::Client::new()

@@ -173,20 +173,23 @@ impl Database for Sqlite {
             Some(UsersSorting::UsernameZA) => "username DESC".to_string(),
         };
 
-        let (join_filters, where_filters) = filters.as_ref().map_or_else(|| (String::new(), String::new()), |filters| {
-            let (mut join_filters_query, mut where_filters_query) = (String::new(), String::new());
-            for filter in filters {
-                match filter {
-                    UsersFilters::TorrentUploader => join_filters_query.push_str(
-                        "INNER JOIN torrust_torrents tt
+        let (join_filters, where_filters) = filters.as_ref().map_or_else(
+            || (String::new(), String::new()),
+            |filters| {
+                let (mut join_filters_query, mut where_filters_query) = (String::new(), String::new());
+                for filter in filters {
+                    match filter {
+                        UsersFilters::TorrentUploader => join_filters_query.push_str(
+                            "INNER JOIN torrust_torrents tt
                     ON tu.user_id = tt.uploader_id ",
-                    ),
-                    UsersFilters::EmailNotVerified => where_filters_query.push_str(" AND email_verified = false"),
-                    UsersFilters::EmailVerified => where_filters_query.push_str(" AND email_verified = true"),
+                        ),
+                        UsersFilters::EmailNotVerified => where_filters_query.push_str(" AND email_verified = false"),
+                        UsersFilters::EmailVerified => where_filters_query.push_str(" AND email_verified = true"),
+                    }
                 }
-            }
-            (join_filters_query, where_filters_query)
-        });
+                (join_filters_query, where_filters_query)
+            },
+        );
 
         let mut query_string = format!(
             "SELECT 

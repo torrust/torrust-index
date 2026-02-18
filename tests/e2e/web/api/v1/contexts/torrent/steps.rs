@@ -23,7 +23,9 @@ pub async fn upload_torrent(uploader: &LoggedInUserData, torrent: &TorrentIndexI
 
     let form: UploadTorrentMultipartForm = torrent.clone().into();
 
-    let response = client.upload_torrent(form.try_into().expect("multipart form should be valid")).await;
+    let response = client
+        .upload_torrent(form.try_into().expect("multipart form should be valid"))
+        .await;
 
     let res = serde_json::from_str::<UploadedTorrentResponse>(&response.body);
 
@@ -41,7 +43,9 @@ pub async fn upload_torrent(uploader: &LoggedInUserData, torrent: &TorrentIndexI
 /// Returns an `ErrorResponseData` if the response is not a 200.
 pub async fn upload_test_torrent(client: &Client, test_torrent: &TestTorrent) -> Result<InfoHash, ErrorResponseData> {
     let form: UploadTorrentMultipartForm = test_torrent.clone().index_info.into();
-    let response = client.upload_torrent(form.try_into().expect("multipart form should be valid")).await;
+    let response = client
+        .upload_torrent(form.try_into().expect("multipart form should be valid"))
+        .await;
 
     if response.status != 200 {
         let error: ErrorResponseData = serde_json::from_str(&response.body)

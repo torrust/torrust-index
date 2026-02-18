@@ -34,7 +34,7 @@ fn get_error_images() -> &'static ErrorImages {
     })
 }
 
-#[must_use] 
+#[must_use]
 pub fn map_error_to_image(error: &Error) -> Bytes {
     let images = get_error_images();
     match error {
