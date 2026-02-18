@@ -35,7 +35,7 @@ impl ListResponse {
     }
 }
 
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Deserialize, Debug, PartialEq, Eq)]
 pub struct ListItem {
     pub tag_id: i64,
     pub name: String,

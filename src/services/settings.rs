@@ -18,8 +18,8 @@ pub struct Service {
 
 impl Service {
     #[must_use]
-    pub fn new(configuration: Arc<Configuration>, authorization_service: Arc<authorization::Service>) -> Service {
-        Service {
+    pub const fn new(configuration: Arc<Configuration>, authorization_service: Arc<authorization::Service>) -> Self {
+        Self {
             configuration,
             authorization_service,
         }
@@ -86,19 +86,15 @@ impl Service {
 }
 
 fn extract_public_settings(settings: &Settings) -> ConfigurationPublic {
-    let email_on_signup = match &settings.registration {
-        Some(registration) => match &registration.email {
-            Some(email) => {
-                if email.required {
-                    EmailOnSignup::Required
-                } else {
-                    EmailOnSignup::Optional
-                }
+    let email_on_signup = settings.registration.as_ref().map_or(EmailOnSignup::NotIncluded, |registration| {
+        registration.email.as_ref().map_or(EmailOnSignup::NotIncluded, |email| {
+            if email.required {
+                EmailOnSignup::Required
+            } else {
+                EmailOnSignup::Optional
             }
-            None => EmailOnSignup::NotIncluded,
-        },
-        None => EmailOnSignup::NotIncluded,
-    };
+        })
+    });
 
     ConfigurationPublic {
         website_name: settings.website.name.clone(),
@@ -112,7 +108,7 @@ fn extract_public_settings(settings: &Settings) -> ConfigurationPublic {
 
 /// The public index configuration.
 /// There is an endpoint to get this configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigurationPublic {
     website_name: String,
     tracker_url: Url,
@@ -123,7 +119,7 @@ pub struct ConfigurationPublic {
 }
 
 /// Whether the email is required on signup or not.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum EmailOnSignup {
     /// The email is required on signup.
@@ -138,9 +134,9 @@ pub enum EmailOnSignup {
 impl fmt::Display for EmailOnSignup {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let display_str = match self {
-            EmailOnSignup::Required => "required",
-            EmailOnSignup::Optional => "optional",
-            EmailOnSignup::NotIncluded => "ignored",
+            Self::Required => "required",
+            Self::Optional => "optional",
+            Self::NotIncluded => "ignored",
         };
         write!(f, "{display_str}")
     }
@@ -151,9 +147,9 @@ impl FromStr for EmailOnSignup {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "required" => Ok(EmailOnSignup::Required),
-            "optional" => Ok(EmailOnSignup::Optional),
-            "none" => Ok(EmailOnSignup::NotIncluded),
+            "required" => Ok(Self::Required),
+            "optional" => Ok(Self::Optional),
+            "none" => Ok(Self::NotIncluded),
             _ => Err(format!(
                 "Unknown config 'email_on_signup' option (required, optional, none): {s}"
             )),
@@ -161,7 +157,7 @@ impl FromStr for EmailOnSignup {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Website {
     pub name: String,
     pub demo: Option<Demo>,
@@ -178,7 +174,7 @@ impl From<config::Website> for Website {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Demo {
     pub warning: String,
 }
@@ -189,7 +185,7 @@ impl From<config::Demo> for Demo {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Terms {
     pub page: TermsPage,
     pub upload: TermsUpload,
@@ -204,7 +200,7 @@ impl From<config::Terms> for Terms {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TermsPage {
     pub title: String,
     pub content: Markdown,
@@ -219,7 +215,7 @@ impl From<config::TermsPage> for TermsPage {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TermsUpload {
     pub content_upload_agreement: Markdown,
 }
@@ -232,7 +228,7 @@ impl From<config::TermsUpload> for TermsUpload {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Markdown(pub String);
 
 impl Markdown {
@@ -257,19 +253,15 @@ mod tests {
         let configuration = Configuration::default();
         let all_settings = configuration.get_all().await;
 
-        let email_on_signup = match &all_settings.registration {
-            Some(registration) => match &registration.email {
-                Some(email) => {
-                    if email.required {
-                        EmailOnSignup::Required
-                    } else {
-                        EmailOnSignup::Optional
-                    }
+        let email_on_signup = all_settings.registration.as_ref().map_or(EmailOnSignup::NotIncluded, |registration| {
+            registration.email.as_ref().map_or(EmailOnSignup::NotIncluded, |email| {
+                if email.required {
+                    EmailOnSignup::Required
+                } else {
+                    EmailOnSignup::Optional
                 }
-                None => EmailOnSignup::NotIncluded,
-            },
-            None => EmailOnSignup::NotIncluded,
-        };
+            })
+        });
 
         assert_eq!(
             extract_public_settings(&all_settings),

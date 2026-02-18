@@ -14,8 +14,8 @@ pub struct Service {
 
 impl Service {
     #[must_use]
-    pub fn new(tag_repository: Arc<DbTagRepository>, authorization_service: Arc<authorization::Service>) -> Service {
-        Service {
+    pub const fn new(tag_repository: Arc<DbTagRepository>, authorization_service: Arc<authorization::Service>) -> Self {
+        Self {
             tag_repository,
             authorization_service,
         }

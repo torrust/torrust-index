@@ -31,7 +31,7 @@ pub async fn registration_handler(
         .cfg
         .get_api_base_url()
         .await
-        .unwrap_or(api_base_url(&host_from_header));
+        .unwrap_or_else(|| api_base_url(&host_from_header));
 
     match app_data
         .registration_service

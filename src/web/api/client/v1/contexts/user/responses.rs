@@ -37,7 +37,7 @@ pub struct TokenRenewalResponse {
     pub data: TokenRenewalData,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct TokenRenewalData {
     pub token: String,
     pub username: String,

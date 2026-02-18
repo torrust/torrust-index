@@ -80,7 +80,7 @@ async fn it_should_allow_admins_to_add_new_tags() {
 
     let response = client
         .add_tag(AddTagForm {
-            name: tag_name.to_string(),
+            name: tag_name.clone(),
         })
         .await;
 
@@ -275,7 +275,7 @@ mod authorization {
 
             let response = client
                 .add_tag(AddTagForm {
-                    name: tag_name.to_string(),
+                    name: tag_name.clone(),
                 })
                 .await;
 

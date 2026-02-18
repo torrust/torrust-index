@@ -21,7 +21,7 @@ pub struct Service {
 
 impl Service {
     #[must_use]
-    pub fn new(image_cache_service: Arc<ImageCacheService>, authorization_service: Arc<authorization::Service>) -> Self {
+    pub const fn new(image_cache_service: Arc<ImageCacheService>, authorization_service: Arc<authorization::Service>) -> Self {
         Self {
             image_cache_service,
             authorization_service,

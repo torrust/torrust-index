@@ -8,7 +8,7 @@ use url::Url;
 
 use crate::utils::hex::{from_bytes, into_bytes};
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct Torrent {
     pub info: TorrentInfoDictionary, //
     #[serde(default)]
@@ -80,20 +80,22 @@ impl Torrent {
         torrent_nodes: Vec<(String, i64)>,
     ) -> Self {
         let pieces_or_root_hash = if db_torrent.is_bep_30 == 0 {
-            if let Some(pieces) = &db_torrent.pieces {
-                pieces.clone()
-            } else {
-                error!("Invalid torrent #{}. Null `pieces` in database", db_torrent.torrent_id);
-                String::new()
-            }
+            db_torrent.pieces.as_ref().map_or_else(
+                || {
+                    error!("Invalid torrent #{}. Null `pieces` in database", db_torrent.torrent_id);
+                    String::new()
+                },
+                std::clone::Clone::clone,
+            )
         } else {
             // A BEP-30 torrent
-            if let Some(root_hash) = &db_torrent.root_hash {
-                root_hash.clone()
-            } else {
-                error!("Invalid torrent #{}. Null `root_hash` in database", db_torrent.torrent_id);
-                String::new()
-            }
+            db_torrent.root_hash.as_ref().map_or_else(
+                || {
+                    error!("Invalid torrent #{}. Null `root_hash` in database", db_torrent.torrent_id);
+                    String::new()
+                },
+                std::clone::Clone::clone,
+            )
         };
 
         let info_dict = TorrentInfoDictionary::with(
@@ -168,7 +170,7 @@ impl Torrent {
         }
     }
 
-    fn is_private(&self) -> bool {
+    const fn is_private(&self) -> bool {
         if let Some(private) = self.info.private {
             if private == 1 {
                 return true;
@@ -205,19 +207,15 @@ impl Torrent {
 
     #[must_use]
     pub fn file_size(&self) -> i64 {
-        match self.info.length {
-            Some(length) => length,
-            None => match &self.info.files {
-                None => 0,
-                Some(files) => {
-                    let mut file_size = 0;
-                    for file in files {
-                        file_size += file.length;
-                    }
-                    file_size
+        self.info.length.unwrap_or_else(|| {
+            self.info.files.as_ref().map_or(0, |files| {
+                let mut file_size = 0;
+                for file in files {
+                    file_size += file.length;
                 }
-            },
-        }
+                file_size
+            })
+        })
     }
 
     /// It returns the announce urls of the torrent file.
@@ -227,19 +225,19 @@ impl Torrent {
     /// This function will panic if both the `announce_list` and the `announce` are `None`.
     #[must_use]
     pub fn announce_urls(&self) -> Vec<String> {
-        match &self.announce_list {
-            Some(list) => list.clone().into_iter().flatten().collect::<Vec<String>>(),
-            None => vec![self.announce.clone().expect("variable `announce` should not be None")],
-        }
+        self.announce_list.as_ref().map_or_else(
+            || vec![self.announce.clone().expect("variable `announce` should not be None")],
+            |list| list.clone().into_iter().flatten().collect::<Vec<String>>(),
+        )
     }
 
     #[must_use]
-    pub fn is_a_single_file_torrent(&self) -> bool {
+    pub const fn is_a_single_file_torrent(&self) -> bool {
         self.info.is_a_single_file_torrent()
     }
 
     #[must_use]
-    pub fn is_a_multiple_file_torrent(&self) -> bool {
+    pub const fn is_a_multiple_file_torrent(&self) -> bool {
         self.info.is_a_multiple_file_torrent()
     }
 }
@@ -318,35 +316,31 @@ impl TorrentInfoDictionary {
     /// [BEP 39](http://www.bittorrent.org/beps/bep_0030.html)
     #[must_use]
     pub fn get_pieces_as_string(&self) -> String {
-        match &self.pieces {
-            None => String::new(),
-            Some(byte_buf) => from_bytes(byte_buf.as_ref()),
-        }
+        self.pieces
+            .as_ref()
+            .map_or_else(String::new, |byte_buf| from_bytes(byte_buf.as_ref()))
     }
 
     /// torrent file can only hold a pieces key or a root hash key:
     /// [BEP 39](http://www.bittorrent.org/beps/bep_0030.html)
     #[must_use]
     pub fn get_root_hash_as_string(&self) -> String {
-        match &self.root_hash {
-            None => String::new(),
-            Some(root_hash) => root_hash.clone(),
-        }
+        self.root_hash.as_ref().map_or_else(String::new, std::clone::Clone::clone)
     }
 
     /// It returns true if the torrent is a BEP-30 torrent.
     #[must_use]
-    pub fn is_bep_30(&self) -> bool {
+    pub const fn is_bep_30(&self) -> bool {
         self.root_hash.is_some()
     }
 
     #[must_use]
-    pub fn is_a_single_file_torrent(&self) -> bool {
+    pub const fn is_a_single_file_torrent(&self) -> bool {
         self.length.is_some()
     }
 
     #[must_use]
-    pub fn is_a_multiple_file_torrent(&self) -> bool {
+    pub const fn is_a_multiple_file_torrent(&self) -> bool {
         self.files.is_some()
     }
 }
@@ -454,7 +448,7 @@ mod tests {
             };
 
             let torrent = Torrent {
-                info: info.clone(),
+                info,
                 announce: None,
                 announce_list: Some(vec![]),
                 creation_date: None,
@@ -495,7 +489,7 @@ mod tests {
                 };
 
                 let torrent = Torrent {
-                    info: info.clone(),
+                    info,
                     announce: None,
                     announce_list: Some(vec![]),
                     creation_date: None,
@@ -534,7 +528,7 @@ mod tests {
                 };
 
                 let torrent = Torrent {
-                    info: info.clone(),
+                    info,
                     announce: None,
                     announce_list: Some(vec![]),
                     creation_date: None,
@@ -569,7 +563,7 @@ mod tests {
                 };
 
                 let torrent = Torrent {
-                    info: info.clone(),
+                    info,
                     announce: None,
                     announce_list: Some(vec![]),
                     creation_date: None,
@@ -604,7 +598,7 @@ mod tests {
                 };
 
                 let torrent = Torrent {
-                    info: info.clone(),
+                    info,
                     announce: None,
                     announce_list: Some(vec![]),
                     creation_date: None,

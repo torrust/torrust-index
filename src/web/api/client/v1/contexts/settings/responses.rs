@@ -12,7 +12,7 @@ pub struct PublicSettingsResponse {
     pub data: Public,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct Public {
     pub website_name: String,
     pub tracker_url: String,

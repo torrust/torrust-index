@@ -79,8 +79,8 @@ impl TorrentResponse {
         torrent_listing: TorrentListing,
         category: Option<DatabaseCategory>,
         canonical_info_hash_group: &CanonicalInfoHashGroup,
-    ) -> TorrentResponse {
-        TorrentResponse {
+    ) -> Self {
+        Self {
             torrent_id: torrent_listing.torrent_id,
             uploader: torrent_listing.uploader,
             info_hash: torrent_listing.info_hash,

@@ -77,7 +77,7 @@ impl Metadata {
     ///
     /// This function will return an error if any of the metadata fields does
     /// not have a valid format.
-    fn validate_format(
+    const fn validate_format(
         title: &str,
         _description: &str,
         _category_id: CategoryId,

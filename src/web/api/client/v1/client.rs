@@ -16,7 +16,7 @@ pub enum Error {
 
 impl From<reqwest::Error> for Error {
     fn from(err: reqwest::Error) -> Self {
-        Error::HttpError(err)
+        Self::HttpError(err)
     }
 }
 
@@ -41,7 +41,7 @@ impl Client {
     }
 
     #[must_use]
-    pub fn new(connection_info: ConnectionInfo) -> Self {
+    pub const fn new(connection_info: ConnectionInfo) -> Self {
         Self {
             http_client: Http::new(connection_info),
         }

@@ -50,14 +50,14 @@ pub struct TorrentInfoRecordV2 {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, PartialEq, Eq)]
 pub struct TorrentAnnounceUrlV2 {
     pub announce_url_id: i64,
     pub torrent_id: i64,
     pub tracker_url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, sqlx::FromRow, PartialEq, Eq)]
 pub struct TorrentFileV2 {
     pub file_id: i64,
     pub torrent_id: i64,

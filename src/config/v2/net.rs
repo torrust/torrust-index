@@ -11,7 +11,7 @@ use crate::config::Tsl;
 /// the application migth be running behind a proxy. The local socket could be
 /// bound to, for example, port 80 but the application could be exposed publicly
 /// via port 443, which is a very common setup.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Network {
     /// The base URL for the API. For example: `http://localhost`.
     /// If not set, the base URL will be inferred from the request.
@@ -41,23 +41,23 @@ impl Default for Network {
 }
 
 impl Network {
-    fn default_bind_address() -> SocketAddr {
+    const fn default_bind_address() -> SocketAddr {
         SocketAddr::new(Self::default_ip(), Self::default_port())
     }
 
-    fn default_ip() -> IpAddr {
+    const fn default_ip() -> IpAddr {
         IpAddr::V4(Ipv4Addr::UNSPECIFIED)
     }
 
-    fn default_port() -> u16 {
+    const fn default_port() -> u16 {
         3001
     }
 
-    fn default_base_url() -> Option<Url> {
+    const fn default_base_url() -> Option<Url> {
         None
     }
 
-    fn default_tsl() -> Option<Tsl> {
+    const fn default_tsl() -> Option<Tsl> {
         None
     }
 }

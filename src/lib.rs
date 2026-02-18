@@ -312,7 +312,7 @@ where
         T: std::str::FromStr,
     {
         match self {
-            Some(ref s) if !s.as_ref().trim().is_empty() => {
+            Some(s) if !s.as_ref().trim().is_empty() => {
                 let mut acc = vec![];
                 for s in s.as_ref().split(',') {
                     let item = s.trim().parse::<T>().map_err(|_| ())?;

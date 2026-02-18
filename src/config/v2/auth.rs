@@ -3,7 +3,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 /// Authentication options.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Auth {
     /// The secret key used to sign JWT tokens.
     #[serde(default = "Auth::default_user_claim_token_pepper")]
@@ -37,7 +37,7 @@ impl Auth {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ClaimTokenPepper(String);
 
 impl ClaimTokenPepper {
@@ -63,7 +63,7 @@ impl fmt::Display for ClaimTokenPepper {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PasswordConstraints {
     /// The maximum password length.
     #[serde(default = "PasswordConstraints::default_max_password_length")]
@@ -83,11 +83,11 @@ impl Default for PasswordConstraints {
 }
 
 impl PasswordConstraints {
-    fn default_min_password_length() -> usize {
+    const fn default_min_password_length() -> usize {
         6
     }
 
-    fn default_max_password_length() -> usize {
+    const fn default_max_password_length() -> usize {
         64
     }
 }

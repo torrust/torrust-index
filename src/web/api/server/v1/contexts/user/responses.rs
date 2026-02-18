@@ -12,7 +12,7 @@ pub struct NewUser {
 }
 
 /// Response after successfully creating a new user.
-pub fn added_user(user_id: i64) -> Json<OkResponseData<NewUser>> {
+pub const fn added_user(user_id: i64) -> Json<OkResponseData<NewUser>> {
     Json(OkResponseData {
         data: NewUser { user_id },
     })

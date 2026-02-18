@@ -13,7 +13,7 @@ use crate::config::{
     TrackerStatisticsImporter as DomainTrackerStatisticsImporter, Website as DomainWebsite,
 };
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Settings {
     pub website: Website,
     pub tracker: Tracker,
@@ -26,12 +26,12 @@ pub struct Settings {
     pub tracker_statistics_importer: TrackerStatisticsImporter,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Website {
     pub name: String,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Tracker {
     pub url: Url,
     pub listed: bool,
@@ -41,50 +41,50 @@ pub struct Tracker {
     pub token_valid_seconds: u64,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Network {
     pub base_url: Option<String>,
     pub bind_address: SocketAddr,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Auth {
     pub user_claim_token_pepper: String,
     pub password_constraints: PasswordConstraints,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct PasswordConstraints {
     pub min_password_length: usize,
     pub max_password_length: usize,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Database {
     pub connect_url: String,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Mail {
     pub from: String,
     pub reply_to: String,
     pub smtp: Smtp,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Smtp {
     pub server: String,
     pub port: u16,
     pub credentials: Credentials,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Credentials {
     pub username: String,
     pub password: String,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct ImageCache {
     pub max_request_timeout_ms: u64,
     pub capacity: usize,
@@ -93,13 +93,13 @@ pub struct ImageCache {
     pub user_quota_bytes: usize,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Api {
     pub default_torrent_page_size: u8,
     pub max_torrent_page_size: u8,
 }
 
-#[derive(Deserialize, Serialize, PartialEq, Debug, Clone)]
+#[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct TrackerStatisticsImporter {
     pub torrent_info_update_interval: u64,
     port: u16,
@@ -107,7 +107,7 @@ pub struct TrackerStatisticsImporter {
 
 impl From<DomainSettings> for Settings {
     fn from(settings: DomainSettings) -> Self {
-        Settings {
+        Self {
             website: Website::from(settings.website),
             tracker: Tracker::from(settings.tracker),
             net: Network::from(settings.net),

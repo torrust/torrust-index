@@ -164,10 +164,7 @@ impl Database for Sqlite {
         offset: u64,
         limit: u8,
     ) -> Result<UserProfilesResponse, database::Error> {
-        let user_name = match search {
-            None => "%".to_string(),
-            Some(v) => format!("%{v}%"),
-        };
+        let user_name = search.as_ref().map_or_else(|| "%".to_string(), |v| format!("%{v}%"));
 
         let sort_query: String = match sort {
             Some(UsersSorting::DateRegisteredNewest) => "date_registered ASC".to_string(),
@@ -176,7 +173,7 @@ impl Database for Sqlite {
             Some(UsersSorting::UsernameZA) => "username DESC".to_string(),
         };
 
-        let (join_filters, where_filters) = if let Some(filters) = filters {
+        let (join_filters, where_filters) = filters.as_ref().map_or_else(|| (String::new(), String::new()), |filters| {
             let (mut join_filters_query, mut where_filters_query) = (String::new(), String::new());
             for filter in filters {
                 match filter {
@@ -189,9 +186,7 @@ impl Database for Sqlite {
                 }
             }
             (join_filters_query, where_filters_query)
-        } else {
-            (String::new(), String::new())
-        };
+        });
 
         let mut query_string = format!(
             "SELECT 
@@ -392,10 +387,7 @@ impl Database for Sqlite {
         offset: u64,
         limit: u8,
     ) -> Result<TorrentsResponse, database::Error> {
-        let title = match search {
-            None => "%".to_string(),
-            Some(v) => format!("%{v}%"),
-        };
+        let title = search.as_ref().map_or_else(|| "%".to_string(), |v| format!("%{v}%"));
 
         let sort_query: String = match sort {
             Sorting::UploadedAsc => "date_uploaded ASC".to_string(),
@@ -685,19 +677,18 @@ impl Database for Sqlite {
 
         // add HTTP seeds
 
-        let insert_torrent_http_seeds_result: Result<(), database::Error> = if let Some(http_seeds) = &torrent.httpseeds {
-            for seed_url in http_seeds {
-                let () = query("INSERT INTO torrust_torrent_http_seeds (torrent_id, seed_url) VALUES (?, ?)")
-                    .bind(torrent_id)
-                    .bind(seed_url)
-                    .execute(&mut *tx)
-                    .await
-                    .map(|_| ())
-                    .map_err(|_| database::Error::Error)?;
+        let insert_torrent_http_seeds_result: Result<(), database::Error> = {
+            if let Some(http_seeds) = &torrent.httpseeds {
+                for seed_url in http_seeds {
+                    let () = query("INSERT INTO torrust_torrent_http_seeds (torrent_id, seed_url) VALUES (?, ?)")
+                        .bind(torrent_id)
+                        .bind(seed_url)
+                        .execute(&mut *tx)
+                        .await
+                        .map(|_| ())
+                        .map_err(|_| database::Error::Error)?;
+                }
             }
-
-            Ok(())
-        } else {
             Ok(())
         };
 
@@ -709,20 +700,19 @@ impl Database for Sqlite {
 
         // add nodes
 
-        let insert_torrent_nodes_result: Result<(), database::Error> = if let Some(nodes) = &torrent.nodes {
-            for node in nodes {
-                let () = query("INSERT INTO torrust_torrent_nodes (torrent_id, node_ip, node_port) VALUES (?, ?, ?)")
-                    .bind(torrent_id)
-                    .bind(node.0.clone())
-                    .bind(node.1)
-                    .execute(&mut *tx)
-                    .await
-                    .map(|_| ())
-                    .map_err(|_| database::Error::Error)?;
+        let insert_torrent_nodes_result: Result<(), database::Error> = {
+            if let Some(nodes) = &torrent.nodes {
+                for node in nodes {
+                    let () = query("INSERT INTO torrust_torrent_nodes (torrent_id, node_ip, node_port) VALUES (?, ?, ?)")
+                        .bind(torrent_id)
+                        .bind(node.0.clone())
+                        .bind(node.1)
+                        .execute(&mut *tx)
+                        .await
+                        .map(|_| ())
+                        .map_err(|_| database::Error::Error)?;
+                }
             }
-
-            Ok(())
-        } else {
             Ok(())
         };
 

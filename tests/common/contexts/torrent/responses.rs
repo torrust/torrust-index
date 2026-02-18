@@ -10,7 +10,7 @@ pub struct TorrentListResponse {
     pub data: TorrentList,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct TorrentList {
     pub total: u32,
     pub results: Vec<ListItem>,
@@ -22,7 +22,7 @@ impl TorrentList {
     }
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct ListItem {
     pub torrent_id: i64,
     pub uploader: String,
@@ -41,12 +41,12 @@ pub struct ListItem {
     pub encoding: Option<String>,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct TorrentDetailsResponse {
     pub data: TorrentDetails,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct TorrentDetails {
     pub torrent_id: Id,
     pub uploader: String,
@@ -70,49 +70,49 @@ pub struct TorrentDetails {
     pub canonical_info_hash_group: Vec<String>,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct Category {
     pub id: CategoryId,
     pub name: String,
     pub num_torrents: u64,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct Tag {
     pub tag_id: TagId,
     pub name: String,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct File {
     pub path: Vec<String>,
     pub length: u64,
     pub md5sum: Option<String>,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct UploadedTorrentResponse {
     pub data: UploadedTorrent,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct UploadedTorrent {
     pub torrent_id: Id,
     pub canonical_info_hash: String,
     pub info_hash: String,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct DeletedTorrentResponse {
     pub data: DeletedTorrent,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct DeletedTorrent {
     pub torrent_id: Id,
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
+#[derive(Deserialize, PartialEq, Eq, Debug)]
 pub struct UpdatedTorrentResponse {
     pub data: UpdatedTorrent,
 }

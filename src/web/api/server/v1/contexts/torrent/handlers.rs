@@ -77,6 +77,7 @@ pub async fn download_torrent_handler(
 
     debug!("Downloading torrent: {:?}", info_hash.to_hex_string());
 
+    #[allow(if_let_rescope)]
     if let Some(redirect_response) =
         redirect_to_download_url_using_canonical_info_hash_if_needed(&app_data, &info_hash, maybe_user_id).await
     {
@@ -168,15 +169,12 @@ pub async fn get_torrent_info_handler(
         return errors::Request::InvalidInfoHashParam.into_response();
     };
 
-    if let Some(redirect_response) =
-        redirect_to_details_url_using_canonical_info_hash_if_needed(&app_data, &info_hash, maybe_user_id).await
-    {
-        redirect_response
-    } else {
-        match app_data.torrent_service.get_torrent_info(&info_hash, maybe_user_id).await {
+    match redirect_to_details_url_using_canonical_info_hash_if_needed(&app_data, &info_hash, maybe_user_id).await {
+        Some(redirect_response) => redirect_response,
+        _ => match app_data.torrent_service.get_torrent_info(&info_hash, maybe_user_id).await {
             Ok(torrent_response) => Json(OkResponseData { data: torrent_response }).into_response(),
             Err(error) => error.into_response(),
-        }
+        },
     }
 }
 
@@ -328,7 +326,11 @@ async fn build_add_torrent_request_from_payload(mut payload: Multipart) -> Resul
     let mut category = String::new();
     let mut tags: Vec<TagId> = vec![];
 
-    while let Some(mut field) = payload.next_field().await.unwrap() {
+    loop {
+        let next = payload.next_field().await.unwrap();
+        let Some(mut field) = next else {
+            break;
+        };
         let name = field.name().unwrap();
 
         match name {
@@ -368,11 +370,14 @@ async fn build_add_torrent_request_from_payload(mut payload: Multipart) -> Resul
                     return Err(errors::Request::InvalidFileType);
                 }
 
-                while let Some(chunk) = field
-                    .chunk()
-                    .await
-                    .map_err(|_| errors::Request::CannotReadChunkFromUploadedBinary)?
-                {
+                loop {
+                    let chunk_result = field
+                        .chunk()
+                        .await
+                        .map_err(|_| errors::Request::CannotReadChunkFromUploadedBinary)?;
+                    let Some(chunk) = chunk_result else {
+                        break;
+                    };
                     torrent_cursor
                         .write_all(&chunk)
                         .map_err(|_| errors::Request::CannotWriteChunkFromUploadedBinary)?;

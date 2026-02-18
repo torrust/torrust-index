@@ -114,7 +114,7 @@ impl FromStr for Username {
         let re = Regex::new(&pattern).expect("username regexp should be valid");
 
         if re.is_match(s) {
-            Ok(Username(s.to_string()))
+            Ok(Self(s.to_string()))
         } else {
             Err(UsernameParseError {
                 message: format!("'{s}' is not a valid username. {USERNAME_VALIDATION_ERROR_MSG}."),

@@ -36,7 +36,7 @@ impl BinaryFile {
     /// - The file can't be read.
     #[must_use]
     pub fn from_file_at_path(path: &Path) -> Self {
-        BinaryFile {
+        Self {
             name: path.file_name().unwrap().to_owned().into_string().unwrap(),
             contents: fs::read(path).unwrap(),
         }
@@ -44,14 +44,16 @@ impl BinaryFile {
 
     /// Build the binary file directly from the binary data provided.
     #[must_use]
-    pub fn from_bytes(name: String, contents: Vec<u8>) -> Self {
-        BinaryFile { name, contents }
+    pub const fn from_bytes(name: String, contents: Vec<u8>) -> Self {
+        Self { name, contents }
     }
 }
 
-impl From<UploadTorrentMultipartForm> for Form {
-    fn from(form: UploadTorrentMultipartForm) -> Self {
-        Form::new()
+impl TryFrom<UploadTorrentMultipartForm> for Form {
+    type Error = reqwest::Error;
+
+    fn try_from(form: UploadTorrentMultipartForm) -> Result<Self, Self::Error> {
+        Ok(Self::new()
             .text("title", form.title)
             .text("description", form.description)
             .text("category", form.category)
@@ -59,8 +61,7 @@ impl From<UploadTorrentMultipartForm> for Form {
                 "torrent",
                 reqwest::multipart::Part::bytes(form.torrent_file.contents)
                     .file_name(form.torrent_file.name)
-                    .mime_str("application/x-bittorrent")
-                    .unwrap(),
-            )
+                    .mime_str("application/x-bittorrent")?,
+            ))
     }
 }

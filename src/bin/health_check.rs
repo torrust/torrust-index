@@ -24,7 +24,9 @@ async fn main() {
 
     let client = Client::builder().timeout(Duration::from_secs(5)).build().unwrap();
 
-    match client.get(url).send().await {
+    let result = client.get(url).send().await;
+
+    match result {
         Ok(response) => {
             if response.status().is_success() {
                 println!("STATUS: {}", response.status());

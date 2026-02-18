@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Core configuration for the API
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Api {
     /// The default page size for torrent lists.
     #[serde(default = "Api::default_default_torrent_page_size")]
@@ -23,28 +23,28 @@ pub struct Api {
 impl Default for Api {
     fn default() -> Self {
         Self {
-            default_torrent_page_size: Api::default_default_torrent_page_size(),
-            max_torrent_page_size: Api::default_max_torrent_page_size(),
-            default_user_profile_page_size: Api::default_user_profile_page_size(),
-            max_user_profile_page_size: Api::default_max_user_profile_page_size(),
+            default_torrent_page_size: Self::default_default_torrent_page_size(),
+            max_torrent_page_size: Self::default_max_torrent_page_size(),
+            default_user_profile_page_size: Self::default_user_profile_page_size(),
+            max_user_profile_page_size: Self::default_max_user_profile_page_size(),
         }
     }
 }
 
 impl Api {
-    fn default_default_torrent_page_size() -> u8 {
+    const fn default_default_torrent_page_size() -> u8 {
         10
     }
 
-    fn default_max_torrent_page_size() -> u8 {
+    const fn default_max_torrent_page_size() -> u8 {
         100
     }
 
-    fn default_user_profile_page_size() -> u8 {
+    const fn default_user_profile_page_size() -> u8 {
         10
     }
 
-    fn default_max_user_profile_page_size() -> u8 {
+    const fn default_max_user_profile_page_size() -> u8 {
         100
     }
 }

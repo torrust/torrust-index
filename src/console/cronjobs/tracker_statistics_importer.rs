@@ -117,7 +117,7 @@ pub fn start(
                 error!("Failed to send heartbeat from importer cronjob: {}", e);
             }
 
-            if let Some(statistics_importer) = weak_tracker_statistics_importer.upgrade() {
+            match weak_tracker_statistics_importer.upgrade() { Some(statistics_importer) => {
                 let one_interval_ago = seconds_ago_utc(
                     torrent_stats_update_interval
                         .try_into()
@@ -140,9 +140,9 @@ pub fn start(
                 }
 
                 drop(statistics_importer);
-            } else {
+            } _ => {
                 break;
-            }
+            }}
 
             execution_interval.tick().await;
         }
@@ -170,6 +170,7 @@ async fn heartbeat_handler(State(state): State<Arc<ImporterState>>) -> Json<Valu
     let now = Utc::now();
     let mut last_heartbeat = state.last_heartbeat.lock().unwrap();
     *last_heartbeat = now;
+    drop(last_heartbeat);
     Json(json!({ "status": "Heartbeat received" }))
 }
 

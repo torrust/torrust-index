@@ -21,9 +21,9 @@ enum UserRole {
 impl fmt::Display for UserRole {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let role_str = match self {
-            UserRole::Admin => "admin",
-            UserRole::Registered => "registered",
-            UserRole::Guest => "guest",
+            Self::Admin => "admin",
+            Self::Registered => "registered",
+            Self::Guest => "guest",
         };
         write!(f, "{role_str}")
     }
@@ -83,6 +83,7 @@ impl Service {
         let authorize = enforcer
             .enforce((&role, action))
             .map_err(|_| ServiceError::UnauthorizedAction)?;
+        drop(enforcer);
 
         if authorize {
             Ok(())

@@ -61,7 +61,7 @@ pub struct VerifyClaims {
 }
 
 impl Service {
-    pub async fn new(cfg: Arc<Configuration>) -> Service {
+    pub async fn new(cfg: Arc<Configuration>) -> Self {
         let mailer = Arc::new(Self::get_mailer(&cfg).await);
 
         Self { cfg, mailer }
@@ -144,10 +144,12 @@ impl Service {
 
         let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(key)).unwrap();
 
-        let base_url = match &settings.net.base_url {
-            Some(url) => url.to_string(),
-            None => base_url.to_string(),
-        };
+        let base_url = settings
+            .net
+            .base_url
+            .as_ref()
+            .map_or_else(|| base_url.to_string(), std::string::ToString::to_string);
+        drop(settings);
 
         format!("{base_url}/{API_VERSION_URL_PREFIX}/user/email/verify/{token}")
     }

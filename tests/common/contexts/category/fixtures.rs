@@ -4,7 +4,7 @@ pub fn software_category_name() -> String {
     "software".to_string()
 }
 
-pub fn software_predefined_category_id() -> i64 {
+pub const fn software_predefined_category_id() -> i64 {
     5
 }
 

@@ -39,7 +39,7 @@ impl TextResponse {
     }
 
     #[must_use]
-    pub fn is_ok(&self) -> bool {
+    pub const fn is_ok(&self) -> bool {
         self.status == 200
     }
 }
@@ -91,7 +91,7 @@ impl BinaryResponse {
     }
 
     #[must_use]
-    pub fn is_ok(&self) -> bool {
+    pub const fn is_ok(&self) -> bool {
         self.status == 200
     }
 }

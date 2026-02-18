@@ -11,7 +11,7 @@ pub struct ConnectionInfo {
 
 impl ConnectionInfo {
     #[must_use]
-    pub fn new(url: Url, token: String) -> Self {
+    pub const fn new(url: Url, token: String) -> Self {
         Self { url, token }
     }
 }

@@ -8,11 +8,11 @@ pub struct Query {
 }
 
 impl Query {
-    pub fn empty() -> Self {
+    pub const fn empty() -> Self {
         Self { params: vec![] }
     }
 
-    pub fn with_params(params: Vec<QueryParam>) -> Self {
+    pub const fn with_params(params: Vec<QueryParam>) -> Self {
         Self { params }
     }
 

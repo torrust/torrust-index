@@ -43,7 +43,7 @@ pub enum TrackerAPIError {
     FailedToParseTrackerResponse { body: String },
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TorrentInfo {
     pub info_hash: String,
     pub seeders: i64,
@@ -52,7 +52,7 @@ pub struct TorrentInfo {
     pub peers: Vec<Peer>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TorrentBasicInfo {
     pub info_hash: String,
     pub seeders: i64,
@@ -60,7 +60,7 @@ pub struct TorrentBasicInfo {
     pub leechers: i64,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Peer {
     pub peer_id: Option<PeerId>,
     pub peer_addr: Option<String>,
@@ -71,7 +71,7 @@ pub struct Peer {
     pub event: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PeerId {
     pub id: Option<String>,
     pub client: Option<String>,
@@ -88,7 +88,7 @@ impl Service {
     /// # Panics
     ///
     /// Will panic if it can't build a Tracker API client.
-    pub async fn new(cfg: Arc<Configuration>, database: Arc<Box<dyn Database>>) -> Service {
+    pub async fn new(cfg: Arc<Configuration>, database: Arc<Box<dyn Database>>) -> Self {
         let settings = cfg.settings.read().await;
         let api_client = Client::new(ConnectionInfo::new(
             settings.tracker.api_url.clone(),
@@ -98,7 +98,7 @@ impl Service {
         let token_valid_seconds = settings.tracker.token_valid_seconds;
         let tracker_url = settings.tracker.url.clone();
         drop(settings);
-        Service {
+        Self {
             database,
             api_client,
             token_valid_seconds,

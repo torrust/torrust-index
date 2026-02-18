@@ -2,7 +2,7 @@ use lettre::message::Mailbox;
 use serde::{Deserialize, Serialize};
 
 /// SMTP configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Mail {
     /// The email address to send emails from.
     #[serde(default = "Mail::default_from")]
@@ -42,7 +42,7 @@ impl Mail {
 }
 
 /// SMTP configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Smtp {
     /// The SMTP port to use.
     #[serde(default = "Smtp::default_port")]
@@ -70,7 +70,7 @@ impl Smtp {
         String::default()
     }
 
-    fn default_port() -> u16 {
+    const fn default_port() -> u16 {
         25
     }
 
@@ -80,7 +80,7 @@ impl Smtp {
 }
 
 /// SMTP configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Credentials {
     /// The password to use for SMTP authentication.
     #[serde(default = "Credentials::default_password")]
