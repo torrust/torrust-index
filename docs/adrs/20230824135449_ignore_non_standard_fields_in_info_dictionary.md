@@ -135,4 +135,4 @@ pub struct TorrentInfo {
 
 ## Other considerations
 
-The source field migth be considered a non-standard field, because it's not included in any BEP, but this field is being parsed and stored in the database since it seems to be widely used by private trackers.
+The source field might be considered a non-standard field, because it's not included in any BEP, but this field is being parsed and stored in the database since it seems to be widely used by private trackers.

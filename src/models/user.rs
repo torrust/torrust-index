@@ -73,7 +73,7 @@ pub struct UserClaims {
     pub exp: u64, // epoch in seconds
 }
 
-const MAX_USERNAME_LENGTH: usize = 20;
+pub(crate) const MAX_USERNAME_LENGTH: usize = 20;
 const USERNAME_VALIDATION_ERROR_MSG: &str = "Usernames must consist of 1-20 alphanumeric characters, dashes, or underscore";
 
 #[derive(Debug, Clone)]
@@ -92,6 +92,15 @@ impl fmt::Display for UsernameParseError {
 impl std::error::Error for UsernameParseError {}
 
 pub struct Username(String);
+
+impl Username {
+    /// Creates a `Username` directly without validation.
+    /// Intended for test helpers and internal use.
+    #[cfg(test)]
+    pub(crate) fn new(s: &str) -> Self {
+        Self(s.to_string())
+    }
+}
 
 impl fmt::Display for Username {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -120,34 +129,5 @@ impl FromStr for Username {
                 message: format!("'{s}' is not a valid username. {USERNAME_VALIDATION_ERROR_MSG}."),
             })
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn username_must_consist_of_1_to_20_alphanumeric_characters_or_dashes() {
-        let username_str = "validUsername123";
-        assert!(username_str.parse::<Username>().is_ok());
-    }
-
-    #[test]
-    fn username_should_be_shorter_then_21_chars() {
-        let username_str = "a".repeat(MAX_USERNAME_LENGTH + 1);
-        assert!(username_str.parse::<Username>().is_err());
-    }
-
-    #[test]
-    fn username_should_not_allow_invalid_characters() {
-        let username_str = "invalid*Username";
-        assert!(username_str.parse::<Username>().is_err());
-    }
-
-    #[test]
-    fn username_should_be_displayed() {
-        let username = Username("FirstLast-01".to_string());
-        assert_eq!(username.to_string(), "FirstLast-01");
     }
 }

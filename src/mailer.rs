@@ -1,8 +1,7 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use jsonwebtoken::{encode, EncodingKey, Header};
-use lazy_static::lazy_static;
 use lettre::message::{MessageBuilder, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
@@ -15,23 +14,21 @@ use crate::errors::ServiceError;
 use crate::utils::clock;
 use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 
-lazy_static! {
-    pub static ref TEMPLATES: Tera = {
-        let mut tera = Tera::default();
+pub static TEMPLATES: LazyLock<Tera> = LazyLock::new(|| {
+    let mut tera = Tera::default();
 
-        match tera.add_template_file("templates/verify.html", Some("html_verify_email")) {
-            Ok(()) => {}
-            Err(e) => {
-                println!("Parsing error(s): {e}");
-                ::std::process::exit(1);
-            }
+    match tera.add_template_file("templates/verify.html", Some("html_verify_email")) {
+        Ok(()) => {}
+        Err(e) => {
+            println!("Parsing error(s): {e}");
+            ::std::process::exit(1);
         }
+    }
 
-        tera.autoescape_on(vec![".html", ".sql"]);
-        tera.register_filter("do_nothing", do_nothing_filter);
-        tera
-    };
-}
+    tera.autoescape_on(vec![".html", ".sql"]);
+    tera.register_filter("do_nothing", do_nothing_filter);
+    tera
+});
 
 /// This function is a dummy filter for tera.
 ///
@@ -155,7 +152,7 @@ impl Service {
     }
 }
 
-fn build_letter(verification_url: &str, username: &str, builder: MessageBuilder) -> Result<Message, ServiceError> {
+pub(crate) fn build_letter(verification_url: &str, username: &str, builder: MessageBuilder) -> Result<Message, ServiceError> {
     let (plain_body, html_body) = build_content(verification_url, username).map_err(|e| {
         tracing::error!("{e}");
         ServiceError::InternalServerError
@@ -179,7 +176,7 @@ fn build_letter(verification_url: &str, username: &str, builder: MessageBuilder)
         .expect("the `multipart` builder had an error"))
 }
 
-fn build_content(verification_url: &str, username: &str) -> Result<(String, String), tera::Error> {
+pub(crate) fn build_content(verification_url: &str, username: &str) -> Result<(String, String), tera::Error> {
     let plain_body = format!(
         "
                 Welcome to Torrust, {username}!
@@ -198,27 +195,3 @@ fn build_content(verification_url: &str, username: &str) -> Result<(String, Stri
 }
 
 pub type Mailer = AsyncSmtpTransport<Tokio1Executor>;
-
-#[cfg(test)]
-mod tests {
-    use lettre::Message;
-
-    use super::{build_content, build_letter};
-
-    #[test]
-    fn it_should_build_a_letter() {
-        let builder = Message::builder()
-            .from("from@a.b.c".parse().unwrap())
-            .reply_to("reply@a.b.c".parse().unwrap())
-            .to("to@a.b.c".parse().unwrap());
-
-        let _letter = build_letter("https://a.b.c/", "user", builder).unwrap();
-    }
-
-    #[test]
-    fn it_should_build_content() {
-        let (plain_body, html_body) = build_content("https://a.b.c/", "user").unwrap();
-        assert_ne!(plain_body, "");
-        assert_ne!(html_body, "");
-    }
-}

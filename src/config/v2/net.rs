@@ -8,7 +8,7 @@ use crate::config::Tsl;
 /// The the base URL for the API.
 ///
 /// NOTICE: that `port` and por in `base_url` does not necessarily match because
-/// the application migth be running behind a proxy. The local socket could be
+/// the application might be running behind a proxy. The local socket could be
 /// bound to, for example, port 80 but the application could be exposed publicly
 /// via port 443, which is a very common setup.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

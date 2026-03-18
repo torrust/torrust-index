@@ -1,0 +1,23 @@
+[package]
+description = "Render short text strings as PNG images with no system dependencies."
+keywords = ["image", "rendering", "text", "library"]
+name = "torrust-index-render-text-as-image"
+readme = "README.md"
+
+authors.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version = "0.1.0"
+
+[lints]
+workspace = true
+
+[dependencies]
+# §ADR R-001 — Option A
+ab_glyph = "0.2"
+image = { version = "0.25", default-features = false, features = ["png"] }

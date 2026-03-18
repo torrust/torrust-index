@@ -111,14 +111,3 @@ impl fmt::Display for ApiToken {
         write!(f, "{}", self.0)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::ApiToken;
-
-    #[test]
-    #[should_panic(expected = "tracker API token cannot be empty")]
-    fn apai_token_can_not_be_empty() {
-        drop(ApiToken::new(""));
-    }
-}

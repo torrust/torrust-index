@@ -16,7 +16,7 @@
 //! purpose proxy. It is only intended to be used for the images in the
 //! torrent descriptions.
 //!
-//! **NOTICE:** Ununauthorized users can't see images. They will get an image
+//! **NOTICE:** Unauthorized users can't see images. They will get an image
 //! with the text "Sign in to see image" instead.
 //!
 //! # Example

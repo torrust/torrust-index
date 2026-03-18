@@ -1,3 +1,6 @@
+[workspace]
+members = [".", "packages/located-error", "packages/render-text-as-image"]
+
 [package]
 default-run = "torrust-index"
 name = "torrust-index"
@@ -26,14 +29,18 @@ keywords = ["bittorrent", "file-sharing", "index", "peer-to-peer", "torrent"]
 license = "AGPL-3.0-only"
 publish = true
 repository = "https://github.com/torrust/torrust-tracker"
-rust-version = "1.72"
+rust-version = "1.80"
 version = "3.0.0-develop"
+
+[features]
+default = []
 
 [profile.dev.package.sqlx-macros]
 opt-level = 3
 
 [dependencies]
 torrust-index-located-error = { version = "3.0.0-develop", path = "packages/located-error" }
+torrust-index-render-text-as-image = { version = "0.1.0", path = "packages/render-text-as-image" }
 
 anyhow = "1"
 argon2 = "0"
@@ -58,7 +65,6 @@ hyper = "1"
 hyper-util = { version = "0", features = ["http1", "http2", "tokio"] }
 indexmap = "2"
 jsonwebtoken = "9"
-lazy_static = "1"
 lettre = { version = "0", features = [
     "builder",
     "file-transport-envelope",
@@ -84,7 +90,6 @@ sha-1 = "0"
 sqlx = { version = "0", features = ["migrate", "mysql", "runtime-tokio-native-tls", "sqlite", "time"] }
 tera = { version = "1", default-features = false }
 text-colorizer = "1"
-text-to-png = "0"
 thiserror = "1"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "0"
@@ -101,13 +106,13 @@ tempfile = "3"
 which = "6"
 
 [package.metadata.cargo-machete]
-ignored = ["futures"]
+ignored = ["futures", "torrust-sentinel"]
 
 [lints]
 workspace = true
 
 [workspace.lints.rust]
-warnings = { level = "deny", priority = -1 }
+deprecated-safe = { level = "deny", priority = -1 }
 future-incompatible = { level = "deny", priority = -1 }
 let-underscore = { level = "deny", priority = -1 }
 nonstandard-style = { level = "deny", priority = -1 }
@@ -115,9 +120,9 @@ rust-2018-compatibility = { level = "deny", priority = -1 }
 rust-2018-idioms = { level = "deny", priority = -1 }
 rust-2021-compatibility = { level = "deny", priority = -1 }
 rust-2024-compatibility = { level = "warn", priority = -1 }
-unused = { level = "deny", priority = -2 }
-deprecated-safe = { level = "deny", priority = -1 }
 unsafe-code = "warn"
+unused = { level = "deny", priority = -2 }
+warnings = { level = "deny", priority = -1 }
 
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }

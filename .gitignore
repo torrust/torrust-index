@@ -8,3 +8,5 @@
 /storage/
 /target
 /uploads/
+**/*report.txt
+**/*report.diff

@@ -85,7 +85,7 @@ impl Service {
     }
 }
 
-fn extract_public_settings(settings: &Settings) -> ConfigurationPublic {
+pub(crate) fn extract_public_settings(settings: &Settings) -> ConfigurationPublic {
     let email_on_signup = settings
         .registration
         .as_ref()
@@ -113,12 +113,12 @@ fn extract_public_settings(settings: &Settings) -> ConfigurationPublic {
 /// There is an endpoint to get this configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConfigurationPublic {
-    website_name: String,
-    tracker_url: Url,
-    tracker_listed: bool,
-    tracker_private: bool,
-    email_on_signup: EmailOnSignup,
-    website: Website,
+    pub(crate) website_name: String,
+    pub(crate) tracker_url: Url,
+    pub(crate) tracker_listed: bool,
+    pub(crate) tracker_private: bool,
+    pub(crate) email_on_signup: EmailOnSignup,
+    pub(crate) website: Website,
 }
 
 /// Whether the email is required on signup or not.
@@ -243,42 +243,5 @@ impl Markdown {
 impl From<config::Markdown> for Markdown {
     fn from(markdown: config::Markdown) -> Self {
         Self::new(&markdown.source())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::config::Configuration;
-    use crate::services::settings::{extract_public_settings, ConfigurationPublic, EmailOnSignup};
-
-    #[tokio::test]
-    async fn configuration_should_return_only_public_settings() {
-        let configuration = Configuration::default();
-        let all_settings = configuration.get_all().await;
-
-        let email_on_signup = all_settings
-            .registration
-            .as_ref()
-            .map_or(EmailOnSignup::NotIncluded, |registration| {
-                registration.email.as_ref().map_or(EmailOnSignup::NotIncluded, |email| {
-                    if email.required {
-                        EmailOnSignup::Required
-                    } else {
-                        EmailOnSignup::Optional
-                    }
-                })
-            });
-
-        assert_eq!(
-            extract_public_settings(&all_settings),
-            ConfigurationPublic {
-                website_name: all_settings.website.name.clone(),
-                tracker_url: all_settings.tracker.url,
-                tracker_listed: all_settings.tracker.listed,
-                tracker_private: all_settings.tracker.private,
-                email_on_signup,
-                website: all_settings.website.into(),
-            }
-        );
     }
 }
