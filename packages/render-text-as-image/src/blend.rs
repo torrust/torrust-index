@@ -53,4 +53,20 @@ mod tests {
         blend_source_over(&mut dst, [200, 200, 200, 255], 0);
         assert_eq!(dst, original);
     }
+
+    #[test]
+    fn both_fully_transparent_stays_transparent() {
+        let mut dst = Rgba([0, 0, 0, 0]);
+        blend_source_over(&mut dst, [255, 255, 255, 0], 0);
+        assert_eq!(dst, Rgba([0, 0, 0, 0]));
+    }
+
+    #[test]
+    fn semi_transparent_blend() {
+        let mut dst = Rgba([0, 0, 0, 255]);
+        blend_source_over(&mut dst, [255, 255, 255, 255], 128);
+        // After blending, the pixel should be a mid-grey.
+        assert!(dst.0[0] > 100 && dst.0[0] < 200);
+        assert_eq!(dst.0[3], 255);
+    }
 }
