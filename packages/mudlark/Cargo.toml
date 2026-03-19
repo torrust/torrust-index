@@ -1,0 +1,61 @@
+[package]
+categories = ["algorithms", "data-structures"]
+description = "φ-Bounded Geometric-Value Graph"
+keywords = ["adaptive", "data-structure", "dual-tree", "sampling", "spatial-index"]
+name = "torrust-mudlark"
+readme = "README.md"
+version = "1.0.0"
+
+authors.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["dynamic-contour-tracking", "rand", "serde"]
+dynamic-contour-tracking = []
+rand = ["dep:rand_core"]
+serde = ["dep:serde"]
+
+[dependencies]
+rand_core = { version = "0.10", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+tracing = "0"
+
+[dev-dependencies]
+criterion = { version = "0", features = ["html_reports"] }
+rand_core = { version = "0.10" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing-subscriber = { version = "0", features = ["env-filter"] }
+
+[[bench]]
+harness = false
+name = "observe"
+
+[[bench]]
+harness = false
+name = "query"
+
+[[bench]]
+harness = false
+name = "extract"
+
+[[bench]]
+harness = false
+name = "lifecycle"
+
+[[bench]]
+harness = false
+name = "spray"
+
+[[bench]]
+harness = false
+name = "pathological"

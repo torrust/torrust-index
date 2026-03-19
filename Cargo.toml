@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "packages/render-text-as-image"]
+members = [".", "packages/render-text-as-image", "packages/mudlark"]
 
 [package]
 default-run = "torrust-index"
