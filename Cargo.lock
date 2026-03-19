@@ -4084,7 +4084,7 @@ dependencies = [
  "tempfile",
  "tera",
  "text-colorizer",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tokio",
  "toml 1.0.7+spec-1.1.0",
  "torrust-index-located-error",
@@ -4103,7 +4103,7 @@ dependencies = [
 name = "torrust-index-located-error"
 version = "3.0.0-develop"
 dependencies = [
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
  "tracing",
 ]
 
