@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io::ErrorKind;
 use std::sync::{Arc, LazyLock};
 
 use jsonwebtoken::{encode, EncodingKey, Header};
@@ -14,10 +15,25 @@ use crate::errors::ServiceError;
 use crate::utils::clock;
 use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 
+/// Default verify-email template, compiled into the binary.
+const VERIFY_EMAIL_DEFAULT: &str = include_str!("../templates/verify.html");
+
 pub static TEMPLATES: LazyLock<Tera> = LazyLock::new(|| {
     let mut tera = Tera::default();
 
-    match tera.add_template_file("templates/verify.html", Some("html_verify_email")) {
+    // Allow deployers to override the template by placing a file at
+    // `templates/verify.html` relative to the working directory.
+    // Falls back to the compiled-in default when the file is absent.
+    let template = match std::fs::read_to_string("templates/verify.html") {
+        Ok(contents) => contents,
+        Err(err) if err.kind() == ErrorKind::NotFound => VERIFY_EMAIL_DEFAULT.to_string(),
+        Err(err) => {
+            eprintln!("Failed to read templates/verify.html: {err}");
+            ::std::process::exit(1);
+        }
+    };
+
+    match tera.add_raw_template("html_verify_email", &template) {
         Ok(()) => {}
         Err(e) => {
             println!("Parsing error(s): {e}");
