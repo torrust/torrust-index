@@ -53,7 +53,7 @@ camino = { version = "1", features = ["serde"] }
 casbin = "2"
 chrono = { version = "0", default-features = false, features = ["clock"] }
 clap = { version = "4", features = ["derive", "env"] }
-derive_more = { version = "1", features = ["display", "error"] }
+derive_more = { version = "2", features = ["display", "error"] }
 email_address = "0"
 figment = { version = "0", features = ["env", "test", "toml"] }
 futures = "0"
