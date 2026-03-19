@@ -297,6 +297,9 @@ pub mod upgrades;
 pub mod utils;
 pub mod web;
 
+#[cfg(test)]
+mod tests;
+
 trait AsCSV {
     fn as_csv<T>(&self) -> Result<Option<Vec<T>>, ()>
     where

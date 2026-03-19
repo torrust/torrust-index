@@ -646,7 +646,7 @@ pub struct DbTorrentInfoHash {
 
 /// All the infohashes associated to a canonical one.
 ///
-/// When you upload a torrent the info-hash migth change because the Index
+/// When you upload a torrent the info-hash might change because the Index
 /// remove the non-standard fields in the `info` dictionary. That makes the
 /// infohash change. The canonical infohash is the resulting infohash.
 /// This function returns the original infohashes of a canonical infohash.

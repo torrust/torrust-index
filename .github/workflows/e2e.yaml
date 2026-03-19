@@ -1,4 +1,4 @@
-# Temporary execution of E2E tests using MySQL becuase it's failing
+# Temporary execution of E2E tests using MySQL because it's failing
 # in the `testing.yml` workflows and affects deployments and releases.
 # See https://github.com/torrust/torrust-index/issues/580
 name: E2E Testing

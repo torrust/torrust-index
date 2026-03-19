@@ -31,11 +31,8 @@ fn main() -> io::Result<()> {
                 println!("Parsed torrent: \n{torrent:#?}");
                 Ok(())
             }
-            Err(e) => Err(io::Error::new(io::ErrorKind::Other, format!("Error: invalid torrent!. {e}"))),
+            Err(e) => Err(io::Error::other(format!("Error: invalid torrent!. {e}"))),
         },
-        Err(e) => Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("Error: invalid bencode data!. {e}"),
-        )),
+        Err(e) => Err(io::Error::other(format!("Error: invalid bencode data!. {e}"))),
     }
 }

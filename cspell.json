@@ -1,6 +1,7 @@
 {
-  "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
+  "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/refs/heads/main/cspell.schema.json",
   "version": "0.2",
+  "language": "en,en-GB,en-US",
   "dictionaryDefinitions": [
     {
       "name": "project-words",
@@ -8,6 +9,15 @@
       "addWords": true
     }
   ],
-  "dictionaries": ["project-words"],
-  "ignorePaths": ["target", "/project-words.txt"]
+  "dictionaries": [
+    "project-words",
+    "en_US",
+    "en-gb",
+    "softwareTerms",
+    "latex"
+  ],  "ignoreRegExpList": [
+    "/[a-zA-Z0-9_.~%-]+%[0-9A-Fa-f]{2}[a-zA-Z0-9_.~%-]*/g",
+    "/[\\p{Modifier_Letter}\\p{Nonspacing_Mark}\\u2080-\\u209F\\u2090-\\u209C]+/gu"
+  ],
+  "words": ["Nonspacing"],  "ignorePaths": ["target", "/project-words.txt", ".github/labels.json"]
 }

@@ -91,14 +91,3 @@ impl PasswordConstraints {
         64
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::ClaimTokenPepper;
-
-    #[test]
-    #[should_panic(expected = "secret key cannot be empty")]
-    fn secret_key_can_not_be_empty() {
-        drop(ClaimTokenPepper::new(""));
-    }
-}
