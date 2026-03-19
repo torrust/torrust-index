@@ -15,7 +15,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - id: setup
         name: Setup Toolchain
@@ -44,7 +44,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - id: setup
         name: Setup Toolchain
@@ -97,7 +97,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - id: setup
         name: Setup Toolchain
@@ -134,7 +134,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - id: setup
         name: Setup Toolchain
