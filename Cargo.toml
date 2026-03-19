@@ -53,7 +53,7 @@ camino = { version = "1", features = ["serde"] }
 casbin = "2"
 chrono = { version = "0", default-features = false, features = ["clock"] }
 clap = { version = "4", features = ["derive", "env"] }
-derive_more = { version = "1", features = ["display", "error"] }
+derive_more = { version = "2", features = ["display", "error"] }
 email_address = "0"
 figment = { version = "0", features = ["env", "test", "toml"] }
 futures = "0"
@@ -64,7 +64,7 @@ http-body = "1"
 hyper = "1"
 hyper-util = { version = "0", features = ["http1", "http2", "tokio"] }
 indexmap = "2"
-jsonwebtoken = "9"
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 lettre = { version = "0", features = [
     "builder",
     "file-transport-envelope",
@@ -90,9 +90,9 @@ sha-1 = "0"
 sqlx = { version = "0", features = ["migrate", "mysql", "runtime-tokio-native-tls", "sqlite", "time"] }
 tera = { version = "1", default-features = false }
 text-colorizer = "1"
-thiserror = "1"
+thiserror = "2"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
-toml = "0"
+toml = "1"
 tower = { version = "0", features = ["timeout"] }
 tower-http = { version = "0", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
 tracing = "0"
@@ -103,7 +103,7 @@ uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 tempfile = "3"
-which = "6"
+which = "8"
 
 [package.metadata.cargo-machete]
 ignored = ["futures", "torrust-sentinel"]
