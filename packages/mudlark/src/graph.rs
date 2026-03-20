@@ -12,70 +12,32 @@ use std::collections::BTreeMap;
 use std::sync::atomic::AtomicU32;
 
 use crate::arena::Arena;
-use crate::gnode::{GNode, GState};
+use crate::gnode::GNode;
 use crate::handle::{GNodeId, VNodeId};
 #[cfg(feature = "dynamic-contour-tracking")]
 use crate::plateau::{BasisEdge, Plateau, PlateauBasis};
 use crate::traits::{Accumulator, Coordinate};
+use crate::view::Node;
 use crate::vnode::VNode;
 
 // ── Surface 1 view type (ADR-M-036 D2) ────────────────────────────
 
-/// Snapshot of a G-node's spatial extent, accumulation, and
-/// tree-structural neighbours.
+/// Current child handles of a G-node (left, right).
 ///
-/// Returned by [`GvGraph::gnode_info()`]. All fields are values
-/// captured at call time — the snapshot does not borrow the graph.
+/// Returned by [`GvGraph::gnode_children()`]. All handles are live at
+/// snapshot time but may become stale after graph mutations
+/// (`observe()`, `decay()`). Intended for single-pass tree walks
+/// within a read-only borrow of the graph.
 ///
-/// The `left`, `right`, and `parent` handles are live at snapshot
-/// time but may become stale after graph mutations (`observe()`,
-/// `decay()`). They are intended for single-pass tree walks within
-/// a read-only borrow of the graph, not for long-lived caching.
-///
-/// # Examples
-///
-/// ```
-/// use torrust_mudlark::{Config, GvGraph, GNodeInfo};
-///
-/// let cfg = Config {
-///     split_threshold: 5u64,
-///     depth_create: 3,
-///     depth_evict: 6,
-///     budget: None,
-///     alpha_relax: 0.75,
-///     bounded_eviction: true,
-/// };
-/// let mut g = GvGraph::<u64, u64, 8>::new(cfg);
-/// g.observe(42, 10u64);
-///
-/// let root_info = g.gnode_info(g.g_root()).unwrap();
-/// // Root covers the full domain.
-/// assert_eq!(root_info.start, 0);
-/// assert_eq!(root_info.end, 256);
-/// // Root has no parent.
-/// assert!(root_info.parent.is_none());
-/// ```
+/// For the stable parent pointer, see [`Node::parent`](crate::Node::parent)
+/// (returned by [`GvGraph::gnode_info()`]).
+#[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GNodeInfo<C: Coordinate, V: Accumulator> {
-    /// Lower bound of the dyadic range (inclusive).
-    pub start: C,
-    /// Upper bound of the dyadic range (exclusive).
-    pub end: C,
-    /// Direct accumulation at this node.
-    pub own: V,
-    /// Total value: `own + children.sum`.
-    pub sum: V,
-    /// G-Tree depth of this node.
-    pub depth: u32,
-    /// Categorical state at snapshot time.
-    pub state: GState,
+pub struct GNodeChildren {
     /// Left child G-node, if any.
     pub left: Option<GNodeId>,
     /// Right child G-node, if any.
     pub right: Option<GNodeId>,
-    /// Parent G-node. `None` for the root.
-    pub parent: Option<GNodeId>,
 }
 
 /// Configure how a [`GvGraph`] grows, splits, and prunes
@@ -191,12 +153,13 @@ pub struct Config<V: Accumulator> {
     /// Lower values produce finer spatial resolution at the cost of
     /// more nodes; higher values keep the tree coarser.
     pub split_threshold: V,
-    /// Maximum V-Tree depth at which new splits are allowed.
+    /// Initial maximum V-Tree depth at which new splits are allowed.
     ///
     /// Controls how deep the tree can grow: entries deeper than this
-    /// in the V-Tree cannot create children.  Adjusted automatically
-    /// by dynamic depth control when a [`budget`](Self::budget) is
-    /// set and node pressure changes.
+    /// in the V-Tree cannot create children.  Provides the initial
+    /// value for [`GvGraph::depth_create`]; dynamic depth control
+    /// adjusts the live gate on the graph when a
+    /// [`budget`](Self::budget) is set and node pressure changes.
     pub depth_create: u32,
     /// Minimum V-Tree depth at which entries become eligible for eviction
     ///
@@ -325,7 +288,7 @@ pub fn uniform_contour_depth_of<C: Coordinate, V: Accumulator>(gnodes: &Arena<GN
 /// |--------|---------|------|
 /// | [`get()`](Self::get) | Spot densitometer | $O(\text{depth})$ |
 /// | [`plateaus()`](Self::plateaus) | Isodensity contour map | $O(1)$ borrowed |
-/// | [`sample()`](Self::sample) | Random grain probe | $O(1.44\,H + 1.67)$ expected (requires `V:` [`Weighable`](crate::Weighable)) |
+/// | [`sample()`](Self::sample) | Random grain probe | $O(1.44\,H)$ expected (requires `V:` [`Weighable`](crate::Weighable)) |
 ///
 /// See the crate-level documentation and ADR-M-032 for the full
 /// analogy, including where it breaks: adaptive subdivision,
@@ -787,30 +750,17 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
         self.g_root
     }
 
-    /// The V-Tree root handle
+    /// The V-Tree root handle (diagnostic / testing affordance).
     ///
     /// Always `Some` after construction — the root V-entry is
     /// created alongside the root G-node by [`GvGraph::new`].
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use torrust_mudlark::{Config, GvGraph};
-    /// # let cfg = Config {
-    /// #     split_threshold: 5u64,
-    /// #     depth_create: 3,
-    /// #     depth_evict: 6,
-    /// #     budget: None,
-    /// #     alpha_relax: 0.75,
-    /// #     bounded_eviction: true,
-    /// # };
-    /// # let g = GvGraph::<u64, u64, 8>::new(cfg);
-    /// // Always present after construction.
-    /// assert!(g.v_root().is_some());
-    /// ```
+    /// `VNodeId` has no public consuming methods — this accessor
+    /// exists for diagnostic and crate-level testing only
+    /// (ADR-M-032 surface assignment test, handle test).
     #[must_use]
     #[inline]
-    pub const fn v_root(&self) -> Option<VNodeId> {
+    pub(crate) const fn v_root(&self) -> Option<VNodeId> {
         self.v_root
     }
 
@@ -838,6 +788,9 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// g.observe(20, 7u64);
     /// assert_eq!(g.total_sum(), 10u64);
     /// ```
+    // NOTE: not `const fn` because `Arena::get` indexes into a `Vec`,
+    // and `Vec::as_slice()` only became const in Rust 1.86.  Promote
+    // to `const fn` once the workspace MSRV reaches 1.86+.
     #[must_use]
     #[inline]
     pub fn total_sum(&self) -> V {
@@ -1063,14 +1016,13 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
 
     // ── Sentinel integration API (ADR-M-036) ──────────────────────
 
-    /// Read-only snapshot of a G-node's spatial and structural state.
+    /// Read-only snapshot of a G-node's spatial extent and accumulation.
     ///
     /// Returns `None` if `id` does not refer to a live G-node.
     ///
-    /// The returned [`GNodeInfo`] is a `Copy` snapshot — it does not
-    /// borrow the graph. Handles in `left`, `right`, and `parent`
-    /// are live at the time of the call but may become stale after
-    /// subsequent `observe()` or `decay()` calls.
+    /// The returned [`Node`] is a `Copy` snapshot — it does not
+    /// borrow the graph. For mutable child linkage (left, right), see
+    /// [`gnode_children()`](Self::gnode_children).
     ///
     /// # Cost
     ///
@@ -1079,7 +1031,7 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// # Examples
     ///
     /// ```
-    /// use torrust_mudlark::{Config, GvGraph, GNodeInfo, GState};
+    /// use torrust_mudlark::{Config, GvGraph, GState};
     ///
     /// let cfg = Config {
     ///     split_threshold: 5u64,
@@ -1096,24 +1048,79 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// let info = g.gnode_info(g.g_root()).unwrap();
     /// assert_eq!(info.start, 0);
     /// assert_eq!(info.end, 256);
-    /// assert!(info.parent.is_none());
     /// ```
     #[must_use]
-    pub fn gnode_info(&self, id: GNodeId) -> Option<GNodeInfo<C, V>> {
+    pub fn gnode_info(&self, id: GNodeId) -> Option<Node<C, V>> {
         if !self.gnodes.is_occupied(id.index()) {
             return None;
         }
         let g = self.gnodes.get(id.index());
-        Some(GNodeInfo {
+        Some(Node {
             start: g.lo,
             end: g.hi,
             own: g.own,
             sum: g.sum,
             depth: crate::gtree::gnode_depth_from_interval(g.lo, g.hi, N),
             state: g.state(),
+            gnode_id: id,
+            parent: g.parent,
+        })
+    }
+
+    /// Current child handles of a G-node (left, right).
+    ///
+    /// Returns `None` if `id` does not refer to a live G-node.
+    /// Handles are live at snapshot time but may become stale after
+    /// `observe()` or `decay()`.
+    ///
+    /// For the stable parent pointer, see
+    /// [`gnode_info()`](Self::gnode_info) → [`Node::parent`](crate::Node::parent).
+    ///
+    /// # Cost
+    ///
+    /// $O(1)$ — single arena lookup.
+    ///
+    /// # Examples
+    ///
+    /// Walk from the root to collect all live G-node handles:
+    ///
+    /// ```
+    /// use torrust_mudlark::{Config, GvGraph};
+    ///
+    /// let cfg = Config {
+    ///     split_threshold: 5u64,
+    ///     depth_create: 3,
+    ///     depth_evict: 6,
+    ///     budget: None,
+    ///     alpha_relax: 0.75,
+    ///     bounded_eviction: true,
+    /// };
+    /// let mut g = GvGraph::<u64, u64, 8>::new(cfg);
+    /// g.observe(42, 10u64);
+    ///
+    /// // DFS walk collecting all G-node handles.
+    /// let mut stack = vec![g.g_root()];
+    /// let mut visited = Vec::new();
+    /// while let Some(id) = stack.pop() {
+    ///     visited.push(id);
+    ///     if let Some(ch) = g.gnode_children(id) {
+    ///         stack.extend(ch.left);
+    ///         stack.extend(ch.right);
+    ///     }
+    /// }
+    /// // Root split ⇒ at least three nodes.
+    /// assert!(visited.len() >= 3);
+    /// ```
+    #[doc(hidden)]
+    #[must_use]
+    pub fn gnode_children(&self, id: GNodeId) -> Option<GNodeChildren> {
+        if !self.gnodes.is_occupied(id.index()) {
+            return None;
+        }
+        let g = self.gnodes.get(id.index());
+        Some(GNodeChildren {
             left: g.left,
             right: g.right,
-            parent: g.parent,
         })
     }
 

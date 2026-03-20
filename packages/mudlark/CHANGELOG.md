@@ -5,10 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2026-03-11
+## [1.0.0] - 2026-03-20
 
 Initial stable release. The public API surface documented in
-[docs/api.md](docs/api.md) is now covered by semver guarantees.
+[docs/api.md](docs/api.md) is covered by semver guarantees from
+1.0.0 onwards.
 
 ### Added
 
@@ -31,7 +32,7 @@ Initial stable release. The public API surface documented in
   (requires `V: Proratable + Inspectable`).
 - **Plateau selection** — `select_plateaus(lo, hi)` snapping
   arbitrary coordinates to lattice-aligned contour range endpoints
-  (requires `V: Proratable + Inspectable`).
+  (requires `V: Inspectable`).
 - **Proportional sampling** — `sample(rng)` with O(1.44 H + 1.67)
   expected cost (inherent: `V: Weighable`; via `WeightedSampler`
   trait: `V: Weighable + Inspectable`).
@@ -57,8 +58,8 @@ Initial stable release. The public API surface documented in
 - **Instrument traits** — `SpatialRead`, `SpatialWrite`,
   `TemporalDecay`, `WeightedSampler`.
 - **Built-in implementations** for `u8`–`u128`, `f32`, `f64`.
-- **Feature flags** — `dynamic-contour-tracking` (default), `serde`
-  (default), `rand` (default).
+- **Feature flags** — `dynamic-contour-tracking` (default), `rand`
+  (default), `serde` (opt-in).
 - **Serde support** — `Serialize`/`Deserialize` on all Surface 1
   snapshot types behind the `serde` feature.
 - **rand integration** — blanket `Rng` impl for `rand_core::Rng`
@@ -69,7 +70,7 @@ Initial stable release. The public API surface documented in
   builder, and RNG stubs in the `testing` module.
 - **143 Criterion benchmarks** across six families (observe, query,
   extract, lifecycle, spray, pathological).
-- **833 tests** (346 unit, 379 integration, 108 doc-tests).
+- **868 tests** (346 unit, 415 integration, 107 doc-tests).
 - **37 architecture decision records** in `adr/`.
 - **Full documentation** — `idea.md` (formal spec), `api.md`,
   `architecture.md`, `performance.md`, `testing.md`, `theory.md`.

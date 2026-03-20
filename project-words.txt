@@ -43,6 +43,7 @@ Cyberneering
 denoise
 denoising
 Deque
+deserialisation
 Developability
 dhat
 Dijke
@@ -109,6 +110,7 @@ mockall
 monomorphization
 mult
 multiband
+multiset
 mysqladmin
 NCCA
 newtype
@@ -137,6 +139,7 @@ pmatrix
 polylogarithmic
 postorder
 powi
+precomputes
 preorder
 println
 PRNG
@@ -171,6 +174,7 @@ setgroups
 sgxj
 singlepart
 slotmap
+solarisation
 SPIHT
 splittable
 sqlx

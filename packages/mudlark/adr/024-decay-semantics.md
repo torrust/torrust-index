@@ -219,7 +219,8 @@ trailing rebalance — see Q2).
 | `q` in `(0.0, 1.0]`    | Selective path. Per-depth factors via precomputed table.                    |
 | `q < 0.0`              | Panic. Negative selectivity is not meaningful.                              |
 | `q > 1.0`              | Panic. At $q > 1$, coarse subbands would _grow_, violating decay semantics. |
-| `attenuation <= 0.0`   | Panic. Non-positive factors are not meaningful for multiplicative decay.    |
+| `attenuation == 0.0`   | Annihilation (§THEORY M-7.3). At $q < 1$: entire subtree zeroed. At $q = 1$: detail flush ($0^0 = 1$ preserves root, descendants zeroed). |
+| `attenuation < 0.0`    | Panic. Negative factors are not meaningful for multiplicative decay.        |
 | `attenuation.is_nan()` | Panic. NaN attenuation is a programmer error.                               |
 | `attenuation == 1.0`   | No-op. Early return.                                                        |
 | `attenuation > 1.0`    | Allowed (amplification). Documented.                                        |

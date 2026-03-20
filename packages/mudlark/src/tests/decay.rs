@@ -311,21 +311,36 @@ fn decay_energy_conservation_selective() {
 // ── Panics ──────────────────────────────────────────────────
 
 #[test]
-#[should_panic(expected = "attenuation must be > 0")]
-fn decay_panics_zero_attenuation() {
+fn decay_annihilation_uniform_zeroes_all() {
     let mut g = make_populated_graph();
+    assert!(g.total_sum() > 0);
     g.decay(g.g_root(), 0.0, 0.0);
+    assert_eq!(g.total_sum(), 0);
+    assert_invariants(&g);
 }
 
 #[test]
-#[should_panic(expected = "attenuation must be > 0")]
+fn decay_annihilation_detail_flush_preserves_root() {
+    let mut g = make_populated_graph();
+    let root = g.g_root();
+    let root_own_before = g.gnode_info(root).unwrap().own;
+    assert!(root_own_before > 0);
+    g.decay(root, 0.0, 1.0);
+    let root_own_after = g.gnode_info(root).unwrap().own;
+    // Root preserved (0^0 = 1 convention).
+    assert_eq!(root_own_after, root_own_before);
+    assert_invariants(&g);
+}
+
+#[test]
+#[should_panic(expected = "attenuation must be >= 0")]
 fn decay_panics_negative_attenuation() {
     let mut g = make_populated_graph();
     g.decay(g.g_root(), -0.5, 0.0);
 }
 
 #[test]
-#[should_panic(expected = "attenuation must be > 0")]
+#[should_panic(expected = "attenuation must be >= 0")]
 fn decay_panics_nan_attenuation() {
     let mut g = make_populated_graph();
     g.decay(g.g_root(), f64::NAN, 0.0);
@@ -461,11 +476,12 @@ fn decay_single_node_selective() {
     g.observe(5u64, 100u64);
     assert_invariants(&g);
 
-    // depth_range = N - d_root = 4, so d_local=0 is coarse end.
-    // factor = att^(1-q) = 0.5^0.2 ≈ 0.8706 → floor(100 * 0.8706) = 87.
+    // Single node: actual depth_range = 0, so all Q values collapse
+    // to the midpoint factor att^1 = att (ADR-M-038).  For a single
+    // node there is no depth axis to tilt across.
     g.decay(g.g_root(), 0.5, 0.8);
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // intentional: f64 → u64
-    let expected = (100.0 * 0.5_f64.powf(1.0 - 0.8)) as u64;
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let expected = (100.0 * 0.5_f64) as u64; // att^1.0 = 0.5
     assert_eq!(g.gnodes().get(g.g_root().index()).own, expected);
     assert_invariants(&g);
 }

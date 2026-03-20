@@ -235,12 +235,14 @@ based on which capabilities they need.
 - **Backward compatible.** All seven built-in types implement all
   four sub-traits. Existing code using `u64`, `f64`, etc. sees no
   difference.
-- **No runtime enforcement.** The constraint `v >= V::zero()` (P2)
+- **Debug-mode enforcement.** The constraint `v >= V::zero()` (P2)
   is a doc-contract, not a type-level proof. A user who implements
-  `Accumulator` for a type violating P2 will see silent corruption.
-  A `debug_assert!(delta >= V::zero())` in `observe()` would catch
-  misuse in debug builds; this is not yet implemented but is a
-  natural follow-up.
+  `Accumulator` for a type violating P2 will see silent corruption
+  in release builds.  `observe()` contains a `debug_assert!` that
+  fires when the post-accumulation value drops below `V::zero()`,
+  catching misuse in debug builds and `cargo test`.  See
+  `tests/negative_f64.rs` for integration tests that document the
+  failure modes when the guard is bypassed (release builds).
 - **Smaller test surface.** Only the Standard and Absolute
   configurations need testing (they share the same value space;
   different projections). No adversarial signed-importance or

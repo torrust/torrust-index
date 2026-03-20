@@ -10,9 +10,9 @@ use super::{Rng, SpatialRead};
 /// Extends [`SpatialRead`] — read-only access to the contour and
 /// point queries.  [`sample()`](Self::sample) draws a random leaf
 /// cell with probability proportional to its accumulated intensity.
-/// Expected cost is $O(1.44\,H + 1.67)$ where $H$ is the Shannon
-/// entropy of the intensity distribution
-/// ([ADR-M-019]).
+/// Expected cost is $O(1.44\,H)$ where $H$ is the Shannon entropy
+/// of the intensity distribution (§IDEA M-18.2, §THEORY M-4.3,
+/// [ADR-M-019]).
 ///
 /// Use this trait as a capability bound when a function only needs
 /// to read and sample — it documents that no mutation occurs.

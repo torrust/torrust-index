@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
+use crate::GvGraph;
 use crate::graph::Config;
+use crate::handle::VNodeId;
 use crate::rebalance::is_violated;
 use crate::split::attempt_split;
 use crate::vnode::VKind;
-use crate::{GvGraph, VNodeId};
 
 fn test_config() -> Config<u64> {
     Config {

@@ -5,7 +5,7 @@
 //!
 //! Covers:
 //! - D1: `Node.gnode_id`
-//! - D2: `GvGraph::gnode_info()` + `GNodeInfo`
+//! - D2: `GvGraph::gnode_info()` + `GvGraph::gnode_children()`
 //! - D3: `GvGraph::is_ancestor_of()`
 
 mod support;
@@ -99,9 +99,10 @@ fn gnode_info_children_consistent() {
 
     for (_layer, node) in g.layers() {
         let info = g.gnode_info(node.gnode_id).unwrap();
+        let children = g.gnode_children(node.gnode_id).unwrap();
 
         // If there's a left child, its parent should point back.
-        if let Some(left_id) = info.left {
+        if let Some(left_id) = children.left {
             let left_info = g.gnode_info(left_id).expect("left child should be live");
             assert_eq!(
                 left_info.parent,
@@ -116,7 +117,7 @@ fn gnode_info_children_consistent() {
         }
 
         // If there's a right child, its parent should point back.
-        if let Some(right_id) = info.right {
+        if let Some(right_id) = children.right {
             let right_info = g.gnode_info(right_id).expect("right child should be live");
             assert_eq!(
                 right_info.parent,
@@ -133,13 +134,13 @@ fn gnode_info_children_consistent() {
         // State consistency: children presence matches GState.
         match info.state {
             GState::Terminal => {
-                assert!(info.left.is_none() && info.right.is_none());
+                assert!(children.left.is_none() && children.right.is_none());
             }
             GState::SemiInternal => {
-                assert!(info.left.is_some() ^ info.right.is_some());
+                assert!(children.left.is_some() ^ children.right.is_some());
             }
             GState::Internal => {
-                assert!(info.left.is_some() && info.right.is_some());
+                assert!(children.left.is_some() && children.right.is_some());
             }
         }
     }
@@ -190,8 +191,9 @@ fn gnode_info_sum_equals_own_plus_children() {
 
     for (_layer, node) in g.layers() {
         let info = g.gnode_info(node.gnode_id).unwrap();
+        let children = g.gnode_children(node.gnode_id).unwrap();
 
-        let child_sum: u64 = [info.left, info.right]
+        let child_sum: u64 = [children.left, children.right]
             .iter()
             .flatten()
             .map(|cid| g.gnode_info(*cid).unwrap().sum)
@@ -247,9 +249,9 @@ fn is_ancestor_of_sibling_is_false() {
     let g = build_split_tree();
 
     for (_layer, node) in g.layers() {
-        let info = g.gnode_info(node.gnode_id).unwrap();
+        let children = g.gnode_children(node.gnode_id).unwrap();
 
-        if let (Some(left), Some(right)) = (info.left, info.right) {
+        if let (Some(left), Some(right)) = (children.left, children.right) {
             assert!(!g.is_ancestor_of(left, right), "left sibling should not be ancestor of right");
             assert!(!g.is_ancestor_of(right, left), "right sibling should not be ancestor of left");
         }
@@ -261,13 +263,13 @@ fn is_ancestor_of_parent_child() {
     let g = build_split_tree();
 
     for (_layer, node) in g.layers() {
-        let info = g.gnode_info(node.gnode_id).unwrap();
+        let children = g.gnode_children(node.gnode_id).unwrap();
 
-        if let Some(left) = info.left {
+        if let Some(left) = children.left {
             assert!(g.is_ancestor_of(node.gnode_id, left));
             assert!(!g.is_ancestor_of(left, node.gnode_id));
         }
-        if let Some(right) = info.right {
+        if let Some(right) = children.right {
             assert!(g.is_ancestor_of(node.gnode_id, right));
             assert!(!g.is_ancestor_of(right, node.gnode_id));
         }

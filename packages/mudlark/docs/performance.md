@@ -131,9 +131,10 @@ essentially $O(1)$.
 
 ### 4.3 Sampling — `sample(&mut rng)`
 
-**Design claim:** Expected cost $O(1.44\,H + 1.67)$ where $H$ is
-the Shannon entropy of the weight distribution. Lower entropy →
-fewer coin flips → faster.
+**Design claim:** Expected node visits $\leq 1.44\,H + \log_\varphi\!\sqrt{5}
+\approx 1.44\,H + 1.67$ where $H$ is the Shannon entropy of the weight
+distribution (§IDEA M-18.2, §THEORY M-4.3). Lower entropy → fewer
+coin flips → faster.
 
 | Distribution           | Entropy    | Latency      |
 | ---------------------- | ---------- | ------------ |

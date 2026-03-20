@@ -24,23 +24,15 @@ use super::Accumulator;
 /// "given the current state of a grain (`V`) and an incoming photon
 /// (`Self`), what is the new state?"
 ///
-/// # Contract
-///
-/// ## The `scale` method
-///
-/// `scale` has a default implementation that panics.  Cross-type
-/// impls (`f64` → uint, `f32` → uint) provide working `scale`
-/// methods.  The same-type blanket impl does **not** override
-/// the default because `decay()` bypasses `Observation::scale`
-/// entirely and uses
-/// [`Attenuatable::attenuate`](super::Attenuatable::attenuate)
-/// directly (ADR-M-024).
-///
-/// ## User extension
+/// # User extension
 ///
 /// Only `Observation` and [`Rng`](super::Rng) are designed for user
 /// extension — implement this trait when you need a custom
 /// observation type (e.g. a weighted update or a log-domain delta).
+///
+/// If your observation type also supports multiplicative scaling
+/// (e.g. cross-type `f64` → uint), implement
+/// [`ScalableObservation`] as well.
 ///
 /// # Implementations
 ///
@@ -65,13 +57,13 @@ use super::Accumulator;
 /// Cross-type accumulation (`f64` → `u16`):
 ///
 /// ```
-/// use torrust_mudlark::Observation;
+/// use torrust_mudlark::{Observation, ScalableObservation};
 ///
 /// let current = 100u16;
 /// let updated = <f64 as Observation<u16>>::accumulate(current, 2.7);
 /// assert_eq!(updated, 102); // truncated from 102.7
 ///
-/// let scaled = <f64 as Observation<u16>>::scale(100, 0.5);
+/// let scaled = <f64 as ScalableObservation<u16>>::scale(100, 0.5);
 /// assert_eq!(scaled, 50);
 /// ```
 ///
@@ -108,29 +100,42 @@ pub trait Observation<V: Accumulator>: Copy + Debug + Send + Sync {
     /// Additive update: `current + delta`, in `Self`'s precision,
     /// stored as `V`.
     fn accumulate(current: V, delta: Self) -> V;
+}
 
+/// Multiplicative scaling capability for cross-type observations.
+///
+/// Sub-trait of [`Observation`] — implement this when the observation
+/// type supports `current × factor` (e.g. `f64` → uint).  Same-type
+/// observations do not need this: `decay()` uses
+/// [`Attenuatable::attenuate`](super::Attenuatable::attenuate)
+/// directly (ADR-M-024).
+///
+/// This follows the crate's split-trait pattern: independent
+/// capabilities are gated behind independent sub-traits rather than
+/// bundled with panicking defaults.
+///
+/// # Examples
+///
+/// ```
+/// use torrust_mudlark::ScalableObservation;
+///
+/// // f64 → u16 cross-type scaling.
+/// let scaled = <f64 as ScalableObservation<u16>>::scale(100, 0.5);
+/// assert_eq!(scaled, 50);
+/// ```
+pub trait ScalableObservation<V: Accumulator>: Observation<V> {
     /// Multiplicative scaling: `current × factor`, in `Self`'s
     /// precision, stored as `V`.
-    ///
-    /// Default panics.  Cross-type impls (`f64` → uint, `f32` → uint)
-    /// provide working implementations.  Same-type `scale` is not
-    /// used by the core engine — `decay()` uses
-    /// `Attenuatable::attenuate` directly.
-    fn scale(_current: V, _factor: Self) -> V {
-        unimplemented!(
-            "Observation::scale: use a cross-type Observation impl \
-             (e.g. f64 → uint) or call Attenuatable::attenuate directly"
-        )
-    }
+    fn scale(current: V, factor: Self) -> V;
 }
 
 // ── Same-type blanket impl ──────────────────────────────────────────
 
 /// Every `V: Accumulator` is `Observation<V>` (same-type).
 ///
-/// Provides `accumulate` via [`Accumulator::add`].  `scale` uses
-/// the default (panics) — `decay()` bypasses `Observation::scale`
-/// and uses [`Attenuatable::attenuate`](super::Attenuatable::attenuate)
+/// Provides `accumulate` via [`Accumulator::add`].  Same-type `scale`
+/// is not provided — `decay()` uses
+/// [`Attenuatable::attenuate`](super::Attenuatable::attenuate)
 /// directly (ADR-M-024).
 impl<V: Accumulator> Observation<V> for V {
     #[inline]
@@ -149,7 +154,9 @@ macro_rules! impl_observation_f64_to_uint {
             fn accumulate(current: $v, delta: Self) -> $v {
                 (current as f64 + delta) as $v
             }
+        }
 
+        impl ScalableObservation<$v> for f64 {
             #[inline]
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_lossless, clippy::cast_precision_loss)]
             fn scale(current: $v, factor: Self) -> $v {
@@ -168,7 +175,10 @@ impl Observation<f32> for f64 {
     fn accumulate(current: f32, delta: Self) -> f32 {
         (Self::from(current) + delta) as f32
     }
+}
 
+/// `f64` as scalable observation on `f32` (narrowing).
+impl ScalableObservation<f32> for f64 {
     #[inline]
     #[allow(clippy::cast_possible_truncation)]
     fn scale(current: f32, factor: Self) -> f32 {
@@ -188,7 +198,9 @@ macro_rules! impl_observation_f32_to_uint {
             fn accumulate(current: $v, delta: Self) -> $v {
                 (current as f32 + delta) as $v
             }
+        }
 
+        impl ScalableObservation<$v> for f32 {
             #[inline]
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_lossless, clippy::cast_precision_loss)]
             fn scale(current: $v, factor: Self) -> $v {

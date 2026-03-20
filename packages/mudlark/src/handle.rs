@@ -3,17 +3,21 @@
 
 //! Opaque handles for G-tree and V-tree nodes.
 //!
-//! [`GNodeId`] and [`VNodeId`] are lightweight, `Copy` identity tokens
-//! that let you refer to a specific node inside a [`GvGraph`] without
-//! exposing how nodes are stored internally. Think of them as serial
-//! numbers stamped onto a film grain: the number is enough to locate
+//! [`GNodeId`] is a lightweight, `Copy` identity token
+//! that lets you refer to a specific node inside a [`GvGraph`] without
+//! exposing how nodes are stored internally. Think of it as a serial
+//! number stamped onto a film grain: the number is enough to locate
 //! the grain later, but reveals nothing about the crystal structure
 //! underneath.
 //!
+//! `VNodeId` is the corresponding handle for the V-tree (significance
+//! hierarchy) but is `pub(crate)` — it has no public consuming method
+//! (ADR-M-032 handle test).
+//!
 //! | Handle    | Identifies                                     | Photography analogy               |
-//! |-----------|------------------------------------------------|-----------------------------------|
-//! | `GNodeId` | A spatial node in the G-tree (`[0, 2^N)`)      | Grain serial number               |
-//! | `VNodeId` | A significance node in the V-tree (tournament) | Developing priority tag           |
+//! |-----------|-------------------------------------------------|-----------------------------------|
+//! | `GNodeId` | A spatial node in the G-tree (`[0, 2^N)`)       | Grain serial number               |
+//! | `VNodeId` | A significance node in the V-tree (tournament)  | Developing priority tag           |
 //!
 //! # When you need handles
 //!
@@ -43,17 +47,14 @@
 //! assert!(g.total_sum() < 100);
 //! ```
 //!
-//! You may also use [`GvGraph::v_root`] to inspect the V-tree root for
-//! diagnostic or logging purposes.
-//!
 //! # Obtaining handles
 //!
 //! | Method              | Returns             |
 //! |---------------------|---------------------|
 //! | [`GvGraph::g_root`] | `GNodeId` (always)  |
-//! | [`GvGraph::v_root`] | `Option<VNodeId>`   |
 //!
-//! Both root handles are assigned at construction and never change.
+//! The root handle is assigned at construction and never changes.
+//! (`v_root()` is `pub(crate)` — available inside the crate only.)
 //!
 //! # Representation
 //!
@@ -70,7 +71,6 @@
 //! [`plateaus`]: crate::SpatialRead::plateaus
 //! [`sample`]: crate::WeightedSampler::sample
 //! [`GvGraph::g_root`]: crate::GvGraph::g_root
-//! [`GvGraph::v_root`]: crate::GvGraph::v_root
 //! [`TemporalDecay::decay`]: crate::TemporalDecay::decay
 
 use std::num::NonZeroU32;
@@ -152,20 +152,16 @@ pub struct GNodeId(NonZeroU32);
 /// intensity so high-value regions sit near the root for efficient
 /// proportional sampling.
 ///
-/// # When you need it
+/// # Visibility
 ///
-/// In most workflows you will **not** interact with `VNodeId`
-/// directly. The V-tree drives [`sample()`] and [`extract()`]
+/// `VNodeId` is `pub(crate)` (ADR-M-032 handle test: no public
+/// consuming method). The V-tree drives [`sample()`] and [`extract()`]
 /// internally; those methods return [`Cell`] and [`Pewei`] values
 /// instead of raw handles.
 ///
-/// `VNodeId` is surfaced for **diagnostic and logging** use cases —
-/// for example, confirming the V-tree root exists or correlating
-/// handles in [`dump_gtree`] output.
-///
-/// Obtain the root handle via [`GvGraph::v_root`], which returns
-/// `Option<VNodeId>` — always `Some` for a graph created with
-/// [`GvGraph::new`].
+/// Within the crate, obtain the root handle via `GvGraph::v_root()`,
+/// which returns `Option<VNodeId>` — always `Some` for a graph
+/// created with [`GvGraph::new`].
 ///
 /// `VNodeId` implements `Copy`, `Debug`, `PartialEq`, `Eq`, and
 /// `Hash` — same ergonomics as [`GNodeId`].
@@ -174,34 +170,12 @@ pub struct GNodeId(NonZeroU32);
 /// [`extract()`]: crate::GvGraph::extract
 /// [`Cell`]: crate::Cell
 /// [`Pewei`]: crate::Pewei
-/// [`dump_gtree`]: crate::invariants::dump_gtree
-/// [`GvGraph::v_root`]: crate::GvGraph::v_root
 /// [`GvGraph::new`]: crate::GvGraph::new
 ///
 /// # Examples
 ///
-/// Verify the V-tree root exists and inspect its index:
-///
-/// ```
-/// use torrust_mudlark::{Config, GvGraph, VNodeId};
-///
-/// let cfg = Config {
-///     split_threshold: 5u64,
-///     depth_create: 3,
-///     depth_evict: 6,
-///     budget: None,
-///     alpha_relax: 0.75,
-///     bounded_eviction: true,
-/// };
-/// let g = GvGraph::<u64, u64, 8>::new(cfg);
-///
-/// // A freshly constructed graph always has a V-tree root.
-/// let v_root: VNodeId = g.v_root().expect("V-root present after new()");
-/// assert_eq!(v_root.index(), 0);
-///
-/// // Both trees start at index 0 — they share the initial node.
-/// assert_eq!(g.g_root().index(), v_root.index());
-/// ```
+/// `VNodeId` is `pub(crate)` — see crate-level tests in
+/// `src/tests/worked_example.rs` for usage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VNodeId(NonZeroU32);
@@ -215,13 +189,12 @@ macro_rules! impl_handle {
             /// handle. This is the inverse of [`Self::index`].
             ///
             /// Most users never need to call this directly — handles are
-            /// returned by graph methods such as [`GvGraph::g_root`] and
-            /// [`GvGraph::v_root`]. `from_index` exists for
+            /// returned by graph methods such as [`GvGraph::g_root`].
+            /// `from_index` exists for
             /// serialization round-trips, logging, and diagnostic tools
             /// that reconstitute a previously stored index.
             ///
             /// [`GvGraph::g_root`]: crate::GvGraph::g_root
-            /// [`GvGraph::v_root`]: crate::GvGraph::v_root
             ///
             /// # Panics
             ///
@@ -233,13 +206,10 @@ macro_rules! impl_handle {
             /// Round-trip an index through a handle:
             ///
             /// ```
-            /// use torrust_mudlark::{GNodeId, VNodeId};
+            /// use torrust_mudlark::GNodeId;
             ///
             /// let g = GNodeId::from_index(42);
             /// assert_eq!(g.index(), 42);
-            ///
-            /// let v = VNodeId::from_index(0);
-            /// assert_eq!(v.index(), 0);
             /// ```
             ///
             /// Reconstruct a handle from a previously stored index:
@@ -262,6 +232,7 @@ macro_rules! impl_handle {
             /// let restored = GNodeId::from_index(saved_index);
             /// assert_eq!(restored, g.g_root());
             /// ```
+            #[doc(hidden)]
             #[must_use]
             pub fn from_index(index: usize) -> Self {
                 let raw = u32::try_from(index)
@@ -308,6 +279,7 @@ macro_rules! impl_handle {
             /// labels[root.index()] = "root";
             /// assert_eq!(labels[0], "root");
             /// ```
+            #[doc(hidden)]
             #[must_use]
             #[inline]
             pub const fn index(self) -> usize {

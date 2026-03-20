@@ -38,8 +38,16 @@ Or add it manually to your `Cargo.toml`:
 torrust-mudlark = "1"
 ```
 
-All three default features (`dynamic-contour-tracking`, `serde`, `rand`)
-are enabled. To opt out:
+The two default features (`dynamic-contour-tracking` and `rand`) are
+enabled automatically. The `serde` feature is opt-in:
+
+```toml
+[dependencies]
+torrust-mudlark = { version = "1", features = ["serde"] }
+```
+
+Users who need a minimal build should use `default-features = false`,
+which disables both default features simultaneously:
 
 ```toml
 [dependencies]
@@ -134,7 +142,7 @@ canonical path per type.
 | `ContourRange<C, V>` | 1       | Full contour-range decomposition of a lattice-aligned interval       |
 | `ContourRangeEnergy<V>` | 1    | Energy-only result of a contour range query                          |
 | `BasisElement<C, V>`    | 1    | One element of the minimal G-node cover of a contour range           |
-| `GNodeId`, `VNodeId` | 1       | Opaque arena handles                                                 |
+| `GNodeId`            | 1       | Opaque arena handle                                                  |
 
 ### Key operations on `GvGraph`
 
@@ -148,8 +156,8 @@ canonical path per type.
 | `range_sum(range)`                | Recursive G-Tree range sum — $O(N)$ (requires `V: Proratable`)                 |
 | `contour_range(start, end)`       | Contour range decomposition — $O(N)$ (requires `V: Proratable + Inspectable`)  |
 | `contour_range_energy(start, end)` | Energy-only contour range query — $O(N)$ (requires `V: Proratable + Inspectable`) |
-| `select_plateaus(lo, hi)`          | Plateau selection — snaps arbitrary coords to lattice endpoints — $O(\log P)$ (requires `V: Proratable + Inspectable`) |
-| `sample(rng)`                     | Proportional sampling — $O(1.44\,H + 1.67)$ expected (requires `V: Weighable`) |
+| `select_plateaus(lo, hi)`          | Plateau selection — snaps arbitrary coords to lattice endpoints — $O(\log P)$ (requires `V: Inspectable`) |
+| `sample(rng)`                     | Proportional sampling — $O(1.44\,H)$ expected (requires `V: Weighable`) |
 | `extract()`                       | PEWEI extraction — $O(n)$ (requires `V: Inspectable`)                          |
 | `layers()`                        | Streaming V-Tree BFS yielding `(layer_index, Node)` — lazy, $O(V)$ BFS queue (requires `V: Inspectable`) |
 | `decay(root, attenuation, q)`     | Subband-adaptive temporal decay (requires `V: Attenuatable + Inspectable`)     |
@@ -165,7 +173,7 @@ canonical path per type.
 | `Accumulator`    | Core intensity/value type — non-negative, starting from zero. Provided for `u8`..`u128`, `f32`, `f64`                                                    |
 | `Attenuatable`   | Multiplicative decay — required by `decay()` / `TemporalDecay`                                                                                           |
 | `Weighable`      | Weight projection to `f64` — required by `sample()` / `WeightedSampler`                                                                                  |
-| `Proratable`     | Fractional subdivision — required by `range_sum()`, `contour_range()`, `contour_range_energy()`, `select_plateaus()`, and `Pewei::reconstruct()`         |
+| `Proratable`     | Fractional subdivision — required by `range_sum()`, `contour_range()`, `contour_range_energy()`, and `Pewei::reconstruct()`         |
 | `Inspectable`    | Diagnostic `f64` projection — baseline for most operations (`observe`, `plateaus`, `extract`, `layers`, `contour_range`, `from_observations`, `check_evictions`, `decay`) |
 | `Observation<V>` | Accumulation rule (blanket impl for same-type; cross-type for floats)                                                                                    |
 | `Rng`            | Minimal RNG — blanket impl for `rand_core::Rng` with `rand` feature                                                                                  |
@@ -208,7 +216,7 @@ require fallback paths for every feature they break.
 | Feature                    | Default | Effect                                                              |
 | -------------------------- | ------- | ------------------------------------------------------------------- |
 | `dynamic-contour-tracking` | yes     | Live plateau mirror; `plateaus()` returns `Cow::Borrowed` in $O(1)$ |
-| `serde`                    | yes     | `Serialize`/`Deserialize` on all Surface 1 snapshot types           |
+| `serde`                    | no      | `Serialize`/`Deserialize` on all Surface 1 snapshot types           |
 | `rand`                     | yes     | Blanket `Rng` impl for all `rand_core::Rng` types               |
 
 ## Performance
@@ -284,8 +292,8 @@ cargo clippy -p torrust-mudlark --all-targets --all-features
 cargo doc -p torrust-mudlark --all-features --no-deps
 ```
 
-833 tests across unit, integration, and doc-test suites (346 unit,
-379 integration, 108 doc-tests).
+868 tests across unit, integration, and doc-test suites (346 unit,
+415 integration, 107 doc-tests).
 See [docs/testing.md](docs/testing.md) for the full breakdown,
 feature-gated variation, and benchmark details.
 

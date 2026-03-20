@@ -10,7 +10,7 @@
 //!
 //! | Type     | Returned by   | Use case |
 //! |----------|---------------|----------|
-//! | [`Cell`] | [`get()`](crate::GvGraph::get), [`sample()`](crate::GvGraph::sample) | Terminal G-node snapshot (leaf region) |
+//! | [`Cell`] | [`get()`](crate::GvGraph::get), [`sample()`](crate::GvGraph::sample) | Contour cell snapshot (terminal or uncovered semi-internal half) |
 //! | [`Node`] | [`layers()`](crate::GvGraph::layers) | Any G-node snapshot (`own`, `sum`, `state`) |
 //! | [`Span`] | [`Cell::to_span`], [`Node::to_span`], [`Pewei::reconstruct`](crate::Pewei::reconstruct) | Owned dyadic interval + intensity |
 //!
@@ -104,13 +104,19 @@ impl<C: Coordinate, V: Accumulator> Span<C, V> {
 
 // ── Cell ─────────────────────────────────────────────────────────────
 
-/// Snapshot of a terminal G-node (leaf cell)
+/// Snapshot of a contour cell — a terminal G-node or the uncovered
+/// half of a semi-internal G-node.
 ///
 /// `Cell` is the most common query result — returned by
 /// [`get()`](crate::GvGraph::get) (infallible point query) and
 /// [`sample()`](crate::GvGraph::sample) (proportional sampling).
-/// Because terminal nodes are leaves of the G-Tree, `intensity`
-/// equals both `g.own` and `g.sum`.
+///
+/// For terminals, the interval is the full G-node range and
+/// `intensity` equals both `g.own` and `g.sum`. For the uncovered
+/// half of a semi-internal node, the interval is narrowed to the
+/// vacated half and `intensity` is the node's `g.own` — direct
+/// accumulation only (pre-split + absorbed + post-eviction
+/// observations routed to that half; §IDEA M-5.5.1).
 ///
 /// # Examples
 ///
@@ -127,7 +133,7 @@ impl<C: Coordinate, V: Accumulator> Span<C, V> {
 /// # let mut g = GvGraph::<u64, u64, 8>::new(cfg);
 /// g.observe(42, 10u64);
 ///
-/// // `get` always returns the terminal cell containing the coordinate.
+/// // `get` always returns the contour cell containing the coordinate.
 /// let cell = g.get(42);
 /// assert!(cell.start <= 42 && 42 < cell.end);
 /// ```
@@ -138,7 +144,9 @@ pub struct Cell<C: Coordinate, V: Accumulator> {
     pub start: C,
     /// Upper bound of the dyadic range (exclusive).
     pub end: C,
-    /// Intensity: `g.own` (= `g.sum` for terminals).
+    /// Intensity: `g.own`. Equals `g.sum` for terminals; for
+    /// semi-internal uncovered halves this is the node's direct
+    /// accumulation only.
     pub intensity: V,
     /// G-Tree depth of this cell.
     pub depth: u32,
@@ -291,6 +299,10 @@ pub struct Node<C: Coordinate, V: Accumulator> {
     /// for passing to [`GvGraph::gnode_info()`](crate::GvGraph::gnode_info)
     /// or [`GvGraph::is_ancestor_of()`](crate::GvGraph::is_ancestor_of).
     pub gnode_id: GNodeId,
+    /// Stable provenance: the G-node that was split to produce this
+    /// one (ADR-M-032). `None` at the root. Determined at creation;
+    /// immutable for the node's lifetime.
+    pub parent: Option<GNodeId>,
 }
 
 impl<C: Coordinate, V: Accumulator> Node<C, V> {
@@ -426,6 +438,31 @@ impl<C: Coordinate, V: Accumulator> Node<C, V> {
     #[must_use]
     pub fn refinement(&self) -> V {
         V::sub(self.sum, self.own)
+    }
+
+    /// Whether this node is the root of the G-Tree.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use torrust_mudlark::{Config, GvGraph};
+    /// # let cfg = Config {
+    /// #     split_threshold: 5u64,
+    /// #     depth_create: 3,
+    /// #     depth_evict: 6,
+    /// #     budget: None,
+    /// #     alpha_relax: 0.75,
+    /// #     bounded_eviction: true,
+    /// # };
+    /// # let mut g = GvGraph::<u64, u64, 8>::new(cfg);
+    /// # g.observe(42, 10u64);
+    /// let (_layer, node) = g.layers().next().unwrap();
+    /// assert_eq!(node.is_root(), node.parent.is_none());
+    /// ```
+    #[inline]
+    #[must_use]
+    pub const fn is_root(&self) -> bool {
+        self.parent.is_none()
     }
 
     /// Width of this node's interval: `end - start`.

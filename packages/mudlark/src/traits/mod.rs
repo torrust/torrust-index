@@ -46,6 +46,7 @@
 //! | [`Proratable`] | Partial-grain densitometry | Fractional subdivision for range-query overlap |
 //! | [`Inspectable`] | Lab densitometer calibration | Diagnostic `f64` projection for logging and invariant checks |
 //! | [`Observation`] | Photon characteristics (wavelength, energy) | How a single event affects the accumulator |
+//! | [`ScalableObservation`] | Photon attenuation characteristics | How an observation can scale (multiply) the accumulator — cross-type only |
 //! | [`Rng`] | Developer diffusion — thermal Brownian motion | Randomness source for proportional sampling |
 //!
 //! # Instruments
@@ -184,7 +185,7 @@ mod inspectable;
 pub use inspectable::Inspectable;
 
 mod observation;
-pub use observation::Observation;
+pub use observation::{Observation, ScalableObservation};
 
 mod rng;
 pub use rng::Rng;

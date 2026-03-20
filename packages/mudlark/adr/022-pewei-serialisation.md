@@ -95,22 +95,22 @@ crate stays dependency-light when the feature is disabled. `serde`
 is always available as a dev-dependency for the test harness,
 regardless of the feature flag.
 
-**Note:** The `serde` feature is enabled by default in `Cargo.toml`
-(`default = ["dynamic-contour-tracking", "rand", "serde"]`), so
-most consumers get serialisation support without opting in.
-Consumers who want a minimal dependency tree can specify
-`default-features = false`.
+**Note:** The `serde` feature is **not** enabled by default
+(`default = ["dynamic-contour-tracking", "rand"]`). Consumers who
+need serialisation support must opt in explicitly:
+`features = ["serde"]`.
 
 ## Consequences
 
-- Zero compile-time cost for consumers who disable the `serde`
-  feature (`default-features = false`).
-- Consumers using default features get `Serialize`/`Deserialize` on
-  all Surface 1 snapshot types with no additional configuration.
+- Zero compile-time cost for consumers who do not enable the `serde`
+  feature.
+- Consumers who enable the `serde` feature get
+  `Serialize`/`Deserialize` on all Surface 1 snapshot types.
 - Users who want JSON/CBOR/MessagePack output get
   `Serialize`/`Deserialize` on all Surface 1 snapshot types.
 - `Pewei<C, V>` is `Serialize` when both `C: Serialize` and
   `V: Serialize` — always true for primitive types. Custom newtypes
   must derive `Serialize` themselves.
 - The `dynamic-contour-tracking`, `rand`, and `serde` features are
-  independent and composable.
+  independent and composable. `serde` is opt-in; the other two are
+  default-on.

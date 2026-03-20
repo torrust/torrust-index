@@ -2003,6 +2003,16 @@ V-Tree sampling from flat proportional sampling over a fixed set of bins.
 Sampling preferentially directs attention toward regions that have proven
 sustained significance through repeated competitive promotion.
 
+> **No thatching in sampling.** Plateau thatching (§5.6.3)
+> multi-counts energy across overlapping plateaus via `g.sum`.
+> Sampling uses `g.own` — the V-entry's importance — which the
+> V-Tree propagates with clean summation (V-I1). The two mechanisms
+> operate on different accumulators: thatching answers "what is the
+> total energy in this plateau region?" while sampling answers
+> "which contour cell should receive attention?" The returned cell
+> is trimmed to the uncovered half for semi-internals (§5.5.1),
+> with `intensity = g.own` — no plateau overlap enters the result.
+
 ---
 
 ## Chapter 7. Depth Gates

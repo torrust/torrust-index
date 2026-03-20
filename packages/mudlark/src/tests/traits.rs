@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
 use crate::traits::Coordinate;
-use crate::{Accumulator, Inspectable, Observation, Proratable, Rng};
+use crate::{Accumulator, Inspectable, Observation, Proratable, Rng, ScalableObservation};
 
 // ── Coordinate tests ────────────────────────────────────────
 
@@ -132,39 +132,37 @@ fn same_type_accumulate() {
     assert!((r - 4.0).abs() < f64::EPSILON);
 }
 
-#[test]
-#[should_panic(expected = "Observation::scale")]
-fn same_type_scale_panics() {
-    // Same-type `scale` is intentionally unimplemented — the engine
-    // uses `Attenuatable::attenuate` directly (ADR-M-024).
-    let _ = <u64 as Observation<u64>>::scale(100, 3);
-}
+// Same-type `scale` no longer exists on `Observation` — factored
+// into `ScalableObservation` (ADR-M-032 surface assignment test).
+// The blanket `Observation<V> for V` does not impl
+// `ScalableObservation` because `decay()` uses
+// `Attenuatable::attenuate` directly (ADR-M-024).
 
 #[test]
 fn cross_type_f64_to_u16() {
     // 100 + 3.7 = 103.7 → truncates to 103.
     assert_eq!(<f64 as Observation<u16>>::accumulate(100, 3.7), 103);
     // 100 × 0.5 = 50.0 → 50.
-    assert_eq!(<f64 as Observation<u16>>::scale(100, 0.5), 50);
+    assert_eq!(<f64 as ScalableObservation<u16>>::scale(100, 0.5), 50);
 }
 
 #[test]
 fn cross_type_f64_to_u64() {
     assert_eq!(<f64 as Observation<u64>>::accumulate(10, 5.9), 15);
-    assert_eq!(<f64 as Observation<u64>>::scale(100, 0.75), 75);
+    assert_eq!(<f64 as ScalableObservation<u64>>::scale(100, 0.75), 75);
 }
 
 #[test]
 fn cross_type_f32_to_u16() {
     assert_eq!(<f32 as Observation<u16>>::accumulate(10, 3.2_f32), 13);
-    assert_eq!(<f32 as Observation<u16>>::scale(100, 0.5_f32), 50);
+    assert_eq!(<f32 as ScalableObservation<u16>>::scale(100, 0.5_f32), 50);
 }
 
 #[test]
 fn cross_type_f64_to_f32() {
     let result = <f64 as Observation<f32>>::accumulate(1.0_f32, 0.5_f64);
     assert!((result - 1.5_f32).abs() < f32::EPSILON);
-    let scaled = <f64 as Observation<f32>>::scale(10.0_f32, 0.25_f64);
+    let scaled = <f64 as ScalableObservation<f32>>::scale(10.0_f32, 0.25_f64);
     assert!((scaled - 2.5_f32).abs() < f32::EPSILON);
 }
 
@@ -173,5 +171,5 @@ fn observation_total_zero_edge() {
     // f64 accumulate on zero.
     assert_eq!(<f64 as Observation<u64>>::accumulate(0, 5.0), 5);
     // Scale by zero.
-    assert_eq!(<f64 as Observation<u64>>::scale(100, 0.0), 0);
+    assert_eq!(<f64 as ScalableObservation<u64>>::scale(100, 0.0), 0);
 }

@@ -141,8 +141,8 @@ mod tests;
 //   contour_range: BasisElement, ContourRange, ContourRangeEnergy
 //             (contour range decomposition, ADR-M-037)
 //   gnode:    GState           (node state enum)
-//   graph:    GNodeInfo        (G-node structural snapshot, ADR-M-036)
-//   handle:   GNodeId, VNodeId (opaque arena handles)
+//   graph:    GNodeChildren    (#[doc(hidden)] — child linkage, ADR-M-036)
+//   handle:   GNodeId          (opaque arena handle)
 //   pewei:    Pewei, Layer     (extraction snapshots, Clone-only)
 //             Transition, Terminal (Copy leaf/phase nodes)
 //   plateau:  BasisEdge, Plateau  (contour map)
@@ -156,12 +156,14 @@ mod tests;
 //             WeightedSampler
 pub use contour_range::{BasisElement, ContourRange, ContourRangeEnergy};
 pub use gnode::GState;
-pub use graph::{Config, GNodeInfo, GvGraph};
-pub use handle::{GNodeId, VNodeId};
+#[doc(hidden)]
+pub use graph::GNodeChildren;
+pub use graph::{Config, GvGraph};
+pub use handle::GNodeId;
 pub use pewei::{Layer, Pewei, Terminal, Transition};
 pub use plateau::{BasisEdge, Plateau};
 pub use traits::{
-    Accumulator, Attenuatable, Coordinate, Inspectable, Observation, Proratable, Rng, SpatialRead, SpatialWrite, TemporalDecay,
-    Weighable, WeightedSampler,
+    Accumulator, Attenuatable, Coordinate, Inspectable, Observation, Proratable, Rng, ScalableObservation, SpatialRead,
+    SpatialWrite, TemporalDecay, Weighable, WeightedSampler,
 };
 pub use view::{Cell, Node, Span};

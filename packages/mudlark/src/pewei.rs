@@ -170,7 +170,7 @@ pub struct Pewei<C: Coordinate, V: Accumulator> {
     pub layers: Vec<Layer<C, V>>,
 }
 
-impl<C: Coordinate, V: Accumulator + Proratable> Pewei<C, V> {
+impl<C: Coordinate, V: Accumulator> Pewei<C, V> {
     /// Number of layers.
     ///
     /// # Examples
@@ -197,6 +197,8 @@ impl<C: Coordinate, V: Accumulator + Proratable> Pewei<C, V> {
     }
 
     /// Total number of nodes (transitions + terminals) across all layers.
+    ///
+    /// This walks all layers — $O(L)$ where $L$ is `layer_count()`.
     ///
     /// # Examples
     ///
@@ -258,7 +260,9 @@ impl<C: Coordinate, V: Accumulator + Proratable> Pewei<C, V> {
         }
         acc
     }
+}
 
+impl<C: Coordinate, V: Accumulator + Proratable> Pewei<C, V> {
     /// Reconstruct a signal estimate from the first `max_layer + 1`
     /// layers of this PEWEI.
     ///

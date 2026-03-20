@@ -58,7 +58,7 @@ src/
 ├── view.rs             # Span, Cell, Node: snapshot view types
 │
 │   ── Surface 2 — Film ────────────────────────────
-├── graph.rs            # GvGraph struct, Config, GNodeInfo, new(), accessors
+├── graph.rs            # GvGraph struct, Config, GNodeChildren, new(), accessors
 ├── traits/             # Chemistry contracts and instrument traits (ADR-M-009, ADR-M-033)
 │   ├── mod.rs          # Re-exports, module-level docs
 │   ├── accumulator.rs  # Accumulator trait (ordered commutative monoid)
@@ -204,9 +204,11 @@ and cross-tree V-entry link (`entry`).
 (ADR-M-016): `Terminal` (0 children), `SemiInternal` (1 child),
 `Internal` (2 children).
 
-`GNodeInfo<C, V>` (Surface 1, ADR-M-036) is the read-only snapshot
-of a G-node's structural state — range, own/sum, depth, state,
-child IDs, and parent ID. Obtained via `GvGraph::gnode_info()`.
+`GvGraph::gnode_info()` returns a `Node<C, V>` (Surface 1, ADR-M-036)
+— the read-only snapshot of a G-node's spatial state: range, own/sum,
+depth, state, and gnode_id. Mutable child linkage (left, right)
+is available via the `#[doc(hidden)]` `gnode_children()` method.
+For the stable parent pointer, see `Node::parent`.
 
 ### 3.4 VNode — tournament node (ADR-M-002, ADR-M-029)
 
@@ -249,7 +251,7 @@ pub struct GvGraph<C: Coordinate, V: Accumulator, const N: u32> {
     live_depth_create: u32,           // dynamic (ADR-M-017)
     depth_buffer: u32,                // D_evict − D_create, fixed at construction
     headroom: usize,                  // 3^(buffer+1) (ADR-M-018)
-    soft_limit: Option<usize>,        // budget − headroom (ADR-M-018)
+    soft_limit: Option<usize>,        // budget − max(headroom, 2(D_c−1)); dynamic (ADR-M-018)
 
     // ── cfg(feature = "dynamic-contour-tracking") ──
     plateaus: BTreeMap<BasisEdge<C>, Plateau<C, V>>,   // live contour mirror (ADR-M-026)
@@ -299,7 +301,7 @@ Both share the same $O(N)$ G-Tree walk and require
 `[lo, hi)`, snaps outward to the nearest lattice-aligned endpoints
 that span all overlapping plateaus.  Returns a `(BasisEdge, BasisEdge)`
 pair valid for `contour_range()`.  Cost: $O(\log P)$.  Requires
-`V: Proratable + Inspectable`.
+`V: Inspectable`.
 
 ### 4.4 Depth computation — `gtree::gnode_depth_from_interval`
 
@@ -345,8 +347,8 @@ Weighted random walk from V-root to leaf entry, choosing each child
 with probability proportional to its cached intensity via
 cumulative-sum scan over `PackedChildren::intensities`. Returns
 `Option<Cell<C, V>>` — `None` when total intensity is zero.
-Expected cost: $O(1.44\, H + 1.67)$ where $H$ is the Shannon
-entropy. Requires `V: Weighable`.
+Expected cost: $O(1.44\,H)$ where $H$ is the Shannon entropy.
+Requires `V: Weighable`.
 
 ### 5.5 Evictable flag propagation — `vtree::propagate_evictable_flags`
 
@@ -713,14 +715,14 @@ can call `assert_invariants()`.
 
 `GvGraph` methods are split across six focused modules. The core
 module (`graph.rs`) holds the struct definition, `Config`,
-`GNodeInfo`, `new()`, and accessors. Each satellite module contains
+`GNodeChildren`, `new()`, and accessors. Each satellite module contains
 one cohesive concern as `impl GvGraph` blocks:
 
 | Module              | Concern                                                              | Key ADRs      |
 | ------------------- | -------------------------------------------------------------------- | ------------- |
-| `graph.rs`          | Struct, `Config`, `GNodeInfo`, `new()`, core accessors               | ADR-M-005, -006 |
-| `graph_plateau.rs`  | Plateau tracking: incremental contour maintenance, normalization     | ADR-M-026, -031 |
-| `graph_query.rs`    | Read queries: `sample`, `get`, `range_sum`, `contour_range`, `contour_range_energy`, `select_plateaus` | ADR-M-019, -020, -037 |
+| `graph.rs`          | Struct, `Config`, `GNodeChildren`, `new()`, core accessors              | ADR-M-005, -006 |
+| `graph_plateau.rs`  | Plateau tracking: incremental contour maintenance, normalization, `select_plateaus` | ADR-M-026, -031, -037 |
+| `graph_query.rs`    | Read queries: `sample`, `get`, `range_sum`, `contour_range`, `contour_range_energy` | ADR-M-019, -020, -037 |
 | `graph_extract.rs`  | PEWEI extraction, layer iteration, `from_observations`               | ADR-M-021, -022 |
 | `graph_budget.rs`   | Budget enforcement, depth-gate adjustment, eviction orchestration    | ADR-M-015, -017, -018 |
 | `graph_traits.rs`   | Trait impls: `SpatialRead`, `SpatialWrite`, `TemporalDecay`, `WeightedSampler` | ADR-M-009 |

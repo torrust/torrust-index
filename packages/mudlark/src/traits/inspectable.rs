@@ -12,10 +12,12 @@ use super::Accumulator;
 /// [`GvGraph`](crate::GvGraph) operations:
 /// [`observe`](crate::GvGraph::observe),
 /// [`extract`](crate::GvGraph::extract),
-/// [`layers`](crate::GvGraph::layers), and
-/// [`check_evictions`](crate::GvGraph::check_evictions).  In
-/// practice, any useful `V` type should implement this — it is the
-/// most commonly needed sub-trait.
+/// [`layers`](crate::GvGraph::layers),
+/// [`check_evictions`](crate::GvGraph::check_evictions),
+/// [`contour_range`](crate::GvGraph::contour_range), and
+/// [`contour_range_energy`](crate::GvGraph::contour_range_energy).
+/// In practice, any useful `V` type should implement this — it is
+/// the most commonly needed sub-trait.
 ///
 /// Semantically distinct from
 /// [`Weighable::weight`](super::Weighable::weight) — this is for

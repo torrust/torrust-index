@@ -340,6 +340,7 @@ pub fn check_all_invariants<C: Coordinate, V: Accumulator + Inspectable, const N
 
 // ── G-I1: Summation invariant ───────────────────────────────────────
 
+#[allow(clippy::float_cmp)] // Intentional: ∞ == ∞ short-circuits before ∞ − ∞ = NaN.
 fn check_g_i1_summation<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(
     graph: &GvGraph<C, V, N>,
     errors: &mut Vec<String>,
@@ -349,7 +350,7 @@ fn check_g_i1_summation<C: Coordinate, V: Accumulator + Inspectable, const N: u3
         let right_sum = g.right.map_or(0.0, |r| graph.gnodes().get(r.index()).sum.to_f64_approx());
         let expected = g.own.to_f64_approx() + left_sum + right_sum;
         let actual = g.sum.to_f64_approx();
-        if (expected - actual).abs() > 1e-9 {
+        if expected != actual && (expected - actual).abs() > 1e-9 {
             errors.push(format!(
                 "G-I1 violated at G-node {idx}: expected sum={expected}, actual sum={actual} \
                  (own={}, left_sum={left_sum}, right_sum={right_sum})",
@@ -393,7 +394,8 @@ fn check_g_i4_entry_consistency<C: Coordinate, V: Accumulator + Inspectable, con
             // Intensity must match own.
             let g_own = g.own.to_f64_approx();
             let v_int = v.intensity.to_f64_approx();
-            if (g_own - v_int).abs() > 1e-9 {
+            #[allow(clippy::float_cmp)] // Intentional: ∞ == ∞ short-circuit.
+            if g_own != v_int && (g_own - v_int).abs() > 1e-9 {
                 errors.push(format!(
                     "G-I4 violated at G-node {idx}: g.own={g_own}, entry.intensity={v_int}"
                 ));
@@ -421,6 +423,7 @@ fn check_g_i4_entry_consistency<C: Coordinate, V: Accumulator + Inspectable, con
 
 // ── V-I1: Structural sum consistency ────────────────────────────────
 
+#[allow(clippy::float_cmp)] // Intentional: ∞ == ∞ short-circuits before ∞ − ∞ = NaN.
 fn check_v_i1_structural_sum<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(
     graph: &GvGraph<C, V, N>,
     errors: &mut Vec<String>,
@@ -441,7 +444,9 @@ fn check_v_i1_structural_sum<C: Coordinate, V: Accumulator + Inspectable, const 
                     continue;
                 }
                 let actual_int = graph.vnodes().get(child_id.index()).intensity;
-                if (cached_int.to_f64_approx() - actual_int.to_f64_approx()).abs() > 1e-9 {
+                if (cached_int.to_f64_approx() != actual_int.to_f64_approx())
+                    && (cached_int.to_f64_approx() - actual_int.to_f64_approx()).abs() > 1e-9
+                {
                     errors.push(format!(
                         "V-I1 cached intensity mismatch at V-node {idx}, child {}: \
                          cached={}, actual={}",
@@ -454,7 +459,7 @@ fn check_v_i1_structural_sum<C: Coordinate, V: Accumulator + Inspectable, const 
             }
 
             let node_int = v.intensity.to_f64_approx();
-            if (node_int - sum).abs() > 1e-9 {
+            if node_int != sum && (node_int - sum).abs() > 1e-9 {
                 errors.push(format!(
                     "V-I1 violated at V-node {idx}: intensity={node_int}, sum of children={sum}"
                 ));
@@ -623,6 +628,7 @@ fn check_v_i7_structural_flag<C: Coordinate, V: Accumulator + Inspectable, const
 
 // ── Clean accounting ────────────────────────────────────────────────
 
+#[allow(clippy::float_cmp)] // Intentional: ∞ == ∞ short-circuit.
 fn check_clean_accounting<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(
     graph: &GvGraph<C, V, N>,
     errors: &mut Vec<String>,
@@ -634,7 +640,7 @@ fn check_clean_accounting<C: Coordinate, V: Accumulator + Inspectable, const N: 
         }
     }
     let g_root_sum = graph.gnodes().get(graph.g_root().index()).sum.to_f64_approx();
-    if (total_v - g_root_sum).abs() > 1e-9 {
+    if total_v != g_root_sum && (total_v - g_root_sum).abs() > 1e-9 {
         errors.push(format!(
             "Clean accounting violated: V-entry sum={total_v}, G-root sum={g_root_sum}"
         ));
@@ -908,6 +914,7 @@ fn check_plateau_basis_consistency<C: Coordinate, V: Accumulator + Inspectable, 
 
 /// For each plateau: `p.sum == Σ gnodes[r].sum for r in basis_elements(key)`.
 #[cfg(feature = "dynamic-contour-tracking")]
+#[allow(clippy::float_cmp)]
 fn check_plateau_sum_consistency<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(
     graph: &GvGraph<C, V, N>,
     errors: &mut Vec<String>,
@@ -921,7 +928,7 @@ fn check_plateau_sum_consistency<C: Coordinate, V: Accumulator + Inspectable, co
             .map(|&gid| graph.gnodes().get(gid.index()).sum.to_f64_approx())
             .sum();
         let actual = plateau.sum.to_f64_approx();
-        if (expected - actual).abs() > 1e-9 {
+        if expected != actual && (expected - actual).abs() > 1e-9 {
             errors.push(format!(
                 "Plateau sum: key {key:?}: expected sum={expected}, actual sum={actual}"
             ));

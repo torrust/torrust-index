@@ -19,7 +19,7 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = ["dynamic-contour-tracking", "rand", "serde"]
+default = ["dynamic-contour-tracking", "rand"]
 dynamic-contour-tracking = []
 rand = ["dep:rand_core"]
 serde = ["dep:serde"]

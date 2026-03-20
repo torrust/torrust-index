@@ -353,6 +353,7 @@ pub fn compute_plateau_energy<C: Coordinate, V: Accumulator>(
 ///
 /// Skipped in release builds.
 #[cfg(debug_assertions)]
+#[allow(clippy::float_cmp)]
 pub fn debug_assert_contour_range_invariants<C, V>(cr: &ContourRange<C, V>)
 where
     C: Coordinate,
@@ -401,7 +402,7 @@ where
     let energy_f64 = cr.energy.to_f64_approx();
     let sum_f64 = sum.to_f64_approx();
     debug_assert!(
-        (energy_f64 - sum_f64).abs() < 1e-10,
+        energy_f64 == sum_f64 || (energy_f64 - sum_f64).abs() < 1e-10,
         "§CR.6: energy ({energy_f64}) != Σ basis.sum ({sum_f64})",
     );
 
@@ -416,8 +417,12 @@ where
     let cross_f64 = cr.cross_plateau_energy.to_f64_approx();
     let plateau_f64 = cr.plateau_energy.to_f64_approx();
     let expected_cross = energy_f64 - plateau_f64;
-    debug_assert!(
-        (cross_f64 - expected_cross).abs() < 1e-10,
-        "cross_plateau_energy ({cross_f64}) != energy - plateau_energy ({expected_cross})",
-    );
+    // When energy and plateau_energy are both infinite, energy − plateau
+    // is NaN — the decomposition is indeterminate.  Skip the check.
+    if !expected_cross.is_nan() {
+        debug_assert!(
+            cross_f64 == expected_cross || (cross_f64 - expected_cross).abs() < 1e-10,
+            "cross_plateau_energy ({cross_f64}) != energy - plateau_energy ({expected_cross})",
+        );
+    }
 }

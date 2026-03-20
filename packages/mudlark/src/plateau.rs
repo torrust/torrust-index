@@ -212,6 +212,12 @@ impl<C: Coordinate> Eq for BasisEdge<C> {}
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Plateau<C: Coordinate, V: Accumulator> {
     /// [`BasisEdge`] key identifying this plateau in the contour map.
+    ///
+    /// Always equals the `BTreeMap` key this plateau is stored under
+    /// (enforced by the key-consistency invariant). Included so the
+    /// value remains self-describing when detached from the map — via
+    /// `.values()`, serde round-trips, or passing across API
+    /// boundaries.
     pub basis_edge: BasisEdge<C>,
     /// Spatial range start (inclusive).
     pub start: C,

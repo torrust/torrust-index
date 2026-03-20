@@ -104,7 +104,8 @@ pub trait TemporalDecay: SpatialRead {
     ///   entire domain.
     /// - `attenuation` — base multiplicative factor at the midpoint
     ///   depth.  Values in `(0, 1)` attenuate; `> 1.0` amplifies;
-    ///   `0.0` annihilates.
+    ///   `0.0` annihilates; `∞` is infinite amplification (mirror
+    ///   of annihilation).
     /// - `q` — depth selectivity in `[0.0, 1.0]`: `0.0` applies
     ///   uniform scaling at every depth; higher values make shallow
     ///   and deep nodes scale at different rates.

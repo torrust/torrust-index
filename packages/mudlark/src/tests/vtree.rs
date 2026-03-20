@@ -3,13 +3,14 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use crate::GNodeId;
 use crate::arena::Arena;
 use crate::gnode::GNode;
+use crate::handle::VNodeId;
 use crate::rebalance::{find_violated_nodes, is_violated};
 use crate::traits::{Accumulator, Coordinate};
 use crate::vnode::{DEPTH_STALE, PackedChildren, VKind, VNode};
 use crate::vtree::{propagate_evictable_flags, propagate_v_sums, replace_child_in_parent, v_depth, vtree_remove_leaf};
-use crate::{GNodeId, VNodeId};
 
 // ── Test-only V-Tree insertion (moved from vtree.rs) ────────────────
 

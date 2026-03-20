@@ -3,7 +3,8 @@
 
 use std::mem::size_of;
 
-use crate::{GNodeId, VNodeId};
+use crate::GNodeId;
+use crate::handle::VNodeId;
 
 #[test]
 fn handle_round_trip() {

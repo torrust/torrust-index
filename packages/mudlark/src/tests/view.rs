@@ -130,6 +130,7 @@ fn node_terminal_to_cell() {
         depth: 2,
         state: GState::Terminal,
         gnode_id: GNodeId::from_index(0),
+        parent: None,
     };
     let cell = node.to_cell().expect("terminal → Some(Cell)");
     assert_eq!(cell.start, 0);
@@ -148,6 +149,7 @@ fn node_internal_to_cell_none() {
         depth: 1,
         state: GState::Internal,
         gnode_id: GNodeId::from_index(0),
+        parent: None,
     };
     assert!(node.to_cell().is_none());
 }
@@ -162,6 +164,7 @@ fn node_semi_internal_to_cell_none() {
         depth: 1,
         state: GState::SemiInternal,
         gnode_id: GNodeId::from_index(0),
+        parent: None,
     };
     assert!(node.to_cell().is_none());
 }
@@ -176,6 +179,7 @@ fn node_is_terminal() {
         depth: 3,
         state: GState::Terminal,
         gnode_id: GNodeId::from_index(0),
+        parent: None,
     };
     assert!(terminal.is_terminal());
 
@@ -187,6 +191,7 @@ fn node_is_terminal() {
         depth: 1,
         state: GState::Internal,
         gnode_id: GNodeId::from_index(0),
+        parent: None,
     };
     assert!(!internal.is_terminal());
 }
@@ -201,6 +206,7 @@ fn node_to_span_uses_sum() {
         depth: 0,
         state: GState::Internal,
         gnode_id: GNodeId::from_index(0),
+        parent: None,
     };
     let span = node.to_span();
     assert_eq!(span.intensity, 42); // sum, not own
@@ -216,6 +222,7 @@ fn node_width() {
         depth: 1,
         state: GState::Terminal,
         gnode_id: GNodeId::from_index(0),
+        parent: None,
     };
     assert_eq!(node.width(), 8);
 }
@@ -230,6 +237,7 @@ fn node_copy_semantics() {
         depth: 1,
         state: GState::Internal,
         gnode_id: GNodeId::from_index(0),
+        parent: None,
     };
     let b = a;
     assert_eq!(a, b);
@@ -245,6 +253,7 @@ fn node_f64_types() {
         depth: 1,
         state: GState::SemiInternal,
         gnode_id: GNodeId::from_index(0),
+        parent: None,
     };
     assert!((node.width() - 8.0).abs() < f64::EPSILON);
     assert!(node.to_cell().is_none());
@@ -264,6 +273,7 @@ fn node_refinement_internal() {
         depth: 1,
         state: GState::Internal,
         gnode_id: GNodeId::from_index(0),
+        parent: None,
     };
     assert_eq!(node.refinement(), 20); // 25 - 5
 }
@@ -278,6 +288,7 @@ fn node_refinement_terminal_is_zero() {
         depth: 2,
         state: GState::Terminal,
         gnode_id: GNodeId::from_index(0),
+        parent: None,
     };
     assert_eq!(node.refinement(), 0);
 }
@@ -292,6 +303,7 @@ fn node_refinement_f64() {
         depth: 1,
         state: GState::SemiInternal,
         gnode_id: GNodeId::from_index(0),
+        parent: None,
     };
     assert!((node.refinement() - 3.0).abs() < f64::EPSILON);
 }

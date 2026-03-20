@@ -20,17 +20,27 @@ use crate::traits::{Accumulator, Coordinate, Inspectable, Proratable, Weighable}
 impl<C: Coordinate, V: Accumulator + Weighable, const N: u32> GvGraph<C, V, N> {
     // ── Sampling (Phase 4, Step 1 — ADR-M-019) ───────────────────
 
-    /// Sample a terminal cell with probability proportional to its
+    /// Sample a contour cell with probability proportional to its
     /// intensity.
     ///
     /// Performs a weighted random walk from the V-Tree root to a
     /// V-Entry, choosing each child with probability proportional to
-    /// its cached intensity (§IDEA M-6.5, ADR-M-019).
+    /// its cached intensity (§IDEA M-6.5, ADR-M-019). The returned
+    /// [`Cell`](crate::view::Cell) covers the entry's uncovered
+    /// interval — the full range for terminals, the vacated half for
+    /// semi-internals.
     ///
     /// Returns `None` if total intensity is zero (DC-019-2).
     ///
-    /// Expected cost: $O(1.44\, H + 1.67)$ where $H$ is the Shannon
-    /// entropy of the intensity distribution.
+    /// Correctness requires all intensities to be non-negative (P1).
+    /// Negative intensities — possible when `V = f64` and a
+    /// negative delta is observed — make probability ratios
+    /// undefined.  `observe()` guards against this with a
+    /// `debug_assert!` (ADR-M-033).
+    ///
+    /// Expected cost: $O(H / \log_2 \varphi) = O(1.44\,H)$ node
+    /// visits, where $H$ is the Shannon entropy of the intensity
+    /// distribution (§IDEA M-18.2, §THEORY M-4.3).
     ///
     /// With the `rand` feature (enabled by default), any
     /// [`rand_core::Rng`] type satisfies the [`Rng`](crate::Rng)
@@ -65,6 +75,7 @@ impl<C: Coordinate, V: Accumulator + Weighable, const N: u32> GvGraph<C, V, N> {
     /// assert!(cell.start <= 100 && 100 < cell.end);
     /// ```
     #[must_use]
+    #[allow(clippy::doc_markdown)] // KaTeX math notation, not a code identifier
     pub fn sample(&self, rng: &mut impl crate::traits::Rng) -> Option<crate::view::Cell<C, V>> {
         use crate::vnode::VKind;
 
@@ -80,11 +91,12 @@ impl<C: Coordinate, V: Accumulator + Weighable, const N: u32> GvGraph<C, V, N> {
             match &vnode.kind {
                 VKind::Entry { gnode, .. } => {
                     let g = self.gnodes.get(gnode.index());
+                    let (start, end) = Self::uncovered_interval(g);
                     return Some(crate::view::Cell {
-                        start: g.lo,
-                        end: g.hi,
+                        start,
+                        end,
                         intensity: g.own,
-                        depth: crate::gtree::gnode_depth_from_interval(g.lo, g.hi, N),
+                        depth: crate::gtree::gnode_depth_from_interval(start, end, N),
                     });
                 }
                 VKind::Structural { children, .. } => {
@@ -217,7 +229,30 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
         }
     }
 
-    /// Trim a G-node's interval to the effective half for semi-internals.
+    /// Return the uncovered interval of a G-node.
+    ///
+    /// - **Terminal / Internal:** `(g.lo, g.hi)` — the full range.
+    /// - **Semi-internal (left child present):** uncovered right half `[mid, hi)`.
+    /// - **Semi-internal (right child present):** uncovered left half `[lo, mid)`.
+    ///
+    /// Unlike [`trimmed_interval`](Self::trimmed_interval), this
+    /// variant does not require a coordinate and has no debug
+    /// assertions about routing direction — suitable for
+    /// [`sample()`](Self::sample) where no query coordinate exists.
+    #[inline]
+    fn uncovered_interval(g: &GNode<C, V>) -> (C, C) {
+        use crate::gnode::GState;
+        match g.state() {
+            GState::Terminal | GState::Internal => (g.lo, g.hi),
+            GState::SemiInternal => {
+                let mid = C::midpoint(g.lo, g.hi);
+                if g.left.is_some() { (mid, g.hi) } else { (g.lo, mid) }
+            }
+        }
+    }
+
+    /// Trim a G-node's interval to the effective half for semi-internals,
+    /// with a routing-direction assertion.
     ///
     /// - **Terminal / Internal:** returns `(g.lo, g.hi)`.
     /// - **Semi-internal (left child):** uncovered right half `[mid, hi)`.
@@ -470,11 +505,10 @@ impl<C: Coordinate, V: Accumulator + Proratable + Inspectable, const N: u32> GvG
 
     /// Energy-only contour-range query (§CR.6, §CR.13).
     ///
-    /// Returns the energy scalars without exposing the decomposition
-    /// vectors.  Same lattice-endpoint requirement as
-    /// [`contour_range()`](Self::contour_range).
-    ///
-    /// Cost: O(N).
+    /// Same lattice-endpoint requirement and O(N) cost as
+    /// [`contour_range()`](Self::contour_range) — the basis set is
+    /// computed internally but not exposed.  Returns only the scalar
+    /// energy fields.
     ///
     /// Returns `None` if either endpoint is not in the endpoint lattice
     /// or `start >= end`.
@@ -517,80 +551,6 @@ impl<C: Coordinate, V: Accumulator + Proratable + Inspectable, const N: u32> GvG
             cross_plateau_energy: cr.cross_plateau_energy,
             plateau_count: cr.plateau_count,
         })
-    }
-
-    /// Plateau selection (§CR.12): given an arbitrary dyadic range
-    /// `[lo, hi)`, find the contiguous run of overlapping plateaus
-    /// and return their lattice-aligned endpoints.
-    ///
-    /// The returned pair `(start, end)` are valid [`BasisEdge`]s for
-    /// [`contour_range()`](Self::contour_range) and
-    /// [`contour_range_energy()`](Self::contour_range_energy).
-    ///
-    /// Returns `None` if:
-    /// - The plateau map is empty (no observations).
-    /// - `lo >= hi`.
-    /// - No plateau overlaps `[lo, hi)`.
-    ///
-    /// Cost: $O(\log P)$ — two lookups in the plateau ordered map.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use torrust_mudlark::{Config, GvGraph, BasisEdge};
-    ///
-    /// let cfg = Config {
-    ///     split_threshold: 2u64,
-    ///     depth_create: 3,
-    ///     depth_evict: 6,
-    ///     budget: None,
-    ///     alpha_relax: 0.75,
-    ///     bounded_eviction: true,
-    /// };
-    /// let mut g = GvGraph::<u64, u64, 8>::new(cfg);
-    /// for _ in 0..10 {
-    ///     g.observe(16, 5u64);
-    ///     g.observe(48, 5u64);
-    /// }
-    ///
-    /// // Arbitrary coordinates → lattice-aligned contour range endpoints.
-    /// if let Some((start, end)) = g.select_plateaus(10, 60) {
-    ///     let cr = g.contour_range(start, end).unwrap();
-    ///     assert!(cr.basis.len() >= 1);
-    /// }
-    /// ```
-    #[must_use]
-    pub fn select_plateaus(&self, lo: C, hi: C) -> Option<(BasisEdge<C>, BasisEdge<C>)> {
-        use std::ops::Bound;
-
-        if lo >= hi {
-            return None;
-        }
-
-        let plateaus = self.plateaus();
-        if plateaus.is_empty() {
-            return None;
-        }
-
-        // §CR.12: find the largest a_j ≤ lo  (floor index)
-        let start_entry = plateaus.range(..=BasisEdge(lo)).next_back().map(|(k, _)| *k)?;
-
-        // §CR.12: find the last plateau whose basis edge is < hi.
-        let last_plateau_key = plateaus.range(..BasisEdge(hi)).next_back().map(|(k, _)| *k)?;
-
-        // The end endpoint is the next key after last_plateau_key,
-        // or the domain sentinel 2^N.
-        let end = plateaus
-            .range((Bound::Excluded(last_plateau_key), Bound::Unbounded))
-            .next()
-            .map_or_else(|| BasisEdge(C::domain_max(N)), |(k, _)| *k);
-
-        // Sanity: start < end (should always hold given the above logic).
-        if start_entry >= end {
-            return None;
-        }
-
-        Some((start_entry, end))
     }
 
     /// Recursive G-Tree descent for basis set collection (§CR.8.1).

@@ -103,11 +103,13 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
 
     // ── Eviction wiring (Step 7, ADR-M-015) ───────────────────────
 
-    /// Evict **all** eligible candidates (unbounded mode).
+    /// Evict all V-depth-eligible candidates without an eviction-count cap.
     ///
-    /// Scans the V-Tree, re-verifies each candidate, calls
-    /// `evict_tip()`, and performs a trailing rebalance if any
-    /// evictions occurred. Returns the number of entries evicted.
+    /// Unlike the budget-triggered eviction at the end of [`observe()`](Self::observe)
+    /// — which, when `bounded_eviction` is `true`,
+    /// stops once the node count drops to the soft limit — this method
+    /// processes every candidate whose V-depth exceeds the current `D_evict`
+    /// gate. Returns the number of entries evicted.
     ///
     /// Eligible candidates are V-Tree entries whose depth exceeds
     /// the live `D_evict` gate.  In a fresh or lightly-populated

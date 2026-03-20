@@ -287,6 +287,7 @@ impl<C: Coordinate, V: Accumulator, const N: u32> Iterator for Layers<'_, C, V, 
                         depth: g_depth,
                         state: g.state(),
                         gnode_id: *gnode,
+                        parent: g.parent,
                     };
                     return Some((bfs_depth, node));
                 }

@@ -3,10 +3,9 @@
 
 use std::sync::atomic::AtomicU32;
 
-use crate::VNodeId;
 use crate::arena::Arena;
 use crate::gnode::GNode;
-use crate::handle::GNodeId;
+use crate::handle::{GNodeId, VNodeId};
 use crate::rebalance::{
     ViolationSources, contract, find_violated_nodes, is_violated, push_collapse_violations_with_config,
     push_contraction_child_violations, push_cousin_violations_with_config, push_leaf_removal_violations_with_config,

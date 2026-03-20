@@ -104,6 +104,10 @@ pub trait Attenuatable: Accumulator {
     /// `0.0` annihilates (producing `zero()`), and values above
     /// `1.0` amplify.
     ///
+    /// If either `self` or `factor` is zero the result is zero —
+    /// IEEE 754's `0.0 * ∞ = NaN` does not apply in this domain
+    /// (amplifying nothing is nothing; annihilating anything is zero).
+    ///
     /// For built-in types: `(self as f64 * factor) as Self`.
     /// Custom types may snap to the nearest representable level.
     #[must_use]
@@ -132,6 +136,9 @@ impl Attenuatable for f32 {
     #[inline]
     #[allow(clippy::cast_possible_truncation)]
     fn attenuate(self, factor: f64) -> Self {
+        if self == 0.0 || factor == 0.0 {
+            return 0.0;
+        }
         (f64::from(self) * factor) as Self
     }
 }
@@ -139,6 +146,9 @@ impl Attenuatable for f32 {
 impl Attenuatable for f64 {
     #[inline]
     fn attenuate(self, factor: f64) -> Self {
+        if self == 0.0 || factor == 0.0 {
+            return 0.0;
+        }
         self * factor
     }
 }

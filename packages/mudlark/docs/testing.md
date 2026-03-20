@@ -35,7 +35,7 @@ cargo doc -p torrust-mudlark --all-features --no-deps
 
 ## Test Suite Breakdown
 
-841 tests across unit, integration, and doc-test suites (with `--all-features`).
+868 tests across unit, integration, and doc-test suites (with `--all-features`).
 
 ### Unit tests (`src/`)
 
@@ -61,6 +61,7 @@ split logic, and the observation pipeline.
 | `cascade`                 |      18 | Multi-level split cascades                                 |
 | `contour_range`           |      23 | Contour range decomposition (ADR-M-037, revised)           |
 | `cross_type`              |      14 | Different coordinate/value type combinations               |
+| `decay_infinite`          |      25 | Infinite attenuation, factor-table depth bound (ADR-M-038) |
 | `eviction`                |      16 | Eviction ordering and correctness                          |
 | `eviction_debug`          |       7 | Debug-only eviction assertions                             |
 | `eviction_p_i2`           |       4 | P-I² eviction policy edge cases                            |
@@ -71,10 +72,11 @@ split logic, and the observation pipeline.
 | `graph_sample`            |       9 | Proportional sampling correctness                          |
 | `graph_terminal`          |       7 | Terminal node behaviour                                    |
 | `hex_binary_tree_mapping` |      53 | Hex ↔ binary tree coordinate mapping                       |
+| `negative_f64`            |       2 | Negative `f64` observations and property-profile violations |
 | `plateau`                 |      22 | Plateau projection                                         |
 | `sentinel_api`            |      14 | Sentinel integration API (ADR-M-036)                       |
 | `stress_patterns`         |      62 | High-volume adversarial and randomised workloads           |
-| **Subtotal**              | **388** |                                                            |
+| **Subtotal**              | **415** |                                                            |
 
 ### Doc-tests
 
@@ -89,9 +91,9 @@ split logic, and the observation pipeline.
 | Category    |   Tests |
 | ----------- | ------: |
 | Unit        |     346 |
-| Integration |     388 |
+| Integration |     415 |
 | Doc-tests   |     107 |
-| **Total**   | **841** |
+| **Total**   | **868** |
 
 ---
 

@@ -3,7 +3,7 @@
 
 use std::mem::size_of;
 
-use crate::VNodeId;
+use crate::handle::VNodeId;
 use crate::vnode::{PackedChildren, VNode};
 
 // ── Test-only PackedChildren methods ────────────────────────────────

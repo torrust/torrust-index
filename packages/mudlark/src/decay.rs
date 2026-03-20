@@ -30,7 +30,10 @@ impl<C: Coordinate, V: Accumulator + Attenuatable + Inspectable, const N: u32> G
     ///   the entire tree.
     /// - `attenuation`: base decay factor, applied at the midpoint
     ///   depth of the subtree. Values in `(0, 1)` cause exponential
-    ///   decay. Values above `1.0` amplify.
+    ///   decay. Values above `1.0` amplify. `0.0` annihilates
+    ///   (§THEORY M-7.3): at `q < 1` the entire subtree is zeroed;
+    ///   at `q = 1` the `0^0 = 1` convention preserves the root
+    ///   while zeroing all descendants (detail flush).
     /// - `q`: selectivity in `[0, 1]`.
     ///   - `0.0` = uniform: all subbands decay at the same rate.
     ///   - `> 0.0` = selective: coarse persists, fine fades faster.
@@ -39,7 +42,8 @@ impl<C: Coordinate, V: Accumulator + Attenuatable + Inspectable, const N: u32> G
     ///
     /// # Panics
     ///
-    /// - `attenuation <= 0.0` or `attenuation.is_nan()`.
+    /// - `root` is not live (freed arena slot).
+    /// - `attenuation < 0.0` or `attenuation.is_nan()`.
     /// - `q < 0.0`, `q > 1.0`, or `q.is_nan()`.
     ///
     /// # Cost
@@ -86,8 +90,8 @@ impl<C: Coordinate, V: Accumulator + Attenuatable + Inspectable, const N: u32> G
             root.index()
         );
         assert!(
-            attenuation > 0.0 && !attenuation.is_nan(),
-            "decay: attenuation must be > 0 and not NaN, got {attenuation}"
+            attenuation >= 0.0 && !attenuation.is_nan(),
+            "decay: attenuation must be >= 0 and not NaN, got {attenuation}"
         );
         assert!(
             (0.0..=1.0).contains(&q) && !q.is_nan(),
@@ -198,62 +202,117 @@ impl<C: Coordinate, V: Accumulator + Attenuatable + Inspectable, const N: u32> G
 
     /// Per-depth factor table, bottom-up G-sum recompute, trailing
     /// rebalance.
+    ///
+    /// # Implementation note (ADR-M-038)
+    ///
+    /// The depth range for the factor table is derived from the
+    /// *actual* maximum G-tree depth within the subtree, not from N.
+    /// For float coordinates, G-tree depth can exceed N because
+    /// `attempt_split` gates on V-tree depth, not `is_final`.
+    #[allow(clippy::too_many_lines)]
     fn decay_selective(&mut self, root: GNodeId, att: f64, q: f64, is_global: bool) {
         let _span = tracing::debug_span!("decay_selective", root = root.index(), att, q, is_global,).entered();
 
         let d_root = self.gnode_depth(root);
-        let depth_range = N - d_root;
 
-        // 1. Precompute per-depth factor table.
-        //    factors[d_local] = exp(ln(att) * (1 + q * (2*d_local/D - 1)))
-        let ln_att = att.ln();
-        let factors: Vec<f64> = (0..=depth_range)
-            .map(|d_local| {
-                let t = if depth_range == 0 {
-                    0.0
-                } else {
-                    2.0 * f64::from(d_local) / f64::from(depth_range) - 1.0
-                };
-                (ln_att * q.mul_add(t, 1.0)).exp()
-            })
-            .collect();
-
-        // 2. DFS walk: collect nodes in pre-order for bottom-up
-        //    reversal, scale g.own per depth.
+        // 1. DFS pass 1: collect nodes in pre-order and find the
+        //    actual maximum G-tree depth within the subtree
+        //    (ADR-M-038 §DC-038-1).
         let mut order = Vec::new();
-        let mut stack = vec![root];
-        while let Some(gid) = stack.pop() {
-            order.push(gid);
+        let mut max_depth = d_root;
+        {
+            let mut stack = vec![root];
+            while let Some(gid) = stack.pop() {
+                order.push(gid);
+                let depth = self.gnode_depth(gid);
+                if depth > max_depth {
+                    max_depth = depth;
+                }
+                let g = self.gnodes.get(gid.index());
+                if let Some(left) = g.left {
+                    stack.push(left);
+                }
+                if let Some(right) = g.right {
+                    stack.push(right);
+                }
+            }
+        }
+        let depth_range = max_depth - d_root;
 
-            let g = self.gnodes.get(gid.index());
+        // 2. Precompute per-depth factor table.
+        //    factors[d_local] = att^(1 + q * (2*d_local/D - 1))
+        //
+        //    At att = 0 (annihilation, §THEORY M-7.3) the ln-based
+        //    formula is undefined (ln 0 = -∞). We compute 0^exponent
+        //    directly, using the convention 0^0 = 1 (detail flush).
+        #[allow(clippy::float_cmp)] // Intentional exact comparison for the att=0/inf branches.
+        let factors: Vec<f64> = if att == 0.0 {
+            // Annihilation (§THEORY M-7.3): 0^exponent, using 0^0 = 1.
+            (0..=depth_range)
+                .map(|d_local| {
+                    let exponent = if depth_range == 0 {
+                        1.0 // Single node: 0^1 = 0.
+                    } else {
+                        let t = 2.0 * f64::from(d_local) / f64::from(depth_range) - 1.0;
+                        q.mul_add(t, 1.0)
+                    };
+                    if exponent == 0.0 { 1.0 } else { 0.0 }
+                })
+                .collect()
+        } else if att.is_infinite() {
+            // Infinite amplification: ∞^exponent, using ∞^0 = 1.
+            // Mirror of annihilation — the ln-based formula is
+            // undefined (ln ∞ = ∞, and ∞ * 0 = NaN in IEEE 754),
+            // so we compute ∞^exponent directly.
+            (0..=depth_range)
+                .map(|d_local| {
+                    let exponent = if depth_range == 0 {
+                        1.0
+                    } else {
+                        let t = 2.0 * f64::from(d_local) / f64::from(depth_range) - 1.0;
+                        q.mul_add(t, 1.0)
+                    };
+                    if exponent == 0.0 {
+                        1.0
+                    } else if exponent > 0.0 {
+                        f64::INFINITY
+                    } else {
+                        0.0
+                    }
+                })
+                .collect()
+        } else {
+            let ln_att = att.ln();
+            (0..=depth_range)
+                .map(|d_local| {
+                    let t = if depth_range == 0 {
+                        0.0
+                    } else {
+                        2.0 * f64::from(d_local) / f64::from(depth_range) - 1.0
+                    };
+                    (ln_att * q.mul_add(t, 1.0)).exp()
+                })
+                .collect()
+        };
+
+        // 3. Pass 2: scale g.own per depth using the factor table.
+        for &gid in &order {
             let d_local = self.gnode_depth(gid) - d_root;
             let factor = factors[d_local as usize];
 
-            // Scale own.
-            let new_own = g.own.attenuate(factor);
-            // Drop immutable borrow before mutable access.
-            let g = self.gnodes.get_mut(gid.index());
-            g.own = new_own;
-
-            // Push children (read from immutable borrow).
-            let g = self.gnodes.get(gid.index());
-            if let Some(left) = g.left {
-                stack.push(left);
-            }
-            if let Some(right) = g.right {
-                stack.push(right);
-            }
+            let new_own = self.gnodes.get(gid.index()).own.attenuate(factor);
+            self.gnodes.get_mut(gid.index()).own = new_own;
         }
 
-        // 3. Recompute g.sum bottom-up within subtree.
+        // 4. Recompute g.sum bottom-up within subtree.
         gtree::recompute_g_sums_subtree(&mut self.gnodes, &order);
 
-        // 4. Propagate G-sums above the subtree.
+        // 5. Propagate G-sums above the subtree.
         if !is_global && let Some(parent) = self.gnodes.get(root.index()).parent {
             gtree::recompute_g_sums(&mut self.gnodes, parent);
         }
 
-        // 5. Sync V-entry intensities from g.own.
+        // 6. Sync V-entry intensities from g.own.
         for &gid in &order {
             let g = self.gnodes.get(gid.index());
             if let Some(v_id) = g.entry {
@@ -262,12 +321,12 @@ impl<C: Coordinate, V: Accumulator + Attenuatable + Inspectable, const N: u32> G
             }
         }
 
-        // 6. Recompute all V-structural intensities bottom-up.
+        // 7. Recompute all V-structural intensities bottom-up.
         if let Some(v_root) = self.v_root {
             vtree::recompute_all_v_intensities(&mut self.vnodes, v_root);
         }
 
-        // 7. Detect V-I3 violations and rebalance.
+        // 8. Detect V-I3 violations and rebalance.
         //    Selective decay changes relative ordering within the subtree,
         //    so rebalance is always needed (even for global).
         let _ = is_global; // Both paths rebalance for selective.
@@ -282,10 +341,10 @@ impl<C: Coordinate, V: Accumulator + Attenuatable + Inspectable, const N: u32> G
             self.handle_legacy_promotes(&new_gnodes);
         }
 
-        // 8. Plateau sum recomputation (no-op without `plateau` feature).
+        // 9. Plateau sum recomputation (no-op without `plateau` feature).
         self.plateau_recompute_sums("DECAY-SELECTIVE");
 
-        // 9. Normalize plateaus after sum changes.
+        // 10. Normalize plateaus after sum changes.
         // ADR-M-031 Phase 4: mark dirty so normalize runs.
         #[cfg(feature = "dynamic-contour-tracking")]
         {
@@ -293,7 +352,7 @@ impl<C: Coordinate, V: Accumulator + Attenuatable + Inspectable, const N: u32> G
         }
         self.normalize_plateaus();
 
-        // 10. Re-run P-I4 repair after normalization.
+        // 11. Re-run P-I4 repair after normalization.
         self.repair_p_i4();
 
         #[cfg(feature = "dynamic-contour-tracking")]

@@ -113,9 +113,13 @@ pub enum GState {
     /// Zero children — leaf region that receives observations
     /// directly. Returned by [`get()`](crate::GvGraph::get) and
     /// [`sample()`](crate::GvGraph::sample) as a [`Cell`](crate::Cell).
+    /// The contour cell's interval is the full G-node range.
     Terminal,
     /// One child — one half of the interval has been subdivided while
     /// the other half still accumulates locally on this node.
+    /// [`get()`](crate::GvGraph::get) and
+    /// [`sample()`](crate::GvGraph::sample) return the uncovered half
+    /// as a [`Cell`](crate::Cell) with `intensity = g.own`.
     SemiInternal,
     /// Two children — both halves route to child nodes. All new
     /// observations pass through to finer-grained regions below.

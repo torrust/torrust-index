@@ -225,6 +225,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// # Panics
     ///
     /// Panics if an `Internal` G-node is missing a child pointer.
+    #[doc(hidden)]
     #[must_use]
     pub fn build_plateaus(&self) -> BTreeMap<BasisEdge<C>, Plateau<C, V>> {
         use crate::gnode::GState;
@@ -332,6 +333,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     ///
     /// This exposes `pub(crate)` basis bookkeeping for integration
     /// tests that need to diagnose plateau invariant violations.
+    #[doc(hidden)]
     #[cfg(feature = "dynamic-contour-tracking")]
     #[must_use]
     #[allow(clippy::type_complexity)]
@@ -815,7 +817,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// function is only needed for batch-eviction and decay paths.
     /// Early-returns O(1) when the flag is not set.
     #[cfg(feature = "dynamic-contour-tracking")]
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, clippy::float_cmp)]
     pub(crate) fn normalize_plateaus(&mut self) {
         use crate::gnode::GState;
         use crate::gtree::gnode_depth_from_interval;
@@ -954,7 +956,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
             for (key, elem_sum) in &key_sums {
                 let sweep_sum = new_plateaus[key].sum.to_f64_approx();
                 debug_assert!(
-                    (sweep_sum - elem_sum).abs() < 1e-9,
+                    sweep_sum == *elem_sum || (sweep_sum - elem_sum).abs() < 1e-9,
                     "normalize_plateaus step 2: sweep sum {sweep_sum} != \
                      element sum {elem_sum} for plateau {key:?}",
                 );
@@ -984,7 +986,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
                 build.values().map(|p| p.sum.to_f64_approx()).sum()
             };
             debug_assert!(
-                (old_total - new_total).abs() < 1e-9,
+                old_total == new_total || (old_total - new_total).abs() < 1e-9,
                 "normalize_plateaus: total plateau energy changed: \
                  old={old_total}, new={new_total}, delta={}",
                 new_total - old_total,
@@ -1044,6 +1046,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// recomputed `Σ basis_elements.sum`. Panics with a labelled
     /// message identifying the offending plateau.
     #[cfg(feature = "dynamic-contour-tracking")]
+    #[allow(clippy::float_cmp)]
     pub(crate) fn debug_check_plateau_sums(&self, label: &str) {
         // Always run in debug builds (cargo test); optionally in
         // release when a tracing subscriber is active at DEBUG.
@@ -1064,7 +1067,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
             let expected: f64 = elems.iter().map(|e| e.1).sum();
             let actual = plateau.sum.to_f64_approx();
             assert!(
-                (expected - actual).abs() < 1e-9,
+                expected == actual || (expected - actual).abs() < 1e-9,
                 "{label}: plateau sum mismatch at key {key:?}\n\
                  tracked={actual}, recomputed={expected}\n\
                  basis_elements={elems:?}",
@@ -1695,4 +1698,80 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     #[inline(always)]
     #[allow(clippy::unused_self, clippy::needless_pass_by_ref_mut)]
     pub(crate) const fn plateau_recompute_sums(&mut self, _label: &str) {}
+
+    // ── Plateau Selection (§CR.12 — ADR-M-037) ──────────────────
+
+    /// Plateau selection (§CR.12): given an arbitrary dyadic range
+    /// `[lo, hi)`, find the contiguous run of overlapping plateaus
+    /// and return their lattice-aligned endpoints.
+    ///
+    /// The returned pair `(start, end)` are valid [`BasisEdge`]s for
+    /// [`contour_range()`](Self::contour_range) and
+    /// [`contour_range_energy()`](Self::contour_range_energy).
+    ///
+    /// Returns `None` if:
+    /// - The plateau map is empty (no observations).
+    /// - `lo >= hi`.
+    /// - No plateau overlaps `[lo, hi)`.
+    ///
+    /// Cost: $O(\log P)$ — two lookups in the plateau ordered map.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use torrust_mudlark::{Config, GvGraph, BasisEdge};
+    ///
+    /// let cfg = Config {
+    ///     split_threshold: 2u64,
+    ///     depth_create: 3,
+    ///     depth_evict: 6,
+    ///     budget: None,
+    ///     alpha_relax: 0.75,
+    ///     bounded_eviction: true,
+    /// };
+    /// let mut g = GvGraph::<u64, u64, 8>::new(cfg);
+    /// for _ in 0..10 {
+    ///     g.observe(16, 5u64);
+    ///     g.observe(48, 5u64);
+    /// }
+    ///
+    /// // Arbitrary coordinates → lattice-aligned contour range endpoints.
+    /// if let Some((start, end)) = g.select_plateaus(10, 60) {
+    ///     let cr = g.contour_range(start, end).unwrap();
+    ///     assert!(cr.basis.len() >= 1);
+    /// }
+    /// ```
+    #[must_use]
+    pub fn select_plateaus(&self, lo: C, hi: C) -> Option<(BasisEdge<C>, BasisEdge<C>)> {
+        use std::ops::Bound;
+
+        if lo >= hi {
+            return None;
+        }
+
+        let plateaus = self.plateaus();
+        if plateaus.is_empty() {
+            return None;
+        }
+
+        // §CR.12: find the largest a_j ≤ lo  (floor index)
+        let start_entry = plateaus.range(..=BasisEdge(lo)).next_back().map(|(k, _)| *k)?;
+
+        // §CR.12: find the last plateau whose basis edge is < hi.
+        let last_plateau_key = plateaus.range(..BasisEdge(hi)).next_back().map(|(k, _)| *k)?;
+
+        // The end endpoint is the next key after last_plateau_key,
+        // or the domain sentinel 2^N.
+        let end = plateaus
+            .range((Bound::Excluded(last_plateau_key), Bound::Unbounded))
+            .next()
+            .map_or_else(|| BasisEdge(C::domain_max(N)), |(k, _)| *k);
+
+        // Sanity: start < end (should always hold given the above logic).
+        if start_entry >= end {
+            return None;
+        }
+
+        Some((start_entry, end))
+    }
 }

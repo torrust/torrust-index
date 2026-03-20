@@ -206,9 +206,9 @@ When a doc-test exercises a feature-gated path, annotate the fence:
 /// ```
 ````
 
-For the default feature set (`dynamic-contour-tracking`, `serde`,
-`rand`), no annotation is needed — `cargo test` runs with
-`--all-features` by default per the workspace `AGENTS.md`.
+For the default feature set (`dynamic-contour-tracking`, `rand`)
+plus the opt-in `serde` feature, no annotation is needed when running
+with `--all-features` per the workspace `AGENTS.md`.
 
 ### D9. Math in doc-comments
 
@@ -220,8 +220,8 @@ in plain terminal rendering they degrade gracefully to source TeX.
 Examples:
 
 ```text
-/// Expected cost: $O(1.44\, H + 1.67)$ where $H$ is the Shannon
-/// entropy of the intensity distribution.
+/// Expected cost: $O(1.44\,H)$ where $H$ is the Shannon entropy
+/// of the intensity distribution (§IDEA M-18.2, §THEORY M-4.3).
 ```
 
 ```text

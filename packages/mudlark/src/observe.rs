@@ -29,6 +29,14 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     ///  9.    Normalize plateau map — dirty-gated (ADR-M-031).
     /// 10.    P-I4 thatch-hop repair.
     ///
+    /// # Panics
+    ///
+    /// In debug builds, panics if the accumulated value drops below
+    /// `V::zero()` — i.e. if `delta` is negative enough to violate
+    /// P2 (Grounded).  Negative accumulations break sampling,
+    /// violation-free splits, ghost detection, and the Fibonacci
+    /// depth bound.  See ADR-M-033 for the full analysis.
+    ///
     /// # Examples
     ///
     /// ```
@@ -56,6 +64,17 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
         // 2a. Accumulate into G-node own value.
         let g = self.gnodes.get_mut(g_id.index());
         g.own = O::accumulate(g.own, delta);
+
+        // P2 guard: accumulated value must not drop below zero.
+        // Negative intensities violate P2 (Grounded) and silently
+        // corrupt sampling, splits, and the depth bound.  See
+        // ADR-M-033 and `tests/negative_f64.rs`.
+        debug_assert!(
+            g.own >= V::zero(),
+            "observe: P2 violation — accumulated own value {:?} < zero after delta; \
+             negative accumulations are not supported (ADR-M-033)",
+            g.own,
+        );
 
         // 2b. Accumulate into V-entry intensity and propagate V-sums.
         if let Some(entry_id) = self.gnodes.get(g_id.index()).entry {
