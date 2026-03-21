@@ -12,6 +12,48 @@
 //! 3. All plateau invariants hold (`assert_invariants` where
 //!    applicable, manual checks otherwise).
 //!
+//! # Test index
+//!
+//! ## SI shapes (single)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`shape_a_si_left_child_only`] | root SI, left child only |
+//! | [`shape_b_si_right_child_only`] | root SI, right child only |
+//!
+//! ## SI shapes (composite)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`shape_c_thatch_thatch_sandwich`] | plateau \ thatch | thatch / plateau |
+//! | [`shape_d_multi_layer_overlap_start`] | SI overlap at domain start |
+//! | [`shape_e_multi_layer_overlap_end`] | SI overlap at domain end |
+//! | [`shape_f_nested_si_chain`] | nested SI chain (3 depths) |
+//! | [`shape_g_thatch_sandwich`] | SI between two terminals |
+//! | [`shape_h_double_thatch_gap`] | two SIs creating a central gap |
+//! | [`shape_i_multi_layer_deep_overlap`] | SI deep in tree |
+//!
+//! ## SI + symmetric / structural
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`shape_j_symmetric_outward_thatches`] | mirror-symmetric outward SIs |
+//! | [`shape_k_si_child_is_uniform_internal`] | SI-left child is uniform Internal |
+//! | [`shape_k2_si_right_child_is_uniform_internal`] | SI-right child is uniform Internal |
+//!
+//! ## Controls (no SIs)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`shape_l_all_terminal_control`] | uniform balanced tree (exact match) |
+//! | [`shape_m_nonuniform_internal_no_si`] | non-uniform, no SIs (exact match) |
+//!
+//! ## Summary
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`divergence_summary`] | enumerates all shapes, reports build-vs-collect divergence |
+//!
 //! # Divergence between `build_plateaus` and `collect_subtree` + `place_sorted`
 //!
 //! `collect_subtree_basis_elements` intentionally does **not** recurse
@@ -66,6 +108,31 @@
 //!           [0,256) I ─left→ [0,128) I ─left→ [0,64) SI ─left→ [0,32) T
 //!                                     └─right→ [64,128) T
 //!                    └─right→ [128,256) T
+//!
+//! Shape J:  Symmetric double-SI (outward thatches)
+//!           [0,256) I ─left→ [0,128) SI ─left→ [0,64) T
+//!                    └─right→ [128,256) SI ─right→ [192,256) T
+//!
+//! Shape K:  SI-left child is uniform Internal
+//!           [0,256) I ─left→ [0,128) SI ─left→ [0,64) I ─left→ [0,32) T
+//!                                                      └─right→ [32,64) T
+//!                    └─right→ [128,256) T
+//!
+//! Shape K2: SI-right child is uniform Internal
+//!           [0,256) I ─left→ [0,128) T
+//!                    └─right→ [128,256) SI ─right→ [192,256) I ─left→ [192,224) T
+//!                                                             └─right→ [224,256) T
+//!
+//! Shape L:  All-terminal control (no SIs)
+//!           [0,256) I ─left→ [0,128) T
+//!                    └─right→ [128,256) T
+//!
+//! Shape M:  Non-uniform Internal control (no SIs)
+//!           [0,256) I ─left→ [0,128) I ─left→ [0,64) T
+//!                                     └─right→ [64,128) T
+//!                    └─right→ [128,256) I ─left→ [128,192) T
+//!                              └─right→ [192,256) I ─left→ [192,224) T
+//!                                                  └─right→ [224,256) T
 //! ```
 //!
 //! For N=8 the domain is `[0, 256)`.  Depth = 8 − log₂(width):
@@ -76,10 +143,16 @@
 //! | [0, 128)       | 128   | 1     |
 //! | [0, 64)        | 64    | 2     |
 //! | [0, 32)        | 32    | 3     |
+//! | [32, 64)       | 32    | 3     |
+//! | [64, 96)       | 32    | 3     |
 //! | [64, 128)      | 64    | 2     |
-//! | [128, 256)     | 128   | 1     |
+//! | [96, 128)      | 32    | 3     |
+//! | [128, 160)     | 32    | 3     |
 //! | [128, 192)     | 64    | 2     |
+//! | [128, 256)     | 128   | 1     |
+//! | [192, 224)     | 32    | 3     |
 //! | [192, 256)     | 64    | 2     |
+//! | [224, 256)     | 32    | 3     |
 
 #![cfg(feature = "dynamic-contour-tracking")]
 
@@ -858,17 +931,23 @@ fn shape_h_double_thatch_gap() {
     let built = graph.build_plateaus();
     assert_eq!(built.len(), 3, "Shape H: expected 3 plateaus");
 
-    // P1: depth 2 at start.
+    // P1: depth 2 at start, covers [0,128) (left terminal + left SI's uncovered half).
     let p0 = &built[&BasisEdge(0u64)];
     assert_eq!(p0.depth, 2);
+    assert_eq!(p0.start, 0);
+    assert_eq!(p0.end, 128);
 
-    // P2: depth 3 in the middle (thatches merged).
+    // P2: depth 3 in the middle (thatches merged), covers [96,160).
     let p96 = &built[&BasisEdge(96u64)];
     assert_eq!(p96.depth, 3);
+    assert_eq!(p96.start, 96);
+    assert_eq!(p96.end, 160);
 
-    // P3: depth 2 at end.
+    // P3: depth 2 at end, covers [128,256) (right SI's uncovered half + right terminal).
     let p160 = &built[&BasisEdge(160u64)];
     assert_eq!(p160.depth, 2);
+    assert_eq!(p160.start, 128);
+    assert_eq!(p160.end, 256);
 
     // Test-methodology artifact: SI children not independently placed.
     let (build_map, incr_map) = compare_build_vs_collect_place(&mut graph);
@@ -1101,6 +1180,74 @@ fn shape_k_si_child_is_uniform_internal() {
     }
 }
 
+// ── Shape K2: SI-right child is uniform Internal ────────────────
+
+/// ```text
+/// [0,256) I ─left→ [0,128) T
+///          └─right→ [128,256) SI ─right→ [192,256) I ─left→ [192,224) T
+///                                                   └─right→ [224,256) T
+/// ```
+///
+/// Mirror of Shape K: the SI's child is on the right side and is a
+/// fully balanced Internal → uniform depth 3.
+///
+/// DFS from root → non-uniform → decompose:
+///   [0,128) T: edge=0, d=1
+///   [128,256) SI(right): edge=128, d=1  (right child → lo = 128)
+///   [192,256) I uniform d=3: edge=192, d=3
+///
+/// Sorted: (0,d1), (128,d1), (192,d3)
+/// Merge: (0,d1)→P1. (128,d1)→same→merge→P1. (192,d3)→P2.
+///
+/// Result: 2 plateaus [1, 3].
+#[test]
+fn shape_k2_si_right_child_is_uniform_internal() {
+    let _t = init_tracing();
+
+    let mut graph = make_graph_with_topology(|gnodes| {
+        let root = alloc_gnode(gnodes, 0, 256);
+        let left_t = alloc_gnode(gnodes, 0, 128);
+        let right_si = alloc_gnode(gnodes, 128, 256);
+        let child_i = alloc_gnode(gnodes, 192, 256);
+        let child_left = alloc_gnode(gnodes, 192, 224);
+        let child_right = alloc_gnode(gnodes, 224, 256);
+        set_left(gnodes, root, left_t);
+        set_right(gnodes, root, right_si);
+        set_right(gnodes, right_si, child_i);
+        set_left(gnodes, child_i, child_left);
+        set_right(gnodes, child_i, child_right);
+        root
+    });
+
+    let built = graph.build_plateaus();
+    assert_eq!(built.len(), 2, "Shape K2: expected 2 plateaus");
+
+    let p0 = &built[&BasisEdge(0u64)];
+    assert_eq!(p0.depth, 1);
+    assert_eq!(p0.start, 0);
+    assert_eq!(p0.end, 256);
+
+    let p192 = &built[&BasisEdge(192u64)];
+    assert_eq!(p192.depth, 3);
+    assert_eq!(p192.start, 192);
+    assert_eq!(p192.end, 256);
+
+    // Test-methodology artifact: root Internal non-uniform → decompose.
+    //   Left T: emit (left_t, d=1).
+    //   Right SI: emit (right_si, d=1). No child recurse.
+    // → 2 elements at d=1 → may merge into 1 plateau.
+    let (build_map, incr_map) = compare_build_vs_collect_place(&mut graph);
+    if incr_map.len() == build_map.len() {
+        assert_plateaus_eq("Shape K2", &build_map, &incr_map);
+    } else {
+        eprintln!(
+            "Shape K2 artifact: build={} plateaus, collect+place={} plateaus",
+            build_map.len(),
+            incr_map.len(),
+        );
+    }
+}
+
 // ── Shape L: All-terminal control (no SIs) ──────────────────────
 
 /// ```text
@@ -1286,6 +1433,112 @@ fn divergence_summary() {
             }),
         ),
         (
+            "G: thatch sandwich",
+            Box::new(|gnodes| {
+                let root = alloc_gnode(gnodes, 0, 256);
+                let left_i = alloc_gnode(gnodes, 0, 128);
+                let ll_t = alloc_gnode(gnodes, 0, 64);
+                let lr_si = alloc_gnode(gnodes, 64, 128);
+                let lr_child = alloc_gnode(gnodes, 64, 96);
+                let right_t = alloc_gnode(gnodes, 128, 256);
+                set_left(gnodes, root, left_i);
+                set_right(gnodes, root, right_t);
+                set_left(gnodes, left_i, ll_t);
+                set_right(gnodes, left_i, lr_si);
+                set_left(gnodes, lr_si, lr_child);
+                root
+            }),
+        ),
+        (
+            "H: double thatch gap",
+            Box::new(|gnodes| {
+                let root = alloc_gnode(gnodes, 0, 256);
+                let left_i = alloc_gnode(gnodes, 0, 128);
+                let ll_t = alloc_gnode(gnodes, 0, 64);
+                let lr_si = alloc_gnode(gnodes, 64, 128);
+                let lr_child = alloc_gnode(gnodes, 96, 128);
+                let right_i = alloc_gnode(gnodes, 128, 256);
+                let rl_si = alloc_gnode(gnodes, 128, 192);
+                let rl_child = alloc_gnode(gnodes, 128, 160);
+                let rr_t = alloc_gnode(gnodes, 192, 256);
+                set_left(gnodes, root, left_i);
+                set_right(gnodes, root, right_i);
+                set_left(gnodes, left_i, ll_t);
+                set_right(gnodes, left_i, lr_si);
+                set_right(gnodes, lr_si, lr_child);
+                set_left(gnodes, right_i, rl_si);
+                set_right(gnodes, right_i, rr_t);
+                set_left(gnodes, rl_si, rl_child);
+                root
+            }),
+        ),
+        (
+            "I: multi-layer deep",
+            Box::new(|gnodes| {
+                let root = alloc_gnode(gnodes, 0, 256);
+                let left_i = alloc_gnode(gnodes, 0, 128);
+                let ll_si = alloc_gnode(gnodes, 0, 64);
+                let lll_t = alloc_gnode(gnodes, 0, 32);
+                let lr_t = alloc_gnode(gnodes, 64, 128);
+                let right_t = alloc_gnode(gnodes, 128, 256);
+                set_left(gnodes, root, left_i);
+                set_right(gnodes, root, right_t);
+                set_left(gnodes, left_i, ll_si);
+                set_right(gnodes, left_i, lr_t);
+                set_left(gnodes, ll_si, lll_t);
+                root
+            }),
+        ),
+        (
+            "J: symmetric outward",
+            Box::new(|gnodes| {
+                let root = alloc_gnode(gnodes, 0, 256);
+                let left_si = alloc_gnode(gnodes, 0, 128);
+                let left_child = alloc_gnode(gnodes, 0, 64);
+                let right_si = alloc_gnode(gnodes, 128, 256);
+                let right_child = alloc_gnode(gnodes, 192, 256);
+                set_left(gnodes, root, left_si);
+                set_right(gnodes, root, right_si);
+                set_left(gnodes, left_si, left_child);
+                set_right(gnodes, right_si, right_child);
+                root
+            }),
+        ),
+        (
+            "K: SI-left uniform-I child",
+            Box::new(|gnodes| {
+                let root = alloc_gnode(gnodes, 0, 256);
+                let left_si = alloc_gnode(gnodes, 0, 128);
+                let child_i = alloc_gnode(gnodes, 0, 64);
+                let child_left = alloc_gnode(gnodes, 0, 32);
+                let child_right = alloc_gnode(gnodes, 32, 64);
+                let right_t = alloc_gnode(gnodes, 128, 256);
+                set_left(gnodes, root, left_si);
+                set_right(gnodes, root, right_t);
+                set_left(gnodes, left_si, child_i);
+                set_left(gnodes, child_i, child_left);
+                set_right(gnodes, child_i, child_right);
+                root
+            }),
+        ),
+        (
+            "K2: SI-right uniform-I child",
+            Box::new(|gnodes| {
+                let root = alloc_gnode(gnodes, 0, 256);
+                let left_t = alloc_gnode(gnodes, 0, 128);
+                let right_si = alloc_gnode(gnodes, 128, 256);
+                let child_i = alloc_gnode(gnodes, 192, 256);
+                let child_left = alloc_gnode(gnodes, 192, 224);
+                let child_right = alloc_gnode(gnodes, 224, 256);
+                set_left(gnodes, root, left_t);
+                set_right(gnodes, root, right_si);
+                set_right(gnodes, right_si, child_i);
+                set_left(gnodes, child_i, child_left);
+                set_right(gnodes, child_i, child_right);
+                root
+            }),
+        ),
+        (
             "L: all-terminal (control)",
             Box::new(|gnodes| {
                 let root = alloc_gnode(gnodes, 0, 256);
@@ -1296,8 +1549,32 @@ fn divergence_summary() {
                 root
             }),
         ),
+        (
+            "M: non-uniform (control)",
+            Box::new(|gnodes| {
+                let root = alloc_gnode(gnodes, 0, 256);
+                let left_i = alloc_gnode(gnodes, 0, 128);
+                let ll = alloc_gnode(gnodes, 0, 64);
+                let lr = alloc_gnode(gnodes, 64, 128);
+                let right_i = alloc_gnode(gnodes, 128, 256);
+                let rl = alloc_gnode(gnodes, 128, 192);
+                let rr_i = alloc_gnode(gnodes, 192, 256);
+                let rrl = alloc_gnode(gnodes, 192, 224);
+                let rrr = alloc_gnode(gnodes, 224, 256);
+                set_left(gnodes, root, left_i);
+                set_right(gnodes, root, right_i);
+                set_left(gnodes, left_i, ll);
+                set_right(gnodes, left_i, lr);
+                set_left(gnodes, right_i, rl);
+                set_right(gnodes, right_i, rr_i);
+                set_left(gnodes, rr_i, rrl);
+                set_right(gnodes, rr_i, rrr);
+                root
+            }),
+        ),
     ];
 
+    let total = shapes.len();
     let mut divergences = Vec::new();
     for (name, builder) in shapes {
         let mut graph = make_graph_with_topology(builder);
@@ -1315,9 +1592,8 @@ fn divergence_summary() {
         eprintln!("divergence_summary: all shapes agree!");
     } else {
         eprintln!(
-            "divergence_summary: {}/{} shapes diverge:\n{}",
+            "divergence_summary: {}/{total} shapes diverge:\n{}",
             divergences.len(),
-            7, // total shape count
             divergences.join("\n"),
         );
     }

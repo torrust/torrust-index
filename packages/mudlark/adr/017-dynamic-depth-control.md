@@ -738,15 +738,15 @@ pub fn observe<O: Observation<V>>(&mut self, coord: C, delta: O) {
 
 ## Decision Summary
 
-| Question               | Decision                                            | Rationale                                                                                                                          |
-| ---------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **Q1: Timing**         | Before `check_evictions` (step 7 in pipeline)       | O(1) cost; scan uses fresh thresholds; zero delay                                                                                  |
-| **Q2: Rate**           | ±1 level per call                                   | Geometric convergence via exponentially growing eviction batches per level; avoids over-eviction; trivial to reason about          |
+| Question               | Decision                                            | Rationale                                                                                                                                 |
+| ---------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Q1: Timing**         | Before `check_evictions` (step 7 in pipeline)       | O(1) cost; scan uses fresh thresholds; zero delay                                                                                         |
+| **Q2: Rate**           | ±1 level per call                                   | Geometric convergence via exponentially growing eviction batches per level; avoids over-eviction; trivial to reason about                 |
 | **Q3: α_relax**        | 0.75 (configurable, validated ∈ (0, 1))             | 25% dead zone prevents gate churn and unnecessary scans; tree-level oscillation already prevented by benchmark compounding (§IDEA M-13.5) |
-| **Q4: Buffer**         | Fixed gap from initial Config                       | `buffer = config.depth_evict − config.depth_create`, preserved across all adjustments                                              |
-| **Q5: Floor/ceiling**  | Floor: `D_evict ≥ buffer + 1`; no ceiling           | Floor ensures D-I3 + `D_create ≥ 1`; no ceiling allows recovery above initial depth                                                |
-| **Q6: Config surface** | Add `alpha_relax: f64` and `bounded_eviction: bool` | Minimal surface; buffer is derived, not configured                                                                                 |
-| **Q7: Mutability**     | Shadow fields on GvGraph; Config stays immutable    | Clean separation of specification (Config) from runtime state (live gates)                                                         |
+| **Q4: Buffer**         | Fixed gap from initial Config                       | `buffer = config.depth_evict − config.depth_create`, preserved across all adjustments                                                     |
+| **Q5: Floor/ceiling**  | Floor: `D_evict ≥ buffer + 1`; no ceiling           | Floor ensures D-I3 + `D_create ≥ 1`; no ceiling allows recovery above initial depth                                                       |
+| **Q6: Config surface** | Add `alpha_relax: f64` and `bounded_eviction: bool` | Minimal surface; buffer is derived, not configured                                                                                        |
+| **Q7: Mutability**     | Shadow fields on GvGraph; Config stays immutable    | Clean separation of specification (Config) from runtime state (live gates)                                                                |
 
 ---
 

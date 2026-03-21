@@ -85,13 +85,13 @@ builds.
 
 ### Maintenance: Classify by cost
 
-| Operation                    | Depth Impact           | Strategy                                           |
-| ---------------------------- | ---------------------- | -------------------------------------------------- |
+| Operation                           | Depth Impact           | Strategy                                           |
+| ----------------------------------- | ---------------------- | -------------------------------------------------- |
 | `GvGraph::new` (§IDEA M-9.1 Case 1) | Root entry             | **Set** `0`                                        |
-| `bootstrap_split` (§IDEA M-10.3)     | Create tree structure  | **Set** 5 nodes (root=0, L1=1, L2=2)               |
-| `catalytic_split` (§IDEA M-10.2)     | Attach 3-node subtree  | **Set** 3 nodes (s=p+1, entries=p+2)               |
-| `vtree_remove_leaf` 3→2      | No depth change        | **No-op**                                          |
-| `vtree_remove_leaf` collapse | Subtree moves up       | **Invalidate** subtree                             |
+| `bootstrap_split` (§IDEA M-10.3)    | Create tree structure  | **Set** 5 nodes (root=0, L1=1, L2=2)               |
+| `catalytic_split` (§IDEA M-10.2)    | Attach 3-node subtree  | **Set** 3 nodes (s=p+1, entries=p+2)               |
+| `vtree_remove_leaf` 3→2             | No depth change        | **No-op**                                          |
+| `vtree_remove_leaf` collapse        | Subtree moves up       | **Invalidate** subtree                             |
 | `contract` (§IDEA M-11.3)           | Children pushed down   | **Set** merged=p+1; **Invalidate** both subtrees   |
 | `standard_promote` (§IDEA M-11.4)   | Two children move up   | **Invalidate** both subtrees                       |
 | `skip_promote` (§IDEA M-11.5)       | c and s move up        | **Invalidate** both subtrees                       |

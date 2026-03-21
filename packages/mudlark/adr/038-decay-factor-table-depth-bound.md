@@ -102,12 +102,12 @@ properties — but only when the tree lives within `[0, N]`.
 The current code uses `N` as the conceptual maximum G-tree depth.
 If the actual tree extends deeper, the factor table is too short.
 
-| Option | Depth range                        | Pros                                        | Cons                                              |
-| ------ | ---------------------------------- | ------------------------------------------- | ------------------------------------------------- |
-| **A**  | Scan the subtree to find max depth | Always correct for any tree shape.            | Extra O(S) pass, though the DFS already visits every node anyway. |
-| **B**  | Use `live_depth_evict - d_root`    | No extra pass; conservative upper bound.     | Over-allocates: up to `depth_evict` entries, most unused. Shifts the factor curve midpoint away from the actual structural midpoint. |
-| **C**  | Use `N + buffer - d_root`          | Slightly tighter than B. Still O(1).         | `depth_buffer = depth_evict - depth_create` is a V-tree concept; mixing V and G measures is confusing. |
-| **D**  | Clamp `d_local` at `depth_range`   | Zero-cost. No table resize. Nodes deeper than N get the maximum-depth factor. | Changes the mathematical semantics: deepest nodes share the same factor instead of interpolating further. |
+| Option | Depth range                        | Pros                                                                          | Cons                                                                                                                                 |
+| ------ | ---------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **A**  | Scan the subtree to find max depth | Always correct for any tree shape.                                            | Extra O(S) pass, though the DFS already visits every node anyway.                                                                    |
+| **B**  | Use `live_depth_evict - d_root`    | No extra pass; conservative upper bound.                                      | Over-allocates: up to `depth_evict` entries, most unused. Shifts the factor curve midpoint away from the actual structural midpoint. |
+| **C**  | Use `N + buffer - d_root`          | Slightly tighter than B. Still O(1).                                          | `depth_buffer = depth_evict - depth_create` is a V-tree concept; mixing V and G measures is confusing.                               |
+| **D**  | Clamp `d_local` at `depth_range`   | Zero-cost. No table resize. Nodes deeper than N get the maximum-depth factor. | Changes the mathematical semantics: deepest nodes share the same factor instead of interpolating further.                            |
 
 ### Q2: What should the factor curve mean beyond depth N? (DC-038-2)
 
@@ -115,21 +115,21 @@ The selective factor curve ($\ln\lambda(d)$, linear in depth) is
 defined for the depth range `[0, D]`. Nodes at depth `D + k` for
 `k > 0` fall outside this range. What factor should they receive?
 
-| Option | Factor beyond D                                       | Interpretation                                       |
-| ------ | ----------------------------------------------------- | ---------------------------------------------------- |
-| **A**  | Extrapolate: extend the log-linear curve naturally     | The selectivity slope continues. Deeper = more aggressive treatment. Preserves the "constant dB-per-octave" property. |
-| **B**  | Clamp at the depth-D factor: `att^(1+q)`              | The deepest nodes all receive the same treatment. Simpler to reason about. The curve is "flat beyond the nominal boundary." |
-| **C**  | Use a separate factor formula beyond N                 | Maximum flexibility. Harder to explain, harder to compose. |
+| Option | Factor beyond D                                    | Interpretation                                                                                                              |
+| ------ | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **A**  | Extrapolate: extend the log-linear curve naturally | The selectivity slope continues. Deeper = more aggressive treatment. Preserves the "constant dB-per-octave" property.       |
+| **B**  | Clamp at the depth-D factor: `att^(1+q)`           | The deepest nodes all receive the same treatment. Simpler to reason about. The curve is "flat beyond the nominal boundary." |
+| **C**  | Use a separate factor formula beyond N             | Maximum flexibility. Harder to explain, harder to compose.                                                                  |
 
 ### Q3: Should splitting be capped at G-tree depth N? (DC-038-3)
 
 An alternative fix: prevent the tree from exceeding depth N in the
 first place by adding an `is_final` check to `attempt_split`.
 
-| Option | Who changes           | Pros                                                       | Cons                                                        |
-| ------ | --------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- |
-| **A**  | Fix `decay` only      | Decay adapts to whatever tree exists. No change to observe. | The G-tree depth exceeding N is surprising; other code may have the same assumption. |
-| **B**  | Cap splitting at N    | Eliminates the entire class of "depth > N" surprises.       | Reduces resolution for f64 trees. The V-tree depth gate allows deeper structure on purpose. |
+| Option | Who changes           | Pros                                                        | Cons                                                                                            |
+| ------ | --------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **A**  | Fix `decay` only      | Decay adapts to whatever tree exists. No change to observe. | The G-tree depth exceeding N is surprising; other code may have the same assumption.            |
+| **B**  | Cap splitting at N    | Eliminates the entire class of "depth > N" surprises.       | Reduces resolution for f64 trees. The V-tree depth gate allows deeper structure on purpose.     |
 | **C**  | Both: cap + fix decay | Belt and suspenders.                                        | Redundant once splitting is capped. Increases code complexity for a case that no longer occurs. |
 
 ---
@@ -141,7 +141,7 @@ first place by adding an `is_final` check to `attempt_split`.
 **Option A.** The DFS already visits every node. We restructure
 the implementation into two passes:
 
-1. **Pass 1 (DFS):** collect nodes in pre-order *and* record the
+1. **Pass 1 (DFS):** collect nodes in pre-order _and_ record the
    maximum G-tree depth encountered.
 2. **Compute factor table:** `max_depth - d_root + 1` entries.
 3. **Pass 2 (scale):** iterate the collected nodes, look up factors,
@@ -169,7 +169,7 @@ Clamping (option B) would create a discontinuity at depth N
 where the dB slope abruptly flatlines. Extrapolation is the
 natural continuation of the same log-linear family.
 
-Note: using the *actual* max depth as `D` rather than `N` means
+Note: using the _actual_ max depth as `D` rather than `N` means
 the factor curve adapts to the tree's current structure. Two
 otherwise-identical trees with different `depth_evict` values (and
 hence different actual depths) will see slightly different factor

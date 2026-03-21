@@ -1,15 +1,94 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
-//! Tests for the ADR-M-028 span-native tracing system.
+//! Tests for the **ADR-M-028 span-native tracing and diagnostic**
+//! subsystem.
 //!
-//! Verifies:
-//! 1. `diagnostic::audit_violations` detects unqueued violations.
-//! 2. `diagnostic::Gn` display helper formats G-nodes correctly.
-//! 3. Hard invariant assertions fire in debug builds — they are not
-//!    silently swallowed by `tracing::enabled!()` guards.
-//! 4. Spans are emitted during graph mutations (observe, split,
-//!    rebalance, evict, decay).
+//! The diagnostic module exposes audit helpers (`audit_violations`,
+//! `audit_plateau_consistency`, `diagnose_missed_violation`), display
+//! formatters (`Gn`, `Pl`), and is the integration point for
+//! `tracing` spans and events emitted during graph mutations.
+//!
+//! A key concern tested here is that the migration from
+//! `#[cfg(debug_assertions)]` guards to the `tracing::enabled!()`
+//! gate did **not** suppress hard invariant assertions — those must
+//! fire unconditionally in debug builds.  The span-emission tests
+//! additionally verify that every major graph operation (observe,
+//! split, rebalance, decay, eviction) creates the expected `tracing`
+//! spans, so that downstream tooling can rely on a stable span
+//! vocabulary.
+//!
+//! # Test index
+//!
+//! ## `audit_violations`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`audit_violations_returns_empty_when_no_violations`] | empty graph has no missed violations |
+//! | [`audit_violations_returns_empty_after_single_observe`] | single observation leaves no residual violations |
+//! | [`audit_violations_returns_empty_after_many_observes`] | multi-split graph drains all violations |
+//!
+//! ## `Gn` display helper
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`gn_display_for_root`] | root Terminal node formatting |
+//! | [`gn_display_after_split`] | Internal/SemiInternal formatting after bootstrap split |
+//! | [`gn_display_dead_node`] | unallocated slot renders as `DEAD` |
+//! | [`gn_display_semi_internal`] | walk all occupied nodes; confirm T and I states observed |
+//!
+//! ## Hard invariant assertions fire in debug builds
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`observe_runs_post_observe_audit_without_tracing`] | `observe()` audit runs without a tracing subscriber |
+//! | [`rebalance_runs_residual_audit_without_tracing`] | `rebalance()` audit runs without a tracing subscriber |
+//! | [`plateau_mirror_consistency_runs_without_tracing`] | plateau mirror audit fires (dynamic-contour-tracking) |
+//! | [`plateau_sum_check_runs_without_tracing`] | plateau sum check fires (dynamic-contour-tracking) |
+//!
+//! ## Span emission during graph mutations
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`observe_emits_spans`] | `observe()` creates at least one span |
+//! | [`observe_creates_observe_span`] | `observe` span present by name |
+//! | [`split_creates_bootstrap_split_span`] | `bootstrap_split` span on first split |
+//! | [`catalytic_split_creates_span`] | `catalytic_split` span on threshold-triggered split |
+//! | [`rebalance_creates_span`] | `rebalance` span present |
+//! | [`evict_tip_creates_span`] | `evict_tip` span under budget pressure |
+//! | [`decay_creates_span`] | `decay*` span on explicit decay call |
+//! | [`eviction_pipeline_creates_spans`] | `evict_batch` + `scan_for_candidates` spans |
+//! | [`vtree_remove_leaf_creates_span`] | `vtree_remove_leaf` span during eviction |
+//! | [`normalize_plateaus_creates_span`] | `normalize_plateaus` span (dynamic-contour-tracking) |
+//!
+//! ## Events are emitted at expected levels
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`observe_emits_debug_events`] | split + rebalance pipeline emits DEBUG events |
+//!
+//! ## `audit_plateau_consistency` (dynamic-contour-tracking)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`audit_plateau_consistency_passes_on_healthy_graph`] | healthy graph passes without panic |
+//! | [`audit_plateau_consistency_with_context`] | explicit `PlateauAuditContext` accepted |
+//!
+//! ## `diagnose_missed_violation`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`diagnose_missed_violation_emits_events_without_panic`] | deep V-node emits events, no panic |
+//! | [`diagnose_missed_violation_with_eviction_context`] | eviction context fields propagated |
+//! | [`diagnose_missed_violation_on_root_node`] | root V-node early-return branch covered |
+//!
+//! ## `Pl` plateau display helper (dynamic-contour-tracking)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`pl_display_for_root`] | root node plateau display |
+//! | [`pl_display_for_non_basis_node`] | non-basis node shows `not_basis` |
+//! | [`pl_display_contains_range_and_depth`] | full plateau display includes range + depth + sum |
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -18,19 +97,49 @@ use tracing_subscriber::layer::SubscriberExt;
 
 use crate::graph::Config;
 use crate::invariants::assert_invariants;
+use crate::testing::{GraphCreator, Plan, evictable_config, low_threshold_config, run};
 use crate::{GvGraph, diagnostic};
 
 // ── Helpers ─────────────────────────────────────────────────────
 
+/// Canonical observation plan used by most tests: 8 observations
+/// that trigger splits, rebalance, and violations in an N=4 graph.
+fn multi_split_plan() -> Plan<u64, u64> {
+    Plan::new()
+        .observe(3, 6)
+        .observe(12, 6)
+        .observe(5, 6)
+        .observe(10, 6)
+        .observe(7, 6)
+        .observe(14, 6)
+        .observe(1, 6)
+        .observe(15, 6)
+}
+
 fn make_graph(threshold: u64) -> GvGraph<u64, u64, 4> {
     GvGraph::new(Config {
         split_threshold: threshold,
-        depth_create: 4,
-        depth_evict: 8,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
+        ..low_threshold_config()
     })
+}
+
+/// Build a populated N=4 graph via `GraphCreator` with the canonical
+/// multi-split plan and invariant checking on every step.
+fn build_multi_split_graph() -> GvGraph<u64, u64, 4> {
+    GraphCreator::new(Config {
+        split_threshold: 5,
+        ..low_threshold_config()
+    })
+    .observe(3, 6)
+    .observe(12, 6)
+    .observe(5, 6)
+    .observe(10, 6)
+    .observe(7, 6)
+    .observe(14, 6)
+    .observe(1, 6)
+    .observe(15, 6)
+    .check_every(1)
+    .build()
 }
 
 // ── Custom tracing layer that counts new spans ──────────────────
@@ -144,13 +253,24 @@ fn audit_violations_returns_empty_when_no_violations() {
 }
 
 #[test]
-fn audit_violations_returns_empty_after_observe() {
-    let mut g = make_graph(5);
-    // Trigger splits and rebalance.
-    for &c in &[3u64, 12, 5, 10, 7, 14, 1, 15] {
-        g.observe(c, 6u64);
-    }
-    assert_invariants(&g);
+fn audit_violations_returns_empty_after_single_observe() {
+    let g: GvGraph<u64, u64, 4> = run(
+        Config {
+            split_threshold: 100,
+            ..low_threshold_config()
+        },
+        &Plan::new().observe(5, 7),
+    );
+    let missed = diagnostic::audit_violations(&g.vnodes, &g.violations, "SINGLE");
+    assert!(
+        missed.is_empty(),
+        "single observation should not leave missed violations: {missed:?}"
+    );
+}
+
+#[test]
+fn audit_violations_returns_empty_after_many_observes() {
+    let g = build_multi_split_graph();
     let missed = diagnostic::audit_violations(&g.vnodes, &g.violations, "POST-MULTI");
     assert!(
         missed.is_empty(),
@@ -173,8 +293,13 @@ fn gn_display_for_root() {
 
 #[test]
 fn gn_display_after_split() {
-    let mut g = make_graph(5);
-    g.observe(3u64, 10u64); // triggers bootstrap split
+    let g: GvGraph<u64, u64, 4> = GraphCreator::new(Config {
+        split_threshold: 5,
+        ..low_threshold_config()
+    })
+    .observe(3, 10) // triggers bootstrap split
+    .build();
+
     let root_display = format!("{}", diagnostic::Gn(&g.gnodes, g.g_root));
     // Root should now be Internal (I) or SemiInternal (S).
     assert!(
@@ -190,6 +315,44 @@ fn gn_display_dead_node() {
     let dead_id = crate::handle::GNodeId::from_index(99);
     let display = format!("{}", diagnostic::Gn(&g.gnodes, dead_id));
     assert_eq!(display, "G99(DEAD)");
+}
+
+#[test]
+fn gn_display_semi_internal() {
+    // A bootstrap split creates an Internal root (both children).
+    // To get a SemiInternal node we need eviction to remove one child.
+    // Instead, observe enough to check that at least one node in the
+    // tree formats as "S" (SemiInternal) or "I" (Internal).
+    let g = build_multi_split_graph();
+
+    // Walk all occupied G-nodes and check that each formats without panic.
+    let mut seen_states = Vec::new();
+    for (idx, _) in g.gnodes.iter_occupied() {
+        let id = crate::handle::GNodeId::from_index(idx);
+        let display = format!("{}", diagnostic::Gn(&g.gnodes, id));
+        assert!(
+            display.starts_with(&format!("G{idx}(")),
+            "Gn display should start with index: {display}"
+        );
+        // Collect the state letter.
+        if display.contains("(T,") {
+            seen_states.push("T");
+        } else if display.contains("(S,") {
+            seen_states.push("S");
+        } else if display.contains("(I,") {
+            seen_states.push("I");
+        }
+    }
+    // A multi-split graph should have at least one Internal node.
+    assert!(
+        seen_states.contains(&"I"),
+        "expected at least one Internal node, states: {seen_states:?}"
+    );
+    // And at least one Terminal.
+    assert!(
+        seen_states.contains(&"T"),
+        "expected at least one Terminal node, states: {seen_states:?}"
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -208,14 +371,7 @@ fn observe_runs_post_observe_audit_without_tracing() {
     // this would silently pass even if violations were present.
     // With the fix, audit_violations runs unconditionally in debug
     // builds.
-    //
-    // A correct graph should have zero residual violations — if the
-    // audit is running, this test passes. If the audit is silently
-    // skipped, a future regression could go undetected.
-    let mut g = make_graph(5);
-    for &c in &[3u64, 12, 5, 10, 7, 14, 1, 15] {
-        g.observe(c, 6u64);
-    }
+    let g = build_multi_split_graph();
     // The key assertion is implicit: if the `debug_assert!` inside
     // `observe()` fires on a violation, the test panics. If we get
     // here, the audit ran and found no violations.
@@ -226,10 +382,11 @@ fn observe_runs_post_observe_audit_without_tracing() {
 fn rebalance_runs_residual_audit_without_tracing() {
     // Same pattern: the hard `assert!` inside `rebalance()` must
     // fire in debug builds without a tracing subscriber.
-    let mut g = make_graph(5);
-    for &c in &[3u64, 12, 5, 10] {
-        g.observe(c, 6u64);
-    }
+    let cfg = Config {
+        split_threshold: 5,
+        ..low_threshold_config()
+    };
+    let g: GvGraph<u64, u64, 4> = run(cfg, &Plan::new().observe(3, 6).observe(12, 6).observe(5, 6).observe(10, 6));
     assert_invariants(&g);
 }
 
@@ -239,10 +396,7 @@ fn plateau_mirror_consistency_runs_without_tracing() {
     // `debug_assert_plateau_mirror_consistency` must run in debug
     // builds. If it were skipped, plateau divergence would go
     // undetected.
-    let mut g = make_graph(5);
-    for &c in &[3u64, 12, 5, 10, 7, 14, 1, 15] {
-        g.observe(c, 6u64);
-    }
+    let g = build_multi_split_graph();
     // Explicitly call — should not early-return in debug builds.
     g.debug_assert_plateau_mirror_consistency("TEST-DIRECT");
     assert_invariants(&g);
@@ -251,10 +405,20 @@ fn plateau_mirror_consistency_runs_without_tracing() {
 #[cfg(feature = "dynamic-contour-tracking")]
 #[test]
 fn plateau_sum_check_runs_without_tracing() {
-    let mut g = make_graph(5);
-    for &c in &[3u64, 12, 5, 10, 7, 14] {
-        g.observe(c, 6u64);
-    }
+    let cfg = Config {
+        split_threshold: 5,
+        ..low_threshold_config()
+    };
+    let g: GvGraph<u64, u64, 4> = run(
+        cfg,
+        &Plan::new()
+            .observe(3, 6)
+            .observe(12, 6)
+            .observe(5, 6)
+            .observe(10, 6)
+            .observe(7, 6)
+            .observe(14, 6),
+    );
     // Should not early-return.
     g.debug_check_plateau_sums("TEST-DIRECT");
     assert_invariants(&g);
@@ -316,11 +480,11 @@ fn catalytic_split_creates_span() {
 #[test]
 fn rebalance_creates_span() {
     let (names, ()) = with_span_capture(|| {
-        let mut g = make_graph(5);
-        // Multiple observations to force violations and rebalance.
-        for &c in &[3u64, 12, 5, 10, 7, 14, 1, 15] {
-            g.observe(c, 6u64);
-        }
+        let cfg = Config {
+            split_threshold: 5,
+            ..low_threshold_config()
+        };
+        let _g: GvGraph<u64, u64, 4> = run(cfg, &multi_split_plan());
     });
     assert!(
         names.contains(&"rebalance".to_string()),
@@ -332,18 +496,11 @@ fn rebalance_creates_span() {
 fn evict_tip_creates_span() {
     let (names, ()) = with_span_capture(|| {
         let cfg = Config {
-            split_threshold: 5,
-            depth_create: 3,
-            depth_evict: 4,
             budget: Some(20),
-            alpha_relax: 0.75,
-            bounded_eviction: true,
+            ..evictable_config()
         };
-        let mut g: GvGraph<u64, u64, 8> = GvGraph::new(cfg);
-        // Fill tree past budget to trigger eviction.
-        for i in 0..30u64 {
-            g.observe(i * 8, 6u64);
-        }
+        let plan = Plan::new().spread(256, 6, 30);
+        let _g: GvGraph<u64, u64, 8> = run(cfg, &plan);
     });
     assert!(
         names.contains(&"evict_tip".to_string()),
@@ -369,17 +526,11 @@ fn decay_creates_span() {
 fn eviction_pipeline_creates_spans() {
     let (names, ()) = with_span_capture(|| {
         let cfg = Config {
-            split_threshold: 5,
-            depth_create: 3,
-            depth_evict: 4,
             budget: Some(20),
-            alpha_relax: 0.75,
-            bounded_eviction: true,
+            ..evictable_config()
         };
-        let mut g: GvGraph<u64, u64, 8> = GvGraph::new(cfg);
-        for i in 0..30u64 {
-            g.observe(i * 8, 6u64);
-        }
+        let plan = Plan::new().spread(256, 6, 30);
+        let _g: GvGraph<u64, u64, 8> = run(cfg, &plan);
     });
     // The eviction pipeline (triggered by observe → budget check)
     // uses `evict_candidates` which creates `evict_batch` and
@@ -398,21 +549,31 @@ fn eviction_pipeline_creates_spans() {
 fn vtree_remove_leaf_creates_span() {
     let (names, ()) = with_span_capture(|| {
         let cfg = Config {
-            split_threshold: 5,
-            depth_create: 3,
-            depth_evict: 4,
             budget: Some(20),
-            alpha_relax: 0.75,
-            bounded_eviction: true,
+            ..evictable_config()
         };
-        let mut g: GvGraph<u64, u64, 8> = GvGraph::new(cfg);
-        for i in 0..30u64 {
-            g.observe(i * 8, 6u64);
-        }
+        let plan = Plan::new().spread(256, 6, 30);
+        let _g: GvGraph<u64, u64, 8> = run(cfg, &plan);
     });
     assert!(
         names.contains(&"vtree_remove_leaf".to_string()),
         "expected 'vtree_remove_leaf' span in: {names:?}"
+    );
+}
+
+#[cfg(feature = "dynamic-contour-tracking")]
+#[test]
+fn normalize_plateaus_creates_span() {
+    let (names, ()) = with_span_capture(|| {
+        let cfg = Config {
+            split_threshold: 5,
+            ..low_threshold_config()
+        };
+        let _g: GvGraph<u64, u64, 4> = run(cfg, &multi_split_plan());
+    });
+    assert!(
+        names.contains(&"normalize_plateaus".to_string()),
+        "expected 'normalize_plateaus' span in: {names:?}"
     );
 }
 
@@ -423,30 +584,23 @@ fn vtree_remove_leaf_creates_span() {
 #[test]
 fn observe_emits_debug_events() {
     let (_spans, debug_count, _trace, ()) = with_counting_subscriber(|| {
-        let mut g = make_graph(5);
+        let cfg = Config {
+            split_threshold: 5,
+            ..low_threshold_config()
+        };
         // Trigger split + rebalance → debug events.
-        for &c in &[3u64, 12, 5, 10, 7, 14] {
-            g.observe(c, 6u64);
-        }
+        let plan = Plan::new()
+            .observe(3, 6)
+            .observe(12, 6)
+            .observe(5, 6)
+            .observe(10, 6)
+            .observe(7, 6)
+            .observe(14, 6);
+        let _g: GvGraph<u64, u64, 4> = run(cfg, &plan);
     });
     assert!(
         debug_count > 0,
         "expected at least one DEBUG event from observe pipeline, got {debug_count}"
-    );
-}
-
-#[cfg(feature = "dynamic-contour-tracking")]
-#[test]
-fn normalize_plateaus_creates_span() {
-    let (names, ()) = with_span_capture(|| {
-        let mut g = make_graph(5);
-        for &c in &[3u64, 12, 5, 10, 7, 14, 1, 15] {
-            g.observe(c, 6u64);
-        }
-    });
-    assert!(
-        names.contains(&"normalize_plateaus".to_string()),
-        "expected 'normalize_plateaus' span in: {names:?}"
     );
 }
 
@@ -458,11 +612,138 @@ fn normalize_plateaus_creates_span() {
 #[test]
 fn audit_plateau_consistency_passes_on_healthy_graph() {
     let (_, _, _, ()) = with_counting_subscriber(|| {
-        let mut g = make_graph(5);
-        for &c in &[3u64, 12, 5, 10, 7, 14] {
-            g.observe(c, 6u64);
-        }
+        let g = build_multi_split_graph();
         // Should not panic.
         diagnostic::audit_plateau_consistency(&g, "HEALTHY", None);
     });
+}
+
+#[cfg(feature = "dynamic-contour-tracking")]
+#[test]
+fn audit_plateau_consistency_with_context() {
+    let (_, _, _, ()) = with_counting_subscriber(|| {
+        let g = build_multi_split_graph();
+        let ctx = diagnostic::PlateauAuditContext {
+            parent_id: g.g_root,
+            parent_state: crate::gnode::GState::SemiInternal,
+        };
+        // Should not panic even with an explicit context.
+        diagnostic::audit_plateau_consistency(&g, "WITH-CONTEXT", Some(&ctx));
+    });
+}
+
+// ═════════════════════════════════════════════════════════════════
+// 7. diagnose_missed_violation
+// ═════════════════════════════════════════════════════════════════
+
+#[test]
+fn diagnose_missed_violation_emits_events_without_panic() {
+    // Build a graph with enough structure so V-nodes have parents
+    // and grandparents.
+    let (_spans, _debug, _trace, ()) = with_counting_subscriber(|| {
+        let g = build_multi_split_graph();
+        // Find a V-node at depth ≥ 2 (has parent and grandparent).
+        let v_root = g.v_root.expect("graph should have a V-root");
+        let root_vnode = g.vnodes.get(v_root.index());
+        let deep_v = match &root_vnode.kind {
+            crate::vnode::VKind::Structural { children, .. } => {
+                // Pick the first child — it has a parent (v_root).
+                children.get(0).0
+            }
+            crate::vnode::VKind::Entry { .. } => v_root,
+        };
+        let ctx = diagnostic::EvictionContext {
+            evicted_parent: None,
+            evicted_parent_child_count: 0,
+            collapse_sibling: None,
+        };
+        // Should emit tracing events and not panic.
+        diagnostic::diagnose_missed_violation(&g.vnodes, deep_v, &ctx);
+    });
+}
+
+#[test]
+fn diagnose_missed_violation_with_eviction_context() {
+    let (_spans, _debug, _trace, ()) = with_counting_subscriber(|| {
+        let g = build_multi_split_graph();
+        let v_root = g.v_root.expect("graph should have a V-root");
+        let root_vnode = g.vnodes.get(v_root.index());
+        let child_id = match &root_vnode.kind {
+            crate::vnode::VKind::Structural { children, .. } => children.get(0).0,
+            crate::vnode::VKind::Entry { .. } => v_root,
+        };
+        // Supply a plausible eviction context.
+        let ctx = diagnostic::EvictionContext {
+            evicted_parent: Some(v_root),
+            evicted_parent_child_count: 2,
+            collapse_sibling: Some(child_id),
+        };
+        diagnostic::diagnose_missed_violation(&g.vnodes, child_id, &ctx);
+    });
+}
+
+#[test]
+fn diagnose_missed_violation_on_root_node() {
+    // The root V-node has no parent — `diagnose_missed_violation`
+    // should emit a "no parent" event and return early.
+    let (_spans, _debug, _trace, ()) = with_counting_subscriber(|| {
+        let g = build_multi_split_graph();
+        let v_root = g.v_root.expect("graph should have a V-root");
+        let ctx = diagnostic::EvictionContext {
+            evicted_parent: None,
+            evicted_parent_child_count: 0,
+            collapse_sibling: None,
+        };
+        // Should not panic — covers the early-return branch.
+        diagnostic::diagnose_missed_violation(&g.vnodes, v_root, &ctx);
+    });
+}
+
+// ═════════════════════════════════════════════════════════════════
+// 8. Pl plateau display helper
+// ═════════════════════════════════════════════════════════════════
+
+#[cfg(feature = "dynamic-contour-tracking")]
+#[test]
+fn pl_display_for_root() {
+    let g = build_multi_split_graph();
+    let display = format!("{}", diagnostic::Pl(&g, g.g_root));
+    // Root should either be in a plateau or show "not_basis".
+    assert!(
+        display.starts_with("P(") || display.contains("not_basis"),
+        "Pl display should start with 'P(' or contain 'not_basis': {display}"
+    );
+}
+
+#[cfg(feature = "dynamic-contour-tracking")]
+#[test]
+fn pl_display_for_non_basis_node() {
+    let g = make_graph(100);
+    // Unallocated node → not in any plateau basis.
+    let dead_id = crate::handle::GNodeId::from_index(99);
+    let display = format!("{}", diagnostic::Pl(&g, dead_id));
+    assert!(
+        display.contains("not_basis"),
+        "non-basis node should show 'not_basis': {display}"
+    );
+}
+
+#[cfg(feature = "dynamic-contour-tracking")]
+#[test]
+fn pl_display_contains_range_and_depth() {
+    let g = build_multi_split_graph();
+    // Find a G-node that is in a plateau basis.
+    let mut found = false;
+    for (idx, _) in g.gnodes.iter_occupied() {
+        let id = crate::handle::GNodeId::from_index(idx);
+        let display = format!("{}", diagnostic::Pl(&g, id));
+        if display.starts_with("P(") && display.contains("d=") && display.contains("sum=") {
+            // Verify the display contains the expected structure:
+            // P([lo,hi),d=N,sum=V)
+            assert!(display.contains(','), "Pl display should contain comma separators: {display}");
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "expected at least one G-node with a full plateau display");
 }

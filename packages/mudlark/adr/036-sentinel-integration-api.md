@@ -46,20 +46,20 @@ current public API does not provide:
 
 The current public API on `GvGraph` exposes:
 
-| Method | Surface | Returns | Sentinel use |
-|--------|---------|---------|--------------|
-| `observe(coord, delta)` | 2 (Film) | — | Volume accounting (Δ = 1) |
-| `decay(root, att, q)` | 2 (Film) | — | Spatial memory |
-| `get(coord)` | 1+2 | `Cell` | Point query |
-| `sample(rng)` | 1+2 | `Option<Cell>` | — |
-| `range_sum(range)` | 1+2 | `V` | — |
-| `extract()` | 1+2 | `Pewei` | Spatial portrait |
-| `layers()` | 1+2 | `impl Iterator<Item = (usize, Node)>` | **Analysis selector** |
-| `plateaus()` | 1+2 | `Cow<'_, BTreeMap<BasisEdge, Plateau>>` | Contour snapshot |
-| `g_root()` | 1 | `GNodeId` | Decay root, coordination root |
-| `node_count()` | 1 | `u32` | Health reporting |
-| `terminal_count()` | 1 | `u32` | Health reporting |
-| `total_sum()` | 1 | `V` | Health reporting |
+| Method                  | Surface  | Returns                                 | Sentinel use                  |
+| ----------------------- | -------- | --------------------------------------- | ----------------------------- |
+| `observe(coord, delta)` | 2 (Film) | —                                       | Volume accounting (Δ = 1)     |
+| `decay(root, att, q)`   | 2 (Film) | —                                       | Spatial memory                |
+| `get(coord)`            | 1+2      | `Cell`                                  | Point query                   |
+| `sample(rng)`           | 1+2      | `Option<Cell>`                          | —                             |
+| `range_sum(range)`      | 1+2      | `V`                                     | —                             |
+| `extract()`             | 1+2      | `Pewei`                                 | Spatial portrait              |
+| `layers()`              | 1+2      | `impl Iterator<Item = (usize, Node)>`   | **Analysis selector**         |
+| `plateaus()`            | 1+2      | `Cow<'_, BTreeMap<BasisEdge, Plateau>>` | Contour snapshot              |
+| `g_root()`              | 1        | `GNodeId`                               | Decay root, coordination root |
+| `node_count()`          | 1        | `u32`                                   | Health reporting              |
+| `terminal_count()`      | 1        | `u32`                                   | Health reporting              |
+| `total_sum()`           | 1        | `V`                                     | Health reporting              |
 
 The gap: `layers()` yields `(usize, Node)` where `Node` has `start`,
 `end`, `own`, `sum`, `depth`, `state` — but no `GNodeId`. And there
@@ -237,7 +237,7 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
 - In a dyadic tree, ancestry is equivalent to strict interval
   containment, so this is a pure arithmetic check — $O(1)$, no
   tree walk.
-- The sentinel *could* perform this check itself using `start`/`end`
+- The sentinel _could_ perform this check itself using `start`/`end`
   from `GNodeInfo`, but providing it as a method on `GvGraph` is
   more ergonomic and self-documenting. It also insulates the caller
   from the subtlety that interval endpoints must be compared with
@@ -253,6 +253,7 @@ In a dyadic tree, `(start, depth)` uniquely identifies a G-node.
 The sentinel could use this pair instead of `GNodeId`.
 
 **Rejected** because:
+
 - Every tracker map lookup becomes a composite-key comparison instead
   of a single `u32` comparison.
 - Multi-scale delivery requires testing "is cell A an ancestor of
@@ -267,6 +268,7 @@ Keep `Node` as-is and add a parallel iterator that yields
 `(usize, GNodeId, Node)`.
 
 **Rejected** because:
+
 - Two iterators over the same traversal with the same logic are an
   unnecessary maintenance and documentation burden.
 - `GNodeId` on `Node` is a strict superset — callers who don't need
@@ -280,6 +282,7 @@ Make `GNode` public and add `pub fn gnode(&self, id: GNodeId) -> &GNode`
 that returns a borrow.
 
 **Rejected** because:
+
 - `GNode` is Surface 3 (Emulsion). Exposing it violates ADR-M-032's
   crossing rules — Film methods must not expose Emulsion types in
   their public signatures.
@@ -295,8 +298,9 @@ that returns a borrow.
 Add `pub fn walk(&self, root: GNodeId) -> impl Iterator<Item = GNodeInfo>`.
 
 **Rejected for now** because:
+
 - The sentinel's coordination walk is application-specific: it cares
-  about which nodes have *analysed cells* in both subtrees, not
+  about which nodes have _analysed cells_ in both subtrees, not
   about visiting every node. A generic walk would visit many
   irrelevant nodes.
 - `gnode_info()` + the sentinel's own recursive logic is more
@@ -323,15 +327,15 @@ callback infrastructure. If needed, a future ADR can introduce a
 
 ### File changes in `packages/mudlark/`
 
-| File | Change | Surface |
-|------|--------|---------|
-| `src/view.rs` | Add `gnode_id: GNodeId` field to `Node` | 1 |
-| `src/graph_extract.rs` | Set `gnode_id` in `Layers::next()` | 3 |
-| `src/graph.rs` | Add `GNodeInfo` struct, `gnode_info()`, `is_ancestor_of()` | 1 + 2 |
-| `src/lib.rs` | Re-export `GNodeInfo` | 1 |
-| `src/handle.rs` | Add `serde` derives to `GNodeId` and `VNodeId`; expand doc table | 1 |
-| `src/tests/view.rs` | Add `gnode_id` to 12 internal `Node` struct literals | (test-only) |
-| `tests/sentinel_api.rs` | New integration test file — 14 tests | (test-only) |
+| File                    | Change                                                           | Surface     |
+| ----------------------- | ---------------------------------------------------------------- | ----------- |
+| `src/view.rs`           | Add `gnode_id: GNodeId` field to `Node`                          | 1           |
+| `src/graph_extract.rs`  | Set `gnode_id` in `Layers::next()`                               | 3           |
+| `src/graph.rs`          | Add `GNodeInfo` struct, `gnode_info()`, `is_ancestor_of()`       | 1 + 2       |
+| `src/lib.rs`            | Re-export `GNodeInfo`                                            | 1           |
+| `src/handle.rs`         | Add `serde` derives to `GNodeId` and `VNodeId`; expand doc table | 1           |
+| `src/tests/view.rs`     | Add `gnode_id` to 12 internal `Node` struct literals             | (test-only) |
+| `tests/sentinel_api.rs` | New integration test file — 14 tests                             | (test-only) |
 
 ### D1 — `Node.gnode_id`
 
@@ -414,22 +418,22 @@ pub use graph::GNodeInfo;
 
 ## Testing
 
-| Test | Validates |
-|------|-----------|
-| `node_carries_gnode_id` | `layers()` yields `Node` with correct `gnode_id` matching the G-tree topology |
-| `node_gnode_id_empty_tree` | Root-only tree: `layers()` yields one node whose `gnode_id == g_root()` |
-| `gnode_info_live_node` | `gnode_info()` returns `Some` for live nodes with correct fields |
-| `gnode_info_dead_handle` | `gnode_info()` returns `None` for handles that have been evicted |
-| `gnode_info_root_has_no_parent` | `gnode_info(g_root()).parent` is `None` |
-| `gnode_info_children_consistent` | `left`/`right` handles round-trip: `gnode_info(info.left.unwrap()).parent == Some(id)` |
-| `gnode_info_sum_equals_own_plus_children` | `info.sum == info.own + Σ child.sum` for every node |
-| `is_ancestor_of_root_ancestors_all` | `is_ancestor_of(g_root(), any_other)` is true |
-| `is_ancestor_of_self_is_false` | `is_ancestor_of(x, x)` is false (proper ancestor) |
-| `is_ancestor_of_stale_handles` | Both stale-ancestor and stale-descendant return false |
-| `is_ancestor_of_sibling_is_false` | Sibling nodes are not ancestors of each other |
-| `is_ancestor_of_parent_child` | Direct parent→child is true, child→parent is false |
-| `is_ancestor_of_transitive` | Leaf-to-root path: every higher node is ancestor of every lower node |
-| `range_tree_gnode_ids_consistent` | `range_tree` preset: every `layers()` gnode_id round-trips through `gnode_info()` |
+| Test                                      | Validates                                                                              |
+| ----------------------------------------- | -------------------------------------------------------------------------------------- |
+| `node_carries_gnode_id`                   | `layers()` yields `Node` with correct `gnode_id` matching the G-tree topology          |
+| `node_gnode_id_empty_tree`                | Root-only tree: `layers()` yields one node whose `gnode_id == g_root()`                |
+| `gnode_info_live_node`                    | `gnode_info()` returns `Some` for live nodes with correct fields                       |
+| `gnode_info_dead_handle`                  | `gnode_info()` returns `None` for handles that have been evicted                       |
+| `gnode_info_root_has_no_parent`           | `gnode_info(g_root()).parent` is `None`                                                |
+| `gnode_info_children_consistent`          | `left`/`right` handles round-trip: `gnode_info(info.left.unwrap()).parent == Some(id)` |
+| `gnode_info_sum_equals_own_plus_children` | `info.sum == info.own + Σ child.sum` for every node                                    |
+| `is_ancestor_of_root_ancestors_all`       | `is_ancestor_of(g_root(), any_other)` is true                                          |
+| `is_ancestor_of_self_is_false`            | `is_ancestor_of(x, x)` is false (proper ancestor)                                      |
+| `is_ancestor_of_stale_handles`            | Both stale-ancestor and stale-descendant return false                                  |
+| `is_ancestor_of_sibling_is_false`         | Sibling nodes are not ancestors of each other                                          |
+| `is_ancestor_of_parent_child`             | Direct parent→child is true, child→parent is false                                     |
+| `is_ancestor_of_transitive`               | Leaf-to-root path: every higher node is ancestor of every lower node                   |
+| `range_tree_gnode_ids_consistent`         | `range_tree` preset: every `layers()` gnode_id round-trips through `gnode_info()`      |
 
 All tests go in `tests/sentinel_api.rs` (integration tests on the
 public API surface), per [§API M-7.4](../docs/api.md#74-test-organisation).

@@ -11,27 +11,191 @@
 //! **Hex–Binary-Tree Bijection Tests**
 //!
 //! Validates the gap-free bijection Φ: T → H from the infinite
-//! complete binary tree to the hexagonal lattice, as specified in
-//! `docs/hex_binary_tree_mapping.md`.
+//! complete binary tree to the hexagonal lattice.  The mapping
+//! assigns each BFS-indexed tree node to a hex tile via the spiral
+//! enumeration σ, using bit-reversal to reorder within-level
+//! indices so that tree locality (parent/child, sibling) is
+//! preserved as spatial locality on the lattice.
 //!
-//! # What is tested
+//! The key properties under test are:
 //!
-//! | Property          | Method                                         |
-//! |-------------------|------------------------------------------------|
-//! | Gap-free          | Exhaustive image check for small depths         |
-//! | Deterministic     | Identical output across repeated runs           |
-//! | Invertible        | Round-trip Φ ∘ Φ⁻¹ = id for all tiles in range |
-//! | Radially monotone | `depth(u) < depth(v) ⇒ R(Φ(u)) ≤ R(Φ(v))`    |
-//! | Angular locality  | Siblings land angularly adjacent                |
-//! | Optimal locality  | `|j(u)−j(v)|≤k ⇒ |θ(u)−θ(v)| = O(k/R)`      |
-//! | Polar stability   | Small tree perturbation → small polar change    |
-//! | Subtree coherence | Subtree maps to contiguous angular wedge        |
-//! | Ring count 6R     | Ring R contains exactly 6R tiles (R ≥ 1)       |
-//! | Tile count 3R²+3R+1 | Cumulative tile count identity               |
-//! | Radius growth √2  | `R(d+1)/R(d) → √2` as d → ∞                  |
-//! | Angular uniformity | Level angles fill `[0,2π)` with low discrepancy |
-//! | 6-fold symmetry   | Sextant bin counts balanced within each level   |
-//! | Fuzz (random BFS) | Random BFS indices produce unique hex tiles     |
+//! - **Gap-free bijectivity** — every spiral index in
+//!   `[0, 2^{d+1} − 2]` is hit exactly once.
+//! - **Radial monotonicity** — deeper tree levels map to
+//!   equal-or-greater hex rings, so depth ≈ distance from origin.
+//! - **Angular locality** — tree-close nodes (siblings, subtree
+//!   descendants) land angularly close on the lattice, thanks to
+//!   the bit-reversal permutation turning shared suffixes into
+//!   shared prefixes.
+//! - **Polar stability** — small perturbations in the BFS index
+//!   produce bounded ring and angle changes.
+//! - **Hexagonal symmetry** — the mapping respects the lattice's
+//!   6-fold rotational symmetry: nodes distribute evenly across
+//!   sextants with low discrepancy.
+//!
+//! # Test index
+//!
+//! ## §A — Lattice arithmetic identities
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`ring_0_has_one_tile`] | ring 0 contains exactly 1 tile |
+//! | [`ring_sizes_are_6r`] | ring *R* ≥ 1 has exactly 6*R* tiles |
+//! | [`cumulative_tile_count_identity`] | `3R² + 3R + 1` cumulative formula |
+//! | [`ring_start_plus_ring_size_equals_next_ring_start`] | ring-start arithmetic consistency |
+//! | [`min_radius_for_depth_is_monotone`] | `min_radius_for_depth` is non-decreasing |
+//!
+//! ## §B — Spiral enumeration sanity
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`spiral_origin_is_index_zero`] | origin maps to spiral index 0 |
+//! | [`spiral_is_injective_through_ring_50`] | no duplicate hex tiles through ring 50 |
+//! | [`spiral_tiles_land_on_correct_ring`] | each tile's ring matches its spiral position |
+//! | [`spiral_inverse_round_trips`] | σ⁻¹(σ(h)) = h for all tiles |
+//! | [`spiral_ring_1_tiles_are_hex_neighbors_of_origin`] | ring-1 tiles are the 6 axial neighbours |
+//!
+//! ## §C — BFS index sanity
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`bfs_root_is_zero`] | root node has BFS index 0 |
+//! | [`bfs_level_ranges`] | level *d* spans `[2^d − 1, 2^{d+1} − 2]` |
+//! | [`bfs_inverse_round_trips_to_depth_20`] | `bfs_inverse(bfs_index(d,j)) = (d,j)` through depth 20 |
+//!
+//! ## §D — Bit-reversal properties
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`bitrev_is_involution`] | `bitrev(bitrev(x)) = x` |
+//! | [`bitrev_is_bijection_within_level`] | bitrev is a permutation of `[0, 2^d)` |
+//! | [`bitrev_known_values`] | spot-check against hand-computed values |
+//!
+//! ## §E — Φ is a gap-free bijection (exhaustive small depths)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`phi_root_maps_to_spiral_zero`] | tree root → spiral index 0 (origin) |
+//! | [`phi_is_bijective_through_depth_16`] | injective + surjective through 2¹⁷ − 1 nodes |
+//! | [`phi_covers_every_spiral_index_through_depth_14`] | every index in `[0, 2¹⁵ − 2]` is hit |
+//!
+//! ## §F — Φ⁻¹ ∘ Φ = id (round-trip)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`phi_inverse_round_trip_depth_16`] | `phi_inverse(phi(d,j)) = (d,j)` for all nodes to depth 16 |
+//!
+//! ## §G — Radial monotonicity
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`deeper_nodes_never_precede_shallower_on_hex_grid`] | level *d* min spiral > level *d−1* max spiral |
+//! | [`radial_monotonicity_on_actual_hex_rings`] | max ring per level is non-decreasing on real hex coords |
+//!
+//! ## §H — Angular locality: siblings are angularly close
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`tree_siblings_are_angularly_adjacent`] | sibling bitrev distance = exactly 2^d (half-level apart) |
+//!
+//! ## §I — Radius growth factor → √2
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`radius_growth_converges_to_sqrt2`] | `min_radius(d+1) / min_radius(d)` → √2 |
+//!
+//! ## §J — Tile addressing (Corollary 2)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`tile_address_matches_bfs_inverse`] | `tile_address(s)` agrees with `bfs_inverse` |
+//!
+//! ## §K — Cumulative capacity
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`hex_capacity_dominates_tree_size_at_every_ring`] | `|H_R| ≥ |T_{d(R)}|` at every ring |
+//!
+//! ## §L — Determinism
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`deterministic_across_runs`] | two independent Φ evaluations produce identical results |
+//!
+//! ## §M — Fuzz
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`fuzz_random_bfs_indices_produce_unique_spirals`] | 50k random BFS indices all round-trip correctly |
+//!
+//! ## §N — Algebraic identity proofs
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`phi_block_is_contiguous_interval`] | level *d* block = `[2^d − 1, 2^{d+1} − 2]` |
+//! | [`algebraic_ring_count_formula`] | `ring_size` matches `cumulative(R) − cumulative(R−1)` |
+//! | [`algebraic_bfs_count_per_level`] | level *d* has exactly 2^d nodes |
+//! | [`proof_bitrev_permutation_preserves_range`] | bitrev maps `[0, 2^d)` onto itself |
+//!
+//! ## §O — Space-filling completeness theorem
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`theorem_phi_is_gap_free_bijection`] | combined proof of gap-free + radially monotone to depth 15 |
+//!
+//! ## §P — Exhaustive hex-coordinate verification
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`every_hex_tile_through_ring_20_is_assigned_exactly_one_tree_node`] | each tile hit exactly once through ring 20 |
+//!
+//! ## §Q — Stress: full verification at depth 18
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`stress_depth_18_full_verification`] | 524 287-node exhaustive bijectivity + monotonicity proof |
+//!
+//! ## §R — Optimal angular locality
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`subtree_descendants_are_regularly_strided`] | descendants form evenly-spaced set with stride 2^d |
+//! | [`subtree_spiral_span_proportional_to_level_fraction`] | spiral span = `(2^k − 1) · 2^d` |
+//! | [`angular_locality_holds_statistically`] | close BFS pairs have smaller angular separation than far pairs |
+//! | [`bitrev_shared_suffix_implies_bounded_distance`] | shared trailing *s* bits ⇒ bitrev distance < 2^{d−s} |
+//! | [`within_level_angular_order_is_monotone_under_bitrev`] | sorted-by-spiral order = `0, 1, …, 2^d − 1` in bitrev |
+//!
+//! ## §S — Polar stability
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`parent_child_ring_bands_are_adjacent`] | child band starts near parent band end |
+//! | [`within_level_ring_variation_bounded_by_band_width`] | ring span within a level ≤ band width |
+//! | [`within_level_perturbation_delta_j_1_ring_change_bounded`] | Δj = 1 ⇒ median ring change ≤ band/2 + 1 |
+//! | [`within_level_spiral_order_is_angularly_monotone`] | within a ring, spiral order matches angular order |
+//! | [`subtree_angular_span_shrinks_with_depth`] | deeper subtrees subtend smaller angular arcs |
+//! | [`polar_stability_within_level_bfs_perturbation`] | p90 ring jump for Δj = 1 stays within band width |
+//! | [`fuzz_angular_correlation_with_tree_distance`] | binned-by-distance median angular sep is non-decreasing |
+//! | [`ring_assignment_is_deterministic_under_recomputation`] | recomputed ring values are identical |
+//!
+//! ## §T — Angular distribution & symmetry
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`level_angles_cover_full_circle`] | every sextant has ≥ 1 node (no 60° dead zone) |
+//! | [`level_angles_have_low_discrepancy`] | discrepancy `D_N` ≤ 3/√N + 0.05 |
+//! | [`sextant_bin_counts_are_balanced`] | max/min sextant ratio ≤ 2.0 |
+//! | [`per_ring_nodes_occupy_multiple_sextants`] | rings with ≥ 18 nodes span ≥ 3 sextants |
+//! | [`sixfold_rotation_maps_level_onto_itself_approximately`] | 60° rotation preserves ring and lands on valid tile |
+//! | [`fuzz_angular_distribution_chi_squared`] | χ² goodness-of-fit passes at α = 0.001 |
+//! | [`angular_range_spans_full_circle`] | largest angular gap < π/2 |
+//!
+//! ## §U — Helper function edge cases
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`hex_angle_at_origin_is_zero`] | origin angle ≈ 0, +q → 0°, +r → 60° |
+//! | [`angular_distance_basic_properties`] | self-distance, symmetry, wrap-around, max = π |
 
 use std::collections::{HashMap, HashSet};
 
@@ -292,6 +456,21 @@ fn ring_start_plus_ring_size_equals_next_ring_start() {
     }
 }
 
+#[test]
+fn min_radius_for_depth_is_monotone() {
+    let _t = init_tracing();
+    let mut prev = min_radius_for_depth(0);
+    for d in 1u32..40 {
+        let r = min_radius_for_depth(d);
+        assert!(
+            r >= prev,
+            "min_radius_for_depth non-monotone: R({}) = {prev} > R({d}) = {r}",
+            d - 1
+        );
+        prev = r;
+    }
+}
+
 // ── §B  Spiral enumeration sanity ───────────────────────────────
 
 #[test]
@@ -340,6 +519,26 @@ fn spiral_inverse_round_trips() {
     for (i, &h) in spiral.iter().enumerate() {
         assert_eq!(inv[&h], i as u64, "inverse mismatch for spiral[{i}] = {h:?}");
     }
+}
+
+#[test]
+fn spiral_ring_1_tiles_are_hex_neighbors_of_origin() {
+    // Ring 1 has 6 tiles.  Each must differ from the origin by
+    // exactly one of the 6 axial direction vectors.
+    let _t = init_tracing();
+    let spiral = build_spiral(1);
+    let origin = spiral[0];
+    assert_eq!(origin, Hex::new(0, 0));
+
+    let ring_1: Vec<Hex> = spiral[1..7].to_vec();
+    assert_eq!(ring_1.len(), 6);
+
+    let expected_neighbors: HashSet<Hex> = HEX_DIRS.iter().map(|&(dq, dr)| Hex::new(dq, dr)).collect();
+    let actual: HashSet<Hex> = ring_1.into_iter().collect();
+    assert_eq!(
+        actual, expected_neighbors,
+        "ring 1 tiles are not the 6 hex neighbors of origin"
+    );
 }
 
 // ── §C  BFS index sanity ────────────────────────────────────────
@@ -413,6 +612,16 @@ fn bitrev_known_values() {
 }
 
 // ── §E  Φ is a gap-free bijection (exhaustive small depths) ─────
+
+#[test]
+fn phi_root_maps_to_spiral_zero() {
+    let _t = init_tracing();
+    // The tree root (depth 0, j 0) must map to spiral index 0 (the
+    // origin hex tile).
+    assert_eq!(phi_spiral_index(0, 0), 0);
+    let (d, j) = phi_inverse(0);
+    assert_eq!((d, j), (0, 0));
+}
 
 #[test]
 fn phi_is_bijective_through_depth_16() {
@@ -633,19 +842,18 @@ fn hex_capacity_dominates_tree_size_at_every_ring() {
 // ── §L  Determinism: repeated runs yield identical results ──────
 
 #[test]
-fn deterministic_across_1000_runs() {
+fn deterministic_across_runs() {
     let _t = init_tracing();
     let depth = 10u32;
     let reference: Vec<u64> = (0..=depth)
         .flat_map(|d| (0..(1u64 << d)).map(move |j| phi_spiral_index(d, j)))
         .collect();
 
-    for run in 0..1_000 {
-        let attempt: Vec<u64> = (0..=depth)
-            .flat_map(|d| (0..(1u64 << d)).map(move |j| phi_spiral_index(d, j)))
-            .collect();
-        assert_eq!(reference, attempt, "non-determinism detected on run {run}");
-    }
+    // Φ is a pure function — two independent computations must agree.
+    let attempt: Vec<u64> = (0..=depth)
+        .flat_map(|d| (0..(1u64 << d)).map(move |j| phi_spiral_index(d, j)))
+        .collect();
+    assert_eq!(reference, attempt, "non-determinism detected");
 }
 
 // ── §M  Fuzz: pseudo-random BFS indices all produce unique tiles ─
@@ -698,31 +906,6 @@ fn fuzz_random_bfs_indices_produce_unique_spirals() {
         // Same (d, j) must always produce the same s.
         let s2 = phi_spiral_index(d, j);
         assert_eq!(s, s2, "non-deterministic Φ for ({d},{j})");
-    }
-}
-
-#[test]
-fn fuzz_random_seeds_all_bijective_depth_12() {
-    // Re-run the full bijectivity proof for depth 12 under multiple
-    // "seeds" (not that the mapping uses a seed — this is just
-    // asserting stability).
-    let _t = init_tracing();
-    let max_depth = 12u32;
-    let total_nodes = (1u64 << (max_depth + 1)) - 1;
-
-    for seed in 0u64..10 {
-        let _ = seed; // no actual randomness — Φ is deterministic
-        let mut images = vec![false; total_nodes as usize];
-        for d in 0..=max_depth {
-            for j in 0..(1u64 << d) {
-                let s = phi_spiral_index(d, j) as usize;
-                assert!(!images[s], "seed={seed}: double hit at s={s} (depth {d}, j={j})");
-                images[s] = true;
-            }
-        }
-        for (i, &h) in images.iter().enumerate() {
-            assert!(h, "seed={seed}: gap at spiral index {i}");
-        }
     }
 }
 
@@ -1735,5 +1918,60 @@ fn angular_range_spans_full_circle() {
             "depth {d}: largest angular gap {max_gap:.4} ≥ π/2 — \
              circle not fully covered"
         );
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// §U  Helper function edge cases
+// ═══════════════════════════════════════════════════════════════════
+
+#[test]
+fn hex_angle_at_origin_is_zero() {
+    let _t = init_tracing();
+    // atan2(0, 0) = 0 in Rust; verify our wrapper agrees.
+    assert!(hex_angle(Hex::new(0, 0)).abs() < 1e-10, "origin angle should be ≈ 0");
+
+    // Known directions: +q axis → 0°, +r axis → 60°.
+    let a_q = hex_angle(Hex::new(1, 0));
+    assert!(a_q.abs() < 1e-10, "+q axis angle should be ≈ 0, got {a_q}");
+
+    let a_r = hex_angle(Hex::new(0, 1));
+    let expected_60 = std::f64::consts::PI / 3.0;
+    assert!((a_r - expected_60).abs() < 1e-10, "+r axis angle should be ≈ π/3, got {a_r}");
+}
+
+#[test]
+fn angular_distance_basic_properties() {
+    let _t = init_tracing();
+    let pi = std::f64::consts::PI;
+
+    // Self-distance is zero.
+    assert!(angular_distance(1.0, 1.0) < 1e-10, "self-distance should be 0");
+    assert!(angular_distance(pi, pi) < 1e-10, "self-distance should be 0");
+
+    // Opposite points are π apart.
+    let d = angular_distance(0.0, pi);
+    assert!((d - pi).abs() < 1e-10, "opposite distance should be π, got {d}");
+
+    // Symmetry: d(a, b) == d(b, a).
+    let a = 0.5;
+    let b = 4.0;
+    assert!(
+        (angular_distance(a, b) - angular_distance(b, a)).abs() < 1e-10,
+        "angular_distance is not symmetric"
+    );
+
+    // Wrap-around: distance between ε and 2π−ε should be ≈ 2ε.
+    let eps = 0.01;
+    let d_wrap = angular_distance(eps, 2.0f64.mul_add(pi, -eps));
+    assert!(
+        2.0f64.mul_add(-eps, d_wrap).abs() < 1e-10,
+        "wrap-around distance should be ≈ {}, got {d_wrap}",
+        2.0 * eps
+    );
+
+    // Maximum is π.
+    for &(a, b) in &[(0.0, 3.5), (1.0, 5.0), (0.1, 6.0)] {
+        assert!(angular_distance(a, b) <= pi + 1e-10, "angular_distance({a}, {b}) exceeds π");
     }
 }

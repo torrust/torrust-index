@@ -191,12 +191,12 @@ no separate threshold.
 
 ### Impact on each flag
 
-| Current name               | New name                    | Semantic change                                                                           |
-| -------------------------- | --------------------------- | ----------------------------------------------------------------------------------------- |
+| Current name               | New name                    | Semantic change                                                                                  |
+| -------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------ |
 | `is_geo_terminal`          | `is_exposed`                | **Broadened (§IDEA M-4.2):** true for terminal AND semi-internal (any node with uncovered range) |
 | (new)                      | `is_evictable`              | **New (§IDEA M-4.2):** caches `¬has_dependents(gnode)`, true for terminal only                   |
 | `has_geo_terminal`         | `has_evictable`             | **Renamed (§IDEA M-4.3):** true iff any descendant entry backs a 0-child G-node                  |
-| `propagate_terminal_flags` | `propagate_evictable_flags` | Renamed to match                                                                          |
+| `propagate_terminal_flags` | `propagate_evictable_flags` | Renamed to match                                                                                 |
 
 The critical change is `is_exposed`. Currently `is_geo_terminal` is
 true only for 0-child nodes. The spec's `is_exposed` is true for
@@ -399,16 +399,16 @@ to `legacy_promote` when both hold.
 
 ### Spec sections implemented
 
-| Section | What it describes                                                           |
-| ------- | --------------------------------------------------------------------------- |
-| §IDEA M-4.1    | Three node states, `uncovered_range()`, exposed/dependents table            |
-| §IDEA M-4.2    | V-Entry `is_exposed` and `is_evictable` flags                               |
-| §IDEA M-4.3    | V-Structural `has_evictable` flag, why no legacy-promotion flag             |
-| §IDEA M-11.6   | `legacy_promote` function                                                   |
-| §IDEA M-11.7   | Decision table: entry + semi-internal + depth ≤ D_evict → legacy promote    |
-| §IDEA M-11.9   | Resolve dispatcher: `is_semi_internal` + depth check at skip-promote branch |
-| §IDEA M-12.3   | Eviction eligibility: depth + ¬has_dependents                               |
-| §IDEA M-13.2   | Full G-node lifecycle with legacy promotion arrow                           |
+| Section      | What it describes                                                           |
+| ------------ | --------------------------------------------------------------------------- |
+| §IDEA M-4.1  | Three node states, `uncovered_range()`, exposed/dependents table            |
+| §IDEA M-4.2  | V-Entry `is_exposed` and `is_evictable` flags                               |
+| §IDEA M-4.3  | V-Structural `has_evictable` flag, why no legacy-promotion flag             |
+| §IDEA M-11.6 | `legacy_promote` function                                                   |
+| §IDEA M-11.7 | Decision table: entry + semi-internal + depth ≤ D_evict → legacy promote    |
+| §IDEA M-11.9 | Resolve dispatcher: `is_semi_internal` + depth check at skip-promote branch |
+| §IDEA M-12.3 | Eviction eligibility: depth + ¬has_dependents                               |
+| §IDEA M-13.2 | Full G-node lifecycle with legacy promotion arrow                           |
 
 ### What does NOT change
 

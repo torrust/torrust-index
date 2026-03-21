@@ -43,7 +43,7 @@ directory retains the codename `mudlark`.
 | Item           | Name      | Rationale                                                                                     |
 | -------------- | --------- | --------------------------------------------------------------------------------------------- |
 | Crate          | `pewei`   | Memorable, searchable, names the concept (published as `torrust-mudlark`)                     |
-| Primary struct | `GvGraph` | Geometric-Value Graph — names the mechanism (ADR-M-006: `GvGraph<C, V, N>`)                     |
+| Primary struct | `GvGraph` | Geometric-Value Graph — names the mechanism (ADR-M-006: `GvGraph<C, V, N>`)                   |
 | Output struct  | `Pewei`   | Progressive Entropic-Wavelet Exposure Image — the expansion's final word is literally "image" |
 | Config         | `Config`  | Simple, namespaced by crate                                                                   |
 

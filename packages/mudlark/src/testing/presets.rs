@@ -146,3 +146,18 @@ pub fn plan_phase_shifted(a: u64, b: u64, n: usize) -> Plan<u64, u64> {
 pub fn plan_gray_code(domain: u64, n: usize) -> Plan<u64, u64> {
     Plan::new().bit_flip_walk(domain, 8, n)
 }
+
+// ── Contour range ───────────────────────────────────────────────
+
+/// Multi-plateau tree for contour range testing (N=8).
+///
+/// Concentrates observations in `[0, 64)` to create deeper
+/// plateaus on the left, with light observations elsewhere.
+#[must_use]
+pub fn plan_multi_plateau() -> Plan<u64, u64> {
+    Plan::new()
+        .hotspot(16, 5, 20)
+        .hotspot(48, 5, 20)
+        .observe(128, 1)
+        .observe(200, 1)
+}

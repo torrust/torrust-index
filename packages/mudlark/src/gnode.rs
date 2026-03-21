@@ -123,6 +123,10 @@ pub enum GState {
     SemiInternal,
     /// Two children — both halves route to child nodes. All new
     /// observations pass through to finer-grained regions below.
+    /// The node's V-entry retains its frozen `g.own` intensity, so
+    /// [`sample()`](crate::GvGraph::sample) can still land here and
+    /// return a [`Cell`](crate::Cell) covering the full `[lo, hi)`
+    /// range (see ADR-M-019 and §IDEA M-6.5).
     Internal,
 }
 

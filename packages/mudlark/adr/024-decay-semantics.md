@@ -19,11 +19,11 @@ generics), [ADR-M-012](012-g-sum-recomputation.md) (G-sum recomputation),
 
 The G-V Graph is a **spatiotemporal filter bank** with three stages:
 
-| Stage          | Operation                                                                                               | Axis            | Module          |
-| -------------- | ------------------------------------------------------------------------------------------------------- | --------------- | --------------- |
+| Stage          | Operation                                                                                                      | Axis            | Module          |
+| -------------- | -------------------------------------------------------------------------------------------------------------- | --------------- | --------------- |
 | **Analysis**   | Each `observe` decomposes incoming energy into spatial subbands defined by the G-Tree's plateaus (§IDEA M-5.6) | Spatial → Scale | `observe()`     |
-| **Processing** | Decay attenuates inactive entries; rebalance promotes active ones — a time-varying gain per subband     | Time            | `decay()`       |
-| **Synthesis**  | PEWEI reconstruction reassembles the filtered subbands into a spatial intensity function                | Scale → Spatial | `reconstruct()` |
+| **Processing** | Decay attenuates inactive entries; rebalance promotes active ones — a time-varying gain per subband            | Time            | `decay()`       |
+| **Synthesis**  | PEWEI reconstruction reassembles the filtered subbands into a spatial intensity function                       | Scale → Spatial | `reconstruct()` |
 
 This is the same architecture as a QMF filter bank in audio, a
 subband coder in video, or a wavelet-domain Wiener filter in
@@ -213,17 +213,17 @@ trailing rebalance — see Q2).
 
 **Validation:**
 
-| Condition              | Behaviour                                                                   |
-| ---------------------- | --------------------------------------------------------------------------- |
-| `q == 0.0`             | Uniform fast path. Same factor for every node.                              |
-| `q` in `(0.0, 1.0]`    | Selective path. Per-depth factors via precomputed table.                    |
-| `q < 0.0`              | Panic. Negative selectivity is not meaningful.                              |
-| `q > 1.0`              | Panic. At $q > 1$, coarse subbands would _grow_, violating decay semantics. |
+| Condition              | Behaviour                                                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `q == 0.0`             | Uniform fast path. Same factor for every node.                                                                                            |
+| `q` in `(0.0, 1.0]`    | Selective path. Per-depth factors via precomputed table.                                                                                  |
+| `q < 0.0`              | Panic. Negative selectivity is not meaningful.                                                                                            |
+| `q > 1.0`              | Panic. At $q > 1$, coarse subbands would _grow_, violating decay semantics.                                                               |
 | `attenuation == 0.0`   | Annihilation (§THEORY M-7.3). At $q < 1$: entire subtree zeroed. At $q = 1$: detail flush ($0^0 = 1$ preserves root, descendants zeroed). |
-| `attenuation < 0.0`    | Panic. Negative factors are not meaningful for multiplicative decay.        |
-| `attenuation.is_nan()` | Panic. NaN attenuation is a programmer error.                               |
-| `attenuation == 1.0`   | No-op. Early return.                                                        |
-| `attenuation > 1.0`    | Allowed (amplification). Documented.                                        |
+| `attenuation < 0.0`    | Panic. Negative factors are not meaningful for multiplicative decay.                                                                      |
+| `attenuation.is_nan()` | Panic. NaN attenuation is a programmer error.                                                                                             |
+| `attenuation == 1.0`   | No-op. Early return.                                                                                                                      |
+| `attenuation > 1.0`    | Allowed (amplification). Documented.                                                                                                      |
 
 ### Q2: G-sum propagation strategy (DC-024-2)
 

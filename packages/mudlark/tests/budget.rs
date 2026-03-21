@@ -1,26 +1,159 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
-//! Integration tests for Phase 3: budget enforcement and dynamic
-//! depth control.
+//! Integration tests for **budget enforcement** and **dynamic depth
+//! control** (Phase 3).
 //!
-//! Refactored to use the `graph_creator` test harness for config
-//! presets, observation plans, and budget-checked runners.
+//! Budget enforcement caps the number of G-tree nodes via a hard
+//! limit, dynamically adjusting `D_evict` and `D_create` depth gates
+//! to keep the tree within bounds.  The tests exercise config
+//! validation, gate dynamics, hard-budget guarantees (§ADR M-018),
+//! adversarial workloads, energy conservation, and serialization —
+//! all with full invariant checking.
 //!
-//! **Expanded coverage:** degenerate hotspot under budget, adversarial
-//! zigzag under budget, skewed load under budget, minimum-budget edge
-//! cases, gate oscillation under near-budget load, and plan-based
-//! energy conservation at various budget sizes.
+//! Uses the `testing` harness for config presets, observation plans,
+//! and budget-checked runners.
+//!
+//! # Test index
+//!
+//! ## Config validation
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`no_budget_soft_limit_is_none`] | `soft_limit()` returns `None` without budget |
+//! | [`budget_config_soft_limit_and_headroom`] | soft-limit / headroom arithmetic |
+//!
+//! ## Budget enforcement
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`budget_converges_under_500_observations`] | sweep, unbounded, budget-checked |
+//! | [`budget_bounded_eviction_converges`] | sweep, bounded, budget-checked |
+//!
+//! ## Depth gate dynamics
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`depth_gates_shift_under_budget_pressure`] | sustained spread tightens `D_evict` |
+//! | [`depth_gates_recover_when_under_budget`] | light load relaxes `D_evict` |
+//!
+//! ## Invariants throughout
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`invariants_hold_through_growth_and_contraction`] | per-observation invariant check |
+//! | [`energy_conserved_with_budget`] | total sum equals plan energy (unbounded) |
+//! | [`energy_conserved_with_bounded_eviction`] | total sum equals plan energy (bounded) |
+//!
+//! ## Hard budget guarantee (ADR-M-018)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`hard_budget_never_exceeded`] | 1000-obs sweep, unbounded |
+//! | [`hard_budget_never_exceeded_bounded`] | 1000-obs sweep, bounded |
+//! | [`hard_budget_minimum_budget`] | `tight_budget_config` (budget=82) |
+//! | [`hard_budget_minimum_budget_small_buffer`] | `small_buffer_config(10)` |
+//! | [`hard_budget_ceiling_is_tight`] | max node count exceeds soft limit but not budget |
+//! | [`hard_budget_split_guard_prevents_overshoot`] | small buffer, same pattern |
+//! | [`energy_conserved_at_hard_budget_limit`] | tight budget energy conservation |
+//!
+//! ## Degenerate hotspot under budget
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`hotspot_under_budget`] | single coord, budget=100 |
+//! | [`hotspot_under_minimum_budget`] | single coord, budget=10 |
+//!
+//! ## Adversarial patterns under budget
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`adversarial_zigzag_under_budget`] | `plan_adversarial` preset |
+//! | [`left_deep_under_budget`] | `plan_left_deep` (all at coord 0) |
+//! | [`right_deep_under_budget`] | `plan_right_deep` (all at domain − 1) |
+//!
+//! ## Skewed / burst / random under budget
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`skewed_load_under_budget`] | power-law skew + energy check |
+//! | [`budget_burst_growth_then_spike`] | `plan_budget_burst` preset |
+//! | [`random_spray_under_budget`] | pseudorandom coordinates |
+//! | [`oscillating_hotspot_under_budget`] | alternating deep hotspots |
+//!
+//! ## Multi-phase lifecycle
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`growth_pressure_relax_under_budget`] | `plan_growth_pressure_relax` preset |
+//!
+//! ## Gate oscillation
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`gate_oscillation_near_budget_boundary`] | tracks tighten/relax counts |
+//!
+//! ## D-I3 (buffer invariant)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`di3_maintained_through_budget_lifecycle`] | per-observation D-I3 check |
+//!
+//! ## Serialization
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`budget_plan_serializes_correctly`] | serde round-trip (`#[cfg(feature = "serde")]`) |
+//!
+//! ## Bounded vs unbounded comparison
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`bounded_and_unbounded_both_respect_hard_limit`] | both modes conserve energy |
+//!
+//! ## Various budget sizes
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`budget_200_sustained_load`] | larger budget under sweep |
+//! | [`budget_50_tight_small_buffer`] | `small_buffer_config(50)` |
+//!
+//! ## Empty / trivial
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`empty_plan_under_budget`] | zero observations, budget graph is valid |
 
 use torrust_mudlark::GvGraph;
 use torrust_mudlark::invariants::assert_invariants;
 use torrust_mudlark::testing::{
-    Plan, budget_config, budget_config_unbounded, plan_adversarial, plan_budget_burst, run, run_budget_checked, run_checked,
-    small_buffer_config, tight_budget_config,
+    Plan, budget_config, budget_config_unbounded, default_config, plan_adversarial, plan_budget_burst,
+    plan_growth_pressure_relax, plan_left_deep, plan_right_deep, run, run_budget_checked, run_checked, small_buffer_config,
+    tight_budget_config,
 };
 
 mod support;
 use support::init_tracing;
+
+// ── Config validation ───────────────────────────────────────────
+
+#[test]
+fn no_budget_soft_limit_is_none() {
+    let _t = init_tracing();
+    let g = GvGraph::<u64, u64, 8>::new(default_config());
+    assert_eq!(g.budget(), None);
+    assert_eq!(g.soft_limit(), None);
+}
+
+#[test]
+fn budget_config_soft_limit_and_headroom() {
+    let _t = init_tracing();
+    let g = GvGraph::<u64, u64, 8>::new(budget_config_unbounded(100));
+    assert_eq!(g.budget(), Some(100));
+    assert_eq!(g.headroom(), 81); // 3^(buffer+1) = 3^4 = 81
+    assert_eq!(g.soft_limit(), Some(100 - 81)); // 19
+    assert_eq!(g.depth_buffer(), 3); // D_evict(6) − D_create(3)
+}
 
 // ── Budget enforcement ──────────────────────────────────────────
 
@@ -94,6 +227,16 @@ fn energy_conserved_with_budget() {
     let g = run::<u64, u64, 8>(budget_config_unbounded(100), &plan);
     let total: u64 = plan.observations.iter().map(|&(_, d)| d).sum();
     assert_eq!(g.total_sum(), total, "G-root sum must equal total observation energy");
+    assert_invariants(&g);
+}
+
+#[test]
+fn energy_conserved_with_bounded_eviction() {
+    let _t = init_tracing();
+    let plan = Plan::new().sweep(256, 300);
+    let g = run::<u64, u64, 8>(budget_config(100), &plan);
+    let total: u64 = plan.observations.iter().map(|&(_, d)| d).sum();
+    assert_eq!(g.total_sum(), total, "bounded eviction must also conserve energy");
     assert_invariants(&g);
 }
 
@@ -201,7 +344,7 @@ fn energy_conserved_at_hard_budget_limit() {
     assert_invariants(&g);
 }
 
-// ── Expanded: degenerate hotspot under budget ───────────────────
+// ── Degenerate hotspot under budget ─────────────────────────────
 
 #[test]
 fn hotspot_under_budget() {
@@ -221,7 +364,7 @@ fn hotspot_under_minimum_budget() {
     assert_invariants(&g);
 }
 
-// ── Expanded: adversarial zigzag under budget ───────────────────
+// ── Adversarial patterns under budget ───────────────────────────
 
 #[test]
 fn adversarial_zigzag_under_budget() {
@@ -231,7 +374,29 @@ fn adversarial_zigzag_under_budget() {
     assert_invariants(&g);
 }
 
-// ── Expanded: skewed load under budget ──────────────────────────
+#[test]
+fn left_deep_under_budget() {
+    let _t = init_tracing();
+    // Worst-case left spine: all observations at coord 0.
+    let plan = plan_left_deep(6, 500);
+    let g = run_budget_checked::<u64, u64, 8>(budget_config_unbounded(100), &plan, 100, 500);
+    let total: u64 = plan.observations.iter().map(|&(_, d)| d).sum();
+    assert_eq!(g.total_sum(), total);
+    assert_invariants(&g);
+}
+
+#[test]
+fn right_deep_under_budget() {
+    let _t = init_tracing();
+    // Worst-case right spine: all observations at domain − 1.
+    let plan = plan_right_deep(256, 6, 500);
+    let g = run_budget_checked::<u64, u64, 8>(budget_config_unbounded(100), &plan, 100, 500);
+    let total: u64 = plan.observations.iter().map(|&(_, d)| d).sum();
+    assert_eq!(g.total_sum(), total);
+    assert_invariants(&g);
+}
+
+// ── Skewed / burst / random under budget ────────────────────────
 
 #[test]
 fn skewed_load_under_budget() {
@@ -243,8 +408,6 @@ fn skewed_load_under_budget() {
     assert_invariants(&g);
 }
 
-// ── Expanded: budget burst ──────────────────────────────────────
-
 #[test]
 fn budget_burst_growth_then_spike() {
     let _t = init_tracing();
@@ -253,7 +416,43 @@ fn budget_burst_growth_then_spike() {
     assert_invariants(&g);
 }
 
-// ── Expanded: gate oscillation near budget boundary ─────────────
+#[test]
+fn random_spray_under_budget() {
+    let _t = init_tracing();
+    let plan = Plan::new().random_spray(42, 256, 6, 500);
+    let g = run_budget_checked::<u64, u64, 8>(budget_config_unbounded(100), &plan, 100, 500);
+    let total: u64 = plan.observations.iter().map(|&(_, d)| d).sum();
+    assert_eq!(g.total_sum(), total);
+    assert_invariants(&g);
+}
+
+#[test]
+fn oscillating_hotspot_under_budget() {
+    let _t = init_tracing();
+    // Alternating deep refinement at two far-apart coords forces
+    // repeated eviction and re-growth.
+    let plan = Plan::new().oscillating_hotspot(0, 255, 10, 50, 8);
+    let g = run_budget_checked::<u64, u64, 8>(budget_config_unbounded(100), &plan, 100, 400);
+    let total: u64 = plan.observations.iter().map(|&(_, d)| d).sum();
+    assert_eq!(g.total_sum(), total);
+    assert_invariants(&g);
+}
+
+// ── Multi-phase lifecycle ───────────────────────────────────────
+
+#[test]
+fn growth_pressure_relax_under_budget() {
+    let _t = init_tracing();
+    // Uses the plan_growth_pressure_relax preset: growth → hotspot
+    // pressure → light relaxation.
+    let plan = plan_growth_pressure_relax(256, 100);
+    let g = run_budget_checked::<u64, u64, 8>(budget_config_unbounded(100), &plan, 100, 350);
+    let total: u64 = plan.observations.iter().map(|&(_, d)| d).sum();
+    assert_eq!(g.total_sum(), total);
+    assert_invariants(&g);
+}
+
+// ── Gate oscillation near budget boundary ───────────────────────
 
 #[test]
 fn gate_oscillation_near_budget_boundary() {
@@ -293,7 +492,7 @@ fn gate_oscillation_near_budget_boundary() {
     );
 }
 
-// ── Expanded: D-I3 maintained through full tighten-relax cycle ──
+// ── D-I3 (buffer invariant) maintained through lifecycle ────────
 
 #[test]
 fn di3_maintained_through_budget_lifecycle() {
@@ -321,7 +520,7 @@ fn di3_maintained_through_budget_lifecycle() {
     assert_invariants(&g);
 }
 
-// ── Expanded: plan serialization for budget scenario ────────────
+// ── Serialization ───────────────────────────────────────────────
 
 #[test]
 #[cfg(feature = "serde")]
@@ -333,7 +532,7 @@ fn budget_plan_serializes_correctly() {
     assert_eq!(plan, restored);
 }
 
-// ── Expanded: bounded vs unbounded eviction converge equally ────
+// ── Bounded vs unbounded comparison ─────────────────────────────
 
 #[test]
 fn bounded_and_unbounded_both_respect_hard_limit() {
@@ -351,7 +550,7 @@ fn bounded_and_unbounded_both_respect_hard_limit() {
     assert_invariants(&g_unbounded);
 }
 
-// ── Expanded: various budget sizes ──────────────────────────────
+// ── Various budget sizes ────────────────────────────────────────
 
 #[test]
 fn budget_200_sustained_load() {
@@ -368,5 +567,17 @@ fn budget_50_tight_small_buffer() {
     // buffer=1, headroom=9, budget=50, soft_limit=41.
     let plan = Plan::new().sweep(256, 500);
     let g = run_budget_checked::<u64, u64, 8>(small_buffer_config(50), &plan, 50, 500);
+    assert_invariants(&g);
+}
+
+// ── Empty / trivial ─────────────────────────────────────────────
+
+#[test]
+fn empty_plan_under_budget() {
+    let _t = init_tracing();
+    let plan: Plan<u64, u64> = Plan::new();
+    let g = run::<u64, u64, 8>(budget_config_unbounded(100), &plan);
+    assert_eq!(g.node_count(), 1, "fresh graph has only the root");
+    assert_eq!(g.total_sum(), 0);
     assert_invariants(&g);
 }

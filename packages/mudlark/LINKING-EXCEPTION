@@ -1,0 +1,38 @@
+TORRUST-MUDLARK LINKING EXCEPTION
+Version 1.0, 2026
+
+As a special exception, the copyright holders of the torrust-mudlark
+library give you permission to combine this library with independent
+crates to produce a combined work, and to distribute and make available
+the resulting combined work under terms of your choice, provided that:
+
+  (a) you interact with the library solely through its documented
+      public API — Surfaces 1 (Prints) and 2 (Film) as specified in
+      docs/api.md of the library's source distribution; and
+
+  (b) you do not modify the library's source code; and
+
+  (c) you include a copy of, or a URI pointing to, this exception
+      notice and the GNU Affero General Public License alongside the
+      combined work.
+
+This exception applies to the obligations imposed by Sections 5, 6,
+and 13 of the GNU Affero General Public License version 3: neither
+distributing the combined work, nor making it available for interaction
+over a computer network, requires you to offer or provide the
+Corresponding Source of your independent crates under the AGPL, so
+long as the conditions above are met.
+
+Any code that reaches into Surface 3 (Emulsion) — the library's
+pub(crate) and #[doc(hidden)] internal machinery as defined in
+docs/api.md §6 — or that copies, adapts, or links against internal
+modules directly, is not covered by this exception and remains
+subject to the full terms of the AGPL.
+
+If you modify the library, you may extend this exception to your
+modified version, but you are not obligated to do so. If you do not
+wish to extend it, delete this exception statement from your version.
+
+Note: The Torrust project's Legacy Exception (five-year MIT-0 sunset)
+does not apply to this package. torrust-mudlark is licensed under
+AGPL-3.0-only with this Linking Exception only.

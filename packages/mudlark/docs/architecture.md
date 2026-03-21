@@ -132,13 +132,13 @@ tests/
 │   ├── query.rs            │   └── spray.rs
 ├── budget.rs               ├── buffer_oscillation.rs
 ├── cascade.rs              ├── contour_range.rs
-├── cross_type.rs           ├── eviction.rs
+├── cross_type.rs           ├── decay_infinite.rs       ├── eviction.rs
 ├── eviction_debug.rs       ├── eviction_p_i2.rs
 ├── graph_extract.rs        ├── graph_layers.rs
 ├── graph_point.rs          ├── graph_range.rs
 ├── graph_sample.rs         ├── graph_terminal.rs
 ├── hex_binary_tree_mapping.rs
-├── plateau.rs              ├── sentinel_api.rs
+├── negative_f64.rs         ├── plateau.rs              ├── sentinel_api.rs
 ├── stress_patterns.rs
 └── support/
     └── mod.rs              # Shared integration test helpers
@@ -149,8 +149,8 @@ tests/
 | Feature                    | Default | Effect                                                              |
 | -------------------------- | ------- | ------------------------------------------------------------------- |
 | `dynamic-contour-tracking` | yes     | Live plateau mirror; `plateaus()` returns `Cow::Borrowed` in $O(1)$ |
-| `serde`                    | yes     | `Serialize`/`Deserialize` on all Surface 1 snapshot types           |
-| `rand`                     | yes     | Blanket `Rng` impl for all `rand_core::Rng` types               |
+| `serde`                    | no      | `Serialize`/`Deserialize` on all Surface 1 snapshot types           |
+| `rand`                     | yes     | Blanket `Rng` impl for all `rand_core::Rng` types                   |
 
 ### Benchmarks (ADR-M-035)
 
@@ -171,11 +171,11 @@ mode (see ADR-M-035).
 
 ### Dependencies
 
-| Crate           | Kind                       | Purpose                               |
-| --------------- | -------------------------- | ------------------------------------- |
-| `rand_core` 0.9 | Optional (`rand` feature)  | RNG trait bridge                      |
-| `serde` 1       | Optional (`serde` feature) | Serialization derives                 |
-| `tracing` 0     | Required                   | Structured diagnostic instrumentation |
+| Crate            | Kind                       | Purpose                               |
+| ---------------- | -------------------------- | ------------------------------------- |
+| `rand_core` 0.10 | Optional (`rand` feature)  | RNG trait bridge                      |
+| `serde` 1        | Optional (`serde` feature) | Serialization derives                 |
+| `tracing` 0      | Required                   | Structured diagnostic instrumentation |
 
 ---
 
@@ -289,9 +289,9 @@ returns `V::zero()`. Cost: $O(N)$. Requires `V: Proratable`.
 **`contour_range` / `contour_range_energy`** (ADR-M-037, revised) —
 Decomposes a coordinate range $[s, e)$ into a **basis set**: the
 minimal G-node cover whose effective tiles are pairwise disjoint and
-contiguously tile the range (§CR.2).  At most two basis elements are
-*boundary thatching* semi-internals whose `.sum` leaks energy outside
-the range (§CR.3.2).  `contour_range` returns the full
+contiguously tile the range (§CR.2). At most two basis elements are
+_boundary thatching_ semi-internals whose `.sum` leaks energy outside
+the range (§CR.3.2). `contour_range` returns the full
 `ContourRange<C, V>` (basis set + energy fields);
 `contour_range_energy` returns only the scalar `ContourRangeEnergy<V>`.
 Both share the same $O(N)$ G-Tree walk and require
@@ -299,8 +299,8 @@ Both share the same $O(N)$ G-Tree walk and require
 
 **`select_plateaus`** (§CR.12) — Given arbitrary dyadic coordinates
 `[lo, hi)`, snaps outward to the nearest lattice-aligned endpoints
-that span all overlapping plateaus.  Returns a `(BasisEdge, BasisEdge)`
-pair valid for `contour_range()`.  Cost: $O(\log P)$.  Requires
+that span all overlapping plateaus. Returns a `(BasisEdge, BasisEdge)`
+pair valid for `contour_range()`. Cost: $O(\log P)$. Requires
 `V: Inspectable`.
 
 ### 4.4 Depth computation — `gtree::gnode_depth_from_interval`
@@ -606,12 +606,12 @@ pub trait Accumulator: Copy + PartialOrd + Debug + Default + Send + Sync + 'stat
 Four independent sub-traits gate additional capabilities
 (ADR-M-009 Addendum 3, ADR-M-033):
 
-| Sub-trait      | Method(s)                      | Required for                                           |
-| -------------- | ------------------------------ | ------------------------------------------------------ |
-| `Attenuatable` | `attenuate(self, f64) -> Self` | `decay()` (`TemporalDecay` trait)                      |
-| `Weighable`    | `weight(self) -> f64`          | `sample()` (`WeightedSampler` trait), PEWEI extraction |
+| Sub-trait      | Method(s)                      | Required for                                                                |
+| -------------- | ------------------------------ | --------------------------------------------------------------------------- |
+| `Attenuatable` | `attenuate(self, f64) -> Self` | `decay()` (`TemporalDecay` trait)                                           |
+| `Weighable`    | `weight(self) -> f64`          | `sample()` (`WeightedSampler` trait), PEWEI extraction                      |
 | `Proratable`   | `prorate(…)`, `scale_by(…)`    | `range_sum()`, exact energy in `contour_range()` / `contour_range_energy()` |
-| `Inspectable`  | `to_f64_approx(self) -> f64`   | Invariant checking, diagnostic display, `contour_range()` zero-pruning |
+| `Inspectable`  | `to_f64_approx(self) -> f64`   | Invariant checking, diagnostic display, `contour_range()` zero-pruning      |
 
 All seven built-in numeric types (`u8`–`u128`, `f32`, `f64`)
 implement `Accumulator` and all four sub-traits. A user-defined
@@ -718,14 +718,14 @@ module (`graph.rs`) holds the struct definition, `Config`,
 `GNodeChildren`, `new()`, and accessors. Each satellite module contains
 one cohesive concern as `impl GvGraph` blocks:
 
-| Module              | Concern                                                              | Key ADRs      |
-| ------------------- | -------------------------------------------------------------------- | ------------- |
-| `graph.rs`          | Struct, `Config`, `GNodeChildren`, `new()`, core accessors              | ADR-M-005, -006 |
-| `graph_plateau.rs`  | Plateau tracking: incremental contour maintenance, normalization, `select_plateaus` | ADR-M-026, -031, -037 |
-| `graph_query.rs`    | Read queries: `sample`, `get`, `range_sum`, `contour_range`, `contour_range_energy` | ADR-M-019, -020, -037 |
-| `graph_extract.rs`  | PEWEI extraction, layer iteration, `from_observations`               | ADR-M-021, -022 |
-| `graph_budget.rs`   | Budget enforcement, depth-gate adjustment, eviction orchestration    | ADR-M-015, -017, -018 |
-| `graph_traits.rs`   | Trait impls: `SpatialRead`, `SpatialWrite`, `TemporalDecay`, `WeightedSampler` | ADR-M-009 |
+| Module             | Concern                                                                             | Key ADRs              |
+| ------------------ | ----------------------------------------------------------------------------------- | --------------------- |
+| `graph.rs`         | Struct, `Config`, `GNodeChildren`, `new()`, core accessors                          | ADR-M-005, -006       |
+| `graph_plateau.rs` | Plateau tracking: incremental contour maintenance, normalization, `select_plateaus` | ADR-M-026, -031, -037 |
+| `graph_query.rs`   | Read queries: `sample`, `get`, `range_sum`, `contour_range`, `contour_range_energy` | ADR-M-019, -020, -037 |
+| `graph_extract.rs` | PEWEI extraction, layer iteration, `from_observations`                              | ADR-M-021, -022       |
+| `graph_budget.rs`  | Budget enforcement, depth-gate adjustment, eviction orchestration                   | ADR-M-015, -017, -018 |
+| `graph_traits.rs`  | Trait impls: `SpatialRead`, `SpatialWrite`, `TemporalDecay`, `WeightedSampler`      | ADR-M-009             |
 
 Corresponding tests live in `src/tests/graph.rs`,
 `src/tests/graph_init.rs`, and `tests/graph_*.rs`.
@@ -734,44 +734,45 @@ Corresponding tests live in `src/tests/graph.rs`,
 
 ## 17. ADR index
 
-| ADR                                                         | Topic                                    | Status                                           |
-| ----------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------ |
-| [001](../adr/001-node-storage.md)                           | Node storage                             | Decided — implemented                            |
-| [002](../adr/002-vtree-node-enum.md)                        | V-Tree node repr                         | Decided — implemented                            |
-| [003](../adr/003-violation-tracking.md)                     | Violation tracking                       | Decided — implemented                            |
-| [005](../adr/005-primary-type-name.md)                      | Primary type name                        | Decided — implemented                            |
-| [006](../adr/006-generic-parameters.md)                     | Generic parameters                       | Decided — implemented                            |
-| [007](../adr/007-thread-safety.md)                          | Thread safety                            | Decided — implemented                            |
-| [008](../adr/008-span-type.md)                              | Span type / view types                   | Decided — implemented                            |
-| [009](../adr/009-trait-decomposition.md)                    | Trait decomposition / Rng                | Decided — implemented                            |
-| [010](../adr/010-observation-generics.md)                   | Observation generics                     | Decided — implemented                            |
-| [011](../adr/011-overflow-narrowing.md)                     | Overflow & narrowing                     | Decided — implemented                            |
-| [012](../adr/012-g-sum-recomputation.md)                    | G-sum recomputation                      | Decided — implemented                            |
-| [013](../adr/013-eviction-eligibility.md)                   | Eviction eligibility                     | Decided — implemented (amended by ADR-M-027)       |
-| [014](../adr/014-value-absorption.md)                       | Value absorption                         | Decided — implemented                            |
-| [015](../adr/015-eviction-scan-design.md)                   | Eviction scan design                     | Decided — implemented                            |
-| [016](../adr/016-semi-internal-state.md)                    | Semi-internal state                      | Decided — implemented (amended by ADR-M-027)       |
-| [017](../adr/017-dynamic-depth-control.md)                  | Dynamic depth control                    | Decided — implemented                            |
-| [018](../adr/018-hard-budget-guarantee.md)                  | Hard budget guarantee                    | Decided — implemented                            |
-| [019](../adr/019-sampling-semantics.md)                     | Sampling semantics                       | Decided — implemented                            |
-| [020](../adr/020-range-query-design.md)                     | Range query design                       | Decided — implemented                            |
-| [021](../adr/021-pewei-output-representation.md)            | PEWEI output representation              | Decided — implemented                            |
-| [022](../adr/022-pewei-serialisation.md)                    | PEWEI serialisation                      | Decided — implemented                            |
-| [023](../adr/023-pewei-reconstruction.md)                   | PEWEI reconstruction                     | Decided — implemented                            |
-| [024](../adr/024-decay-semantics.md)                        | Decay semantics                          | Decided — implemented                            |
-| [025](../adr/025-public-api-surface.md)                     | Public API surface                       | Decided — implemented                            |
-| [026](../adr/026-point-query-and-plateau-semantics.md)      | Plateau semantics / point query          | Decided — implemented                            |
-| [027](../adr/027-observation-receiving-reframe.md)          | Exposed / evictable flag reframe         | Decided — implemented                            |
-| [028](../adr/028-span-native-tracing.md)                    | Span-native tracing                      | Decided — implemented                            |
-| [029](../adr/029-opportunistic-depth-caching.md)            | Opportunistic depth caching              | Decided — implemented                            |
-| [030](../adr/030-graph-module-decomposition.md)             | Graph module decomposition               | Decided — implemented                            |
-| [031](../adr/031-sorted-placement-normalize-elimination.md) | Sorted placement / normalize elimination | Decided — implemented                            |
-| [032](../adr/032-three-surface-model.md)                    | Three-surface visibility model           | Decided — implemented                            |
-| [033](../adr/033-v-generic-importance-properties.md)        | V generic importance properties          | Decided — implemented                            |
-| [034](../adr/034-doc-comment-and-doctest-policy.md)         | Doc-comment and doc-test policy           | Decided — implemented                            |
-| [035](../adr/035-benchmarking-framework.md)                 | Benchmarking framework                   | Decided — implemented                            |
-| [036](../adr/036-sentinel-integration-api.md)               | Sentinel integration API                 | Decided — implemented                            |
-| [037](../adr/037-contour-range-queries.md)                  | Contour range queries                    | Decided — implemented                            |
+| ADR                                                         | Topic                                    | Status                                       |
+| ----------------------------------------------------------- | ---------------------------------------- | -------------------------------------------- |
+| [001](../adr/001-node-storage.md)                           | Node storage                             | Decided — implemented                        |
+| [002](../adr/002-vtree-node-enum.md)                        | V-Tree node repr                         | Decided — implemented                        |
+| [003](../adr/003-violation-tracking.md)                     | Violation tracking                       | Decided — implemented                        |
+| [005](../adr/005-primary-type-name.md)                      | Primary type name                        | Decided — implemented                        |
+| [006](../adr/006-generic-parameters.md)                     | Generic parameters                       | Decided — implemented                        |
+| [007](../adr/007-thread-safety.md)                          | Thread safety                            | Decided — implemented                        |
+| [008](../adr/008-span-type.md)                              | Span type / view types                   | Decided — implemented                        |
+| [009](../adr/009-trait-decomposition.md)                    | Trait decomposition / Rng                | Decided — implemented                        |
+| [010](../adr/010-observation-generics.md)                   | Observation generics                     | Decided — implemented                        |
+| [011](../adr/011-overflow-narrowing.md)                     | Overflow & narrowing                     | Decided — implemented                        |
+| [012](../adr/012-g-sum-recomputation.md)                    | G-sum recomputation                      | Decided — implemented                        |
+| [013](../adr/013-eviction-eligibility.md)                   | Eviction eligibility                     | Decided — implemented (amended by ADR-M-027) |
+| [014](../adr/014-value-absorption.md)                       | Value absorption                         | Decided — implemented                        |
+| [015](../adr/015-eviction-scan-design.md)                   | Eviction scan design                     | Decided — implemented                        |
+| [016](../adr/016-semi-internal-state.md)                    | Semi-internal state                      | Decided — implemented (amended by ADR-M-027) |
+| [017](../adr/017-dynamic-depth-control.md)                  | Dynamic depth control                    | Decided — implemented                        |
+| [018](../adr/018-hard-budget-guarantee.md)                  | Hard budget guarantee                    | Decided — implemented                        |
+| [019](../adr/019-sampling-semantics.md)                     | Sampling semantics                       | Decided — implemented                        |
+| [020](../adr/020-range-query-design.md)                     | Range query design                       | Decided — implemented                        |
+| [021](../adr/021-pewei-output-representation.md)            | PEWEI output representation              | Decided — implemented                        |
+| [022](../adr/022-pewei-serialisation.md)                    | PEWEI serialisation                      | Decided — implemented                        |
+| [023](../adr/023-pewei-reconstruction.md)                   | PEWEI reconstruction                     | Decided — implemented                        |
+| [024](../adr/024-decay-semantics.md)                        | Decay semantics                          | Decided — implemented                        |
+| [025](../adr/025-public-api-surface.md)                     | Public API surface                       | Decided — implemented                        |
+| [026](../adr/026-point-query-and-plateau-semantics.md)      | Plateau semantics / point query          | Decided — implemented                        |
+| [027](../adr/027-observation-receiving-reframe.md)          | Exposed / evictable flag reframe         | Decided — implemented                        |
+| [028](../adr/028-span-native-tracing.md)                    | Span-native tracing                      | Decided — implemented                        |
+| [029](../adr/029-opportunistic-depth-caching.md)            | Opportunistic depth caching              | Decided — implemented                        |
+| [030](../adr/030-graph-module-decomposition.md)             | Graph module decomposition               | Decided — implemented                        |
+| [031](../adr/031-sorted-placement-normalize-elimination.md) | Sorted placement / normalize elimination | Decided — implemented                        |
+| [032](../adr/032-three-surface-model.md)                    | Three-surface visibility model           | Decided — implemented                        |
+| [033](../adr/033-v-generic-importance-properties.md)        | V generic importance properties          | Decided — implemented                        |
+| [034](../adr/034-doc-comment-and-doctest-policy.md)         | Doc-comment and doc-test policy          | Decided — implemented                        |
+| [035](../adr/035-benchmarking-framework.md)                 | Benchmarking framework                   | Decided — implemented                        |
+| [036](../adr/036-sentinel-integration-api.md)               | Sentinel integration API                 | Decided — implemented                        |
+| [037](../adr/037-contour-range-queries.md)                  | Contour range queries                    | Decided — implemented                        |
+| [038](../adr/038-decay-factor-table-depth-bound.md)         | Decay factor table depth bound           | Decided — implemented                        |
 
 ---
 

@@ -1,38 +1,74 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
-//! Inline tests that remain here because they depend on private field
-//! mutation (e.g. `node_count`, `live_depth_evict`, `live_depth_create`,
-//! `violations`) or `pub(crate)` methods (`adjust_depth_gates`,
-//! `check_evictions_bounded`, `gnode_depth`).  All other graph tests
-//! have been extracted to `tests/graph_*.rs` integration test files.
+//! Crate-level tests for **`GvGraph` internals** that require direct
+//! access to private fields (`node_count`, `live_depth_evict`,
+//! `live_depth_create`, `violations`) or `pub(crate)` methods
+//! (`adjust_depth_gates`, `check_evictions_bounded`, `gnode_depth`).
+//!
+//! These tests live at the crate level because the APIs under test are
+//! intentionally hidden from the public surface — they are
+//! implementation details of the adaptive depth-gate machinery
+//! (ADR-M-017) and the eviction subsystem.  All other graph tests live
+//! in `tests/graph_*.rs` integration test files or in more targeted
+//! crate test modules (`config_validation.rs`, `evict.rs`, etc.).
+//!
+//! # Test index
+//!
+//! ## Shadow fields / config accessors
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`shadow_fields_match_config_on_construction`] | depth gates and headroom mirror `Config` at construction |
+//! | [`soft_limit_computed_correctly`] | `soft_limit()` derived from `budget` and `headroom` |
+//!
+//! ## `adjust_depth_gates` (ADR-M-017)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`tighten_when_over_budget`] | gates decrease when `node_count > soft_limit` |
+//! | [`relax_when_under_alpha_budget`] | gates increase when `node_count < α × soft_limit` |
+//! | [`dead_zone_no_change`] | gates unchanged inside the dead-zone band |
+//! | [`floor_prevents_excessive_tightening`] | repeated tightening bottoms out at the floor |
+//! | [`no_ceiling_relax_above_initial`] | relaxation can exceed initial config values |
+//! | [`noop_when_budget_is_none`] | adjustment is a no-op when `budget` is `None` |
+//! | [`di3_maintained_through_full_tighten_relax_cycle`] | D-I3 (`D_create < D_evict`) holds across a full tighten→relax cycle |
+//!
+//! ## `check_evictions` / `check_evictions_bounded`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`check_evictions_unbounded_evicts_all`] | unbounded eviction removes all eligible candidates |
+//! | [`check_evictions_bounded_respects_limit`] | bounded variant respects the per-call limit |
+//! | [`check_evictions_return_value_matches_count_delta`] | return value equals `count_before − count_after` |
+//! | [`check_evictions_trailing_rebalance_clears_violations`] | trailing rebalance drains the violation queue |
+//! | [`check_evictions_noop_when_none_eligible`] | no-op when no nodes sit beyond `D_evict` |
+//!
+//! ## `gnode_depth` (`pub(crate)`)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`gnode_depth_method_matches_free_function`] | method agrees with the free `gnode_depth_from_interval` function |
+//!
+//! ## Semi-internal `get` (needs `build_evictable_graph`)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`get_semi_internal_left_child_trims_right`] | left-child semi-internal trims the right half |
+//! | [`get_semi_internal_right_child_trims_left`] | right-child semi-internal trims the left half |
+//! | [`get_semi_internal_depth_is_trimmed_depth`] | returned cell depth equals `arena_depth + 1` |
+//!
+//! ## Compile-time trait assertions
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | `Send + Sync` | `GvGraph` and `Config` are `Send + Sync` (ADR-M-007) |
 
 use crate::invariants::assert_invariants;
+use crate::testing::{budget_config, default_config, evictable_config, plan_evictable, run};
 use crate::{Config, GvGraph};
 
 // ── Shared helpers (private-field access) ───────────────────
-
-fn default_config() -> Config<u64> {
-    Config {
-        split_threshold: 5,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
-    }
-}
-
-fn budget_config(budget: usize) -> Config<u64> {
-    Config {
-        split_threshold: 5,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: Some(budget),
-        alpha_relax: 0.75,
-        bounded_eviction: true,
-    }
-}
 
 /// Build a graph with terminal entries past `D_evict`.
 ///
@@ -40,108 +76,11 @@ fn budget_config(budget: usize) -> Config<u64> {
 /// After filling the tree, lowers `D_evict` to the floor (2) so
 /// deep V-entries become eligible. D-I3 is respected.
 fn build_evictable_graph() -> GvGraph<u64, u64, 8> {
-    let cfg = Config {
-        split_threshold: 5,
-        depth_create: 3,
-        depth_evict: 4,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
-    };
-    let mut g: GvGraph<u64, u64, 8> = GvGraph::new(cfg);
-    for &c in &[0u64, 128, 64, 192, 32, 96, 160, 224] {
-        g.observe(c, 6u64);
-    }
+    let mut g: GvGraph<u64, u64, 8> = run(evictable_config(), &plan_evictable());
     // buffer = 4 - 3 = 1, floor = 1 + 1 = 2.
     g.live_depth_evict = 2;
     g.live_depth_create = 2 - g.depth_buffer();
     g
-}
-
-// ── Config validation panics ────────────────────────────────
-
-#[test]
-#[should_panic(expected = "D_create")]
-fn config_validates_depth_gate() {
-    let bad = Config {
-        split_threshold: 5u64,
-        depth_create: 6,
-        depth_evict: 3,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
-    };
-    let _unused: GvGraph<u64, u64, 32> = GvGraph::new(bad);
-}
-
-#[test]
-#[should_panic(expected = "alpha_relax")]
-fn config_validates_alpha_relax_zero() {
-    let bad = Config {
-        split_threshold: 5u64,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: None,
-        alpha_relax: 0.0,
-        bounded_eviction: true,
-    };
-    let _unused: GvGraph<u64, u64, 32> = GvGraph::new(bad);
-}
-
-#[test]
-#[should_panic(expected = "alpha_relax")]
-fn config_validates_alpha_relax_one() {
-    let bad = Config {
-        split_threshold: 5u64,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: None,
-        alpha_relax: 1.0,
-        bounded_eviction: true,
-    };
-    let _unused: GvGraph<u64, u64, 32> = GvGraph::new(bad);
-}
-
-#[test]
-#[should_panic(expected = "D_create")]
-fn config_validates_depth_create_zero() {
-    let bad = Config {
-        split_threshold: 5u64,
-        depth_create: 0,
-        depth_evict: 3,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
-    };
-    let _unused: GvGraph<u64, u64, 32> = GvGraph::new(bad);
-}
-
-#[test]
-#[should_panic(expected = "budget")]
-fn config_rejects_budget_at_headroom() {
-    let bad = Config {
-        split_threshold: 5u64,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: Some(81),
-        alpha_relax: 0.75,
-        bounded_eviction: true,
-    };
-    let _unused: GvGraph<u64, u64, 32> = GvGraph::new(bad);
-}
-
-#[test]
-#[should_panic(expected = "budget")]
-fn config_rejects_budget_below_headroom() {
-    let bad = Config {
-        split_threshold: 5u64,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: Some(10),
-        alpha_relax: 0.75,
-        bounded_eviction: true,
-    };
-    let _unused: GvGraph<u64, u64, 32> = GvGraph::new(bad);
 }
 
 // ── Shadow fields / config accessors ────────────────────────

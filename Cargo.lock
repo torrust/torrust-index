@@ -4321,6 +4321,7 @@ name = "torrust-mudlark"
 version = "1.0.0"
 dependencies = [
  "criterion",
+ "rand 0.10.1",
  "rand_core 0.10.1",
  "serde",
  "serde_json",

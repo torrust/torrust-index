@@ -1,8 +1,105 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
+//! Correctness and round-trip tests for the **PEWEI** extraction and
+//! reconstruction pipeline (`Pewei`, `Layer`, `Transition`, `Terminal`,
+//! and `Pewei::reconstruct()`).
+//!
+//! The first group exercises the low-level data types (`Transition`,
+//! `Terminal`, `Layer`) — signal-to-noise ratio, width helpers, serde
+//! round-trips, and convenience accessors on `Pewei` itself.
+//!
+//! The reconstruction tests form the bulk of the module.  Hand-built
+//! PEWEIs with known arithmetic verify that `reconstruct()` correctly
+//! pro-rates ancestral baselines, synthesises invisible-sibling
+//! remainders, conserves energy at every truncation level, and
+//! partitions the domain without gaps or overlaps.  Edge cases for
+//! integer rounding, f64 coordinates, and `max_layer` clamping are
+//! covered explicitly.
+//!
+//! The "D1" group (§ADR M-039) cross-checks `reconstruct()` against
+//! live `GvGraph` instances built via `GraphCreator`: energy
+//! conservation between `total_sum()` and the span sum, agreement
+//! with `range_sum()`, and correct partitioning under diverse
+//! observation patterns (concentrated, sweep, spread, burst).
+//!
+//! Finally, structural checks assert extracted-layer invariants:
+//! `total >= baseline` for every transition, and positive width for
+//! every terminal.
+//!
+//! # Test index
+//!
+//! ## `Transition::snr`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`snr_nonzero_baseline`] | SNR = refinement / baseline for nonzero baseline |
+//! | [`snr_zero_baseline_returns_none`] | `None` when baseline is zero |
+//! | [`snr_float_types`] | SNR computation with `f64` coordinates and energy |
+//!
+//! ## Width
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`transition_width`] | `Transition::width()` returns `end - start` |
+//! | [`terminal_width`] | `Terminal::width()` returns `end - start` |
+//!
+//! ## `Pewei` convenience methods
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`empty_pewei_counts`] | `layer_count`, `node_count`, `total_energy` on empty PEWEI |
+//! | [`pewei_node_count_and_energy`] | counts and energy for a two-layer PEWEI |
+//! | [`total_energy_f64`] | `total_energy` with `f64` values |
+//!
+//! ## Serde round-trip
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`serde_round_trip_json`] | `Pewei` survives JSON serialise → deserialise |
+//! | [`serde_round_trip_transition`] | `Transition` serde round-trip |
+//! | [`serde_round_trip_terminal`] | `Terminal` serde round-trip |
+//! | [`serde_round_trip_layer`] | `Layer` serde round-trip |
+//!
+//! ## Reconstruction — hand-built PEWEIs
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`reconstruct_empty_pewei`] | empty PEWEI yields single zero-intensity span |
+//! | [`reconstruct_single_terminal`] | single root terminal reproduced verbatim |
+//! | [`reconstruct_single_transition_truncated`] | truncation at layer 0 emits total as single span |
+//! | [`reconstruct_full_depth_matches_terminals`] | two-layer pro-rated baseline + terminal intensities |
+//! | [`reconstruct_energy_conservation_at_each_layer`] | three-layer energy sums identical at every truncation |
+//! | [`reconstruct_one_visible_one_invisible_remainder`] | invisible right sibling synthesised from remainder |
+//! | [`reconstruct_right_visible_left_invisible`] | mirrored: invisible left sibling synthesised |
+//! | [`reconstruct_both_children_visible`] | symmetric case with both children visible |
+//! | [`reconstruct_no_gaps_no_overlaps`] | spans partition domain at every truncation level |
+//! | [`reconstruct_integer_rounding`] | odd baseline loses 1 unit to integer truncation |
+//! | [`reconstruct_f64_coordinates`] | pro-rated baseline correct for `f64` domain |
+//! | [`reconstruct_max_layer_clamped`] | `max_layer` beyond depth behaves like full depth |
+//! | [`reconstruct_output_sorted_by_start`] | output spans sorted by `start` coordinate |
+//!
+//! ## D1: Reconstruct from live graph (§ADR M-039)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`reconstruct_from_graph_energy_conservation`] | span sum ≈ `total_sum()` after mixed observations |
+//! | [`reconstruct_concentrated_observation`] | single-point hotspot conserves energy |
+//! | [`reconstruct_from_graph_full_depth_conserves_energy`] | full-depth multi-layer extraction conserves energy |
+//! | [`reconstruct_cross_check_against_range_sum`] | span sum agrees with `range_sum(..)` |
+//! | [`extract_via_graph_creator_conserves_energy`] | spread-graph extraction conserves energy |
+//! | [`extract_spread_graph_partitions_domain`] | burst-graph partitions domain at every layer |
+//!
+//! ## Layer structural checks
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`layer_transition_total_ge_baseline`] | `total >= baseline` for every extracted transition |
+//! | [`layer_terminals_have_positive_width`] | `start < end` for every extracted terminal |
+
 use crate::Pewei;
 use crate::pewei::{Layer, Terminal, Transition};
+use crate::testing::{GraphCreator, default_config, low_threshold_config};
 
 // ── Transition::snr ─────────────────────────────────────────
 
@@ -138,6 +235,34 @@ fn pewei_node_count_and_energy() {
     assert_eq!(p.total_energy(), 50);
 }
 
+#[test]
+fn total_energy_f64() {
+    let p = Pewei::<f64, f64> {
+        domain_start: 0.0,
+        domain_end: 8.0,
+        layers: vec![Layer {
+            transitions: vec![Transition {
+                start: 0.0,
+                end: 8.0,
+                baseline: 2.5,
+                total: 10.0,
+                refinement: 7.5,
+                depth: 0,
+                v_depth: 0,
+            }],
+            terminals: vec![Terminal {
+                start: 0.0,
+                end: 4.0,
+                intensity: 4.0,
+                depth: 1,
+                v_depth: 1,
+            }],
+        }],
+    };
+    // total_energy = baseline(2.5) + terminal(4.0) = 6.5
+    assert!((p.total_energy() - 6.5).abs() < f64::EPSILON);
+}
+
 // ── Serde round-trip ────────────────────────────────────────
 
 #[cfg(feature = "serde")]
@@ -177,6 +302,47 @@ fn serde_round_trip_transition() {
     let json = serde_json::to_string(&t).expect("serialize");
     let restored: Transition<u64, u64> = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(t, restored);
+}
+
+#[cfg(feature = "serde")]
+#[test]
+fn serde_round_trip_terminal() {
+    let t = Terminal::<u64, u64> {
+        start: 64,
+        end: 192,
+        intensity: 99,
+        depth: 2,
+        v_depth: 1,
+    };
+    let json = serde_json::to_string(&t).expect("serialize");
+    let restored: Terminal<u64, u64> = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(t, restored);
+}
+
+#[cfg(feature = "serde")]
+#[test]
+fn serde_round_trip_layer() {
+    let layer = Layer::<u64, u64> {
+        transitions: vec![Transition {
+            start: 0,
+            end: 256,
+            baseline: 10,
+            total: 50,
+            refinement: 40,
+            depth: 0,
+            v_depth: 0,
+        }],
+        terminals: vec![Terminal {
+            start: 128,
+            end: 256,
+            intensity: 15,
+            depth: 1,
+            v_depth: 1,
+        }],
+    };
+    let json = serde_json::to_string(&layer).expect("serialize");
+    let restored: Layer<u64, u64> = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(layer, restored);
 }
 
 // ── Reconstruction ──────────────────────────────────────────
@@ -227,43 +393,7 @@ fn reconstruct_single_terminal() {
 #[test]
 fn reconstruct_single_transition_truncated() {
     // One transition, max_layer=0 → fully truncated → emit total.
-    let p = Pewei::<u64, u64> {
-        domain_start: 0,
-        domain_end: 256,
-        layers: vec![
-            Layer {
-                transitions: vec![Transition {
-                    start: 0,
-                    end: 256,
-                    baseline: 10,
-                    total: 50,
-                    refinement: 40,
-                    depth: 0,
-                    v_depth: 0,
-                }],
-                terminals: vec![],
-            },
-            Layer {
-                transitions: vec![],
-                terminals: vec![
-                    Terminal {
-                        start: 0,
-                        end: 128,
-                        intensity: 25,
-                        depth: 1,
-                        v_depth: 1,
-                    },
-                    Terminal {
-                        start: 128,
-                        end: 256,
-                        intensity: 15,
-                        depth: 1,
-                        v_depth: 1,
-                    },
-                ],
-            },
-        ],
-    };
+    let p = two_layer_pewei();
     // Truncate at layer 0 — children not visible.
     let spans = p.reconstruct(0);
     assert_eq!(spans.len(), 1);
@@ -280,43 +410,7 @@ fn reconstruct_full_depth_matches_terminals() {
     // left:  5 + 25 = 30
     // right: 5 + 15 = 20
     // total: 30 + 20 = 50 ✓
-    let p = Pewei::<u64, u64> {
-        domain_start: 0,
-        domain_end: 256,
-        layers: vec![
-            Layer {
-                transitions: vec![Transition {
-                    start: 0,
-                    end: 256,
-                    baseline: 10,
-                    total: 50,
-                    refinement: 40,
-                    depth: 0,
-                    v_depth: 0,
-                }],
-                terminals: vec![],
-            },
-            Layer {
-                transitions: vec![],
-                terminals: vec![
-                    Terminal {
-                        start: 0,
-                        end: 128,
-                        intensity: 25,
-                        depth: 1,
-                        v_depth: 1,
-                    },
-                    Terminal {
-                        start: 128,
-                        end: 256,
-                        intensity: 15,
-                        depth: 1,
-                        v_depth: 1,
-                    },
-                ],
-            },
-        ],
-    };
+    let p = two_layer_pewei();
     let spans = p.reconstruct(1);
     assert_eq!(spans.len(), 2);
     assert_eq!(spans[0].start, 0);
@@ -340,61 +434,7 @@ fn reconstruct_energy_conservation_at_each_layer() {
     //       refinement for left  = 60 - 10 = 50
     //       Root's children totals: 60 + 20 = 80 = refinement ✓
     //       Left's children totals: 30 + 20 = 50 = refinement ✓
-    let p = Pewei::<u64, u64> {
-        domain_start: 0,
-        domain_end: 256,
-        layers: vec![
-            Layer {
-                transitions: vec![Transition {
-                    start: 0,
-                    end: 256,
-                    baseline: 20,
-                    total: 100,
-                    refinement: 80,
-                    depth: 0,
-                    v_depth: 0,
-                }],
-                terminals: vec![],
-            },
-            Layer {
-                transitions: vec![Transition {
-                    start: 0,
-                    end: 128,
-                    baseline: 10,
-                    total: 60,
-                    refinement: 50,
-                    depth: 1,
-                    v_depth: 1,
-                }],
-                terminals: vec![Terminal {
-                    start: 128,
-                    end: 256,
-                    intensity: 20,
-                    depth: 1,
-                    v_depth: 1,
-                }],
-            },
-            Layer {
-                transitions: vec![],
-                terminals: vec![
-                    Terminal {
-                        start: 0,
-                        end: 64,
-                        intensity: 30,
-                        depth: 2,
-                        v_depth: 2,
-                    },
-                    Terminal {
-                        start: 64,
-                        end: 128,
-                        intensity: 20,
-                        depth: 2,
-                        v_depth: 2,
-                    },
-                ],
-            },
-        ],
-    };
+    let p = three_layer_pewei();
 
     // At every truncation level, total energy must be 100.
     assert_eq!(span_total(&p.reconstruct(0)), 100);
@@ -503,43 +543,7 @@ fn reconstruct_right_visible_left_invisible() {
 #[test]
 fn reconstruct_both_children_visible() {
     // Symmetric case — both children terminals.
-    let p = Pewei::<u64, u64> {
-        domain_start: 0,
-        domain_end: 256,
-        layers: vec![
-            Layer {
-                transitions: vec![Transition {
-                    start: 0,
-                    end: 256,
-                    baseline: 10,
-                    total: 50,
-                    refinement: 40,
-                    depth: 0,
-                    v_depth: 0,
-                }],
-                terminals: vec![],
-            },
-            Layer {
-                transitions: vec![],
-                terminals: vec![
-                    Terminal {
-                        start: 0,
-                        end: 128,
-                        intensity: 25,
-                        depth: 1,
-                        v_depth: 1,
-                    },
-                    Terminal {
-                        start: 128,
-                        end: 256,
-                        intensity: 15,
-                        depth: 1,
-                        v_depth: 1,
-                    },
-                ],
-            },
-        ],
-    };
+    let p = two_layer_pewei();
     let spans = p.reconstruct(1);
     assert_eq!(spans.len(), 2);
     assert_eq!(spans[0].intensity, 30); // 5 + 25
@@ -549,61 +553,7 @@ fn reconstruct_both_children_visible() {
 #[test]
 fn reconstruct_no_gaps_no_overlaps() {
     // Verify output partitions the domain.
-    let p = Pewei::<u64, u64> {
-        domain_start: 0,
-        domain_end: 256,
-        layers: vec![
-            Layer {
-                transitions: vec![Transition {
-                    start: 0,
-                    end: 256,
-                    baseline: 20,
-                    total: 100,
-                    refinement: 80,
-                    depth: 0,
-                    v_depth: 0,
-                }],
-                terminals: vec![],
-            },
-            Layer {
-                transitions: vec![Transition {
-                    start: 0,
-                    end: 128,
-                    baseline: 10,
-                    total: 60,
-                    refinement: 50,
-                    depth: 1,
-                    v_depth: 1,
-                }],
-                terminals: vec![Terminal {
-                    start: 128,
-                    end: 256,
-                    intensity: 20,
-                    depth: 1,
-                    v_depth: 1,
-                }],
-            },
-            Layer {
-                transitions: vec![],
-                terminals: vec![
-                    Terminal {
-                        start: 0,
-                        end: 64,
-                        intensity: 30,
-                        depth: 2,
-                        v_depth: 2,
-                    },
-                    Terminal {
-                        start: 64,
-                        end: 128,
-                        intensity: 20,
-                        depth: 2,
-                        v_depth: 2,
-                    },
-                ],
-            },
-        ],
-    };
+    let p = three_layer_pewei();
 
     for max_layer in 0..=2 {
         let spans = p.reconstruct(max_layer);
@@ -747,7 +697,287 @@ fn reconstruct_max_layer_clamped() {
 
 #[test]
 fn reconstruct_output_sorted_by_start() {
-    let p = Pewei::<u64, u64> {
+    let p = three_layer_pewei();
+    for max_layer in 0..=2 {
+        let spans = p.reconstruct(max_layer);
+        for w in spans.windows(2) {
+            assert!(
+                w[0].start < w[1].start,
+                "layer {max_layer}: not sorted — {} >= {}",
+                w[0].start,
+                w[1].start
+            );
+        }
+    }
+}
+
+// ── D1: Reconstruct value verification (ADR-M-039) ─────────
+
+/// Build a graph, extract a PEWEI, reconstruct, and verify that span
+/// intensities sum to `total_sum()` (energy conservation).
+#[test]
+fn reconstruct_from_graph_energy_conservation() {
+    let g = GraphCreator::new(low_threshold_config())
+        .observe(42, 10u64)
+        .observe(200, 5u64)
+        .observe(42, 20u64)
+        .observe(100, 15u64)
+        .check_every(1)
+        .build::<8>();
+
+    let total = g.total_sum();
+    assert_eq!(total, 50);
+
+    let pewei = g.extract();
+    let max_layer = pewei.layer_count().saturating_sub(1);
+    let spans = pewei.reconstruct(max_layer);
+
+    assert_partitions_domain(&spans, 0, 256);
+
+    // Energy conservation: span sum should equal total_sum within
+    // integer rounding tolerance (at most N=8 units).
+    let span_sum: u64 = spans.iter().map(|s| s.intensity).sum();
+    assert!(
+        total.abs_diff(span_sum) <= 8,
+        "energy conservation: total_sum={total}, span_sum={span_sum}",
+    );
+}
+
+/// After many observations at a single point, the reconstruction's
+/// total energy should match `total_sum()`.
+#[test]
+fn reconstruct_concentrated_observation() {
+    let g = GraphCreator::new(low_threshold_config())
+        .hotspot(128, 1, 20)
+        .check_every(1)
+        .build::<8>();
+
+    let total = g.total_sum();
+    assert_eq!(total, 20);
+
+    let pewei = g.extract();
+    let spans = pewei.reconstruct(pewei.layer_count().saturating_sub(1));
+
+    let span_sum: u64 = spans.iter().map(|s| s.intensity).sum();
+    assert!(
+        total.abs_diff(span_sum) <= 8,
+        "energy conservation: total={total}, span_sum={span_sum}",
+    );
+
+    assert_partitions_domain(&spans, 0, 256);
+
+    // The span containing coordinate 128 should have nonzero intensity.
+    let hot_span = spans.iter().find(|s| s.start <= 128 && s.end > 128).unwrap();
+    assert!(
+        hot_span.intensity > 0,
+        "span covering the observation point should have nonzero intensity",
+    );
+}
+
+/// Reconstruct at full depth from a live graph with multiple layers
+/// and verify energy is preserved.
+#[test]
+fn reconstruct_from_graph_full_depth_conserves_energy() {
+    let g = GraphCreator::new(low_threshold_config())
+        .sweep(256, 8)
+        .check_every(1)
+        .build::<8>();
+
+    let total = g.total_sum();
+    let pewei = g.extract();
+    assert!(pewei.layer_count() >= 2, "need multiple layers for this test");
+
+    let max_layer = pewei.layer_count().saturating_sub(1);
+    let spans = pewei.reconstruct(max_layer);
+
+    // Full-depth reconstruction should conserve energy.
+    let span_sum: u64 = spans.iter().map(|s| s.intensity).sum();
+    assert!(
+        total.abs_diff(span_sum) <= 8,
+        "full depth: total_sum={total}, span_sum={span_sum}",
+    );
+
+    assert_partitions_domain(&spans, 0, 256);
+}
+
+/// Verify reconstruct span values against `range_sum()` — the
+/// independent summation cross-check described in ADR-M-039 D1.
+#[test]
+fn reconstruct_cross_check_against_range_sum() {
+    let g = GraphCreator::new(low_threshold_config())
+        .observe(10u64, 8u64)
+        .observe(50u64, 12u64)
+        .observe(200u64, 6u64)
+        .check_every(1)
+        .build::<8>();
+
+    let pewei = g.extract();
+    let spans = pewei.reconstruct(pewei.layer_count().saturating_sub(1));
+
+    // For each span, the live graph's range_sum over that interval
+    // should be close to the span's intensity. They won't be exactly
+    // equal because reconstruct pro-rates ancestral baselines while
+    // range_sum pro-rates g.own, but global sums must agree.
+    let span_sum: u64 = spans.iter().map(|s| s.intensity).sum();
+    let range_sum: u64 = g.range_sum(..);
+    assert!(
+        range_sum.abs_diff(span_sum) <= 8,
+        "global cross-check: range_sum={range_sum}, span_sum={span_sum}",
+    );
+}
+
+/// Extract from a graph built with `GraphCreator::spread` and verify
+/// energy conservation and domain partitioning.
+#[test]
+fn extract_via_graph_creator_conserves_energy() {
+    let g = GraphCreator::default_u64().spread(256, 5, 50).check_every(10).build::<8>();
+
+    let total = g.total_sum();
+    let pewei = g.extract();
+    let spans = pewei.reconstruct(pewei.layer_count().saturating_sub(1));
+    let span_sum: u64 = spans.iter().map(|s| s.intensity).sum();
+
+    assert!(
+        total.abs_diff(span_sum) <= 8,
+        "spread graph: total_sum={total}, span_sum={span_sum}",
+    );
+    assert_partitions_domain(&spans, 0, 256);
+}
+
+/// Extract from a spread graph and verify the span partition
+/// covers the full domain with sorted, contiguous intervals.
+#[test]
+fn extract_spread_graph_partitions_domain() {
+    let g = GraphCreator::new(default_config())
+        .burst(256, 3, 20, 42u64, 50, 10)
+        .check_every(5)
+        .build::<8>();
+
+    let pewei = g.extract();
+
+    // At every truncation level, partitioning must hold.
+    for layer in 0..pewei.layer_count() {
+        let spans = pewei.reconstruct(layer);
+        assert_partitions_domain(&spans, 0, 256);
+
+        // Sorted by start.
+        for w in spans.windows(2) {
+            assert!(
+                w[0].start < w[1].start,
+                "layer {layer}: not sorted — {} >= {}",
+                w[0].start,
+                w[1].start,
+            );
+        }
+    }
+}
+
+// ── Layer structural checks ─────────────────────────────────
+
+/// Every transition in an extracted PEWEI should have total >= baseline.
+#[test]
+fn layer_transition_total_ge_baseline() {
+    let g = GraphCreator::<u64, _>::new(low_threshold_config())
+        .spread(256, 5, 40)
+        .check_every(5)
+        .build::<8>();
+
+    let pewei = g.extract();
+    for (li, layer) in pewei.layers.iter().enumerate() {
+        for (ti, tr) in layer.transitions.iter().enumerate() {
+            assert!(
+                tr.total >= tr.baseline,
+                "layer {li}, transition {ti}: total ({}) < baseline ({})",
+                tr.total,
+                tr.baseline,
+            );
+            assert_eq!(
+                tr.refinement,
+                tr.total - tr.baseline,
+                "layer {li}, transition {ti}: refinement mismatch",
+            );
+        }
+    }
+}
+
+/// Every terminal should have positive width (start < end).
+#[test]
+fn layer_terminals_have_positive_width() {
+    let g = GraphCreator::new(default_config())
+        .zigzag(0u64, 255u64, 5, 30)
+        .check_every(5)
+        .build::<8>();
+
+    let pewei = g.extract();
+    for (li, layer) in pewei.layers.iter().enumerate() {
+        for (ti, term) in layer.terminals.iter().enumerate() {
+            assert!(
+                term.start < term.end,
+                "layer {li}, terminal {ti}: start ({}) >= end ({})",
+                term.start,
+                term.end,
+            );
+            assert!(term.width() > 0, "layer {li}, terminal {ti}: zero width");
+        }
+    }
+}
+
+// ── Shared test fixtures ────────────────────────────────────
+
+/// Two-layer PEWEI used by several reconstruction tests.
+///
+/// Layer 0: root transition [0,256) baseline=10, total=50
+/// Layer 1: left terminal [0,128) intensity=25
+///          right terminal [128,256) intensity=15
+fn two_layer_pewei() -> Pewei<u64, u64> {
+    Pewei {
+        domain_start: 0,
+        domain_end: 256,
+        layers: vec![
+            Layer {
+                transitions: vec![Transition {
+                    start: 0,
+                    end: 256,
+                    baseline: 10,
+                    total: 50,
+                    refinement: 40,
+                    depth: 0,
+                    v_depth: 0,
+                }],
+                terminals: vec![],
+            },
+            Layer {
+                transitions: vec![],
+                terminals: vec![
+                    Terminal {
+                        start: 0,
+                        end: 128,
+                        intensity: 25,
+                        depth: 1,
+                        v_depth: 1,
+                    },
+                    Terminal {
+                        start: 128,
+                        end: 256,
+                        intensity: 15,
+                        depth: 1,
+                        v_depth: 1,
+                    },
+                ],
+            },
+        ],
+    }
+}
+
+/// Three-layer PEWEI used by energy-conservation and partition tests.
+///
+/// Layer 0: root transition [0,256) baseline=20, total=100
+/// Layer 1: left transition [0,128) baseline=10, total=60
+///          right terminal  [128,256) intensity=20
+/// Layer 2: left-left terminal  [0,64)  intensity=30
+///          left-right terminal [64,128) intensity=20
+fn three_layer_pewei() -> Pewei<u64, u64> {
+    Pewei {
         domain_start: 0,
         domain_end: 256,
         layers: vec![
@@ -801,16 +1031,15 @@ fn reconstruct_output_sorted_by_start() {
                 ],
             },
         ],
-    };
-    for max_layer in 0..=2 {
-        let spans = p.reconstruct(max_layer);
-        for w in spans.windows(2) {
-            assert!(
-                w[0].start < w[1].start,
-                "layer {max_layer}: not sorted — {} >= {}",
-                w[0].start,
-                w[1].start
-            );
-        }
+    }
+}
+
+/// Assert that spans partition `[lo, hi)` with no gaps or overlaps.
+fn assert_partitions_domain(spans: &[crate::view::Span<u64, u64>], lo: u64, hi: u64) {
+    assert!(!spans.is_empty(), "no spans");
+    assert_eq!(spans.first().unwrap().start, lo, "first span doesn't start at {lo}");
+    assert_eq!(spans.last().unwrap().end, hi, "last span doesn't end at {hi}");
+    for w in spans.windows(2) {
+        assert_eq!(w[0].end, w[1].start, "gap/overlap between {} and {}", w[0].end, w[1].start);
     }
 }

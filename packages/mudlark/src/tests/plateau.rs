@@ -1,6 +1,103 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
+//! Crate tests for **plateau types**, **ordering**, and the
+//! **`basis_edge_of`** helper.
+//!
+//! A *plateau* is a contiguous region of the G-tree contour that
+//! shares a single `BasisEdge` key.  Correct plateau computation
+//! depends on `Coordinate::total_cmp` producing a strict total order
+//! (including IEEE 754 edge cases like NaN and −0), on `BasisEdge`
+//! faithfully forwarding that order so it can serve as a `BTreeMap`
+//! key, and on `basis_edge_of` mapping each `GNode` to the right
+//! contour edge depending on its terminal / semi-internal / internal
+//! status.
+//!
+//! The `PlateauBasis` tests (feature-gated behind
+//! `dynamic-contour-tracking`) exercise the bidirectional index that
+//! maps `GNodeId ↔ BasisEdge` and verify forward/back consistency
+//! after insertions, removals, and full rebuilds.
+//!
+//! The integration tests at the end confirm that `GvGraph::plateaus()`
+//! produces a gap-free, overlap-free tiling of the full domain, that a
+//! fresh graph yields exactly one plateau, and that observations refine
+//! the contour into multiple plateaus.
+//!
+//! # Test index
+//!
+//! ## `Coordinate::total_cmp`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`total_cmp_integers`] | basic integer ordering (u8, u32, u64) |
+//! | [`total_cmp_floats`] | f64 ordering including NaN-after-∞ and −0 < +0 |
+//!
+//! ## `BasisEdge` — ordering & traits
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`basis_edge_ord_eq`] | `Ord` / `Eq` for `BasisEdge<u64>` |
+//! | [`basis_edge_copy`] | `Copy` semantics |
+//! | [`basis_edge_u64_matches_native_ord`] | sort order matches native `u64` order |
+//! | [`basis_edge_f64_nan_sorts_last`] | NaN sorts after +∞ via `total_cmp` |
+//! | [`basis_edge_f64_neg_zero_vs_pos_zero`] | −0.0 < +0.0 under IEEE 754 total order |
+//! | [`basis_edge_as_btreemap_key`] | usable as `BTreeMap` key (u64) |
+//! | [`basis_edge_f64_as_btreemap_key`] | usable as `BTreeMap` key (f64 — the whole point) |
+//! | [`basis_edge_debug_format`] | `Debug` output contains inner value |
+//!
+//! ## `Plateau` — struct, traits & methods
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`plateau_size`] | struct fits within a cache line (≤ 48 bytes) |
+//! | [`plateau_copy_semantics`] | `Copy` round-trip preserves all fields |
+//! | [`plateau_debug_clone_partialeq`] | `Debug`, `Clone`, `PartialEq` derive sanity |
+//! | [`plateau_ne_when_fields_differ`] | `PartialEq` detects per-field differences |
+//! | [`plateau_width_u64`] | `width()` for integer coordinates |
+//! | [`plateau_width_f64`] | `width()` for f64 coordinates |
+//! | [`plateau_to_span`] | `to_span()` maps fields correctly |
+//! | [`plateau_cross_types`] | construction with mixed coordinate/accumulator types |
+//!
+//! ## Serde (feature-gated)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`plateau_serde_round_trip`] | JSON round-trip for `Plateau` |
+//! | [`basis_edge_serde_round_trip`] | JSON round-trip for `BasisEdge` |
+//!
+//! ## `PlateauBasis` (feature-gated)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`plateau_basis_empty`] | fresh basis has zero counts |
+//! | [`plateau_basis_insert_lookup`] | insert + forward/back lookup consistency |
+//! | [`plateau_basis_remove`] | removal cleans up both maps; last-element cleanup |
+//! | [`plateau_basis_remove_nonexistent`] | removing absent key returns `None` |
+//! | [`plateau_basis_multiple_plateaus`] | multiple distinct plateau keys coexist |
+//! | [`plateau_basis_forward_back_consistency`] | forward ↔ back invariant over 5 nodes / 3 keys |
+//! | [`plateau_basis_iter_ordered`] | iteration follows `BTreeMap` (basis-edge) order |
+//! | [`plateau_basis_missing_key_returns_empty`] | lookup of absent key yields empty slice |
+//! | [`plateau_basis_rebuild_replaces_state`] | `rebuild()` atomically replaces all mappings |
+//!
+//! ## `basis_edge_of`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`basis_edge_of_terminal`] | terminal node → edge = `lo` |
+//! | [`basis_edge_of_terminal_at_zero`] | terminal at domain origin |
+//! | [`basis_edge_of_balanced_internal`] | internal (both children) → edge = `lo` |
+//! | [`basis_edge_of_semi_internal_child_left`] | left-only child → edge = midpoint |
+//! | [`basis_edge_of_semi_internal_child_right`] | right-only child → edge = `lo` |
+//! | [`basis_edge_of_unit_terminal`] | smallest possible interval `[7, 8)` |
+//!
+//! ## Integration — `GvGraph::plateaus()`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`fresh_graph_single_plateau`] | fresh graph → exactly one full-domain plateau |
+//! | [`observations_refine_contour`] | concentrated observations split contour |
+//! | [`plateaus_partition_full_domain`] | plateaus tile `[0, 2^N)` with no gaps or overlaps |
+
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::mem::size_of;
@@ -8,7 +105,8 @@ use std::mem::size_of;
 use crate::gnode::GNode;
 use crate::handle::GNodeId;
 use crate::plateau::basis_edge_of;
-use crate::{BasisEdge, Coordinate, Plateau};
+use crate::testing::{GraphCreator, default_config};
+use crate::{BasisEdge, Coordinate, GvGraph, Plateau};
 
 // ── Coordinate::total_cmp ───────────────────────────────────
 
@@ -97,6 +195,13 @@ fn basis_edge_f64_as_btreemap_key() {
     assert_eq!(map.keys().map(|k| k.0).collect::<Vec<_>>(), vec![0.0, 4.0]);
 }
 
+#[test]
+fn basis_edge_debug_format() {
+    let e = BasisEdge(42u64);
+    let s = format!("{e:?}");
+    assert!(s.contains("42"), "Debug should include inner value, got: {s}");
+}
+
 // ── Plateau ─────────────────────────────────────────────────
 
 #[test]
@@ -136,6 +241,36 @@ fn plateau_debug_clone_partialeq() {
     let _debug_str = format!("{p:?}"); // Debug
     let q = p; // Copy (also Clone)
     assert_eq!(p, q); // PartialEq
+}
+
+#[test]
+fn plateau_ne_when_fields_differ() {
+    let base = Plateau::<u64, u64> {
+        basis_edge: BasisEdge(0),
+        start: 0,
+        end: 8,
+        depth: 1,
+        sum: 50,
+    };
+
+    // Differ in sum.
+    let different_sum = Plateau { sum: 99, ..base };
+    assert_ne!(base, different_sum);
+
+    // Differ in depth.
+    let different_depth = Plateau { depth: 3, ..base };
+    assert_ne!(base, different_depth);
+
+    // Differ in end.
+    let different_end = Plateau { end: 16, ..base };
+    assert_ne!(base, different_end);
+
+    // Differ in basis_edge.
+    let different_edge = Plateau {
+        basis_edge: BasisEdge(4),
+        ..base
+    };
+    assert_ne!(base, different_edge);
 }
 
 #[test]
@@ -366,6 +501,33 @@ mod plateau_basis_tests {
         let pb = PlateauBasis::<u64>::new();
         assert!(pb.basis_elements(&BasisEdge(42)).is_empty());
     }
+
+    #[test]
+    fn plateau_basis_rebuild_replaces_state() {
+        let mut pb = PlateauBasis::<u64>::new();
+        let g0 = GNodeId::from_index(0);
+        let g1 = GNodeId::from_index(1);
+        let g2 = GNodeId::from_index(2);
+
+        // Populate with initial state.
+        pb.insert(BasisEdge(0), g0);
+        pb.insert(BasisEdge(0), g1);
+        assert_eq!(pb.plateau_count(), 1);
+        assert_eq!(pb.basis_count(), 2);
+
+        // Rebuild with entirely different assignments.
+        pb.rebuild(vec![(BasisEdge(10), g1), (BasisEdge(10), g2), (BasisEdge(20), g0)]);
+
+        // Old state is gone.
+        assert_eq!(pb.plateau_count(), 2);
+        assert_eq!(pb.basis_count(), 3);
+        assert_eq!(pb.plateau_key(g0), Some(BasisEdge(20)));
+        assert_eq!(pb.plateau_key(g1), Some(BasisEdge(10)));
+        assert_eq!(pb.plateau_key(g2), Some(BasisEdge(10)));
+        assert!(pb.basis_elements(&BasisEdge(0)).is_empty());
+        assert_eq!(pb.basis_elements(&BasisEdge(10)).len(), 2);
+        assert_eq!(pb.basis_elements(&BasisEdge(20)).len(), 1);
+    }
 } // mod plateau_basis_tests
 
 // ── basis_edge_of ───────────────────────────────────────────
@@ -420,6 +582,13 @@ fn basis_edge_of_terminal() {
 }
 
 #[test]
+fn basis_edge_of_terminal_at_zero() {
+    // Terminal [0, 8): edge = lo = 0
+    let g = make_terminal_gnode(0, 8);
+    assert_eq!(basis_edge_of(&g), BasisEdge(0));
+}
+
+#[test]
 fn basis_edge_of_balanced_internal() {
     // Internal [0, 8) with both children: edge = lo = 0
     let g = make_internal_gnode(0, 8);
@@ -440,4 +609,70 @@ fn basis_edge_of_semi_internal_child_right() {
     // Uncovered half is [0, 4) → edge = lo = 0
     let g = make_semi_internal_gnode(0, 8, false);
     assert_eq!(basis_edge_of(&g), BasisEdge(0));
+}
+
+#[test]
+fn basis_edge_of_unit_terminal() {
+    // Smallest possible terminal [7, 8): edge = 7
+    let g = make_terminal_gnode(7, 8);
+    assert_eq!(basis_edge_of(&g), BasisEdge(7));
+}
+
+// ── Integration — GvGraph::plateaus() ───────────────────────
+
+#[test]
+fn fresh_graph_single_plateau() {
+    let g: GvGraph<u64, u64, 8> = GraphCreator::new(default_config()).build();
+    let p = g.plateaus();
+    assert_eq!(p.len(), 1, "fresh graph should have exactly one plateau");
+
+    let only = p.values().next().unwrap();
+    assert_eq!(only.start, 0);
+    assert_eq!(only.end, 256); // 2^8
+    assert_eq!(only.depth, 0);
+    assert_eq!(only.sum, 0);
+    assert_eq!(only.width(), 256);
+}
+
+#[test]
+fn observations_refine_contour() {
+    let g: GvGraph<u64, u64, 8> = GraphCreator::new(default_config()).hotspot(42, 10, 5).build();
+
+    let p = g.plateaus();
+    assert!(
+        p.len() >= 2,
+        "concentrated observations should refine contour, got {} plateaus",
+        p.len()
+    );
+
+    // Every plateau's basis_edge matches its map key.
+    for (&key, plateau) in p.iter() {
+        assert_eq!(key, plateau.basis_edge, "key-consistency invariant");
+    }
+}
+
+#[test]
+fn plateaus_partition_full_domain() {
+    // Build a graph with spread observations so multiple plateaus exist.
+    let g: GvGraph<u64, u64, 8> = GraphCreator::new(default_config()).spread(256, 10, 20).build();
+
+    let p = g.plateaus();
+
+    // Verify the plateaus tile [0, 256) with no gaps or overlaps.
+    let mut expected_start = 0u64;
+    for plateau in p.values() {
+        assert_eq!(
+            plateau.start, expected_start,
+            "gap or overlap: expected start {expected_start}, got {}",
+            plateau.start
+        );
+        assert!(
+            plateau.start < plateau.end,
+            "empty plateau: [{}, {})",
+            plateau.start,
+            plateau.end
+        );
+        expected_start = plateau.end;
+    }
+    assert_eq!(expected_start, 256, "plateaus should cover up to 2^8 = 256");
 }

@@ -48,9 +48,9 @@ as in the spec pseudocode.
 
 ### The overshoot problem
 
-A single `observe()` can split (+2 nodes) *before* the eviction
+A single `observe()` can split (+2 nodes) _before_ the eviction
 step fires. Gate tightening proceeds at ±1 level per call. Eviction
-can only remove *terminal* G-nodes. These three constraints create
+can only remove _terminal_ G-nodes. These three constraints create
 a structural gap between the user-specified budget and the worst-
 case actual node count.
 
@@ -76,11 +76,11 @@ eviction-eligible. There is no configuration that avoids this
 structural ceiling.
 
 | `depth_create` | `depth_evict` | buffer | floor | $n_{\max}$ |
-|:--------------:|:-------------:|:------:|:-----:|:----------:|
-| 1 | 2 | 1 | 2 | **9** |
-| 2 | 4 | 2 | 3 | **27** |
-| 3 | 6 | 3 | 4 | **81** |
-| 4 | 8 | 4 | 5 | **243** |
+| :------------: | :-----------: | :----: | :---: | :--------: |
+|       1        |       2       |   1    |   2   |   **9**    |
+|       2        |       4       |   2    |   3   |   **27**   |
+|       3        |       6       |   3    |   4   |   **81**   |
+|       4        |       8       |   4    |   5   |  **243**   |
 
 If `budget < n_max`, the system converges to `budget` under
 sustained load with only transient overshoot. If `budget ≥ n_max`,
@@ -103,13 +103,13 @@ ceiling promise and the soft trigger for depth control.
 ### Separate the hard limit from the soft trigger
 
 The key insight: if we trigger depth tightening and eviction
-*earlier* — at a count below the user's hard limit — the gates have
+_earlier_ — at a count below the user's hard limit — the gates have
 room to converge before the hard wall is reached.
 
 Define:
 
 - **Hard limit** $H$: the user-specified `budget`. Node count must
-  *never* exceed this value.
+  _never_ exceed this value.
 - **Structural headroom** $M = 3^{\text{buffer}+1}$: the worst-case
   number of entries that can exist while immune to eviction at the
   floor.
@@ -159,7 +159,7 @@ This is self-consistent because the proof is inductive:
 
 1. At any moment, $S_{\text{now}} = H - \max(M, 2(D_c^{\text{now}} - 1))$.
 2. Maximum further overshoot from this moment $= 2(D_c^{\text{now}} - 1)$.
-3. Peak $\leq S_{\text{now}} + 2(D_c^{\text{now}} - 1) \leq S_{\text{now}} + R_{\text{now}} = H$.  $\checkmark$
+3. Peak $\leq S_{\text{now}} + 2(D_c^{\text{now}} - 1) \leq S_{\text{now}} + R_{\text{now}} = H$. $\checkmark$
 
 During tightening, $D_c$ falls → $R$ drops → $S$ rises → the gap
 closes from both sides. The system never needs more headroom than
@@ -169,14 +169,14 @@ it has reserved.
 
 $D_c^{\text{init}} = 3$, buffer = 1, $M = 9$, $H = 100$.
 
-| Phase | $D_c^{\text{live}}$ | $K = 2(D_c{-}1)$ | $R = \max(M, K)$ | $S = H - R$ |
-|-------|:---:|:---:|:---:|:---:|
-| Startup | 3 | 4 | 9 | **91** |
-| Quiet (relaxes to 10) | 10 | 18 | 18 | **82** |
-| Quiet (relaxes to 30) | 30 | 58 | 58 | **42** |
-| Burst starts | 30 | 58 | 58 | **42** |
-| Tightening (5 calls) | 25 | 48 | 48 | **52** |
-| Near floor | 3 | 4 | 9 | **91** |
+| Phase                 | $D_c^{\text{live}}$ | $K = 2(D_c{-}1)$ | $R = \max(M, K)$ | $S = H - R$ |
+| --------------------- | :-----------------: | :--------------: | :--------------: | :---------: |
+| Startup               |          3          |        4         |        9         |   **91**    |
+| Quiet (relaxes to 10) |         10          |        18        |        18        |   **82**    |
+| Quiet (relaxes to 30) |         30          |        58        |        58        |   **42**    |
+| Burst starts          |         30          |        58        |        58        |   **42**    |
+| Tightening (5 calls)  |         25          |        48        |        48        |   **52**    |
+| Near floor            |          3          |        4         |        9         |   **91**    |
 
 At the burst onset, tightening triggers at 42. Worst-case peak:
 $42 + 58 = 100 = H$. Hard limit held. As $D_c$ drops during
@@ -201,7 +201,7 @@ as the threat recedes.
 4. **Preserves unbounded relaxation.** ADR-M-017 Q5 allows $D_c$ to
    grow without a ceiling. The dynamic soft limit accommodates this
    without restricting adaptivity: deep relaxation simply lowers
-   $S$ to reserve more headroom. The tree *can* use the deeper
+   $S$ to reserve more headroom. The tree _can_ use the deeper
    resolution, but starts tightening earlier to ensure it can
    converge in time.
 
@@ -313,7 +313,7 @@ $S = H - \max(M, 2(D_c^{\text{live}} - 1))$, recomputed on every
    `node_count > soft_limit`.
 
 5. The `Config.budget` doc comment remains "hard ceiling on live
-   G-node count" — because it now *is* a hard ceiling.
+   G-node count" — because it now _is_ a hard ceiling.
 
 6. A public accessor `soft_limit() -> Option<usize>` is provided
    for observability. The returned value may differ between
@@ -337,7 +337,7 @@ $S = H - \max(M, 2(D_c^{\text{live}} - 1))$, recomputed on every
   complexity — under all conditions.
 
 - **Minimum budget validation.** Users must set `budget >
-  max(3^(buffer+1), 2*(depth_create - 1))`. For example, with
+max(3^(buffer+1), 2*(depth_create - 1))`. For example, with
   buffer=3 and depth_create=3, the minimum budget is 82 (the
   structural term dominates). This is documented and enforced at
   construction time.

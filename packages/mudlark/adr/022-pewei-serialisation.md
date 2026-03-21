@@ -72,12 +72,12 @@ All Surface 1 snapshot types (ADR-M-032 §Prints) get:
 
 Specifically:
 
-| Module          | Types                                                                                                   |
-| --------------- | ------------------------------------------------------------------------------------------------------- |
-| `view`          | `Span<C, V>`, `Cell<C, V>`, `Node<C, V>`                                                                |
-| `gnode`         | `GState`                                                                                                 |
-| `pewei`         | `Pewei<C, V>`, `Layer<C, V>`, `Transition<C, V>`, `Terminal<C, V>`                                       |
-| `plateau`       | `BasisEdge<C>`, `Plateau<C, V>`                                                                          |
+| Module          | Types                                                               |
+| --------------- | ------------------------------------------------------------------- |
+| `view`          | `Span<C, V>`, `Cell<C, V>`, `Node<C, V>`                            |
+| `gnode`         | `GState`                                                            |
+| `pewei`         | `Pewei<C, V>`, `Layer<C, V>`, `Transition<C, V>`, `Terminal<C, V>`  |
+| `plateau`       | `BasisEdge<C>`, `Plateau<C, V>`                                     |
 | `contour_range` | `BasisElement<C, V>`, `ContourRange<C, V>`, `ContourRangeEnergy<V>` |
 
 **Excluded:** `GNodeId` and `VNodeId` are opaque arena handles —

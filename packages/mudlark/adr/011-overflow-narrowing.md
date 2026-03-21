@@ -50,15 +50,15 @@ wrappers. The tree's internal machinery calls trait methods —
 `Observation::{accumulate, scale}` — but is agnostic to the
 overflow, underflow, and narrowing policy each method embodies.
 
-| Method       | Used by                                                                                                                                                                      | Policy concern                     |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Method       | Used by                                                                                                                                                                            | Policy concern                     |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | `add`        | Blanket `Observation<V>` (same-type), G-sum recomputation (ADR-M-012), V-sum propagation, eviction absorption (ADR-M-014), PEWEI reconstruction (ADR-M-023), range-sum combination | Overflow                           |
-| `sub`        | PEWEI extraction (`Transition.refinement`), `Node::refinement()`, PEWEI reconstruction remainder (ADR-M-023)                                                                   | Underflow                          |
-| `to_f64`     | Sampling weights, V-I3 comparison, range-sum pro-ration, decay (ADR-M-024), `Transition::snr()`                                                                                | Precision loss                     |
-| `from_f64`   | Blanket `Observation::scale`, range-sum pro-ration, decay (ADR-M-024)                                                                                                          | Narrowing / truncation             |
-| `prorate`    | PEWEI reconstruction baseline pro-ration (ADR-M-023)                                                                                                                           | Intermediate overflow / truncation |
-| `accumulate` | Observation hot-path (§IDEA M-8)                                                                                                                                            | Cross-type narrowing               |
-| `scale`      | Contract method for custom `Observation` impls; not called internally — `decay()` uses `to_f64`/`from_f64` directly (ADR-M-024)                                                | Cross-type narrowing               |
+| `sub`        | PEWEI extraction (`Transition.refinement`), `Node::refinement()`, PEWEI reconstruction remainder (ADR-M-023)                                                                       | Underflow                          |
+| `to_f64`     | Sampling weights, V-I3 comparison, range-sum pro-ration, decay (ADR-M-024), `Transition::snr()`                                                                                    | Precision loss                     |
+| `from_f64`   | Blanket `Observation::scale`, range-sum pro-ration, decay (ADR-M-024)                                                                                                              | Narrowing / truncation             |
+| `prorate`    | PEWEI reconstruction baseline pro-ration (ADR-M-023)                                                                                                                               | Intermediate overflow / truncation |
+| `accumulate` | Observation hot-path (§IDEA M-8)                                                                                                                                                   | Cross-type narrowing               |
+| `scale`      | Contract method for custom `Observation` impls; not called internally — `decay()` uses `to_f64`/`from_f64` directly (ADR-M-024)                                                    | Cross-type narrowing               |
 
 ## Examples
 

@@ -238,9 +238,9 @@ based on which capabilities they need.
 - **Debug-mode enforcement.** The constraint `v >= V::zero()` (P2)
   is a doc-contract, not a type-level proof. A user who implements
   `Accumulator` for a type violating P2 will see silent corruption
-  in release builds.  `observe()` contains a `debug_assert!` that
+  in release builds. `observe()` contains a `debug_assert!` that
   fires when the post-accumulation value drops below `V::zero()`,
-  catching misuse in debug builds and `cargo test`.  See
+  catching misuse in debug builds and `cargo test`. See
   `tests/negative_f64.rs` for integration tests that document the
   failure modes when the guard is bypassed (release builds).
 - **Smaller test surface.** Only the Standard and Absolute

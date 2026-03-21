@@ -98,9 +98,9 @@ counter comparison needed.
 
 The decision produces two arena instances in `GvGraph`:
 
-| Arena                        | Stored type   | Node size               | Spec types covered                                                                        |
-| ---------------------------- | ------------- | ----------------------- | ----------------------------------------------------------------------------------------- |
-| `gnodes: Arena<GNode<C, V>>` | `GNode<C, V>` | 48 bytes (`<u64, u64>`) | G-Node (§IDEA M-4.1)                                                                             |
+| Arena                        | Stored type   | Node size               | Spec types covered                                                                                        |
+| ---------------------------- | ------------- | ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| `gnodes: Arena<GNode<C, V>>` | `GNode<C, V>` | 48 bytes (`<u64, u64>`) | G-Node (§IDEA M-4.1)                                                                                      |
 | `vnodes: Arena<VNode<V>>`    | `VNode<V>`    | 64 bytes (`<u64>`)      | V-Entry (§IDEA M-4.2) + V-Structural (§IDEA M-4.3) via `VKind` enum ([ADR-M-002](002-vtree-node-enum.md)) |
 
 Both types fit in a single 64-byte cache line.

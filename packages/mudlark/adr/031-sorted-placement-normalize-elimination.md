@@ -38,11 +38,11 @@ the spec's seven steps with three additional implementation steps:
 | --------- | --------- | ------------------------------------------------- |
 | 1         | 1         | Route to receiver                                 |
 | 2a–2b     | 2–3       | Accumulate (G-node own + V-entry intensity)       |
-| 3         | 4         | Recompute G-sums upward (ADR-M-012)                 |
+| 3         | 4         | Recompute G-sums upward (ADR-M-012)               |
 | 4         | —         | Plateau sum maintenance (`plateau_after_observe`) |
 | 5         | 5         | Attempt contour refinement                        |
 | 6         | 6         | Rebalance (drain violation queue)                 |
-| 7         | —         | Dynamic depth control (ADR-M-017)                   |
+| 7         | —         | Dynamic depth control (ADR-M-017)                 |
 | 8         | 7         | Budget-guarded eviction                           |
 | 9         | —         | Normalize plateau map **(this ADR)**              |
 | 10        | —         | P-I4 thatch-hop repair                            |

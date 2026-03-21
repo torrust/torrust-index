@@ -1,29 +1,86 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
+//! Correctness tests for **`attempt_split`** (§IDEA M-10).
+//!
+//! Splitting is the primary mechanism for refining the G-tree: when a
+//! terminal G-node accumulates energy above the split threshold *θ*,
+//! it is bisected into two children that cover its left and right
+//! half-intervals.  The first split on a fresh root is the
+//! *bootstrap* split (§IDEA M-10.3); all subsequent splits are
+//! *catalytic* (§IDEA M-10.2) and may trigger preprocessing
+//! contraction when the parent structural V-node is already a 3-node.
+//!
+//! The tests are arranged in four tiers:
+//! 1. **Guard tests** — verify every early-return path in
+//!    `attempt_split` (non-terminal, below threshold, width-1
+//!    interval, missing V-entry).
+//! 2. **Bootstrap split** — shape checks on the G-tree and V-tree
+//!    produced by the very first split.
+//! 3. **Catalytic split** — deeper splits, depth-gate rejection,
+//!    and preprocessing contraction.
+//! 4. **High-level / `observe()`** — splits triggered through the
+//!    public API to confirm end-to-end behaviour.
+//!
+//! An additional section covers **plateau tracking** behind the
+//! `dynamic-contour-tracking` feature gate.
+//!
+//! # Test index
+//!
+//! ## `attempt_split` guards
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`no_split_when_not_terminal`] | guard 1: already has G-children |
+//! | [`no_split_when_below_threshold`] | guard 3: sum ≤ θ |
+//! | [`no_split_when_at_exact_threshold`] | guard 3 boundary: sum == θ (strict `>`) |
+//! | [`no_split_when_width_1`] | guard 2: interval indivisible |
+//! | [`no_split_when_entry_is_none`] | guard 4: missing V-entry |
+//!
+//! ## Bootstrap split (§IDEA M-10.3)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`bootstrap_split_creates_correct_structure`] | G-tree + V-tree shape after first split |
+//!
+//! ## Catalytic split (§IDEA M-10.2)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`catalytic_split_after_bootstrap`] | structure after 2nd split |
+//! | [`catalytic_split_is_violation_free`] | no max-uncle violations |
+//! | [`depth_gate_rejects_deep_split`] | `D_create` gate rejects too-deep entries |
+//! | [`preprocessing_contraction_before_catalytic_split`] | 3-node contraction before split |
+//!
+//! ## High-level (via `observe()`)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`observe_triggers_bootstrap_split`] | split through public API |
+//! | [`observe_triggers_catalytic_split`] | deeper split through repeated hotspot |
+//!
+//! ## Plateau (`feature = "dynamic-contour-tracking"`)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`bootstrap_split_plateau_count`] | single plateau after bootstrap |
+//! | [`bootstrap_split_plateau_depth`] | plateau depth == 1 |
+//! | [`catalytic_split_creates_boundary`] | >1 plateau after catalytic splits |
+
 use crate::GvGraph;
 use crate::graph::Config;
 use crate::handle::VNodeId;
 use crate::rebalance::is_violated;
 use crate::split::attempt_split;
+use crate::testing::{GraphCreator, Plan, default_config, run};
+use crate::tests::init_tracing;
 use crate::vnode::VKind;
-
-fn test_config() -> Config<u64> {
-    Config {
-        split_threshold: 5,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
-    }
-}
 
 // ── attempt_split guards ────────────────────────────────────
 
 #[test]
 fn no_split_when_not_terminal() {
-    let mut graph: GvGraph<u64, u64, 8> = GvGraph::new(test_config());
+    let mut graph: GvGraph<u64, u64, 8> = GvGraph::new(default_config());
     // Manually give the root enough intensity to split.
     let root = graph.g_root();
     graph.gnodes.get_mut(root.index()).own = 10;
@@ -43,7 +100,7 @@ fn no_split_when_not_terminal() {
 
 #[test]
 fn no_split_when_below_threshold() {
-    let mut graph: GvGraph<u64, u64, 8> = GvGraph::new(test_config());
+    let mut graph: GvGraph<u64, u64, 8> = GvGraph::new(default_config());
     let root = graph.g_root();
     graph.gnodes.get_mut(root.index()).own = 3;
     graph.gnodes.get_mut(root.index()).sum = 3;
@@ -53,7 +110,24 @@ fn no_split_when_below_threshold() {
     #[cfg(feature = "dynamic-contour-tracking")]
     graph.recompute_plateau(&crate::plateau::BasisEdge(0u64));
     attempt_split(&mut graph, root);
-    // sum=3 <= θ=5, no split.
+    // sum=3 < θ=5, no split.
+    assert_eq!(graph.node_count(), 1);
+    crate::invariants::assert_invariants(&graph);
+}
+
+#[test]
+fn no_split_when_at_exact_threshold() {
+    // Guard 3 uses strict `>`, so sum == θ must NOT split.
+    let mut graph: GvGraph<u64, u64, 8> = GvGraph::new(default_config());
+    let root = graph.g_root();
+    graph.gnodes.get_mut(root.index()).own = 5;
+    graph.gnodes.get_mut(root.index()).sum = 5;
+    let entry_id = graph.gnodes.get(root.index()).entry.unwrap();
+    graph.vnodes.get_mut(entry_id.index()).intensity = 5;
+    #[cfg(feature = "dynamic-contour-tracking")]
+    graph.recompute_plateau(&crate::plateau::BasisEdge(0u64));
+    attempt_split(&mut graph, root);
+    // sum=5 == θ=5, guard uses `>` so no split.
     assert_eq!(graph.node_count(), 1);
     crate::invariants::assert_invariants(&graph);
 }
@@ -61,7 +135,7 @@ fn no_split_when_below_threshold() {
 #[test]
 fn no_split_when_width_1() {
     // N=3, domain [0,8). Create a graph, manually shrink a node to width 1.
-    let mut graph: GvGraph<u64, u64, 3> = GvGraph::new(test_config());
+    let mut graph: GvGraph<u64, u64, 3> = GvGraph::new(default_config());
     let root = graph.g_root();
     // Manually set range to [3,4) — width 1, can't split.
     let g = graph.gnodes.get_mut(root.index());
@@ -78,11 +152,24 @@ fn no_split_when_width_1() {
     // (P-I1). This test only verifies the width-1 split guard.
 }
 
+#[test]
+fn no_split_when_entry_is_none() {
+    // Guard 4: if g.entry is None, attempt_split returns early.
+    let mut graph: GvGraph<u64, u64, 8> = GvGraph::new(default_config());
+    let root = graph.g_root();
+    // Remove the entry link.
+    graph.gnodes.get_mut(root.index()).entry = None;
+    graph.gnodes.get_mut(root.index()).own = 100;
+    graph.gnodes.get_mut(root.index()).sum = 100;
+    attempt_split(&mut graph, root);
+    assert_eq!(graph.node_count(), 1);
+}
+
 // ── bootstrap split ─────────────────────────────────────────
 
 #[test]
 fn bootstrap_split_creates_correct_structure() {
-    let mut graph: GvGraph<u64, u64, 3> = GvGraph::new(test_config());
+    let mut graph: GvGraph<u64, u64, 3> = GvGraph::new(default_config());
     let root = graph.g_root();
 
     // Set root intensity above θ.
@@ -142,7 +229,8 @@ fn bootstrap_split_creates_correct_structure() {
 
 #[test]
 fn catalytic_split_after_bootstrap() {
-    let mut graph: GvGraph<u64, u64, 3> = GvGraph::new(test_config());
+    let _t = init_tracing();
+    let mut graph: GvGraph<u64, u64, 3> = GvGraph::new(default_config());
     let root = graph.g_root();
 
     // Bootstrap: observe enough to split root.
@@ -167,7 +255,7 @@ fn catalytic_split_after_bootstrap() {
 
     // Manual state setup may create max-uncle violations; enqueue
     // and rebalance just as observe() would.
-    if crate::rebalance::is_violated(&graph.vnodes, le_entry) {
+    if is_violated(&graph.vnodes, le_entry) {
         tracing::debug!(
             entry = %crate::rebalance::Ctx(&graph.vnodes, le_entry),
             "enqueuing test violation",
@@ -209,7 +297,7 @@ fn catalytic_split_after_bootstrap() {
 
 #[test]
 fn catalytic_split_is_violation_free() {
-    let mut graph: GvGraph<u64, u64, 3> = GvGraph::new(test_config());
+    let mut graph: GvGraph<u64, u64, 3> = GvGraph::new(default_config());
     let root = graph.g_root();
 
     // Bootstrap split.
@@ -242,6 +330,7 @@ fn catalytic_split_is_violation_free() {
 
 #[test]
 fn depth_gate_rejects_deep_split() {
+    let _t = init_tracing();
     // Config with D_create=1 so only very shallow entries can split.
     let config = Config {
         split_threshold: 5,
@@ -279,7 +368,7 @@ fn depth_gate_rejects_deep_split() {
 
     // Manual state setup may create max-uncle violations; enqueue
     // and rebalance just as observe() would.
-    if crate::rebalance::is_violated(&graph.vnodes, le_entry) {
+    if is_violated(&graph.vnodes, le_entry) {
         tracing::debug!(
             entry = %crate::rebalance::Ctx(&graph.vnodes, le_entry),
             "enqueuing test violation (depth gate)",
@@ -306,7 +395,7 @@ fn preprocessing_contraction_before_catalytic_split() {
     // After bootstrap + one catalytic split, the child structural cs
     // becomes a 3-node. A second catalytic split on its child triggers
     // preprocessing contraction.
-    let mut graph: GvGraph<u64, u64, 4> = GvGraph::new(test_config());
+    let mut graph: GvGraph<u64, u64, 4> = GvGraph::new(default_config());
     let root = graph.g_root();
 
     // Bootstrap.
@@ -347,6 +436,26 @@ fn preprocessing_contraction_before_catalytic_split() {
     crate::invariants::assert_invariants(&graph);
 }
 
+// ── High-level (via observe()) ──────────────────────────────
+
+#[test]
+fn observe_triggers_bootstrap_split() {
+    // A single observation above θ should trigger bootstrap split
+    // through the public API, producing 3 G-nodes.
+    let g: GvGraph<u64, u64, 3> = run(default_config(), &Plan::new().observe(3, 10));
+    assert_eq!(g.node_count(), 3);
+    crate::invariants::assert_invariants(&g);
+}
+
+#[test]
+fn observe_triggers_catalytic_split() {
+    // Repeated hotspot should drive the tree deeper via catalytic
+    // splits, checked at every step.
+    let g: GvGraph<u64, u64, 3> = GraphCreator::default_u64().hotspot(3, 10, 5).check_every(1).build();
+    assert!(g.node_count() > 3, "repeated hotspot should trigger catalytic split");
+    crate::invariants::assert_invariants(&g);
+}
+
 // ── Plateau unit tests (Step 2G) ────────────────────────────
 
 #[test]
@@ -356,7 +465,7 @@ fn bootstrap_split_plateau_count() {
     // The root now has both children at the same depth → still
     // one plateau (or more, depending on whether adjacent regions
     // are at the same depth).
-    let mut graph: GvGraph<u64, u64, 4> = GvGraph::new(test_config());
+    let mut graph: GvGraph<u64, u64, 4> = GvGraph::new(default_config());
     let root = graph.g_root();
     graph.gnodes.get_mut(root.index()).own = 10;
     graph.gnodes.get_mut(root.index()).sum = 10;
@@ -375,9 +484,7 @@ fn bootstrap_split_plateau_count() {
 #[test]
 #[cfg(feature = "dynamic-contour-tracking")]
 fn bootstrap_split_plateau_depth() {
-    use crate::split::attempt_split;
-
-    let mut graph: GvGraph<u64, u64, 4> = GvGraph::new(test_config());
+    let mut graph: GvGraph<u64, u64, 4> = GvGraph::new(default_config());
     let root = graph.g_root();
     graph.gnodes.get_mut(root.index()).own = 10;
     graph.gnodes.get_mut(root.index()).sum = 10;
@@ -399,8 +506,7 @@ fn bootstrap_split_plateau_depth() {
 fn catalytic_split_creates_boundary() {
     // Drive enough observations through observe() to trigger
     // catalytic splits that create new plateau boundaries.
-
-    let mut g: GvGraph<u64, u64, 4> = GvGraph::new(test_config());
+    let mut g: GvGraph<u64, u64, 4> = GvGraph::new(default_config());
     for _ in 0..10 {
         g.observe(3u64, 10u64);
     }

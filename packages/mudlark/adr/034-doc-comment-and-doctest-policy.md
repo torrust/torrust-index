@@ -293,11 +293,11 @@ implementation backlog.
 
 #### Contour range decomposition (ADR-M-037)
 
-| Item                                | Doc-test |
-| ----------------------------------- | -------- |
-| `BasisElement<C, V>` (struct)       | ☑        |
-| `ContourRange<C, V>` (struct)       | ☑        |
-| `ContourRangeEnergy<V>` (struct)    | ☑        |
+| Item                             | Doc-test |
+| -------------------------------- | -------- |
+| `BasisElement<C, V>` (struct)    | ☑        |
+| `ContourRange<C, V>` (struct)    | ☑        |
+| `ContourRangeEnergy<V>` (struct) | ☑        |
 
 #### Handles
 

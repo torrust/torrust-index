@@ -104,19 +104,37 @@ impl<C: Coordinate, V: Accumulator> Span<C, V> {
 
 // ── Cell ─────────────────────────────────────────────────────────────
 
-/// Snapshot of a contour cell — a terminal G-node or the uncovered
-/// half of a semi-internal G-node.
+/// Snapshot of a single G-node's directly-accumulated energy.
 ///
 /// `Cell` is the most common query result — returned by
 /// [`get()`](crate::GvGraph::get) (infallible point query) and
 /// [`sample()`](crate::GvGraph::sample) (proportional sampling).
 ///
-/// For terminals, the interval is the full G-node range and
-/// `intensity` equals both `g.own` and `g.sum`. For the uncovered
-/// half of a semi-internal node, the interval is narrowed to the
-/// vacated half and `intensity` is the node's `g.own` — direct
-/// accumulation only (pre-split + absorbed + post-eviction
-/// observations routed to that half; §IDEA M-5.5.1).
+/// The typical case is a **contour cell** — a terminal G-node or
+/// the uncovered half of a semi-internal G-node. However,
+/// `sample()` can also land on an **internal** G-node whose
+/// V-entry still carries frozen pre-split intensity (see
+/// [ADR-M-019] and §IDEA M-6.5).
+///
+/// | G-node state  | Interval              | `intensity`          |
+/// |---------------|-----------------------|----------------------|
+/// | Terminal      | full `[lo, hi)`       | `g.own` (= `g.sum`) |
+/// | Semi-internal | uncovered half only   | `g.own`              |
+/// | Internal      | full `[lo, hi)`       | `g.own` (frozen)     |
+///
+/// For the uncovered half of a semi-internal node, the interval is
+/// narrowed to the vacated half and `intensity` is the node's
+/// `g.own` — direct accumulation only (pre-split + absorbed +
+/// post-eviction observations routed to that half; §IDEA M-5.5.1).
+/// For internal nodes both halves have children, so no narrowing
+/// occurs; `intensity` is the frozen baseline from before the split.
+///
+/// `get()` routes through the G-Tree and always reaches a terminal
+/// or semi-internal node. `sample()` walks the V-Tree, where an
+/// internal G-node's V-entry persists with its frozen `g.own`
+/// weight.
+///
+/// [ADR-M-019]: https://github.com/torrust/torrust-index/blob/main/packages/mudlark/adr/019-sampling-semantics.md
 ///
 /// # Examples
 ///

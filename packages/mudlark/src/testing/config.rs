@@ -40,6 +40,16 @@ pub const fn default_config() -> Config<u64> {
     BASE_U64
 }
 
+/// High threshold to prevent splits: θ=100, keeping everything in
+/// a single root node.
+#[must_use]
+pub const fn no_split_config() -> Config<u64> {
+    Config {
+        split_threshold: 100,
+        ..BASE_U64
+    }
+}
+
 /// Standard budgeted config: θ=5, `D_create`=3, `D_evict`=6.
 #[must_use]
 pub const fn budget_config(budget: usize) -> Config<u64> {
@@ -147,12 +157,39 @@ pub const fn worked_example_config() -> Config<u64> {
     BASE_U64
 }
 
+/// Config for decay tests: θ=5, `D_create`=3, `D_evict`=8.
+///
+/// Deeper eviction ceiling than `default_config()` gives decay
+/// tests headroom for multi-depth factor tables without triggering
+/// eviction-related edge cases.
+#[must_use]
+pub const fn decay_config() -> Config<u64> {
+    Config {
+        depth_evict: 8,
+        ..BASE_U64
+    }
+}
+
 /// Config for `build_range_tree` equivalent: θ=1 forces immediate
 /// splits.
 #[must_use]
 pub const fn range_tree_config() -> Config<u64> {
     Config {
         split_threshold: 1,
+        ..BASE_U64
+    }
+}
+
+/// Config for contour range testing: θ=2, shallow depths.
+///
+/// Low threshold forces multiple depth levels and hence multiple
+/// plateaus, facilitating contour range decomposition tests.
+#[must_use]
+pub const fn contour_range_config() -> Config<u64> {
+    Config {
+        split_threshold: 2,
+        depth_create: 3,
+        depth_evict: 6,
         ..BASE_U64
     }
 }
@@ -177,6 +214,16 @@ pub const fn evictable_config() -> Config<u64> {
 #[must_use]
 pub const fn f64_default_config() -> Config<f64> {
     BASE_F64
+}
+
+/// High f64 threshold to prevent splits: θ=100.0, keeping
+/// everything in a single root node.
+#[must_use]
+pub const fn f64_no_split_config() -> Config<f64> {
+    Config {
+        split_threshold: 100.0,
+        ..BASE_F64
+    }
 }
 
 /// Deep f64 config for depth-saturation testing: θ=5.0,

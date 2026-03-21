@@ -1,22 +1,96 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
-//! Multi-violation cascade tests.
+//! Correctness tests for **multi-violation cascade** resolution.
 //!
-//! Verify that the rebalance loop correctly handles multiple
-//! independent and side-effect violations in a single `observe()`
-//! call. Exercises ADR-M-003 (violation tracking).
+//! A single `observe()` call can trigger a rebalance that itself
+//! produces secondary violations — contractions may shift energy
+//! across siblings, splits may create new uncle-shield breaches, and
+//! promotions may expose previously hidden imbalances.  The rebalance
+//! loop (ADR-M-003) must drain every such violation before returning,
+//! regardless of how they chain.
 //!
-//! **Expanded coverage:** adversarial zigzag, power-law skew,
-//! plan composition, and serialization round-trip for degenerate
-//! cascade-inducing plans.
+//! These tests exercise that loop across a spectrum of patterns:
+//! independent concurrent violations, side-effect chains from
+//! contraction and restructuring, adversarial access patterns
+//! (zigzag, deep chains, alternating extremes), multi-phase
+//! workloads, and scale stress — all verifying that invariants hold
+//! and energy is conserved after every mutation.
+//!
+//! # Test index
+//!
+//! ## Independent & side-effect violations
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`two_independent_violations_resolved`] | two rapid accumulations resolved in one pass |
+//! | [`contraction_side_effects_resolved`] | contraction-induced side effects cleaned up |
+//! | [`rapid_fire_observations`] | 16 interleaved observations preserve invariants |
+//! | [`invariants_hold_after_every_observation`] | checked after every step in a monotone sweep |
+//!
+//! ## Propagation & restructuring
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`ancestor_violation_caught_by_propagation_walk`] | ancestor violation resolved via upward walk |
+//! | [`promoted_children_checked_after_restructure`] | promoted children re-checked in new uncle context |
+//! | [`escalation_triggered_by_deep_concentration`] | build → spike → recovery keeps invariants |
+//! | [`split_preprocessing_violations_caught`] | merged violations from split preprocessing |
+//! | [`stress_skewed_200_observations`] | 200 power-law–skewed observations |
+//!
+//! ## Adversarial & degenerate patterns
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`adversarial_zigzag_cascade`] | escalating zigzag between domain extremes |
+//! | [`left_deep_chain_cascade`] | all observations at coord 0 (left spine) |
+//! | [`right_deep_chain_cascade`] | all observations at max coord (right spine) |
+//! | [`alternating_extremes_at_boundary`] | coords 0 and 255 alternating on N=8 |
+//!
+//! ## Burst & multi-phase
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`burst_then_cascade`] | uniform spread followed by concentrated hotspot |
+//! | [`composed_plan_preserves_invariants`] | three-phase composed plan stays valid |
+//! | [`oscillating_hotspot_cascade`] | oscillating between two hotspots |
+//! | [`random_spray_cascade`] | pseudo-random observations across domain |
+//!
+//! ## Energy conservation
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`energy_conserved_through_cascade`] | `total_sum()` equals sum of all deltas |
+//! | [`energy_conserved_after_every_step`] | `total_sum()` correct at each observation |
+//!
+//! ## Stress / scale
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`stress_rapid_fire_500_n8`] | 500 sweep observations on N=8 domain |
+//!
+//! ## Serialization (`feature = "serde"`)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`cascade_plan_serializes_correctly`] | round-trip JSON of a cascade-inducing plan |
+//!
+//! ## Edge cases
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`empty_plan_produces_valid_graph`] | zero observations → valid root-only graph |
+//! | [`single_observation_no_cascade`] | one observation below threshold → no split |
 
-use torrust_mudlark::Config;
 use torrust_mudlark::invariants::assert_invariants;
 use torrust_mudlark::testing::{Plan, cascade_config, deep_config, low_threshold_config, plan_adversarial, run, run_checked};
 
 mod support;
 use support::init_tracing;
+
+// =====================================================================
+// Independent & side-effect violations (§4)
+// =====================================================================
 
 // ── 4.1: Two independent violations from rapid accumulation ─────
 
@@ -61,6 +135,10 @@ fn invariants_hold_after_every_observation() {
     let g = run_checked::<u64, u64, 4>(cascade_config(), &plan, 1);
     assert_invariants(&g);
 }
+
+// =====================================================================
+// Propagation & restructuring (§5)
+// =====================================================================
 
 // ── 5.1: Ancestor violation from propagation ────────────────────
 
@@ -137,7 +215,9 @@ fn stress_skewed_200_observations() {
     assert_invariants(&g);
 }
 
-// ── Expanded: adversarial zigzag cascade ────────────────────────
+// =====================================================================
+// Adversarial & degenerate patterns
+// =====================================================================
 
 #[test]
 fn adversarial_zigzag_cascade() {
@@ -147,18 +227,13 @@ fn adversarial_zigzag_cascade() {
     assert_invariants(&g);
 }
 
-// ── Expanded: left-deep chain cascade ───────────────────────────
-
 #[test]
 fn left_deep_chain_cascade() {
     let _t = init_tracing();
-    // All observations at coord 0 — maximally left-biased.
     let plan = Plan::new().hotspot(0, 10, 100);
     let g = run_checked::<u64, u64, 4>(low_threshold_config(), &plan, 1);
     assert_invariants(&g);
 }
-
-// ── Expanded: right-deep chain cascade ──────────────────────────
 
 #[test]
 fn right_deep_chain_cascade() {
@@ -168,7 +243,18 @@ fn right_deep_chain_cascade() {
     assert_invariants(&g);
 }
 
-// ── Expanded: burst then cascade ────────────────────────────────
+#[test]
+fn alternating_extremes_at_boundary() {
+    let _t = init_tracing();
+    // coord 0 and coord 255 on N=8 domain.
+    let plan = Plan::new().zigzag(0, 255, 10, 100);
+    let g = run_checked::<u64, u64, 8>(deep_config(), &plan, 1);
+    assert_invariants(&g);
+}
+
+// =====================================================================
+// Burst & multi-phase
+// =====================================================================
 
 #[test]
 fn burst_then_cascade() {
@@ -177,20 +263,6 @@ fn burst_then_cascade() {
     let g = run_checked::<u64, u64, 4>(cascade_config(), &plan, 1);
     assert_invariants(&g);
 }
-
-// ── Expanded: energy conservation through cascade ───────────────
-
-#[test]
-fn energy_conserved_through_cascade() {
-    let _t = init_tracing();
-    let plan = Plan::new().skewed(16, 100);
-    let g = run::<u64, u64, 4>(cascade_config(), &plan);
-    let total: u64 = plan.observations.iter().map(|&(_, d)| d).sum();
-    assert_eq!(g.total_sum(), total, "energy conservation violated through cascade");
-    assert_invariants(&g);
-}
-
-// ── Expanded: multi-phase plan composition ──────────────────────
 
 #[test]
 fn composed_plan_preserves_invariants() {
@@ -203,7 +275,69 @@ fn composed_plan_preserves_invariants() {
     assert_invariants(&g);
 }
 
-// ── Expanded: serialization round-trip of cascade plan ──────────
+#[test]
+fn oscillating_hotspot_cascade() {
+    let _t = init_tracing();
+    let plan = Plan::new().oscillating_hotspot(0, 15, 10, 8, 12);
+    let g = run_checked::<u64, u64, 4>(cascade_config(), &plan, 1);
+    assert_invariants(&g);
+}
+
+#[test]
+fn random_spray_cascade() {
+    let _t = init_tracing();
+    let plan = Plan::new().random_spray(42, 16, 8, 200);
+    let g = run_checked::<u64, u64, 4>(cascade_config(), &plan, 1);
+    assert_invariants(&g);
+}
+
+// =====================================================================
+// Energy conservation
+// =====================================================================
+
+#[test]
+fn energy_conserved_through_cascade() {
+    let _t = init_tracing();
+    let plan = Plan::new().skewed(16, 100);
+    let g = run::<u64, u64, 4>(cascade_config(), &plan);
+    let total: u64 = plan.observations.iter().map(|&(_, d)| d).sum();
+    assert_eq!(g.total_sum(), total, "energy conservation violated through cascade");
+    assert_invariants(&g);
+}
+
+#[test]
+fn energy_conserved_after_every_step() {
+    let _t = init_tracing();
+    let plan = Plan::new().spread(16, 4, 20).hotspot(0, 50, 10).zigzag(0, 15, 8, 30);
+    let mut g = torrust_mudlark::GvGraph::<u64, u64, 4>::new(cascade_config());
+    let mut cumulative = 0u64;
+    for &(coord, delta) in &plan.observations {
+        cumulative += delta;
+        g.observe(coord, delta);
+        assert_eq!(
+            g.total_sum(),
+            cumulative,
+            "energy conservation violated at cumulative={cumulative}"
+        );
+    }
+    assert_invariants(&g);
+}
+
+// =====================================================================
+// Stress / scale
+// =====================================================================
+
+#[test]
+fn stress_rapid_fire_500_n8() {
+    let _t = init_tracing();
+    let plan = Plan::new().sweep(256, 500);
+    let g = run_checked::<u64, u64, 8>(deep_config(), &plan, 10);
+    assert_invariants(&g);
+}
+
+// =====================================================================
+// Serialization
+// =====================================================================
 
 #[test]
 #[cfg(feature = "serde")]
@@ -216,45 +350,24 @@ fn cascade_plan_serializes_correctly() {
     assert_eq!(plan.len(), restored.len());
 }
 
-// ── Expanded: 500 rapid-fire observations on N=8 ────────────────
+// =====================================================================
+// Edge cases
+// =====================================================================
 
 #[test]
-fn stress_rapid_fire_500_n8() {
+fn empty_plan_produces_valid_graph() {
     let _t = init_tracing();
-    let plan = Plan::new().sweep(256, 500);
-    let g = run_checked::<u64, u64, 8>(
-        Config {
-            split_threshold: 3,
-            depth_create: 5,
-            depth_evict: 10,
-            budget: None,
-            alpha_relax: 0.75,
-            bounded_eviction: true,
-        },
-        &plan,
-        10,
-    );
+    let plan = Plan::<u64, u64>::new();
+    let g = run::<u64, u64, 4>(cascade_config(), &plan);
+    assert_eq!(g.total_sum(), 0);
     assert_invariants(&g);
 }
 
-// ── Expanded: alternating extremes at domain boundary ───────────
-
 #[test]
-fn alternating_extremes_at_boundary() {
+fn single_observation_no_cascade() {
     let _t = init_tracing();
-    // coord 0 and coord 255 on N=8 domain.
-    let plan = Plan::new().zigzag(0, 255, 10, 100);
-    let g = run_checked::<u64, u64, 8>(
-        Config {
-            split_threshold: 5,
-            depth_create: 4,
-            depth_evict: 8,
-            budget: None,
-            alpha_relax: 0.75,
-            bounded_eviction: true,
-        },
-        &plan,
-        1,
-    );
+    let plan = Plan::new().observe(7, 1);
+    let g = run::<u64, u64, 4>(cascade_config(), &plan);
+    assert_eq!(g.total_sum(), 1);
     assert_invariants(&g);
 }

@@ -32,11 +32,11 @@ Three related sub-decisions:
 
 ### Q1: Output structure (DC-021-1)
 
-| Option | Representation                                                                                          | Notes                                                                |
-| ------ | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Option | Representation                                                                                          | Notes                                                                  |
+| ------ | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | A      | `Vec<Layer<C, V>>` where `Layer { transitions: Vec<Transition<C, V>>, terminals: Vec<Terminal<C, V>> }` | Typed access to the two node populations, directly mirrors §PEWEI M-2. |
-| B      | Single flat `Vec<PeweiNode<C, V>>` with a `layer: u32` field and an enum discriminant                   | Simple to iterate; single allocation. Loses typed layer access.      |
-| C      | `Vec<Vec<PeweiNode<C, V>>>` — vec of layers, each a vec of nodes (enum)                                 | Grouped by layer. One enum type covers both node kinds.              |
+| B      | Single flat `Vec<PeweiNode<C, V>>` with a `layer: u32` field and an enum discriminant                   | Simple to iterate; single allocation. Loses typed layer access.        |
+| C      | `Vec<Vec<PeweiNode<C, V>>>` — vec of layers, each a vec of nodes (enum)                                 | Grouped by layer. One enum type covers both node kinds.                |
 
 **Considerations:**
 

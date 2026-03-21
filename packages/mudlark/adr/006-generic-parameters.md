@@ -76,13 +76,13 @@ pub trait Coordinate: Copy + PartialOrd + Debug + Default + Send + Sync + 'stati
 
 Eleven methods, grouped by purpose:
 
-| Group | Methods | Role |
-| ----- | ------- | ---- |
-| **Domain construction** | `BITS`, `zero()`, `domain_max(n)` | Define the spatial extent $[0, 2^N)$ and validate `N <= C::BITS` at compile time |
-| **Dyadic arithmetic** | `midpoint(a, b)`, `width(start, end)`, `is_final(...)` | Binary bisection, interval measurement, recursion termination |
-| **Ordering** | `PartialOrd` (super-trait), `total_cmp(...)` | Routing comparisons (`x < mid`), `BTreeMap` key ordering via `BasisEdge<C>` |
-| **Conversions** | `to_f64()`, `from_u64(v)`, `next_value()` | Depth computation, test harnesses, `RangeBounds` resolution |
-| **Safety** | `is_nan()` | Panic guard for float coordinates in `get()` and `range_sum()` |
+| Group                   | Methods                                                | Role                                                                             |
+| ----------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| **Domain construction** | `BITS`, `zero()`, `domain_max(n)`                      | Define the spatial extent $[0, 2^N)$ and validate `N <= C::BITS` at compile time |
+| **Dyadic arithmetic**   | `midpoint(a, b)`, `width(start, end)`, `is_final(...)` | Binary bisection, interval measurement, recursion termination                    |
+| **Ordering**            | `PartialOrd` (super-trait), `total_cmp(...)`           | Routing comparisons (`x < mid`), `BTreeMap` key ordering via `BasisEdge<C>`      |
+| **Conversions**         | `to_f64()`, `from_u64(v)`, `next_value()`              | Depth computation, test harnesses, `RangeBounds` resolution                      |
+| **Safety**              | `is_nan()`                                             | Panic guard for float coordinates in `get()` and `range_sum()`                   |
 
 #### Two families: integers vs floats
 
@@ -90,15 +90,15 @@ Blanket implementations are provided for `u8`, `u16`, `u32`, `u64`,
 `u128`, `f32`, and `f64`. The two families have subtly different
 semantics:
 
-| Property | Integer (`u8`–`u128`) | Float (`f32`, `f64`) |
-| -------- | --------------------- | -------------------- |
-| `domain_max(n)` | `1 << n` (or `MAX` when `n == BITS`) | `2.0.powi(n)` |
-| `midpoint(a, b)` | `a + (b - a) / 2` (overflow-safe) | `a + (b - a) / 2.0` |
-| `is_final(...)` | `end - start == 1` (unit cell) | `depth == n` (depth-gated) |
-| `next_value()` | `self + 1` | **panics** — not meaningful in the dyadic context |
-| `total_cmp(...)` | `Ord::cmp` (zero overhead) | IEEE 754 `total_cmp` (NaN sorts after +∞) |
-| NaN | Impossible | Must be guarded (`is_nan()` checks) |
-| Finality | Natural — subdivision terminates at width 1 | Artificial — `depth == n` is the recursion bound |
+| Property         | Integer (`u8`–`u128`)                       | Float (`f32`, `f64`)                              |
+| ---------------- | ------------------------------------------- | ------------------------------------------------- |
+| `domain_max(n)`  | `1 << n` (or `MAX` when `n == BITS`)        | `2.0.powi(n)`                                     |
+| `midpoint(a, b)` | `a + (b - a) / 2` (overflow-safe)           | `a + (b - a) / 2.0`                               |
+| `is_final(...)`  | `end - start == 1` (unit cell)              | `depth == n` (depth-gated)                        |
+| `next_value()`   | `self + 1`                                  | **panics** — not meaningful in the dyadic context |
+| `total_cmp(...)` | `Ord::cmp` (zero overhead)                  | IEEE 754 `total_cmp` (NaN sorts after +∞)         |
+| NaN              | Impossible                                  | Must be guarded (`is_nan()` checks)               |
+| Finality         | Natural — subdivision terminates at width 1 | Artificial — `depth == n` is the recursion bound  |
 
 `total_cmp` exists separately from `PartialOrd` because `f64` does
 not implement `Ord` (NaN is incomparable). The plateau `BTreeMap`
@@ -191,13 +191,13 @@ G-sum propagation, and violation detection.
 `(V, add, zero(), <=)` must form an **ordered commutative monoid**.
 Concretely, every implementation must satisfy five axioms:
 
-| Axiom | Statement | Used by |
-| ----- | --------- | ------- |
-| **Identity** | `add(a, zero()) == a` | G-sum uses `zero()` for missing children |
-| **Associativity** | `add(a, add(b, c)) == add(add(a, b), c)` | Nested sum recomputation |
-| **Commutativity** | `add(a, b) == add(b, a)` | Sibling merge order is arbitrary |
-| **Minimum** | `zero() <= v` for all `v` | Ghost fast path, violation-free splits |
-| **Compatibility** | `a <= b` implies `add(a, c) <= add(b, c)` for all `c >= zero()` | V-Tree tournament coherence |
+| Axiom             | Statement                                                       | Used by                                  |
+| ----------------- | --------------------------------------------------------------- | ---------------------------------------- |
+| **Identity**      | `add(a, zero()) == a`                                           | G-sum uses `zero()` for missing children |
+| **Associativity** | `add(a, add(b, c)) == add(add(a, b), c)`                        | Nested sum recomputation                 |
+| **Commutativity** | `add(a, b) == add(b, a)`                                        | Sibling merge order is arbitrary         |
+| **Minimum**       | `zero() <= v` for all `v`                                       | Ghost fast path, violation-free splits   |
+| **Compatibility** | `a <= b` implies `add(a, c) <= add(b, c)` for all `c >= zero()` | V-Tree tournament coherence              |
 
 All five axioms are **jointly required** for a fully coherent
 system, but they split into two categories: three are **hard
@@ -315,12 +315,12 @@ implementation details.
         (sample, pewei)
 ```
 
-| Sub-trait | Methods | Required by | Gated behind |
-| --------- | ------- | ----------- | ------------ |
-| `Attenuatable` | `attenuate(self, factor: f64) -> Self` | `decay()` | `TemporalDecay` capability trait |
-| `Weighable` | `weight(self) -> f64` | `sample()`, PEWEI extraction | `WeightedSampler` capability trait |
-| `Proratable` | `prorate(self, portion, total) -> Self`, `scale_by(self, ratio) -> Self` | `range_sum()` | Concrete method on `GvGraph` |
-| `Inspectable` | `to_f64_approx(self) -> f64` | Invariant checking, diagnostics | `#[cfg(debug_assertions)]` paths |
+| Sub-trait      | Methods                                                                  | Required by                     | Gated behind                       |
+| -------------- | ------------------------------------------------------------------------ | ------------------------------- | ---------------------------------- |
+| `Attenuatable` | `attenuate(self, factor: f64) -> Self`                                   | `decay()`                       | `TemporalDecay` capability trait   |
+| `Weighable`    | `weight(self) -> f64`                                                    | `sample()`, PEWEI extraction    | `WeightedSampler` capability trait |
+| `Proratable`   | `prorate(self, portion, total) -> Self`, `scale_by(self, ratio) -> Self` | `range_sum()`                   | Concrete method on `GvGraph`       |
+| `Inspectable`  | `to_f64_approx(self) -> f64`                                             | Invariant checking, diagnostics | `#[cfg(debug_assertions)]` paths   |
 
 Four independent leaves — no sub-trait depends on another sub-trait.
 A minimal `V` implements only `Accumulator` and gets observe +
@@ -443,11 +443,11 @@ Same-type usage requires zero ceremony — no wrapping or conversion.
 
 #### Cross-type implementations
 
-| `O` → `V` | `accumulate` | `scale` |
-| ---------- | ------------ | ------- |
-| `f64 → u8..u128` | `(current as f64 + delta) as V` | `(current as f64 * factor) as V` |
-| `f64 → f32` | `(current as f64 + delta) as f32` | `(current as f64 * factor) as f32` |
-| `f32 → u8..u32` | `(current as f32 + delta) as V` | `(current as f32 * factor) as V` |
+| `O` → `V`        | `accumulate`                      | `scale`                            |
+| ---------------- | --------------------------------- | ---------------------------------- |
+| `f64 → u8..u128` | `(current as f64 + delta) as V`   | `(current as f64 * factor) as V`   |
+| `f64 → f32`      | `(current as f64 + delta) as f32` | `(current as f64 * factor) as f32` |
+| `f32 → u8..u32`  | `(current as f32 + delta) as V`   | `(current as f32 * factor) as V`   |
 
 `f32` cross-type impls stop at `u32` because `f32` has only 24 bits
 of mantissa — insufficient to represent `u64`/`u128` values without
@@ -473,12 +473,12 @@ It is a mapping contract, not an algebraic structure:
 
 `O` flows through five API entry points:
 
-| Entry point | Signature |
-| ----------- | --------- |
-| `observe()` | `fn observe<O: Observation<V>>(&mut self, coord: C, delta: O)` |
-| `SpatialWrite::observe()` | Same signature via capability trait |
-| `Extend<(C, O)>` | `fn extend<I: IntoIterator<Item = (C, O)>>(&mut self, iter: I)` |
-| `from_observations()` | `fn from_observations<O, I>(config, iter) -> Self` |
+| Entry point               | Signature                                                                          |
+| ------------------------- | ---------------------------------------------------------------------------------- |
+| `observe()`               | `fn observe<O: Observation<V>>(&mut self, coord: C, delta: O)`                     |
+| `SpatialWrite::observe()` | Same signature via capability trait                                                |
+| `Extend<(C, O)>`          | `fn extend<I: IntoIterator<Item = (C, O)>>(&mut self, iter: I)`                    |
+| `from_observations()`     | `fn from_observations<O, I>(config, iter) -> Self`                                 |
 | `plateau_after_observe()` | Internal: `fn plateau_after_observe<O: Observation<V>>(&mut self, g_id, delta: O)` |
 
 The `O: Observation<V>` bound on `observe()` makes `SpatialWrite`

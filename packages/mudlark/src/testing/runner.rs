@@ -126,3 +126,140 @@ where
     }
     g
 }
+
+// ── Diagnostic run ──────────────────────────────────────────────
+
+/// Apply a plan one observation at a time, checking invariants after
+/// each.  On first failure, dump full G-tree and plateau state to
+/// stderr and panic.
+///
+/// Intended for step-by-step diagnostic replay of failing scenarios.
+///
+/// # Panics
+///
+/// Panics on the first invariant violation, after printing detailed
+/// before/after diagnostic state.
+#[cfg(feature = "dynamic-contour-tracking")]
+#[must_use]
+pub fn run_diagnostic<C, V, const N: u32>(config: Config<V>, plan: &Plan<C, V>, label: &str) -> GvGraph<C, V, N>
+where
+    C: Coordinate + Display,
+    V: Accumulator + Inspectable + Display,
+{
+    use crate::invariants::{check_all_invariants, dump_gtree, dump_plateaus};
+
+    let mut g = GvGraph::new(config);
+    for (i, &(coord, delta)) in plan.observations.iter().enumerate() {
+        let pre_gtree = dump_gtree::<C, V, N>(&g);
+        let pre_plateaus = dump_plateaus::<C, V, N>(&g);
+
+        g.observe(coord, delta);
+
+        let errors = check_all_invariants::<C, V, N>(&g);
+        if !errors.is_empty() {
+            let post_gtree = dump_gtree::<C, V, N>(&g);
+            let post_plateaus = dump_plateaus::<C, V, N>(&g);
+            eprintln!("\n╔══════════════════════════════════════════════════╗");
+            eprintln!("║  FIRST VIOLATION in [{label}]");
+            eprintln!("║  observation #{i}: observe({coord}, {delta})");
+            eprintln!("║  node_count = {}", g.node_count());
+            eprintln!("╚══════════════════════════════════════════════════╝");
+            eprintln!("\n── BEFORE observation #{i} ──\n{pre_gtree}\n{pre_plateaus}");
+            eprintln!("\n── AFTER observation #{i} ──\n{post_gtree}\n{post_plateaus}");
+            eprintln!("\n── Violations ({}) ──", errors.len());
+            for e in &errors {
+                eprintln!("  • {e}");
+            }
+            panic!(
+                "[{label}] invariant violated after observation #{i}: \
+                 observe({coord}, {delta}). {} violations. \
+                 See stderr for full dump.",
+                errors.len()
+            );
+        }
+    }
+    g
+}
+
+/// Like [`run_diagnostic`] but also calls `check_evictions` after
+/// each observation that pushes `node_count` above `budget`.
+///
+/// Checks invariants both after `observe` and after
+/// `check_evictions`, dumping full state on the first failure.
+///
+/// # Panics
+///
+/// Panics on the first invariant violation with diagnostic dump.
+#[cfg(feature = "dynamic-contour-tracking")]
+#[must_use]
+pub fn run_diagnostic_budgeted<C, V, const N: u32>(
+    config: Config<V>,
+    plan: &Plan<C, V>,
+    budget: usize,
+    label: &str,
+) -> GvGraph<C, V, N>
+where
+    C: Coordinate + Display,
+    V: Accumulator + Inspectable + Display,
+{
+    use crate::invariants::{check_all_invariants, dump_gtree, dump_plateaus};
+
+    let mut g = GvGraph::new(config);
+    for (i, &(coord, delta)) in plan.observations.iter().enumerate() {
+        let pre_gtree = dump_gtree::<C, V, N>(&g);
+        let pre_plateaus = dump_plateaus::<C, V, N>(&g);
+
+        g.observe(coord, delta);
+
+        // Check after observe, before eviction.
+        let errors = check_all_invariants::<C, V, N>(&g);
+        if !errors.is_empty() {
+            let post_gtree = dump_gtree::<C, V, N>(&g);
+            let post_plateaus = dump_plateaus::<C, V, N>(&g);
+            eprintln!("\n╔══════════════════════════════════════════════════╗");
+            eprintln!("║  VIOLATION after observe (pre-eviction)");
+            eprintln!("║  [{label}] obs #{i}: observe({coord}, {delta})");
+            eprintln!("╚══════════════════════════════════════════════════╝");
+            eprintln!("\n── BEFORE ──\n{pre_gtree}\n{pre_plateaus}");
+            eprintln!("\n── AFTER observe ──\n{post_gtree}\n{post_plateaus}");
+            eprintln!("\n── Violations ({}) ──", errors.len());
+            for e in &errors {
+                eprintln!("  • {e}");
+            }
+            panic!(
+                "[{label}] invariant violated after observe #{i}. {} violations.",
+                errors.len()
+            );
+        }
+
+        // If over budget, evict and re-check.
+        if g.node_count() as usize > budget {
+            let pre_evict_gtree = dump_gtree::<C, V, N>(&g);
+            let pre_evict_plateaus = dump_plateaus::<C, V, N>(&g);
+
+            g.check_evictions();
+
+            let evict_errors = check_all_invariants::<C, V, N>(&g);
+            if !evict_errors.is_empty() {
+                let post_evict_gtree = dump_gtree::<C, V, N>(&g);
+                let post_evict_plateaus = dump_plateaus::<C, V, N>(&g);
+                eprintln!("\n╔══════════════════════════════════════════════════╗");
+                eprintln!("║  VIOLATION after check_evictions");
+                eprintln!("║  [{label}] obs #{i}: observe({coord}, {delta})");
+                eprintln!("╚══════════════════════════════════════════════════╝");
+                eprintln!("\n── BEFORE eviction ──\n{pre_evict_gtree}\n{pre_evict_plateaus}");
+                eprintln!("\n── AFTER eviction ──\n{post_evict_gtree}\n{post_evict_plateaus}");
+                eprintln!("\n── Violations ({}) ──", evict_errors.len());
+                for e in &evict_errors {
+                    eprintln!("  • {e}");
+                }
+                panic!(
+                    "[{label}] invariant violated after check_evictions at obs #{i}. \
+                     {} violations.",
+                    evict_errors.len()
+                );
+            }
+        }
+    }
+    g
+}

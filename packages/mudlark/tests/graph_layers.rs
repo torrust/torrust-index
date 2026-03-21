@@ -1,10 +1,75 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
-//! Integration tests for `layers()`.
+//! Integration tests for the **`GvGraph::layers()` iterator**.
+//!
+//! `layers()` is the primary BFS-order traversal of the g-tree,
+//! yielding `(layer_index, Node)` pairs.  These tests verify that the
+//! iterator faithfully mirrors the internal structure exposed by
+//! `extract()`, that every `Node` accessor (`width()`, `refinement()`,
+//! `to_cell()`, `to_span()`, …) behaves correctly, and that the
+//! iterator itself satisfies the standard `Iterator` contract across
+//! various tree shapes, type combinations, and configurations.
+//!
+//! # Test index
+//!
+//! ## Empty / minimal trees
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`layers_empty_tree`] | fresh graph yields single terminal root |
+//! | [`layers_single_root_with_intensity`] | root with `own > 0` before split |
+//!
+//! ## Splitting behaviour
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`layers_after_bootstrap_split`] | first split produces ≥2 nodes |
+//! | [`layers_after_multiple_splits`] | range-tree preset, ≥3 nodes, BFS order |
+//! | [`layers_all_states_present`] | dense observations yield all `GState` variants |
+//!
+//! ## Equivalence with `extract()`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`layers_count_matches_extract`] | node count parity across scenarios |
+//! | [`layers_matches_extract_entries`] | field-level match (terminal/transition) |
+//! | [`layers_order_matches_extract`] | same layer indices and (start, end) sets |
+//!
+//! ## Node field / method coverage
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`layers_start_lt_end`] | `start < end` for every node |
+//! | [`layers_sum_ge_own`] | `sum >= own` for every node |
+//! | [`layers_terminal_to_cell`] | `to_cell()` succeeds on terminals |
+//! | [`layers_non_terminal_to_cell_is_none`] | `to_cell()` returns `None` on non-terminals |
+//! | [`layers_to_span`] | `to_span()` field transfer |
+//! | [`layers_width`] | `width()` equals `end - start` |
+//! | [`layers_refinement`] | `refinement()` equals `sum - own` |
+//! | [`layers_is_terminal_matches_state`] | `is_terminal()` agrees with `state` |
+//! | [`layers_is_root_matches_parent`] | `is_root()` agrees with `parent` |
+//! | [`layers_gnode_id_unique`] | all `gnode_id` values are distinct |
+//! | [`layers_exactly_one_root`] | exactly one node with `parent.is_none()` |
+//!
+//! ## Iterator protocol
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`layers_iterator_adapters`] | `count`, `last`, `filter`, `take`, `map` |
+//!
+//! ## Configurations / type combinations
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`layers_budget_constrained`] | budgeted tree with evictions |
+//! | [`layers_after_decay`] | f64 tree after `decay()` |
+//! | [`layers_u32_u32`] | `<u32, u32, 16>` type combo |
+//! | [`layers_f64_f64`] | `<f64, f64, 8>` type combo |
+//! | [`layers_u128_f64`] | `<u128, f64, 64>` type combo |
 
 use torrust_mudlark::invariants::assert_invariants;
-use torrust_mudlark::testing::{default_config, plan_range_tree, range_tree_config, run};
+use torrust_mudlark::testing::{aggressive_config, default_config, f64_default_config, plan_range_tree, range_tree_config, run};
 use torrust_mudlark::{Accumulator, Config, Coordinate, GState, GvGraph, Inspectable, Proratable};
 
 /// Build a small range-tree via the shared preset.
@@ -59,6 +124,8 @@ where
     }
 }
 
+// ── Empty / minimal trees ───────────────────────────────────────
+
 #[test]
 fn layers_empty_tree() {
     let g: GvGraph<u64, u64, 8> = GvGraph::new(default_config());
@@ -74,26 +141,38 @@ fn layers_empty_tree() {
 }
 
 #[test]
-fn layers_after_bootstrap_split() {
+fn layers_single_root_with_intensity() {
+    // θ=100 prevents splitting — root accumulates without children.
     let cfg = Config {
-        split_threshold: 1u64,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
+        split_threshold: 100u64,
+        ..default_config()
     };
     let mut g: GvGraph<u64, u64, 8> = GvGraph::new(cfg);
+    g.observe(42u64, 10u64);
+    assert_invariants(&g);
+
+    let entries: Vec<_> = g.layers().collect();
+    assert_eq!(entries.len(), 1);
+    let (layer, node) = &entries[0];
+    assert_eq!(*layer, 0);
+    assert_eq!(node.state, GState::Terminal);
+    assert_eq!(node.own, 10);
+    assert_eq!(node.sum, 10);
+    assert!(node.is_root());
+}
+
+// ── Splitting behaviour ─────────────────────────────────────────
+
+#[test]
+fn layers_after_bootstrap_split() {
+    let mut g: GvGraph<u64, u64, 8> = GvGraph::new(range_tree_config());
     // Multiple observations to guarantee at least one split.
     g.observe(32u64, 5u64);
     g.observe(32u64, 5u64);
     assert_invariants(&g);
 
     let count = g.layers().count();
-    // After split(s), we should have more than 1 node.
     assert!(count >= 2, "bootstrap split should yield >= 2 nodes, got {count}");
-    // layers() should produce output (layer index may be > 0 if
-    // V-root is structural after the split).
     assert!(g.layers().next().is_some());
 }
 
@@ -115,6 +194,25 @@ fn layers_after_multiple_splits() {
         );
     }
 }
+
+#[test]
+fn layers_all_states_present() {
+    // θ=1 forces immediate splitting; many coords → all three states.
+    let mut g: GvGraph<u64, u64, 8> = GvGraph::new(range_tree_config());
+    for &c in &[32u64, 96, 64, 128, 192, 16, 48, 80, 112, 200, 220, 240] {
+        g.observe(c, 5u64);
+    }
+    assert_invariants(&g);
+
+    let states: Vec<GState> = g.layers().map(|(_, n)| n.state).collect();
+    assert!(states.contains(&GState::Terminal), "terminal state should be present");
+    assert!(
+        states.contains(&GState::Internal) || states.contains(&GState::SemiInternal),
+        "at least one non-terminal state should be present with enough splits"
+    );
+}
+
+// ── Equivalence with extract() ──────────────────────────────────
 
 #[test]
 fn layers_count_matches_extract() {
@@ -153,16 +251,8 @@ fn layers_matches_extract_entries() {
     let g1 = build_range_tree();
     assert_layers_matches_extract(&g1);
 
-    // With higher volume.
-    let cfg = Config {
-        split_threshold: 1u64,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
-    };
-    let mut g2: GvGraph<u64, u64, 8> = GvGraph::new(cfg);
+    // Aggressive config: θ=1, deeper tree.
+    let mut g2: GvGraph<u64, u64, 8> = GvGraph::new(aggressive_config());
     for i in 0..20u64 {
         g2.observe(i * 12, 5u64);
     }
@@ -176,7 +266,7 @@ fn layers_order_matches_extract() {
     let from_layers: Vec<(usize, torrust_mudlark::Node<u64, u64>)> = g.layers().collect();
     let pewei = g.extract();
 
-    // layers() yields entries layer-by-layer. Group by layer and
+    // layers() yields entries layer-by-layer.  Group by layer and
     // compare the set of (start, end) per layer.
     let mut layers_by_idx: std::collections::BTreeMap<usize, Vec<(u64, u64)>> = std::collections::BTreeMap::new();
     for (idx, node) in &from_layers {
@@ -215,6 +305,29 @@ fn layers_order_matches_extract() {
     }
 }
 
+// ── Node field / method coverage ────────────────────────────────
+
+#[test]
+fn layers_start_lt_end() {
+    let g = build_range_tree();
+    for (_layer, node) in g.layers() {
+        assert!(
+            node.start < node.end,
+            "start ({:?}) must be < end ({:?})",
+            node.start,
+            node.end
+        );
+    }
+}
+
+#[test]
+fn layers_sum_ge_own() {
+    let g = build_range_tree();
+    for (_layer, node) in g.layers() {
+        assert!(node.sum >= node.own, "sum ({:?}) must be >= own ({:?})", node.sum, node.own);
+    }
+}
+
 #[test]
 fn layers_terminal_to_cell() {
     let g = build_range_tree();
@@ -232,47 +345,103 @@ fn layers_terminal_to_cell() {
 }
 
 #[test]
-fn layers_transition_refinement() {
-    let g = build_range_tree();
+fn layers_non_terminal_to_cell_is_none() {
+    // Aggressive splitting to ensure non-terminals exist.
+    let mut g: GvGraph<u64, u64, 8> = GvGraph::new(range_tree_config());
+    for &c in &[32u64, 96, 64, 128, 192, 16, 48] {
+        g.observe(c, 5u64);
+    }
+    assert_invariants(&g);
+
     for (_layer, node) in g.layers() {
         if node.state != GState::Terminal {
-            let refinement = node.refinement();
-            assert_eq!(
-                refinement,
-                Accumulator::sub(node.sum, node.own),
-                "refinement should equal sum - own"
+            assert!(
+                node.to_cell().is_none(),
+                "non-terminal node should not convert to Cell: {node:?}"
             );
         }
     }
 }
 
 #[test]
-fn layers_all_states_present() {
-    // Build a tree with enough splits to produce all three states.
-    let cfg = Config {
-        split_threshold: 1u64,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
-    };
-    let mut g: GvGraph<u64, u64, 8> = GvGraph::new(cfg);
-    // Observe at different points to trigger multiple splits.
-    for &c in &[32u64, 96, 64, 128, 192, 16, 48, 80, 112, 200, 220, 240] {
-        g.observe(c, 5u64);
+fn layers_to_span() {
+    let g = build_range_tree();
+    for (_layer, node) in g.layers() {
+        let span = node.to_span();
+        assert_eq!(span.start, node.start);
+        assert_eq!(span.end, node.end);
+        assert_eq!(span.intensity, node.sum, "to_span uses sum as intensity");
+        assert_eq!(span.depth, node.depth);
     }
-    assert_invariants(&g);
-
-    let states: Vec<GState> = g.layers().map(|(_, n)| n.state).collect();
-    // At minimum, Terminal should always be present.
-    assert!(states.contains(&GState::Terminal), "terminal state should be present");
-    // With this many observations, we expect at least one non-terminal.
-    assert!(
-        states.contains(&GState::Internal) || states.contains(&GState::SemiInternal),
-        "at least one non-terminal state should be present with enough splits"
-    );
 }
+
+#[test]
+fn layers_width() {
+    let g = build_range_tree();
+    for (_layer, node) in g.layers() {
+        assert_eq!(node.width(), node.end - node.start);
+    }
+}
+
+#[test]
+fn layers_refinement() {
+    let g = build_range_tree();
+    for (_layer, node) in g.layers() {
+        let refinement = node.refinement();
+        assert_eq!(
+            refinement,
+            Accumulator::sub(node.sum, node.own),
+            "refinement should equal sum - own"
+        );
+        // refinement + own == sum
+        assert_eq!(refinement + node.own, node.sum);
+
+        if node.state == GState::Terminal {
+            assert_eq!(refinement, 0, "terminal refinement must be zero");
+        }
+    }
+}
+
+#[test]
+fn layers_is_terminal_matches_state() {
+    let g = build_range_tree();
+    for (_layer, node) in g.layers() {
+        assert_eq!(
+            node.is_terminal(),
+            node.state == GState::Terminal,
+            "is_terminal() must agree with state"
+        );
+    }
+}
+
+#[test]
+fn layers_is_root_matches_parent() {
+    let g = build_range_tree();
+    for (_layer, node) in g.layers() {
+        assert_eq!(
+            node.is_root(),
+            node.parent.is_none(),
+            "is_root() must agree with parent.is_none()"
+        );
+    }
+}
+
+#[test]
+fn layers_gnode_id_unique() {
+    let g = build_range_tree();
+    let ids: Vec<_> = g.layers().map(|(_, n)| n.gnode_id).collect();
+    let unique: std::collections::HashSet<_> = ids.iter().collect();
+    assert_eq!(ids.len(), unique.len(), "all gnode_id values must be distinct");
+}
+
+#[test]
+fn layers_exactly_one_root() {
+    let g = build_range_tree();
+    let root_count = g.layers().filter(|(_, n)| n.is_root()).count();
+    assert_eq!(root_count, 1, "exactly one node should have parent == None");
+}
+
+// ── Iterator protocol ───────────────────────────────────────────
 
 #[test]
 fn layers_iterator_adapters() {
@@ -299,6 +468,8 @@ fn layers_iterator_adapters() {
     assert_eq!(mapped_count, count);
 }
 
+// ── Configurations / type combinations ──────────────────────────
+
 #[test]
 fn layers_budget_constrained() {
     let cfg = Config {
@@ -314,22 +485,13 @@ fn layers_budget_constrained() {
         g.observe(i % 16, 5u64);
         assert_invariants(&g);
     }
-    // Should iterate without panic, count matches extract.
     assert_eq!(g.layers().count(), g.extract().node_count());
     assert_layers_matches_extract(&g);
 }
 
 #[test]
 fn layers_after_decay() {
-    let cfg = Config {
-        split_threshold: 1.0_f64,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
-    };
-    let mut g: GvGraph<f64, f64, 4> = GvGraph::new(cfg);
+    let mut g: GvGraph<f64, f64, 4> = GvGraph::new(f64_default_config());
     g.observe(2.0_f64, 10.0_f64);
     g.observe(12.0_f64, 5.0_f64);
     assert_invariants(&g);
@@ -339,9 +501,6 @@ fn layers_after_decay() {
     assert_invariants(&g);
 
     // After decay, layers() should still work and match extract().
-    assert_eq!(g.layers().count(), g.extract().node_count());
-
-    // Verify the node count reflects decayed state.
     assert_eq!(g.layers().count(), g.extract().node_count());
 }
 
@@ -366,11 +525,7 @@ fn layers_u32_u32() {
 fn layers_f64_f64() {
     let cfg = Config {
         split_threshold: 1.0_f64,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
+        ..f64_default_config()
     };
     let mut g: GvGraph<f64, f64, 8> = GvGraph::new(cfg);
     g.observe(2.0_f64, 10.0_f64);
@@ -384,11 +539,7 @@ fn layers_f64_f64() {
 fn layers_u128_f64() {
     let cfg = Config {
         split_threshold: 1.0_f64,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
+        ..f64_default_config()
     };
     let mut g: GvGraph<u128, f64, 64> = GvGraph::new(cfg);
     g.observe(1000u128, 2.72_f64);

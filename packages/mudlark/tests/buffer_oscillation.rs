@@ -15,6 +15,61 @@
 //! - Buffer=3 further reduces or eliminates oscillation.
 //! - **All invariants hold** throughout regardless of buffer value
 //!   (oscillation is a performance concern, not a correctness bug).
+//!
+//! # Test index
+//!
+//! ## Core comparisons
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`hotspot_oscillation_buffer_comparison`] | sustained single-coord hotspot |
+//! | [`spread_oscillation_buffer_comparison`] | uniform load across domain |
+//! | [`zigzag_oscillation_buffer_comparison`] | adversarial alternating extremes |
+//! | [`oscillating_hotspot_buffer_comparison`] | burst-length oscillating hotspot pattern |
+//!
+//! ## Structural properties
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`stabilisation_latency_ordering`] | rounds until eviction stops |
+//! | [`invariants_hold_every_round_for_all_buffers`] | per-round invariant sweep |
+//! | [`energy_conserved_for_all_buffers`] | root sum equals total observed delta |
+//! | [`wider_buffer_retains_more_nodes`] | node count monotone with buffer width |
+//! | [`buffer_1_round_trace`] | detailed per-round trace for manual inspection |
+//!
+//! ## Edge cases
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`buffer_1_maximum_pressure`] | minimum valid buffer; maximum eviction pressure |
+//! | [`sub_threshold_no_oscillation`] | delta ≤ θ triggers no splits or eviction |
+//! | [`random_spray_buffer_comparison`] | stochastic load still shows monotone eviction |
+//!
+//! ## Worst-case patterns
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`worst_case_dueling_hotspots`] | alternating high-intensity coords |
+//! | [`worst_case_escalating_adversarial`] | asymmetric intensity growth |
+//! | [`worst_case_hotspot_migration`] | abrupt hotspot relocation |
+//! | [`worst_case_rotating_hotspots`] | 4-coord round-robin via `interleaved_hotspots` |
+//! | [`worst_case_growth_spike_relax`] | spread → spike → relaxation via `burst` |
+//! | [`worst_case_skewed_power_law`] | power-law intensity distribution |
+//! | [`worst_case_rapid_microbursts`] | very short bursts at many coords |
+//! | [`worst_case_intensity_inversion`] | complete V-tree re-ranking |
+//! | [`worst_case_invariants_hold_at_buffer_1`] | per-round sweep of all worst-cases |
+//!
+//! ## Breaking buffer=4
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`break_buffer_4_hyper_escalation`] | step ≫ θ adversarial zigzag |
+//! | [`break_buffer_4_multi_front_battle`] | 8-coord escalating round-robin |
+//! | [`break_buffer_4_burst_inversion`] | rapid dominance inversion |
+//! | [`break_buffer_4_staircase`] | progressive new competitor introduction |
+//! | [`break_buffer_4_combined_assault`] | layered pattern assault |
+//! | [`break_buffer_4_energy_conserved`] | energy conservation under deep config |
+//! | [`break_buffer_4_invariants_hold`] | per-round sweep of all breaking patterns |
 
 use torrust_mudlark::invariants::assert_invariants;
 use torrust_mudlark::testing::Plan;
@@ -287,6 +342,43 @@ fn zigzag_oscillation_buffer_comparison() {
     assert!(e1 >= e3, "zigzag: buffer=1 evictions ({e1}) ≥ buffer=3 ({e3})");
 }
 
+// ── Oscillating hotspot: burst-length alternation ───────────────
+
+/// [`Plan::oscillating_hotspot`] is the canonical pattern for buffer
+/// oscillation: every `burst` observations the target switches between
+/// two coordinates.  The burst length controls how deep each side
+/// builds before abandonment.
+#[test]
+fn oscillating_hotspot_buffer_comparison() {
+    let _t = init_tracing();
+
+    // Burst=10: build 10 obs at coord 0, then 10 at coord 255, for 12 cycles.
+    let plan = Plan::new().oscillating_hotspot(0, 255, 8, 10, 12);
+
+    let (g1, s1) = collect_stats::<8>(1, &plan);
+    let (g2, s2) = collect_stats::<8>(2, &plan);
+    let (g3, s3) = collect_stats::<8>(3, &plan);
+
+    assert_invariants(&g1);
+    assert_invariants(&g2);
+    assert_invariants(&g3);
+
+    log_summary("osc buf=1", &s1);
+    log_summary("osc buf=2", &s2);
+    log_summary("osc buf=3", &s3);
+
+    let e1 = total_evictions(&s1);
+    let e2 = total_evictions(&s2);
+    let e3 = total_evictions(&s3);
+
+    assert!(e1 >= e2, "osc: buffer=1 evictions ({e1}) ≥ buffer=2 ({e2})");
+    assert!(e2 >= e3, "osc: buffer=2 evictions ({e2}) ≥ buffer=3 ({e3})");
+
+    // Oscillating hotspot is the textbook futile-cycle trigger.
+    let futile = futile_cycle_count(&s1);
+    tracing::info!(futile, "oscillating hotspot futile cycles at buffer=1");
+}
+
 // ── Stabilisation latency ───────────────────────────────────────
 
 /// Measures how long (in observation rounds) before the graph stops
@@ -418,6 +510,100 @@ fn buffer_1_round_trace() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+//  Edge cases
+// ═══════════════════════════════════════════════════════════════
+
+/// Buffer=1 is the minimum valid buffer (`D_create < D_evict` is
+/// required).  It represents maximum eviction pressure: entries
+/// created at the depth gate are only one level away from `D_evict`.
+/// Invariants must still hold, and eviction count must be ≥ any
+/// wider buffer.
+#[test]
+fn buffer_1_maximum_pressure() {
+    let _t = init_tracing();
+
+    let plan = Plan::new().hotspot(42, 6, 60);
+
+    let (g1, s1) = collect_stats::<8>(1, &plan);
+    let (_, s2) = collect_stats::<8>(2, &plan);
+    let (_, s3) = collect_stats::<8>(3, &plan);
+
+    assert_invariants(&g1);
+
+    let e1 = total_evictions(&s1);
+    let e2 = total_evictions(&s2);
+    let e3 = total_evictions(&s3);
+
+    log_summary("buf=1 pressure", &s1);
+
+    assert!(e1 >= e2, "buffer=1 evictions ({e1}) should be ≥ buffer=2 ({e2})");
+    assert!(e1 >= e3, "buffer=1 evictions ({e1}) should be ≥ buffer=3 ({e3})");
+
+    // Energy conservation.
+    let total: u64 = plan.observations.iter().map(|&(_, d)| d).sum();
+    assert_eq!(g1.total_sum(), total, "energy conservation violated at buffer=1");
+}
+
+/// Sub-threshold observations (accumulated energy < θ at every node)
+/// never trigger splits, so the tree stays at the root.  Buffer width
+/// should have no effect: zero evictions for all buffers.
+#[test]
+fn sub_threshold_no_oscillation() {
+    let _t = init_tracing();
+
+    // 4 observations of delta=1 at the same coord → root sum=4 < θ=5.
+    // No node ever exceeds threshold, so no splits occur.
+    let plan = Plan::new().observe_n(42, 1, 4);
+
+    for buffer in 1..=3 {
+        let (g, stats) = collect_stats::<8>(buffer, &plan);
+        let evictions = total_evictions(&stats);
+        let futile = futile_cycle_count(&stats);
+        assert_invariants(&g);
+        assert_eq!(
+            evictions, 0,
+            "sub-threshold: buffer={buffer} should have 0 evictions, got {evictions}"
+        );
+        assert_eq!(
+            futile, 0,
+            "sub-threshold: buffer={buffer} should have 0 futile cycles, got {futile}"
+        );
+    }
+}
+
+/// Stochastic load via [`Plan::random_spray`] still exhibits the
+/// monotone eviction ordering: wider buffer ⟹ fewer evictions.
+#[test]
+fn random_spray_buffer_comparison() {
+    let _t = init_tracing();
+
+    let plan = Plan::new().random_spray(0xDEAD_BEEF, 256, 6, 300);
+
+    let (g1, s1) = collect_stats::<8>(1, &plan);
+    let (g2, s2) = collect_stats::<8>(2, &plan);
+    let (g3, s3) = collect_stats::<8>(3, &plan);
+
+    assert_invariants(&g1);
+    assert_invariants(&g2);
+    assert_invariants(&g3);
+
+    log_summary("spray buf=1", &s1);
+    log_summary("spray buf=2", &s2);
+    log_summary("spray buf=3", &s3);
+
+    let e1 = total_evictions(&s1);
+    let e2 = total_evictions(&s2);
+    let e3 = total_evictions(&s3);
+
+    assert!(e1 >= e2, "spray: buffer=1 evictions ({e1}) ≥ buffer=2 ({e2})");
+    assert!(e2 >= e3, "spray: buffer=2 evictions ({e2}) ≥ buffer=3 ({e3})");
+
+    // Energy conservation.
+    let total: u64 = plan.observations.iter().map(|&(_, d)| d).sum();
+    assert_eq!(g1.total_sum(), total, "spray energy conservation at buffer=1");
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  Worst-case patterns
 // ═══════════════════════════════════════════════════════════════
 
@@ -527,18 +713,15 @@ fn worst_case_hotspot_migration() {
 /// subtree while demoting the other three.  With buffer=1, entries
 /// from the previous hotspot get pushed past `D_evict` on every
 /// rotation.
+///
+/// Uses [`Plan::interleaved_hotspots`] — the canonical multi-coord
+/// round-robin pattern from the testing infra.
 #[test]
 fn worst_case_rotating_hotspots() {
     let _t = init_tracing();
 
-    // 4 locations × 5 rotations × 15 obs per burst = 300 total.
-    let coords = [0u64, 64, 128, 192];
-    let mut plan = Plan::new();
-    for _ in 0..5 {
-        for &c in &coords {
-            plan = plan.hotspot(c, 8, 15);
-        }
-    }
+    // 4 locations at spacing=64, 15 obs per burst, 5 full rotations = 300 total.
+    let plan = Plan::new().interleaved_hotspots(0, 4, 64, 8, 15, 5);
 
     compare_buffers("rotate", &plan);
 
@@ -554,13 +737,15 @@ fn worst_case_rotating_hotspots() {
 /// then dilute with gentle spread.  The spike phase forces deep
 /// contraction that pushes spread entries past `D_evict` with
 /// buffer=1.
+///
+/// Uses [`Plan::burst`] for the growth→spike phases, followed by
+/// a gentle relaxation spread.
 #[test]
 fn worst_case_growth_spike_relax() {
     let _t = init_tracing();
 
     let plan = Plan::new()
-        .spread(256, 6, 100) // grow the tree
-        .hotspot(42, 50, 50) // spike: one entry dominates, pushes others deep
+        .burst(256, 6, 100, 42, 50, 50) // grow then spike
         .spread(256, 1, 100); // relaxation: gentle background load
 
     compare_buffers("spike", &plan);
@@ -687,9 +872,8 @@ const fn deep_buffer_config(buffer: u32) -> Config<u64> {
     }
 }
 
-/// Run a buffer comparison at 3, 4, and 5 with a custom config
-/// constructor, logging diagnostics.
-#[allow(dead_code)]
+/// Run a buffer comparison at 3, 4, and 5 with the deep config,
+/// asserting invariants and logging diagnostics.
 fn compare_deep_buffers(label: &str, plan: &Plan<u64, u64>) {
     for buffer in 3..=5 {
         let span = result_span!(label, buffer);
@@ -804,14 +988,7 @@ fn break_buffer_4_burst_inversion() {
         }
     }
 
-    for buffer in 3..=5 {
-        let span = result_span!("burst-inv", buffer);
-        let _enter = span.enter();
-        let cfg = deep_buffer_config(buffer);
-        let (g, stats) = collect_stats_cfg::<16>(cfg, &plan);
-        assert_invariants(&g);
-        record_stats(&span, &stats);
-    }
+    compare_deep_buffers("burst-inv", &plan);
 }
 
 /// Adversarial staircase: introduce new competing coords one by
@@ -830,14 +1007,7 @@ fn break_buffer_4_staircase() {
         plan = plan.observe_n(coord, delta, 20);
     }
 
-    for buffer in 3..=5 {
-        let span = result_span!("staircase", buffer);
-        let _enter = span.enter();
-        let cfg = deep_buffer_config(buffer);
-        let (g, stats) = collect_stats_cfg::<16>(cfg, &plan);
-        assert_invariants(&g);
-        record_stats(&span, &stats);
-    }
+    compare_deep_buffers("staircase", &plan);
 }
 
 /// Combined assault: spread → adversarial escalation → inversion →
@@ -853,14 +1023,7 @@ fn break_buffer_4_combined_assault() {
         .hotspot(32768, 100, 50) // spike in the middle
         .adversarial_zigzag(65535, 0, 6, 12, 200); // reverse escalation
 
-    for buffer in 3..=5 {
-        let span = result_span!("assault", buffer);
-        let _enter = span.enter();
-        let cfg = deep_buffer_config(buffer);
-        let (g, stats) = collect_stats_cfg::<16>(cfg, &plan);
-        assert_invariants(&g);
-        record_stats(&span, &stats);
-    }
+    compare_deep_buffers("assault", &plan);
 }
 
 /// Invariants hold for all buffer=4 breaking patterns.
@@ -889,6 +1052,24 @@ fn break_buffer_4_invariants_hold() {
             }
             p
         }),
+        ("multi-front", {
+            let coords: [u64; 8] = [0, 1024, 2048, 4096, 8192, 16384, 32768, 49152];
+            let mut p = Plan::new();
+            for round in 0..15u64 {
+                for &c in &coords {
+                    p = p.observe_n(c, 4 + round * 3, 5);
+                }
+            }
+            p
+        }),
+        (
+            "assault",
+            Plan::new()
+                .spread(65536, 4, 100)
+                .adversarial_zigzag(0, 65535, 6, 8, 100)
+                .hotspot(32768, 100, 30)
+                .adversarial_zigzag(65535, 0, 6, 12, 100),
+        ),
     ];
 
     for (label, plan) in &patterns {
@@ -902,5 +1083,26 @@ fn break_buffer_4_invariants_hold() {
                 tracing::info!(label, step = i + 1, nodes = g.node_count(), "checkpoint");
             }
         }
+    }
+}
+
+/// Energy conservation holds under the deep buffer config.
+#[test]
+fn break_buffer_4_energy_conserved() {
+    let _t = init_tracing();
+
+    let plan = Plan::new().adversarial_zigzag(0, 65535, 6, 10, 200).hotspot(32768, 100, 50);
+    let total: u64 = plan.observations.iter().map(|&(_, d)| d).sum();
+
+    for buffer in 3..=5 {
+        let cfg = deep_buffer_config(buffer);
+        let (g, _) = collect_stats_cfg::<16>(cfg, &plan);
+        let root_sum = g.total_sum();
+        assert_eq!(
+            root_sum, total,
+            "deep config energy conservation violated for buffer={buffer}: \
+             root_sum={root_sum}, expected={total}"
+        );
+        assert_invariants(&g);
     }
 }

@@ -1,194 +1,148 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
-//! Focused diagnostic test for f64 plateau depth inconsistency.
+//! Regression and correctness tests for **f64 depth computation** and
+//! **f64 decay**.
 //!
-//! ## Root cause hypothesis
+//! The depth tests were introduced to guard against a specific bug in
+//! `gnode_depth_from_interval`: when the interval width is sub-unit
+//! (i.e. `hi - lo < 1.0`), the `log2(width)` result is negative, and
+//! the original `as u32` cast saturated it to 0 — collapsing deep
+//! nodes onto the root level.  The fix casts via `as i32` first so
+//! that depths beyond *N* are represented correctly.
 //!
-//! `gnode_depth_from_interval(lo, hi, N)` computes:
+//! The decay tests verify the `GvGraph::decay` operation over f64
+//! trees: boundary attenuation values (0.0 and 1.0), selective decay
+//! (`q > 0`), subtree scoping, energy conservation, and repeated
+//! application — all with full invariant checking after every
+//! mutation.
 //!
-//!     depth = N - (width.log2() as u32)
+//! # Test index
 //!
-//! For f64 intervals narrower than 1.0, `log2(width)` is negative.
-//! The saturating cast `(-1.0_f64 as u32)` yields `0`, so `depth`
-//! is capped at `N` regardless of how narrow the interval is.
+//! ## Depth computation
 //!
-//! This means a parent `[2, 3)` (width=1, depth=N) and its child
-//! `[2, 2.5)` (width=0.5, depth=N) compute the **same depth**.
-//! When the split creates G-children at `child_depth` = N, the
-//! parent (now Internal) contributes `g_depth + 1 = N + 1` to the
-//! plateau, while the child terminals contribute `N`. The plateau
-//! gets `depth = max(N+1, N) = N+1`, and the depth consistency
-//! invariant fires because some basis elements contribute depth N
-//! while the plateau says N+1.
+//! | Test | Focus |
+//! |------|-------|
+//! | [`f64_depth_regression_sub_unit_intervals`] | `i32` cast fix for sub-unit widths (depth > *N*) |
+//! | [`f64_depth_alternating_observations_invariants`] | alternating observations replay + post-decay invariants |
+//! | [`f64_depth_hotspot_deep_splits`] | deep-split stress via single-hotspot plan |
 //!
-//! The original error (surfaced via the `decay_f64_tree` unit test):
+//! ## Decay
 //!
-//!   Plateau depth: key BasisEdge(2.0), basis element `GNodeId(11)` (Terminal):
-//!     element contributes depth 4, plateau.depth=5
-//!
-//! Run with:
-//!   `cargo test --test decay_f64_depth -- --nocapture`
+//! | Test | Focus |
+//! |------|-------|
+//! | [`f64_decay_noop_at_attenuation_one`] | `att = 1.0` is a no-op |
+//! | [`f64_decay_annihilation_zeroes_all`] | `att = 0.0` zeroes all energy |
+//! | [`f64_decay_selective_preserves_invariants`] | selective decay (`q > 0`) preserves invariants |
+//! | [`f64_decay_multiple_consecutive`] | 10 consecutive selective decays |
+//! | [`f64_decay_energy_conservation_uniform`] | uniform decay: total ≈ before × attenuation |
+//! | [`f64_decay_subtree_scoped`] | sibling subtree energy is unaffected |
+//! | [`f64_decay_selective_q1_root_undecayed`] | at `q = 1.0`, subtree root's own energy is unchanged |
 
 use crate::graph::GvGraph;
 use crate::gtree::gnode_depth_from_interval;
-use crate::invariants::{check_all_invariants, dump_gtree, dump_plateaus};
-use crate::testing::{Plan, f64_deep_config, f64_default_config};
+use crate::invariants::{assert_invariants, check_all_invariants, dump_gtree, dump_plateaus};
+use crate::testing::{Plan, f64_deep_config, f64_default_config, run, run_checked, run_soft_checked};
 use crate::tests::init_tracing;
 use crate::traits::Coordinate;
 
-// ── Test 1: demonstrate the depth computation saturation ────────
+// ── Helpers ─────────────────────────────────────────────────────
 
-/// Show that `gnode_depth_from_interval` saturates at `N` for f64
-/// intervals narrower than 1.0.
+/// Alternating observation plan: 10 rounds of (2.0, +10.0) then
+/// (10.0, +5.0).  Shared across most tests in this module.
+fn f64_alternating_plan() -> Plan<f64, f64> {
+    (0..10).fold(Plan::new(), |p, _| p.observe(2.0, 10.0).observe(10.0, 5.0))
+}
+
+/// Build and validate a populated `GvGraph<f64, f64, 4>` from the
+/// alternating plan.
+fn make_f64_graph() -> GvGraph<f64, f64, 4> {
+    let g = run::<f64, f64, 4>(f64_default_config(), &f64_alternating_plan());
+    assert_invariants(&g);
+    g
+}
+
+// ── Depth computation regression ────────────────────────────────
+
+/// Verify that `gnode_depth_from_interval` returns correct depths
+/// for f64 intervals, including sub-unit widths that previously
+/// saturated at N due to an unsigned cast.
 #[test]
-fn f64_depth_saturates_at_n() {
+fn f64_depth_regression_sub_unit_intervals() {
     let _t = init_tracing();
 
-    tracing::debug!("gnode_depth_from_interval saturation for f64, N=4");
-    tracing::debug!("domain = [0, 16)  domain_max = 2^4 = 16.0");
-
-    let cases: &[(f64, f64, &str)] = &[
-        (0.0, 16.0, "root"),
-        (0.0, 8.0, "depth-1 left"),
-        (0.0, 4.0, "depth-2"),
-        (2.0, 4.0, "depth-3 (width=2)"),
-        (2.0, 3.0, "depth-4 (width=1)"),
-        (2.0, 2.5, "CHILD (width=0.5) ← should be depth 5"),
-        (2.5, 3.0, "CHILD (width=0.5) ← should be depth 5"),
-        (2.0, 2.25, "width=0.25 ← should be depth 6"),
+    // N = 4, domain [0, 16).  Width 2^k → depth N-k.
+    let cases: &[(f64, f64, u32)] = &[
+        (0.0, 16.0, 0), // width=16 → depth 0
+        (0.0, 8.0, 1),  // width=8  → depth 1
+        (0.0, 4.0, 2),  // width=4  → depth 2
+        (2.0, 4.0, 3),  // width=2  → depth 3
+        (2.0, 3.0, 4),  // width=1  → depth 4 (= N)
+        (2.0, 2.5, 5),  // width=0.5  → depth 5 (> N, was the bug)
+        (2.5, 3.0, 5),  // width=0.5  → depth 5
+        (2.0, 2.25, 6), // width=0.25 → depth 6
     ];
 
-    for &(lo, hi, label) in cases {
-        let width = hi - lo;
-        let log2_raw = width.log2();
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        let log2_as_u32 = log2_raw as u32;
+    for &(lo, hi, expected_depth) in cases {
         let depth = gnode_depth_from_interval(lo, hi, 4);
-        let saturated = if log2_raw < 0.0 { " ◀◀◀ SATURATED" } else { "" };
-        tracing::debug!(
-            "  [{lo:>6.2}, {hi:>6.2})  w={width:<6.2}  log2(w)={log2_raw:>5.1}  \
-             as_u32={log2_as_u32}  depth={depth}  {label}{saturated}",
+        assert_eq!(
+            depth,
+            expected_depth,
+            "[{lo}, {hi}) width={}: expected depth {expected_depth}, got {depth}",
+            hi - lo,
         );
     }
 
-    // Verify the saturation.
+    // Key regression check: parent and child must differ in depth.
     let depth_parent = gnode_depth_from_interval(2.0_f64, 3.0_f64, 4);
     let depth_child = gnode_depth_from_interval(2.0_f64, 2.5_f64, 4);
-    tracing::debug!("Parent [2.0, 3.0) depth = {depth_parent}");
-    tracing::debug!("Child  [2.0, 2.5) depth = {depth_child}");
-    tracing::debug!(
-        "EQUAL? {} ← both saturate to N=4 despite being different tree levels",
-        depth_parent == depth_child,
+    assert_ne!(
+        depth_parent, depth_child,
+        "parent [2.0, 3.0) and child [2.0, 2.5) must have different depths"
     );
-
-    // Show the knock-on effect on plateau depth.
-    tracing::debug!("After split: parent becomes Internal at g_depth={depth_parent}");
-    tracing::debug!("  → Internal contributes depth {}", depth_parent + 1);
-    tracing::debug!(
-        "  → recompute_plateau sees max({}, {}) = {}",
-        depth_parent + 1,
-        depth_child,
-        depth_parent + 1
-    );
-    tracing::debug!("  → but child Terminal contributes depth {depth_child}");
-    tracing::debug!(
-        "  → INVARIANT VIOLATION: child contributes {} ≠ plateau.depth {}",
-        depth_child,
-        depth_parent + 1,
-    );
+    assert_eq!(depth_child, depth_parent + 1);
 }
 
-// ── Test 2: replay f64 tree, check invariants per observation ───
+// ── Invariant-checked f64 tree construction + decay ─────────────
 
-/// Replay the exact f64 tree construction step-by-step. Checks
-/// plateau invariants after **every** observation. On first failure,
-/// dumps full G-tree + plateau state with basis membership using
-/// the library's `dump_gtree` and `dump_plateaus` helpers.
+/// Replay alternating f64 observations with soft invariant checks
+/// on every step.  On failure, dumps full G-tree + plateau state
+/// for diagnosis.  Then applies uniform decay and re-checks.
 #[test]
-fn trace_f64_depth_inconsistency_step_by_step() {
+fn f64_depth_alternating_observations_invariants() {
     let _t = init_tracing();
 
     let config = f64_default_config();
-    let mut g: GvGraph<f64, f64, 4> = GvGraph::new(config);
+    let plan = f64_alternating_plan();
 
-    // 10 rounds of alternating observations at coords 2.0 and 10.0.
-    let plan: Plan<f64, f64> = (0..10).fold(Plan::new(), |p, _| p.observe(2.0, 10.0).observe(10.0, 5.0));
+    let (mut g, errors) = run_soft_checked::<f64, f64, 4>(config, &plan, 1);
 
-    let mut nc_prev = g.node_count();
-
-    for (step, &(coord, delta)) in plan.observations.iter().enumerate() {
-        let step1 = step + 1; // 1-based
-        g.observe(coord, delta);
-        let nc = g.node_count();
-
-        // Log structural changes.
-        if nc != nc_prev {
-            tracing::debug!("Step {step1}: observe({coord}, {delta}) — nodes {nc_prev}→{nc}");
-
-            // Flag sub-unit intervals (the symptom).
-            for (i, gn) in g.gnodes().iter_occupied() {
-                let lo_f = Coordinate::to_f64(gn.lo);
-                let hi_f = Coordinate::to_f64(gn.hi);
-                let w = hi_f - lo_f;
-                if w < 1.0 {
-                    let d = gnode_depth_from_interval(gn.lo, gn.hi, 4);
-                    tracing::debug!(
-                        "  ⚠ Sub-unit interval: G({i}) [{:.3}, {:.3}) w={w:.4} \
-                         → depth saturates to {d} (true depth ≈ {:.0})",
-                        lo_f,
-                        hi_f,
-                        4.0 - w.log2(),
-                    );
-                }
-            }
-        }
-
-        // Soft check: collect errors without panicking.
-        let errs = check_all_invariants(&g);
-        if !errs.is_empty() {
-            tracing::debug!("INVARIANT VIOLATION at step {step1}");
-            for e in &errs {
+    if !errors.is_empty() {
+        for (step, errs) in &errors {
+            tracing::debug!("INVARIANT VIOLATION at step {step}:");
+            for e in errs {
                 tracing::debug!("  ✗ {e}");
             }
-            tracing::debug!("\n{}", dump_gtree(&g));
-            tracing::debug!("{}", dump_plateaus(&g));
+        }
+        tracing::debug!("\n{}", dump_gtree(&g));
+        tracing::debug!("{}", dump_plateaus(&g));
 
-            // Extra: show depth contribution per basis element.
-            tracing::debug!("── Depth contribution analysis ──");
-            for (key, elems) in g.debug_plateau_basis() {
-                let plateaus = g.plateaus();
-                let p = &plateaus[&key];
-                for &(idx, lo, hi, state, g_depth) in &elems {
-                    let contributes = if state == "Internal" { g_depth + 1 } else { g_depth };
-                    let mismatch = if contributes == p.depth { "" } else { " ◀◀◀ MISMATCH" };
-                    let lo_f = Coordinate::to_f64(lo);
-                    let hi_f = Coordinate::to_f64(hi);
-                    let w = hi_f - lo_f;
-                    tracing::debug!(
-                        "  {key:?} → G({idx}) {state} [{:.2}, {:.2}) w={w:.3} \
-                         g_depth={g_depth} contributes={contributes} plateau.depth={}{mismatch}",
-                        lo_f,
-                        hi_f,
-                        p.depth,
-                    );
-                }
+        // Extra diagnosis: flag sub-unit intervals.
+        for (i, gn) in g.gnodes().iter_occupied() {
+            let lo_f = Coordinate::to_f64(gn.lo);
+            let hi_f = Coordinate::to_f64(gn.hi);
+            let w = hi_f - lo_f;
+            if w < 1.0 {
+                let d = gnode_depth_from_interval(gn.lo, gn.hi, 4);
+                tracing::debug!("  ⚠ Sub-unit: G({i}) [{lo_f:.3}, {hi_f:.3}) w={w:.4} depth={d}",);
             }
-
-            panic!("Invariant violation at step {step1}. See stderr for full diagnosis.");
         }
 
-        nc_prev = nc;
+        panic!("Invariant violations during observation: {} failing step(s)", errors.len());
     }
 
-    tracing::debug!("All 20 observations passed with invariants.");
-    tracing::debug!("{}", dump_plateaus(&g));
-
-    // Now decay — this was the original trigger.
-    tracing::debug!("Calling decay(g_root, 0.5, 0.0) ...");
+    // Uniform decay — the original trigger for the depth bug.
     g.decay(g.g_root(), 0.5, 0.0);
-    tracing::debug!("{}", dump_plateaus(&g));
-
     let post_decay_errs = check_all_invariants(&g);
     assert!(
         post_decay_errs.is_empty(),
@@ -196,70 +150,162 @@ fn trace_f64_depth_inconsistency_step_by_step() {
     );
 }
 
-// ── Test 3: minimal reproduction ────────────────────────────────
+// ── Deep-split hotspot ──────────────────────────────────────────
 
-/// Minimal f64 tree that triggers the depth saturation bug.
-/// Feeds observations exclusively at coord=2.0 to force repeated
-/// splits into sub-unit-width intervals where `gnode_depth_from_interval`
-/// saturates.
+/// Feeds 100 observations at a single f64 coordinate to force
+/// deep splits into sub-unit-width intervals.  Invariants are
+/// checked every step.
 #[test]
-fn minimal_f64_depth_saturation() {
+fn f64_depth_hotspot_deep_splits() {
     let _t = init_tracing();
 
     let config = f64_deep_config();
-    let mut g: GvGraph<f64, f64, 4> = GvGraph::new(config);
-
-    // 100 observations at a single hotspot to force deep splits.
     let plan: Plan<f64, f64> = Plan::new().hotspot(2.0, 10.0, 100);
 
-    tracing::debug!("Minimal f64 depth saturation reproduction");
-    let mut nc_prev = g.node_count();
+    // run_checked panics on first violation with a clear message.
+    let g = run_checked::<f64, f64, 4>(config, &plan, 1);
 
-    for (i, &(coord, delta)) in plan.observations.iter().enumerate() {
-        let step = i + 1; // 1-based
-        g.observe(coord, delta);
-        let nc = g.node_count();
+    // Verify the tree actually grew beyond the root.
+    assert!(g.node_count() > 1, "hotspot should have triggered splits");
+}
 
-        if nc != nc_prev {
-            tracing::debug!("observation {step}: nodes {nc_prev}→{nc}");
+// ── f64 decay noop ──────────────────────────────────────────────
 
-            // Flag sub-unit intervals.
-            for (idx, gn) in g.gnodes().iter_occupied() {
-                let lo_f = Coordinate::to_f64(gn.lo);
-                let hi_f = Coordinate::to_f64(gn.hi);
-                let w = hi_f - lo_f;
-                if w < 1.0 {
-                    let d = gnode_depth_from_interval(gn.lo, gn.hi, 4);
-                    tracing::debug!(
-                        "  ⚠ G({idx}) [{:.4}, {:.4}) w={w:.6} depth={d} true_depth≈{:.1}",
-                        lo_f,
-                        hi_f,
-                        4.0 - w.log2(),
-                    );
-                }
-            }
+/// Decay with attenuation = 1.0 must leave the tree unchanged.
+#[test]
+fn f64_decay_noop_at_attenuation_one() {
+    let _t = init_tracing();
 
-            let errs = check_all_invariants(&g);
-            if !errs.is_empty() {
-                tracing::debug!("BUG REPRODUCED at observation {step}");
-                for e in &errs {
-                    tracing::debug!("  ✗ {e}");
-                }
-                tracing::debug!("\n{}", dump_gtree(&g));
-                tracing::debug!("{}", dump_plateaus(&g));
-                tracing::debug!(
-                    "Root cause: f64 interval width < 1.0 → log2(w) negative → \
-                     `as u32` saturates to 0 → depth capped at N={}, \
-                     but Internal parent contributes N+1={}.",
-                    4,
-                    5,
-                );
-                panic!("Depth saturation bug reproduced at observation {step}.");
-            }
+    let mut g = make_f64_graph();
+    let before = g.total_sum();
+    g.decay(g.g_root(), 1.0, 0.0);
 
-            nc_prev = nc;
-        }
+    assert!(
+        (g.total_sum() - before).abs() < f64::EPSILON,
+        "decay at att=1.0 should be a no-op"
+    );
+    assert_invariants(&g);
+}
+
+// ── f64 decay annihilation ──────────────────────────────────────
+
+/// Decay with attenuation = 0.0 must zero all energy.
+#[test]
+fn f64_decay_annihilation_zeroes_all() {
+    let _t = init_tracing();
+
+    let mut g = make_f64_graph();
+    assert!(g.total_sum() > 0.0);
+
+    g.decay(g.g_root(), 0.0, 0.0);
+
+    assert!(
+        g.total_sum().abs() < f64::EPSILON,
+        "decay at att=0.0 should zero all energy, got {}",
+        g.total_sum()
+    );
+    assert_invariants(&g);
+}
+
+// ── f64 selective decay (q > 0) ─────────────────────────────────
+
+/// Selective decay on an f64 tree preserves all invariants.
+#[test]
+fn f64_decay_selective_preserves_invariants() {
+    let _t = init_tracing();
+
+    let mut g = make_f64_graph();
+
+    g.decay(g.g_root(), 0.6, 0.7);
+    assert_invariants(&g);
+}
+
+// ── f64 multiple consecutive decays ─────────────────────────────
+
+/// 10 consecutive selective decays on an f64 tree.
+#[test]
+fn f64_decay_multiple_consecutive() {
+    let _t = init_tracing();
+
+    let mut g = make_f64_graph();
+
+    for _ in 0..10 {
+        g.decay(g.g_root(), 0.9, 0.4);
+        assert_invariants(&g);
     }
+}
 
-    tracing::debug!("All 100 observations passed (no sub-unit splits triggered).");
+// ── f64 energy conservation ─────────────────────────────────────
+
+/// After uniform decay (q=0), total energy ≈ before × attenuation.
+#[test]
+fn f64_decay_energy_conservation_uniform() {
+    let _t = init_tracing();
+
+    let mut g = make_f64_graph();
+
+    let before = g.total_sum();
+    g.decay(g.g_root(), 0.75, 0.0);
+    let after = g.total_sum();
+
+    // f64 accumulator: no integer truncation, tolerance is just
+    // floating-point rounding.
+    let expected = before * 0.75;
+    assert!((after - expected).abs() < 1e-6, "expected ≈{expected}, got {after}");
+    assert_invariants(&g);
+}
+
+// ── f64 subtree-scoped decay ────────────────────────────────────
+
+/// Decay scoped to one subtree must leave the sibling untouched.
+#[test]
+fn f64_decay_subtree_scoped() {
+    let _t = init_tracing();
+
+    let mut g = make_f64_graph();
+
+    let g_root = g.g_root();
+    let left_child = g
+        .gnodes()
+        .get(g_root.index())
+        .left
+        .expect("expected left child after observations");
+    let right_child = g
+        .gnodes()
+        .get(g_root.index())
+        .right
+        .expect("expected right child after observations");
+
+    let right_before = g.gnodes().get(right_child.index()).sum;
+
+    g.decay(left_child, 0.5, 0.0);
+
+    let right_after = g.gnodes().get(right_child.index()).sum;
+    assert!(
+        (right_before - right_after).abs() < f64::EPSILON,
+        "right subtree should be unaffected by left-subtree decay"
+    );
+    assert_invariants(&g);
+}
+
+// ── f64 selective decay q=1 root undecayed ──────────────────────
+
+/// At q = 1.0, the subtree root's own (`d_local` = 0) gets
+/// `att^(1-1) = 1.0` — it should be unchanged.
+#[test]
+fn f64_decay_selective_q1_root_undecayed() {
+    let _t = init_tracing();
+
+    let mut g = make_f64_graph();
+    let root = g.g_root();
+    let root_own_before = g.gnodes().get(root.index()).own;
+
+    g.decay(root, 0.5, 1.0);
+
+    let root_own_after = g.gnodes().get(root.index()).own;
+    assert!(
+        (root_own_before - root_own_after).abs() < f64::EPSILON,
+        "at q=1.0, subtree root own should be unchanged"
+    );
+    assert_invariants(&g);
 }

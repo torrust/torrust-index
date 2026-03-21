@@ -1,13 +1,153 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
+//! Crate tests for **V-Tree rebalancing** (§IDEA M-11).
+//!
+//! These tests exercise every primitive (`max_uncle_intensity`,
+//! `is_violated`, `contract`, `standard_promote`, `skip_promote`),
+//! the top-level `rebalance` loop, and each secondary violation
+//! source (3–10) that can be triggered as a side-effect of a
+//! restructuring step.  Escalation (§IDEA M-11.10) is covered both
+//! for correctness (no residual violations) and for resulting
+//! structure (ADR-M-039).
+//!
+//! All trees are built by hand from `Arena<VNode<u64>>` with explicit
+//! intensities so that violation / non-violation is deterministic and
+//! easy to reason about.
+//!
+//! # Test index
+//!
+//! ## `max_uncle_intensity`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`max_uncle_returns_none_at_depth_0`] | root has no uncle → `None` |
+//! | [`max_uncle_returns_none_at_depth_1`] | depth-1 node has no uncle → `None` |
+//! | [`max_uncle_returns_uncle_intensity_2node`] | 2-node parent returns sibling intensity |
+//! | [`max_uncle_returns_min_uncle_intensity_3node`] | 3-node parent returns **min** of both siblings |
+//!
+//! ## `is_violated`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`not_violated_when_below_uncle`] | intensity < uncle → safe |
+//! | [`violated_when_above_uncle`] | intensity > uncle → violated |
+//! | [`not_violated_when_equal_to_uncle`] | intensity = uncle → safe (not strict) |
+//! | [`violated_3node_grandparent_must_beat_both_uncles`] | 3-node: must exceed **both** uncles to be safe |
+//! | [`violated_3node_grandparent_beats_both`] | 3-node: exceeds both → violated |
+//! | [`no_violation_at_depth_0`] | root is never violated |
+//! | [`no_violation_at_depth_1`] | depth-1 child is never violated |
+//!
+//! ## `contract`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`contract_3node_to_2node`] | 3→2 contraction merges lighter siblings |
+//! | [`contract_isolates_non_first_heaviest`] | heaviest is not first child → still isolated correctly |
+//!
+//! ## `standard_promote`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`standard_promote_explodes_2node`] | 2-node parent replaced by children of violated node + sibling |
+//!
+//! ## `skip_promote`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`skip_promote_elevates_entry`] | entry skip-promoted past parent to grandparent level |
+//!
+//! ## Rebalance loop
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`rebalance_resolves_single_violation`] | single violated node resolved in one pass |
+//! | [`rebalance_empty_queue_is_noop`] | empty queue terminates immediately |
+//! | [`rebalance_skips_destroyed_node`] | deallocated node silently skipped |
+//! | [`rebalance_skips_already_resolved`] | node no longer violated → skipped |
+//! | [`resolve_with_contraction_first`] | 3-node parent: contraction precedes promotion |
+//!
+//! ## Structural ancestor violations
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`structural_node_violated_while_leaves_safe`] | structural node violated while all leaf descendants are safe |
+//! | [`structural_violation_resolved_by_rebalance`] | rebalance resolves structural-only violation |
+//!
+//! ## Source 4: promotion children
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`source_4_promotion_children_necessary`] | without source 4 the violation is missed |
+//! | [`source_4_catches_all_violated_children`] | all newly-violated children are enqueued |
+//! | [`source_4_noop_when_children_safe`] | no false positives when children are safe |
+//!
+//! ## Source 3: contraction grandchildren
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`source_3_contraction_grandchildren_necessary`] | without source 3 the grandchild violation is missed |
+//!
+//! ## `push_contraction_child_violations`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`contraction_child_violations_skips_target`] | target node excluded from its own violation set |
+//! | [`contraction_child_violations_empty_when_target_is_only_violated`] | no siblings violated → empty result |
+//!
+//! ## Escalation (§IDEA M-11.10)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`escalation_direct_breaks_promote_cycle`] | direct heaviest-child violation → skip-promote breaks cycle |
+//! | [`escalation_with_structural_heaviest_child`] | deeper structural heaviest child → cycle broken |
+//! | [`escalation_indirect_child_of_heaviest_violated`] | heaviest safe but its child violated → escalation fires |
+//!
+//! ## Source 7: 2-node collapse children
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`source_7_collapse_children_necessary`] | surviving sibling's children gain new uncle → violation caught |
+//!
+//! ## Source 8: 3→2 transition siblings
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`source_8_three_to_two_transition_necessary`] | remaining siblings re-checked after 3→2 transition |
+//!
+//! ## Source 9: 2-node collapse cousins
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`source_9_collapse_cousins_necessary`] | cousin nodes gain new uncle after collapse → violation caught |
+//!
+//! ## Source 10: g-contraction + promotion grandchildren
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`source_10_g_contraction_promotion_grandchildren_necessary`] | depth-3 grandchild violated after g-contraction + promotion |
+//! | [`source_10_full_rebalance_resolves_all`] | full rebalance resolves source-10 scenario end-to-end |
+//!
+//! ## Source 6: leaf-removal ancestor walk
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`source_6_leaf_removal_ancestors_necessary`] | ancestor intensity drop exposes sibling-subtree violation |
+//!
+//! ## Escalation structure verification (ADR-M-039)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`escalation_direct_resulting_structure`] | post-escalation structure: entries survive with correct intensities |
+//! | [`escalation_structural_heaviest_resulting_structure`] | deeper variant: entry intensities conserved, depth preserved |
+
 use std::sync::atomic::AtomicU32;
 
 use crate::arena::Arena;
 use crate::gnode::GNode;
 use crate::handle::{GNodeId, VNodeId};
 use crate::rebalance::{
-    ViolationSources, contract, find_violated_nodes, is_violated, push_collapse_violations_with_config,
+    ViolationSources, contract, find_violated_nodes, is_violated, max_uncle_intensity, push_collapse_violations_with_config,
     push_contraction_child_violations, push_cousin_violations_with_config, push_leaf_removal_violations_with_config,
     push_promoted_violations_with_config, push_remaining_sibling_violations_with_config, push_side_effect_violations_with_config,
     push_source_10_violations_with_config, rebalance, skip_promote, standard_promote,
@@ -97,20 +237,13 @@ fn make_entry(vnodes: &mut Arena<VNode<u64>>, intensity: u64) -> VNodeId {
     VNodeId::from_index(vnodes.alloc(e))
 }
 
-/// Helper: create a dummy gnodes arena with a terminal G-node at
-/// index 0 so that `resolve` can safely check `is_semi_internal()`.
-fn make_dummy_gnodes() -> Arena<GNode<u64, u64>> {
+/// Helper: create a gnodes arena with a single terminal G-node at
+/// index 0.  Required for tests that call `rebalance` (which
+/// calls `resolve`, which may read `is_semi_internal()`) or
+/// `vtree_remove_leaf`.
+fn make_gnodes() -> Arena<GNode<u64, u64>> {
     let mut gnodes = Arena::new();
-    gnodes.alloc(GNode {
-        lo: 0,
-        hi: 1,
-        sum: 0,
-        own: 0,
-        left: None,
-        right: None,
-        parent: None,
-        entry: None,
-    });
+    gnodes.alloc(GNode::default());
     gnodes
 }
 
@@ -154,12 +287,49 @@ fn make_structural_3(vnodes: &mut Arena<VNode<u64>>, a: VNodeId, b: VNodeId, c: 
     s_id
 }
 
-/// Helper: create a minimal gnodes arena (one dummy entry at index 0).
-/// Required for tests that call `vtree_remove_leaf`.
-fn make_gnodes() -> Arena<GNode<u64, u64>> {
-    let mut gnodes = Arena::new();
-    gnodes.alloc(GNode::default()); // index 0, matches make_entry's dummy GNodeId
-    gnodes
+// ── max_uncle_intensity ─────────────────────────────────────
+
+#[test]
+fn max_uncle_returns_none_at_depth_0() {
+    let mut vnodes = Arena::new();
+    let root = make_entry(&mut vnodes, 100);
+    assert_eq!(max_uncle_intensity(&vnodes, root), None);
+}
+
+#[test]
+fn max_uncle_returns_none_at_depth_1() {
+    let mut vnodes = Arena::new();
+    let a = make_entry(&mut vnodes, 50);
+    let b = make_entry(&mut vnodes, 10);
+    let _root = make_structural_2(&mut vnodes, a, b);
+    assert_eq!(max_uncle_intensity(&vnodes, a), None);
+    assert_eq!(max_uncle_intensity(&vnodes, b), None);
+}
+
+#[test]
+fn max_uncle_returns_uncle_intensity_2node() {
+    let mut vnodes = Arena::new();
+    let c = make_entry(&mut vnodes, 5);
+    let sib = make_entry(&mut vnodes, 3);
+    let uncle = make_entry(&mut vnodes, 20);
+    let p = make_structural_2(&mut vnodes, c, sib);
+    let _g = make_structural_2(&mut vnodes, p, uncle);
+    assert_eq!(max_uncle_intensity(&vnodes, c), Some(20));
+}
+
+#[test]
+fn max_uncle_returns_min_uncle_intensity_3node() {
+    // Under a 3-node grandparent with two uncles, max_uncle returns
+    // the *maximum* uncle intensity.
+    let mut vnodes = Arena::new();
+    let c = make_entry(&mut vnodes, 5);
+    let sib = make_entry(&mut vnodes, 3);
+    let uncle1 = make_entry(&mut vnodes, 20);
+    let uncle2 = make_entry(&mut vnodes, 10);
+    let p = make_structural_2(&mut vnodes, c, sib);
+    let _g = make_structural_3(&mut vnodes, p, uncle1, uncle2);
+    // max uncle = max(20, 10) = 20
+    assert_eq!(max_uncle_intensity(&vnodes, c), Some(20));
 }
 
 // ── is_violated ─────────────────────────────────────────────
@@ -280,6 +450,39 @@ fn contract_3node_to_2node() {
     assert_eq!(vnodes.get(c.index()).parent, Some(m));
 }
 
+#[test]
+#[allow(clippy::many_single_char_names)]
+fn contract_isolates_non_first_heaviest() {
+    // Heaviest child is in the *last* position (not first).
+    // Verifies `heaviest_child_index()` is used correctly.
+    let mut vnodes = Arena::new();
+    let a = make_entry(&mut vnodes, 5);
+    let b = make_entry(&mut vnodes, 10);
+    let c = make_entry(&mut vnodes, 30); // heaviest, last
+    let p = make_structural_3(&mut vnodes, a, b, c);
+
+    let m = contract(&mut vnodes, p);
+
+    // p is now a 2-node: [c(30), m(15)]
+    let p_node = vnodes.get(p.index());
+    if let VKind::Structural { children, .. } = &p_node.kind {
+        assert_eq!(children.len(), 2);
+        // Isolate is c(30), merged is a+b=15.
+        let (iso_id, iso_int) = children.get(0);
+        let (mer_id, mer_int) = children.get(1);
+        assert_eq!(iso_id, c);
+        assert_eq!(iso_int, 30);
+        assert_eq!(mer_id, m);
+        assert_eq!(mer_int, 15);
+    } else {
+        panic!("expected structural");
+    }
+
+    // a and b are now children of the merged node.
+    assert_eq!(vnodes.get(a.index()).parent, Some(m));
+    assert_eq!(vnodes.get(b.index()).parent, Some(m));
+}
+
 // ── standard_promote ────────────────────────────────────────
 
 #[test]
@@ -335,7 +538,7 @@ fn skip_promote_elevates_entry() {
 #[test]
 fn rebalance_resolves_single_violation() {
     let mut vnodes = Arena::new();
-    let mut gnodes = make_dummy_gnodes();
+    let mut gnodes = make_gnodes();
     let c = make_entry(&mut vnodes, 25);
     let s = make_entry(&mut vnodes, 3);
     let uncle = make_entry(&mut vnodes, 10);
@@ -352,7 +555,7 @@ fn rebalance_resolves_single_violation() {
 #[test]
 fn rebalance_empty_queue_is_noop() {
     let mut vnodes: Arena<VNode<u64>> = Arena::new();
-    let mut gnodes = make_dummy_gnodes();
+    let mut gnodes = make_gnodes();
     let mut violations = vec![];
     rebalance(&mut vnodes, &mut gnodes, &mut violations, u32::MAX);
     assert!(violations.is_empty());
@@ -361,7 +564,7 @@ fn rebalance_empty_queue_is_noop() {
 #[test]
 fn rebalance_skips_destroyed_node() {
     let mut vnodes = Arena::new();
-    let mut gnodes = make_dummy_gnodes();
+    let mut gnodes = make_gnodes();
     let e = make_entry(&mut vnodes, 10);
     vnodes.dealloc(e.index());
 
@@ -373,7 +576,7 @@ fn rebalance_skips_destroyed_node() {
 #[test]
 fn rebalance_skips_already_resolved() {
     let mut vnodes = Arena::new();
-    let mut gnodes = make_dummy_gnodes();
+    let mut gnodes = make_gnodes();
     let c = make_entry(&mut vnodes, 5);
     let s = make_entry(&mut vnodes, 3);
     let uncle = make_entry(&mut vnodes, 10);
@@ -388,7 +591,7 @@ fn rebalance_skips_already_resolved() {
 #[test]
 fn resolve_with_contraction_first() {
     let mut vnodes = Arena::new();
-    let mut gnodes = make_dummy_gnodes();
+    let mut gnodes = make_gnodes();
     let c = make_entry(&mut vnodes, 25);
     let sib1 = make_entry(&mut vnodes, 3);
     let sib2 = make_entry(&mut vnodes, 2);
@@ -444,7 +647,7 @@ fn structural_node_violated_while_leaves_safe() {
 fn structural_violation_resolved_by_rebalance() {
     // Same tree as above — verify rebalance resolves it.
     let mut vnodes = Arena::new();
-    let mut gnodes = make_dummy_gnodes();
+    let mut gnodes = make_gnodes();
     let e1 = make_entry(&mut vnodes, 6);
     let e2 = make_entry(&mut vnodes, 3);
     let uncle_g = make_entry(&mut vnodes, 8);
@@ -654,7 +857,7 @@ fn escalation_direct_breaks_promote_cycle() {
     // With escalation: detects c1(20) > uncle_g(8) immediately
     // after standard_promote, escalates to skip_promote past p.
     let mut vnodes = Arena::new();
-    let mut gnodes = make_dummy_gnodes();
+    let mut gnodes = make_gnodes();
     let c1 = make_entry(&mut vnodes, 20);
     let c2 = make_entry(&mut vnodes, 10);
     let sib = make_entry(&mut vnodes, 4);
@@ -704,7 +907,7 @@ fn escalation_with_structural_heaviest_child() {
     //
     // Escalation breaks this by skip-promoting h past p.
     let mut vnodes = Arena::new();
-    let mut gnodes = make_dummy_gnodes();
+    let mut gnodes = make_gnodes();
     let h1 = make_entry(&mut vnodes, 20);
     let h2 = make_entry(&mut vnodes, 8);
     let light = make_entry(&mut vnodes, 4);
@@ -750,7 +953,7 @@ fn escalation_indirect_child_of_heaviest_violated() {
     //
     // Escalation detects this indirect variant.
     let mut vnodes = Arena::new();
-    let mut gnodes = make_dummy_gnodes();
+    let mut gnodes = make_gnodes();
     let h1 = make_entry(&mut vnodes, 12);
     let h2 = make_entry(&mut vnodes, 6);
     let light = make_entry(&mut vnodes, 3);
@@ -1026,7 +1229,7 @@ fn source_10_g_contraction_promotion_grandchildren_necessary() {
 #[test]
 fn source_10_full_rebalance_resolves_all() {
     let mut vnodes = Arena::new();
-    let mut gnodes = make_dummy_gnodes();
+    let mut gnodes = make_gnodes();
 
     // Post-promotion tree (manually constructed, same as unit test):
     //
@@ -1058,4 +1261,183 @@ fn source_10_full_rebalance_resolves_all() {
         remaining.is_empty(),
         "full rebalance should resolve all violations including source-10, remaining: {remaining:?}"
     );
+}
+
+// ── Source 6: leaf-removal ancestor walk (§IDEA M-11.11.3) ──────────
+//
+// When a leaf is removed, ancestor intensities decrease.  Nodes in
+// sibling subtrees that were previously shielded by the removed leaf's
+// high ancestor intensity may become violated.  The ancestor walk in
+// `push_leaf_removal_violations` must catch them.
+//
+//   root(2-node: [left, right])
+//     left(2-node: [p, uncle_left(3)])
+//       p(2-node: [victim(100), survivor(2)])
+//     right(2-node: [x1(6), x2(1)])
+//
+// Before: x1(6) ≤ left(105) → safe (left is uncle of x1).
+// After removing victim: p collapses, survivor replaces p in left.
+//   left = (2-node: [survivor(2), uncle_left(3)]) → int = 5.
+// Now x1(6) > left(5) → VIOLATED.
+//
+// Source 6 walks upward from left to root, checking siblings'
+// children at each level.  At root, sibling right has children
+// x1, x2 — source 6 finds x1(6) > left(5) → pushes x1.
+
+#[test]
+fn source_6_leaf_removal_ancestors_necessary() {
+    let mut vnodes = Arena::new();
+    let mut gnodes = make_gnodes();
+
+    let victim = make_entry(&mut vnodes, 100);
+    let survivor = make_entry(&mut vnodes, 2);
+    let uncle_left = make_entry(&mut vnodes, 3);
+    let x1 = make_entry(&mut vnodes, 6);
+    let x2 = make_entry(&mut vnodes, 1);
+    let p = make_structural_2(&mut vnodes, victim, survivor);
+    let left = make_structural_2(&mut vnodes, p, uncle_left);
+    let right = make_structural_2(&mut vnodes, x1, x2);
+    let root = make_structural_2(&mut vnodes, left, right);
+
+    // Sanity: x1(6) ≤ left(105) → safe before removal.
+    assert!(!is_violated(&vnodes, x1), "x1(6) ≤ left(105) should be safe before removal");
+
+    // Remove victim; p collapses, left.int drops from 105 to 5.
+    let new_root = vtree_remove_leaf(&mut vnodes, &mut gnodes, victim, Some(root));
+    assert_eq!(new_root, Some(root));
+
+    // x1(6) > left(5) → VIOLATED after removal.
+    assert!(is_violated(&vnodes, x1), "x1(6) > left(5) should be violated after removal");
+
+    // ── Part 1: Without source 6, violation NOT caught ──
+    let mut violations = Vec::new();
+    push_leaf_removal_violations_with_config(&vnodes, left, &mut violations, ViolationSources::all_disabled());
+    assert!(!violations.contains(&x1), "source 6 disabled: x1 should NOT be caught");
+
+    // Source 7 also doesn't catch it (collapse checks survivor's children, not cousins).
+    push_collapse_violations_with_config(&vnodes, survivor, &mut violations, ViolationSources::only_source_7());
+    assert!(
+        !violations.contains(&x1),
+        "source 7 should NOT catch ancestor-walk violations"
+    );
+
+    // ── Part 2: With only source 6, violation IS caught ──
+    violations.clear();
+    push_leaf_removal_violations_with_config(&vnodes, left, &mut violations, ViolationSources::only_source_6());
+    assert!(
+        violations.contains(&x1),
+        "source 6 enabled: x1 SHOULD be caught, got: {violations:?}"
+    );
+    assert!(!violations.contains(&x2), "x2(1) ≤ left(5) should not be pushed");
+}
+
+// ── D6: Escalation post-promote structure verification (ADR-M-039) ──
+//
+// Existing escalation tests verify "no violations remain". These
+// additionally verify the *resulting V-Tree structure* to catch
+// mutations that resolve violations via a wrong restructuring path.
+
+/// After escalation on a direct violation, the heaviest child `h`
+/// must have been skip-promoted past `p`. Verify that `h` ends up
+/// as a child of `g` (or higher) — not still under `p`.
+#[test]
+fn escalation_direct_resulting_structure() {
+    // Same topology as `escalation_direct_breaks_promote_cycle`:
+    //
+    //   gg(2-node: [g, uncle_gg(40)])
+    //     g(2-node: [p, uncle_g(8)])
+    //       p(2-node: [c, sib(4)])
+    //         c(2-node: [c1(20), c2(10)])
+    let mut vnodes = Arena::new();
+    let mut gnodes = make_gnodes();
+    let c1 = make_entry(&mut vnodes, 20);
+    let c2 = make_entry(&mut vnodes, 10);
+    let sib = make_entry(&mut vnodes, 4);
+    let uncle_g = make_entry(&mut vnodes, 8);
+    let uncle_gg = make_entry(&mut vnodes, 40);
+    let c = make_structural_2(&mut vnodes, c1, c2);
+    let p = make_structural_2(&mut vnodes, c, sib);
+    let g = make_structural_2(&mut vnodes, p, uncle_g);
+    let _gg = make_structural_2(&mut vnodes, g, uncle_gg);
+
+    let mut violations = vec![c];
+    rebalance(&mut vnodes, &mut gnodes, &mut violations, u32::MAX);
+
+    // Post-rebalance: no violations, and c1's intensity is preserved.
+    let remaining = find_violated_nodes(&vnodes);
+    assert!(remaining.is_empty(), "should have no violations: {remaining:?}");
+
+    // c1 must still be live and have its original intensity.
+    assert!(vnodes.is_occupied(c1.index()), "c1 entry must still be live after escalation");
+    assert_eq!(vnodes.get(c1.index()).intensity, 20, "c1 intensity must be preserved");
+
+    // c2 must also be live with its intensity.
+    assert!(vnodes.is_occupied(c2.index()), "c2 entry must still be live after escalation");
+    assert_eq!(vnodes.get(c2.index()).intensity, 10, "c2 intensity must be preserved");
+
+    // All original entry intensities must be conserved (sum = 20 + 10 + 4 + 8 + 40 = 82).
+    let total: u64 = [c1, c2, sib, uncle_g, uncle_gg]
+        .iter()
+        .filter(|id| vnodes.is_occupied(id.index()))
+        .map(|id| vnodes.get(id.index()).intensity)
+        .sum();
+    assert_eq!(total, 82, "total entry intensities must be conserved");
+}
+
+/// After escalation on the deeper structural-heaviest-child variant,
+/// verify that all original entries survive with their intensities.
+#[test]
+fn escalation_structural_heaviest_resulting_structure() {
+    // Same topology as `escalation_with_structural_heaviest_child`:
+    //
+    //   gg(2-node: [g, uncle_gg(40)])
+    //     g(2-node: [p, uncle_g(10)])
+    //       p(2-node: [c, sib(5)])
+    //         c(2-node: [h, light(4)])
+    //           h(2-node: [h1(20), h2(8)])
+    let mut vnodes = Arena::new();
+    let mut gnodes = make_gnodes();
+    let h1 = make_entry(&mut vnodes, 20);
+    let h2 = make_entry(&mut vnodes, 8);
+    let light = make_entry(&mut vnodes, 4);
+    let sib = make_entry(&mut vnodes, 5);
+    let uncle_g = make_entry(&mut vnodes, 10);
+    let uncle_gg = make_entry(&mut vnodes, 40);
+    let h = make_structural_2(&mut vnodes, h1, h2);
+    let c = make_structural_2(&mut vnodes, h, light);
+    let p = make_structural_2(&mut vnodes, c, sib);
+    let g = make_structural_2(&mut vnodes, p, uncle_g);
+    let _gg = make_structural_2(&mut vnodes, g, uncle_gg);
+
+    let mut violations = vec![c];
+    rebalance(&mut vnodes, &mut gnodes, &mut violations, u32::MAX);
+
+    let remaining = find_violated_nodes(&vnodes);
+    assert!(remaining.is_empty(), "should have no violations: {remaining:?}");
+
+    // Every original entry must be live with intensity preserved.
+    let entries = [(h1, 20u64), (h2, 8), (light, 4), (sib, 5), (uncle_g, 10), (uncle_gg, 40)];
+    for (id, expected) in &entries {
+        assert!(vnodes.is_occupied(id.index()), "entry {id:?} must be live after escalation");
+        assert_eq!(
+            vnodes.get(id.index()).intensity,
+            *expected,
+            "entry {id:?} intensity must be preserved"
+        );
+    }
+
+    // Total intensity conserved.
+    let total: u64 = entries.iter().map(|(_, v)| v).sum();
+    let actual_total: u64 = entries.iter().map(|(id, _)| vnodes.get(id.index()).intensity).sum();
+    assert_eq!(actual_total, total, "total entry intensities must be conserved");
+
+    // h1 must NOT be a direct child of gg (it was skip-promoted, but not THAT far).
+    // Verify h1 is at depth ≥ 2 (below gg).
+    let mut depth = 0u32;
+    let mut cursor = vnodes.get(h1.index()).parent;
+    while let Some(p) = cursor {
+        depth += 1;
+        cursor = vnodes.get(p.index()).parent;
+    }
+    assert!(depth >= 2, "h1 should be at depth >= 2 in the V-tree, got {depth}");
 }

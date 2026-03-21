@@ -20,15 +20,15 @@ depth bound)
 The formal specification (idea.md) and api.md document asymptotic
 costs for every public operation:
 
-| Operation     | Claimed cost                     | Source                   |
-| ------------- | -------------------------------- | ------------------------ |
-| `get()`       | $O(\text{depth})$                | §API M-5.2              |
-| `range_sum()` | $O(N)$                           | §API M-5.2              |
+| Operation     | Claimed cost                     | Source                 |
+| ------------- | -------------------------------- | ---------------------- |
+| `get()`       | $O(\text{depth})$                | §API M-5.2             |
+| `range_sum()` | $O(N)$                           | §API M-5.2             |
 | `sample()`    | $O(1.44\,H + 1.67)$              | §API M-5.2, §IDEA M-18 |
-| `extract()`   | $O(L + S)$                       | §API M-5.2              |
-| `plateaus()`  | $O(1)$ borrowed / $O(G)$ rebuilt | §API M-5.2              |
-| `observe()`   | $O(\text{depth})$ amortised      | §IDEA M-8               |
-| `decay()`     | $O(G_{\text{subtree}})$          | §IDEA M-14              |
+| `extract()`   | $O(L + S)$                       | §API M-5.2             |
+| `plateaus()`  | $O(1)$ borrowed / $O(G)$ rebuilt | §API M-5.2             |
+| `observe()`   | $O(\text{depth})$ amortised      | §IDEA M-8              |
+| `decay()`     | $O(G_{\text{subtree}})$          | §IDEA M-14             |
 
 These bounds are proven formally but have never been validated
 empirically. Without benchmarks we cannot:

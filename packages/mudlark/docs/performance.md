@@ -34,7 +34,7 @@ are included as Phase 8 cliff-detection probes.
 | Operation                  | Latency            | Conditions                                              |
 | -------------------------- | ------------------ | ------------------------------------------------------- |
 | `plateaus()` borrow        | **2.6–2.9 ns**     | Any graph size. $O(1)$ with `dynamic-contour-tracking`. |
-| `get(x)` point query       | **14–22 ns**       | 100–10K observations. $O(\log P)$.                      |
+| `get(x)` point query       | **14–22 ns**       | 100–10K observations. $O(d_{\text{geo}})$, at most $O(N)$. |
 | `sample()` — hotspot       | **10 ns**          | Concentrated distribution (near-zero entropy).          |
 | `sample()` — uniform       | **126 ns**         | Maximum entropy (uniform spread, 5K obs).               |
 | `range_sum(a..b)`          | **3–77 ns**        | Full-domain to narrow-range.                            |
@@ -98,8 +98,9 @@ smaller.
 
 ### 4.1 Point query — `get(x)`
 
-**Design claim:** $O(\log P)$ where $P$ is the plateau count
-(floor-key lookup in the plateau `BTreeMap`).
+**Design claim:** $O(d_{\text{geo}})$, at most $O(N)$ — G-Tree descent
+via `route_to_receiver` (§IDEA M-5.2). The near-zero scaling exponents
+reflect $d_{\text{geo}} \leq N = 8$ in the benchmark configuration.
 
 | Graph size | Latency |
 | ---------- | ------- |
@@ -496,20 +497,20 @@ floating-point arithmetic overhead from the depth effect.
 
 ## 10. Claims scorecard
 
-| #   | Claim                                        | Source         | Verdict                                                 |
-| --- | -------------------------------------------- | -------------- | ------------------------------------------------------- |
+| #   | Claim                                        | Source        | Verdict                                                 |
+| --- | -------------------------------------------- | ------------- | ------------------------------------------------------- |
 | 1   | $O(d_\text{geo})$ amortised observe          | §IDEA M-18.9  | **Confirmed**                                           |
 | 2   | $O(1.44\,H + 1.67)$ entropy-optimal sampling | §IDEA M-18.2  | **Confirmed**                                           |
-| 3   | $O(\log P)$ point query                      | §IDEA M-5.6.5 | **Confirmed**                                           |
+| 3   | $O(d_{\text{geo}})$ point query (at most $O(N)$) | §IDEA M-5.2    | **Confirmed**                                           |
 | 4   | $O(1)$ plateau borrow                        | §API M-3.3    | **Confirmed**                                           |
 | 5   | $O(N)$ range sum                             | §IDEA M-4.6   | **Confirmed**                                           |
 | 6   | $O(\lvert G\rvert)$ decay                    | §IDEA M-18.9  | Nuanced — selective path sub-linear; full-tree untested |
-| 7   | Selectivity monotone with $q$                | bench plan §5  | Not confirmed — walk cost dominates                     |
+| 7   | Selectivity monotone with $q$                | bench plan §5 | Not confirmed — walk cost dominates                     |
 | 8   | $O(E_t + S_t)$ eviction scan                 | §IDEA M-12.2  | **Confirmed** — budget-gated                            |
-| 9   | Cold start faster than steady                | bench plan §5  | **Confirmed** — 6–13× faster                            |
-| 10  | Left ≈ right symmetry                        | bench plan §7  | **Confirmed** — ≤27% gap, 8% at scale                   |
-| 11  | f64 within 2× of u64                         | bench plan §8  | Partial — reads OK, mutations 1.2–12.8×                 |
-| 12  | Budget sub-linear cost growth                | bench plan §5  | Nuanced — non-monotone, ratio-dependent                 |
+| 9   | Cold start faster than steady                | bench plan §5 | **Confirmed** — 6–13× faster                            |
+| 10  | Left ≈ right symmetry                        | bench plan §7 | **Confirmed** — ≤27% gap, 8% at scale                   |
+| 11  | f64 within 2× of u64                         | bench plan §8 | Partial — reads OK, mutations 1.2–12.8×                 |
+| 12  | Budget sub-linear cost growth                | bench plan §5 | Nuanced — non-monotone, ratio-dependent                 |
 
 ---
 

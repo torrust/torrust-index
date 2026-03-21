@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2026-03-20
+## [1.0.0] - 2026-03-21
 
 Initial stable release. The public API surface documented in
 [docs/api.md](docs/api.md) is covered by semver guarantees from
@@ -70,8 +70,8 @@ Initial stable release. The public API surface documented in
   builder, and RNG stubs in the `testing` module.
 - **143 Criterion benchmarks** across six families (observe, query,
   extract, lifecycle, spray, pathological).
-- **868 tests** (346 unit, 415 integration, 107 doc-tests).
-- **37 architecture decision records** in `adr/`.
+- **1315 tests** (651 unit, 543 integration, 121 doc-tests).
+- **38 architecture decision records** in `adr/`.
 - **Full documentation** — `idea.md` (formal spec), `api.md`,
   `architecture.md`, `performance.md`, `testing.md`, `theory.md`.
 

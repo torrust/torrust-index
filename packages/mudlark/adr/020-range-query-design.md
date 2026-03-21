@@ -107,13 +107,13 @@ implementations panic, so callers must use bound forms that avoid
 
 **DC-020-2: Option D — NaN panics, out-of-range clamps.**
 
-| Input                                   | Behaviour                                                    |
-| --------------------------------------- | ------------------------------------------------------------ |
+| Input                                   | Behaviour                                                   |
+| --------------------------------------- | ----------------------------------------------------------- |
 | NaN (either bound)                      | **Panic.** Programmer error, same convention as §API M-7.1. |
-| Negative / below `C::zero()`            | Clamp to `C::zero()`.                                        |
-| Above `C::domain_max(N)`                | Clamp to `C::domain_max(N)`.                                 |
-| ±∞                                      | Clamp to domain bounds (falls out of the above rules).       |
-| Empty range after clamping (`lo >= hi`) | Return `V::zero()`.                                          |
+| Negative / below `C::zero()`            | Clamp to `C::zero()`.                                       |
+| Above `C::domain_max(N)`                | Clamp to `C::domain_max(N)`.                                |
+| ±∞                                      | Clamp to domain bounds (falls out of the above rules).      |
+| Empty range after clamping (`lo >= hi`) | Return `V::zero()`.                                         |
 
 Rationale:
 

@@ -18,13 +18,38 @@
 //! - **Ghost detection** — a node at `intensity = -3.0` is less
 //!   important than `zero()` but is not detected as a ghost.
 //!
-//! ## Debug vs release behaviour
+//! # Debug vs release behaviour
 //!
 //! `observe()` contains a `debug_assert!` that catches negative
 //! accumulations in debug builds (ADR-M-033).  In debug mode the
 //! tests verify the guard fires; in release mode the guard is
 //! stripped and the tests exercise the downstream semantic breakage
 //! that results from unchecked negative values.
+//!
+//! # Test index
+//!
+//! ## Debug-mode (P2 guard)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`debug_first_observation_negative_panics`] | P2 guard fires on negative cold-start observation |
+//! | [`debug_observe_negative_panics_with_p2_message`] | P2 guard fires when accumulation goes negative |
+//! | [`debug_negative_after_splits_panics_before_rebalance`] | P2 guard fires even in a structured tree |
+//! | [`debug_exact_cancellation_to_zero_does_not_panic`] | Exact cancellation to zero is NOT a P2 violation |
+//!
+//! ## Release-mode (downstream breakage)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`release_first_observation_negative_goes_below_zero`] | Cold-start negative drives total below zero |
+//! | [`release_observe_negative_delta_goes_below_zero`] | Negative delta after positive drives below zero |
+//! | [`release_exact_cancellation_to_zero`] | Exact cancellation yields zero total |
+//! | [`release_negative_delta_causes_irresolvable_violations`] | Irresolvable V-I3 violations from negative intensity |
+//! | [`release_sample_with_mixed_sign_children`] | Sampling from incoherent probability weights |
+//! | [`release_negative_intensity_not_detected_as_ghost`] | Below-ground intensity not flagged as ghost |
+//! | [`release_catalytic_split_not_violation_free_with_negative_entries`] | Splits not violation-free with negative entries |
+//! | [`release_g_i1_summation_holds_with_negative_deltas`] | G-I1 (algebraic summation) holds regardless of sign |
+//! | [`release_total_sum_is_algebraic_sum_of_deltas`] | `total_sum()` tracks algebraic sum of all deltas |
 
 mod support;
 
@@ -33,20 +58,11 @@ use std::panic;
 #[cfg(not(debug_assertions))]
 use support::FixedRng;
 #[cfg(not(debug_assertions))]
+use torrust_mudlark::Config;
+use torrust_mudlark::GvGraph;
+#[cfg(not(debug_assertions))]
 use torrust_mudlark::invariants::check_all_invariants;
-use torrust_mudlark::{Config, GvGraph};
-
-/// Config for `GvGraph<u64, f64, 8>` (domain `[0, 256)`).
-const fn f64_config() -> Config<f64> {
-    Config {
-        split_threshold: 5.0,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
-    }
-}
+use torrust_mudlark::testing::f64_default_config;
 
 /// Extract a panic payload as a `&str` (covers both `String` and `&str`).
 fn panic_message(payload: &Box<dyn std::any::Any + Send>) -> &str {
@@ -62,12 +78,26 @@ fn panic_message(payload: &Box<dyn std::any::Any + Send>) -> &str {
 // ═══════════════════════════════════════════════════════════════
 
 /// The `debug_assert!` in `observe()` catches a negative
+/// accumulation when the very first delta is negative (cold start).
+#[test]
+#[cfg(debug_assertions)]
+fn debug_first_observation_negative_panics() {
+    let result = panic::catch_unwind(|| {
+        let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_default_config());
+        g.observe(42u64, -1.0_f64);
+    });
+
+    let err = result.expect_err("should panic in debug mode");
+    assert!(panic_message(&err).contains("P2 violation"));
+}
+
+/// The `debug_assert!` in `observe()` catches a negative
 /// accumulation and panics with a "P2 violation" message.
 #[test]
 #[cfg(debug_assertions)]
 fn debug_observe_negative_panics_with_p2_message() {
     let result = panic::catch_unwind(|| {
-        let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_config());
+        let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_default_config());
         g.observe(42u64, 10.0_f64);
         // This drives own to -5.0 → P2 violation.
         g.observe(42u64, -15.0_f64);
@@ -87,7 +117,7 @@ fn debug_observe_negative_panics_with_p2_message() {
 #[cfg(debug_assertions)]
 fn debug_negative_after_splits_panics_before_rebalance() {
     let result = panic::catch_unwind(|| {
-        let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_config());
+        let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_default_config());
         for _ in 0..20 {
             g.observe(42u64, 10.0_f64);
         }
@@ -100,22 +130,70 @@ fn debug_negative_after_splits_panics_before_rebalance() {
     assert!(panic_message(&err).contains("P2 violation"));
 }
 
+/// Exact cancellation to zero is NOT a P2 violation:
+/// `zero() = 0.0 <= 0.0` holds, so the guard must not fire.
+///
+/// Values stay below `split_threshold` (5.0) to ensure both
+/// observations hit the same G-node.
+#[test]
+#[cfg(debug_assertions)]
+fn debug_exact_cancellation_to_zero_does_not_panic() {
+    let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_default_config());
+    g.observe(42u64, 4.0_f64);
+    g.observe(42u64, -4.0_f64);
+
+    let cell = g.get(42u64);
+    assert!(
+        cell.intensity.abs() < f64::EPSILON,
+        "intensity should be ~0.0, got: {}",
+        cell.intensity
+    );
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Release-mode tests: the guard is stripped — exercise downstream
 // semantic breakage
 // ═══════════════════════════════════════════════════════════════
 
+/// Cold start: the very first observation is negative, driving
+/// the accumulator below zero immediately.
+#[test]
+#[cfg(not(debug_assertions))]
+fn release_first_observation_negative_goes_below_zero() {
+    let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_default_config());
+    g.observe(42u64, -5.0_f64);
+
+    assert!(g.total_sum() < 0.0, "total_sum should be negative: {}", g.total_sum());
+    let cell = g.get(42u64);
+    assert!(cell.intensity < 0.0, "intensity should be negative: {}", cell.intensity);
+}
+
 /// Negative delta drives the accumulator below zero.
 #[test]
 #[cfg(not(debug_assertions))]
 fn release_observe_negative_delta_goes_below_zero() {
-    let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_config());
+    let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_default_config());
 
     g.observe(42u64, 10.0_f64);
     assert!((g.total_sum() - 10.0).abs() < f64::EPSILON);
 
     g.observe(42u64, -15.0_f64);
     assert!(g.total_sum() < 0.0, "total_sum should be negative: {}", g.total_sum());
+}
+
+/// Exact cancellation: positive then equal negate yields zero.
+#[test]
+#[cfg(not(debug_assertions))]
+fn release_exact_cancellation_to_zero() {
+    let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_default_config());
+    g.observe(42u64, 10.0_f64);
+    g.observe(42u64, -10.0_f64);
+
+    assert!(
+        g.total_sum().abs() < f64::EPSILON,
+        "total_sum should be ~0.0 after exact cancellation: {}",
+        g.total_sum()
+    );
 }
 
 /// After building structure, a negative delta can create
@@ -125,7 +203,7 @@ fn release_observe_negative_delta_goes_below_zero() {
 #[cfg(not(debug_assertions))]
 fn release_negative_delta_causes_irresolvable_violations() {
     let result = panic::catch_unwind(|| {
-        let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_config());
+        let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_default_config());
         for _ in 0..20 {
             g.observe(42u64, 10.0_f64);
         }
@@ -205,7 +283,7 @@ fn release_sample_with_mixed_sign_children() {
 #[test]
 #[cfg(not(debug_assertions))]
 fn release_negative_intensity_not_detected_as_ghost() {
-    let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_config());
+    let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_default_config());
 
     g.observe(42u64, 3.0_f64);
     g.observe(42u64, -6.0_f64);
@@ -257,7 +335,7 @@ fn release_catalytic_split_not_violation_free_with_negative_entries() {
 #[test]
 #[cfg(not(debug_assertions))]
 fn release_g_i1_summation_holds_with_negative_deltas() {
-    let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_config());
+    let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_default_config());
 
     for i in 0..50 {
         let delta = if i % 3 == 0 { -2.0_f64 } else { 3.0_f64 };
@@ -273,7 +351,7 @@ fn release_g_i1_summation_holds_with_negative_deltas() {
 #[test]
 #[cfg(not(debug_assertions))]
 fn release_total_sum_is_algebraic_sum_of_deltas() {
-    let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_config());
+    let mut g: GvGraph<u64, f64, 8> = GvGraph::new(f64_default_config());
 
     let deltas = [10.0, -3.0, 7.0, -15.0, 1.0, 4.0, -2.0];
     let expected: f64 = deltas.iter().sum();

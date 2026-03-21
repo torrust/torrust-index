@@ -108,16 +108,33 @@ Methods: `width() -> C`.
 
 #### `Cell<C, V>` — `Copy`
 
-Snapshot of a contour cell — either a terminal G-node (leaf) or the
-uncovered half of a semi-internal G-node. Returned by `get()`,
-`sample()`.
+Snapshot of a single G-node's directly-accumulated energy.
+Returned by `get()` and `sample()`.
 
-For terminals, the interval is the full G-node range and
-`intensity` equals both `g.own` and `g.sum`. For semi-internals,
-the interval is narrowed to the uncovered half and `intensity` is
-`g.own` — the node's direct accumulation (pre-split + absorbed +
-post-eviction observations routed to the vacated half; see
-§IDEA M-5.5.1).
+The typical case is a **contour cell** — a terminal G-node or the
+uncovered half of a semi-internal G-node. However, `sample()` can
+also land on an **internal** G-node whose V-entry still carries
+frozen pre-split intensity (see [ADR-M-019] and §IDEA M-6.5).
+
+| G-node state   | Interval                | `intensity`        |
+| -------------- | ----------------------- | ------------------ |
+| Terminal       | full `[lo, hi)`         | `g.own` (= `g.sum`) |
+| Semi-internal  | uncovered half only     | `g.own`            |
+| Internal       | full `[lo, hi)`         | `g.own` (frozen)   |
+
+For semi-internals the interval is narrowed to the uncovered half
+and `intensity` is the node's direct accumulation (pre-split +
+absorbed + post-eviction observations routed to the vacated half;
+see §IDEA M-5.5.1). For internals, both halves have children so
+no narrowing occurs; `intensity` is the frozen baseline from before
+the split.
+
+`get()` routes through the G-Tree, so it always reaches a terminal
+or semi-internal node — never an internal one. `sample()` walks
+the V-Tree, where an internal G-node's V-entry persists with
+its frozen `g.own` weight.
+
+[ADR-M-019]: ../adr/019-sampling-semantics.md
 
 ```rust
 pub struct Cell<C: Coordinate, V: Accumulator> {
@@ -148,20 +165,20 @@ Methods: `to_span() -> Span`, `width() -> C`, `is_final(n: u32) -> bool`.
 > abstraction boundary working as intended." Here is the full picture.
 >
 > **Three vocabularies, not two.** Surface 1 types actually use
-> *three* naming conventions for the same underlying G-node accumulators:
+> _three_ naming conventions for the same underlying G-node accumulators:
 >
-> | Vocabulary     | Types using it                | `g.own` name  | `g.sum` name       |
-> |----------------|-------------------------------|----------------|---------------------|
-> | Measurement    | `Cell`, `Span`, `Terminal`    | `intensity`    | (absent or equal)   |
-> | Tree-accounting| `Node`, `BasisElement`        | `own`          | `sum`               |
-> | Signal-processing | `Transition`               | `baseline`     | `total`             |
+> | Vocabulary        | Types using it             | `g.own` name | `g.sum` name      |
+> | ----------------- | -------------------------- | ------------ | ----------------- |
+> | Measurement       | `Cell`, `Span`, `Terminal` | `intensity`  | (absent or equal) |
+> | Tree-accounting   | `Node`, `BasisElement`     | `own`        | `sum`             |
+> | Signal-processing | `Transition`               | `baseline`   | `total`           |
 >
 > Each vocabulary serves its consumer. A `Cell` from `get()` or
-> `sample()` is a *reading* — you point at a spot and get back a
+> `sample()` is a _reading_ — you point at a spot and get back a
 > number; "intensity" is the natural name. A `Node` from `layers()`
-> is a *ledger entry* — you see the full double-entry bookkeeping of
+> is a _ledger entry_ — you see the full double-entry bookkeeping of
 > a tree node; `own`/`sum` are the natural names. A `Transition`
-> from `extract()` is a *phase boundary* in the significance
+> from `extract()` is a _phase boundary_ in the significance
 > hierarchy — "baseline" (pre-subdivision energy) and "total"
 > (inclusive of refinement) describe the spectral decomposition.
 > These are not inconsistencies; they are domain-appropriate names
@@ -169,28 +186,26 @@ Methods: `to_span() -> Span`, `width() -> C`, `is_final(n: u32) -> bool`.
 >
 > **Why the doc-comment-only approach is correct.**
 >
-> 1. *Adding `sum` to `Cell` would be spatially misleading.* For
+> 1. _Adding `sum` to `Cell` would be spatially misleading._ For
 >    terminal cells, `sum == own == intensity` — the field is
 >    redundant. For semi-internal contour cells (the uncovered half),
->    `g.sum` covers `[g.lo, g.hi)` — the *full* node range including
+>    `g.sum` covers `[g.lo, g.hi)` — the _full_ node range including
 >    the surviving child's territory — while `Cell.start..Cell.end`
 >    covers only the uncovered half. Exposing `sum` on a struct whose
 >    spatial extent doesn't match what `sum` aggregates would be a
 >    footgun disguised as helpfulness. The existing `Transition` type
 >    gets away with carrying `total` (= `g.sum`) because its
->    `start..end` *is* the full `[g.lo, g.hi)` and its entire purpose
+>    `start..end` _is_ the full `[g.lo, g.hi)` and its entire purpose
 >    is to describe the full-node energy decomposition.
->
-> 2. *Renaming `intensity` → `own` would infect measurement types
->    with tree internals.* `Cell`, `Span`, and `Terminal` are
+> 2. _Renaming `intensity` → `own` would infect measurement types
+>    with tree internals._ `Cell`, `Span`, and `Terminal` are
 >    "prints" — lightweight, detached measurements that don't know
 >    about the tree. The name `own` implies a complementary `sum`
 >    (a partnership the type cannot fulfil), and would make
 >    `Cell::to_span()` a semantic no-op that just renames `own` back
 >    to `intensity` — a signal to API consumers that the naming is
 >    incoherent, not that they're crossing an abstraction boundary.
->
-> 3. *A shared vocabulary would flatten two useful levels.* The
+> 3. _A shared vocabulary would flatten two useful levels._ The
 >    `Cell` ↔ `Node` boundary is the Surface 1 ↔ Surface 1 analogue
 >    of the Print ↔ Emulsion boundary — both expose fields of the
 >    same underlying G-node, but one is a user-facing measurement and
@@ -200,8 +215,7 @@ Methods: `to_span() -> Span`, `width() -> C`, `is_final(n: u32) -> bool`.
 >    don't care about the tree) or strip the accounting distinction
 >    from `Node` (bad for `layers()` consumers who need `own`/`sum`
 >    decomposition).
->
-> 4. *Adding `gnode_id` to `Cell` violates its design.* `Cell` is a
+> 4. _Adding `gnode_id` to `Cell` violates its design._ `Cell` is a
 >    handle-free, graph-detached measurement. Adding an arena handle
 >    would couple it back to the graph — defeating the "no borrow,
 >    no identity" guarantee that makes `Cell` safe to store, send,
@@ -216,14 +230,12 @@ Methods: `to_span() -> Span`, `width() -> C`, `is_final(n: u32) -> bool`.
 >   different abstraction levels). The existing comment already
 >   mentions `g.own` and `g.sum` — the gap is the inter-type
 >   cross-reference, not the raw explanation.
->
 > - `Node::to_cell()`: the existing rustdoc and this api.md spec
 >   already explain the `Terminal`-only restriction and the
 >   semi-internal trimming gap (see the paragraph below the `Node`
->   methods list). The proposed doc comment is a *tightening* that
+>   methods list). The proposed doc comment is a _tightening_ that
 >   brings the inline rustdoc up to the level of this spec document —
 >   worth doing, since the rustdoc is the first thing a consumer reads.
->
 > - `Node::to_span()`: the warning about divergent `Span.intensity`
 >   values between the `Cell` and `Node` paths is genuinely missing
 >   from both the rustdoc and this spec. This is the highest-value
@@ -234,13 +246,13 @@ Methods: `to_span() -> Span`, `width() -> C`, `is_final(n: u32) -> bool`.
 > **One concern with the proposal.** The recommended `Cell.intensity`
 > comment says "for semi-internal contour cells, `Node::sum` includes
 > the surviving child's energy over a wider interval than this cell
-> covers." This is accurate but buries the lede. The *primary*
+> covers." This is accurate but buries the lede. The _primary_
 > consumer confusion isn't "what does `Node::sum` cover?" (since
 > `Node::sum` describes itself on `Node`); it's "I called `get(42)`
 > and got `intensity = 7`, then found the same G-node via `layers()`
 > with `own = 7` and `sum = 42` — which is the 'real' answer?" The
 > doc comment should lead with the equivalence (`intensity` = `own`)
-> and then explain *why* `sum` is deliberately absent — which the
+> and then explain _why_ `sum` is deliberately absent — which the
 > existing code comment already does but without naming `Node`.
 >
 > **Bottom line.** Three doc comments, zero API changes is the right
@@ -368,7 +380,7 @@ $K$ = output span count).
 > own contribution. When a transition node is expanded (its children
 > are visible at the truncation depth), the parent's `baseline`
 > persists as a uniform background beneath the children's
-> refinements — it is *supplemented*, not *overwritten*.
+> refinements — it is _supplemented_, not _overwritten_.
 >
 > A consumer that stamps the parent's `total` and then overwrites
 > with children's values loses the baseline energy and breaks
@@ -411,7 +423,7 @@ Methods (require `V: Weighable`): `snr() -> Option<f64>`
 
 > **`Transition.refinement` — stored vs. derived (§THEORY M-8.2).**
 >
-> The theory defines refinement as *derived*: $R = S - B$. The struct
+> The theory defines refinement as _derived_: $R = S - B$. The struct
 > stores it as a field. This is an intentional denormalisation
 > (DC-021-2 Option C) for ergonomics and self-documenting serialisation.
 >
@@ -439,7 +451,7 @@ Methods (require `V: Weighable`): `snr() -> Option<f64>`
 >    destructuring, pattern matching, and the lightweight data-record
 >    ergonomics that make the PEWEI output pleasant to consume.
 >
-> Compare the live-tree path: `NodeView::refinement()` is a *method*
+> Compare the live-tree path: `NodeView::refinement()` is a _method_
 > that derives the same quantity on the fly. The difference is
 > appropriate — `NodeView` borrows into a mutable graph where values
 > change between calls, so caching would be unsound. `Transition` is
@@ -501,7 +513,7 @@ Methods: `width() -> C`, `to_span() -> Span` (uses `sum` as intensity).
 > The `basis_edge` field always equals the `BTreeMap` key it is stored
 > under (enforced by the key-consistency invariant in
 > `check_plateau_btreemap_key_consistency`). The redundancy is
-> deliberate: `Plateau` is a Surface 1 *Print* — a `Copy`, detachable
+> deliberate: `Plateau` is a Surface 1 _Print_ — a `Copy`, detachable
 > record that may be pulled out of the map via `.values()`, passed
 > across API boundaries, or round-tripped through `serde` without its
 > key. Embedding `basis_edge` keeps the value self-describing in every
@@ -549,16 +561,16 @@ pub struct ContourRange<C: Coordinate, V: Accumulator> {
 }
 ```
 
-| Field | Definition |
-|---|---|
-| `start` | Range start (inclusive), on the endpoint lattice |
-| `end` | Range end (exclusive), on the endpoint lattice |
-| `basis` | Basis set: minimal G-node cover of `[start, end)` (§CR.2) |
-| `energy` | Contour range energy (§CR.6): `Σ basis[i].sum`. Includes boundary thatching; does not double-count interior thatching (resolved by basis consolidation) |
-| `exact_energy` | Exact energy (§CR.13): `range_sum(start..end)`. Pro-rates boundary G-nodes under the uniform-within-cell assumption. Not generally ordered relative to `energy` (§CR.13.6) |
-| `plateau_energy` | Sum of individual plateau energies within the range (§CR.10.4): `Σ P_j.sum` for every plateau whose basis edge lies in `[start, end)`. Each plateau's `.sum` is the energy of its own leaf-level basis, computed independently — it does not include ancestor `.own` energy or thatching from neighbouring plateaus |
+| Field                  | Definition                                                                                                                                                                                                                                                                                                           |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `start`                | Range start (inclusive), on the endpoint lattice                                                                                                                                                                                                                                                                     |
+| `end`                  | Range end (exclusive), on the endpoint lattice                                                                                                                                                                                                                                                                       |
+| `basis`                | Basis set: minimal G-node cover of `[start, end)` (§CR.2)                                                                                                                                                                                                                                                            |
+| `energy`               | Contour range energy (§CR.6): `Σ basis[i].sum`. Includes boundary thatching; does not double-count interior thatching (resolved by basis consolidation)                                                                                                                                                              |
+| `exact_energy`         | Exact energy (§CR.13): `range_sum(start..end)`. Pro-rates boundary G-nodes under the uniform-within-cell assumption. Not generally ordered relative to `energy` (§CR.13.6)                                                                                                                                           |
+| `plateau_energy`       | Sum of individual plateau energies within the range (§CR.10.4): `Σ P_j.sum` for every plateau whose basis edge lies in `[start, end)`. Each plateau's `.sum` is the energy of its own leaf-level basis, computed independently — it does not include ancestor `.own` energy or thatching from neighbouring plateaus  |
 | `cross_plateau_energy` | Cross-plateau energy (§CR.10.4): `energy − plateau_energy`. Captures the net effect of basis consolidation (ancestor `.own` energy gained when the multi-plateau decomposition selects spanning nodes) minus interior thatching resolved by that consolidation. Sign is **indeterminate** under non-negative `g.own` |
-| `plateau_count` | Number of plateaus whose basis edge lies in `[start, end)` — i.e. `plateaus.range(start..end).count()`. Every plateau fully contained in the range is counted; boundary semantics follow the half-open interval (start-inclusive, end-exclusive) |
+| `plateau_count`        | Number of plateaus whose basis edge lies in `[start, end)` — i.e. `plateaus.range(start..end).count()`. Every plateau fully contained in the range is counted; boundary semantics follow the half-open interval (start-inclusive, end-exclusive)                                                                     |
 
 The identity `energy = plateau_energy + cross_plateau_energy` holds
 by construction.
@@ -634,11 +646,11 @@ Neither is re-exported from the crate root.
 > **Serde on handles — resolution of §4.5 vs §4.6/§7.3.**
 >
 > The code agrees with §4.5: both `GNodeId` and `VNodeId` carry the
-> conditional serde derives. §4.6 ("all Surface 1 types *except
-> handles*") and §7.3 ("except opaque handles") were wrong and have
+> conditional serde derives. §4.6 ("all Surface 1 types _except
+> handles_") and §7.3 ("except opaque handles") were wrong and have
 > been corrected.
 >
-> Handles *should* have serde. The safety concern — that deserializing
+> Handles _should_ have serde. The safety concern — that deserializing
 > an arbitrary index could mint a handle that bypasses validation — is
 > real but already mitigated: every consuming method (`gnode_info`,
 > `is_ancestor_of`, `decay`) validates the handle against the arena's
@@ -683,7 +695,7 @@ and attenuate the medium.
 Film stock specification — fixed before loading.
 
 ```rust
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Config<V: Accumulator> {
     pub split_threshold: V,       // θ — minimum intensity to split
     pub depth_create: u32,        // D_create — max V-depth for split
@@ -708,7 +720,7 @@ zone so the system re-expands almost immediately after shedding nodes,
 maximising detail retention at the cost of more frequent gate changes.
 A typical default is 0.75.
 
-`Config` records the **initial** depth gates.  After construction,
+`Config` records the **initial** depth gates. After construction,
 dynamic adjustments modify the live values on `GvGraph` itself —
 accessible via `depth_create()` and `depth_evict()` — while
 `config().depth_create` and `config().depth_evict` retain their
@@ -738,36 +750,36 @@ All fields are `pub(crate)`. The struct is opaque to external consumers.
 **Method index** — grouped by category, with trait-bound and
 asymptotic cost at a glance.
 
-| Method | Bound | Category | Cost | One-liner |
-|---|---|---|---|---|
-| `new` | — | Construction | $O(1)$ | Single root covering $[0, 2^N)$ |
-| `from_observations` | `Insp` | Construction | $n \times$ observe | `new` + `extend` |
-| `observe` | `Insp` | Spatial mutation | $O(d + h_V)$ amort.^[1]^ | Route → accumulate → split → rebalance |
-| `decay` | `Att + Insp` | Temporal transform | $O(\lvert G_{\text{sub}}\rvert + \lvert V\rvert + K h_V)$^[2]^ | Subband-adaptive scaling of G-subtree |
-| `check_evictions` | `Insp` | Maintenance | $O(E_t + E \cdot h_V)$^[3]^ | Evict all eligible tips |
-| `get` | — | Point query | $O(d)$ | Cell at coordinate |
-| `plateaus` | `Insp` | Projection | $O(1)$ / $O(G)$^[4]^ | Bottom-contour `BTreeMap` |
-| `range_sum` | `Pror` | Projection | $O(N)$ | Pro-rated sum over arbitrary range |
-| `contour_range` | `Pror + Insp` | Projection | $O(N)$ | Basis decomposition of lattice interval |
-| `contour_range_energy` | `Pror + Insp` | Projection | $O(N)$ | Energy-only variant |
-| `select_plateaus` | `Insp` | Projection support | $O(\log P)$ | Snap coordinates to lattice endpoints |
-| `sample` | `Weigh` | Stochastic | $\leq 1.44H + 1$ exp. | Weighted random cell |
-| `extract` | `Insp` | Snapshot | $O(\lvert V\rvert)$ | Full PEWEI |
-| `layers` | `Insp` | Iteration | $O(\lvert V\rvert)$ total | Lazy BFS yielding `(layer, Node)` |
-| `gnode_info` | — | Introspection | $O(1)$ | `Node` snapshot by handle |
-| `is_ancestor_of` | — | Introspection | $O(1)$ | Proper ancestor test (interval containment) |
-| `gnode_children`^[5]^ | — | Introspection | $O(1)$ | Current child handles |
-| `build_plateaus`^[5]^ | `Insp` | Diagnostic | $O(G + B\log B)$ | Full plateau rebuild via DFS |
-| `debug_plateau_basis`^[5][7]^ | `Insp` | Diagnostic | $O(B)$ | Per-plateau basis bookkeeping |
-| Accessors (11) | — | Accessor | $O(1)$ | `node_count`, `terminal_count`, `budget`, `total_sum`, `config`, `g_root`, depth gates, `headroom`, `soft_limit` |
+| Method                        | Bound         | Category           | Cost                                                           | One-liner                                                                                                        |
+| ----------------------------- | ------------- | ------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `new`                         | —             | Construction       | $O(1)$                                                         | Single root covering $[0, 2^N)$                                                                                  |
+| `from_observations`           | `Insp`        | Construction       | $n \times$ observe                                             | `new` + `extend`                                                                                                 |
+| `observe`                     | `Insp`        | Spatial mutation   | $O(d + h_V)$ amort.^[1]^                                       | Route → accumulate → split → rebalance                                                                           |
+| `decay`                       | `Att + Insp`  | Temporal transform | $O(\lvert G_{\text{sub}}\rvert + \lvert V\rvert + K h_V)$^[2]^ | Subband-adaptive scaling of G-subtree                                                                            |
+| `check_evictions`             | `Insp`        | Maintenance        | $O(E_t + E \cdot h_V)$^[3]^                                    | Evict all eligible tips                                                                                          |
+| `get`                         | —             | Point query        | $O(d)$                                                         | Cell at coordinate                                                                                               |
+| `plateaus`                    | `Insp`        | Projection         | $O(1)$ / $O(G)$^[4]^                                           | Bottom-contour `BTreeMap`                                                                                        |
+| `range_sum`                   | `Pror`        | Projection         | $O(N)$                                                         | Pro-rated sum over arbitrary range                                                                               |
+| `contour_range`               | `Pror + Insp` | Projection         | $O(N)$                                                         | Basis decomposition of lattice interval                                                                          |
+| `contour_range_energy`        | `Pror + Insp` | Projection         | $O(N)$                                                         | Energy-only variant                                                                                              |
+| `select_plateaus`             | `Insp`        | Projection support | $O(\log P)$                                                    | Snap coordinates to lattice endpoints                                                                            |
+| `sample`                      | `Weigh`       | Stochastic         | $\leq 1.44H + 1$ exp.                                          | Weighted random cell                                                                                             |
+| `extract`                     | `Insp`        | Snapshot           | $O(\lvert V\rvert)$                                            | Full PEWEI                                                                                                       |
+| `layers`                      | `Insp`        | Iteration          | $O(\lvert V\rvert)$ total                                      | Lazy BFS yielding `(layer, Node)`                                                                                |
+| `gnode_info`                  | —             | Introspection      | $O(1)$                                                         | `Node` snapshot by handle                                                                                        |
+| `is_ancestor_of`              | —             | Introspection      | $O(1)$                                                         | Proper ancestor test (interval containment)                                                                      |
+| `gnode_children`^[5]^         | —             | Introspection      | $O(1)$                                                         | Current child handles                                                                                            |
+| `build_plateaus`^[5]^         | `Insp`        | Diagnostic         | $O(G + B\log B)$                                               | Full plateau rebuild via DFS                                                                                     |
+| `debug_plateau_basis`^[5][7]^ | `Insp`        | Diagnostic         | $O(B)$                                                         | Per-plateau basis bookkeeping                                                                                    |
+| Accessors (11)                | —             | Accessor           | $O(1)$                                                         | `node_count`, `terminal_count`, `budget`, `total_sum`, `config`, `g_root`, depth gates, `headroom`, `soft_limit` |
 
 1. Core cost per call; budget-guarded eviction, when triggered, adds amortised $O(h_V)$ per eviction (§PERF M-3, §PERF M-7.1).
 2. $K$ = V-I3 violations created by scaling. Uniform decay on floats ($q = 0$): $K = 0$, cost simplifies to $O(\lvert G\rvert)$. Non-uniform or integer types: $K$ may be non-zero (§THEORY M-7.4).
 3. Per-eviction cost is $O(h_V + d_{\text{geo}} + \log P)$, giving full per-call cost $O(E_t + E \cdot (h_V + d_{\text{geo}} + \log P))$ where $E_t$ = scan pool and $E \leq E_t$ = actually evicted. Convergence (repeated calls): $O(\lvert G_0\rvert \cdot h_V)$ with P4 (§THEORY M-A.7).
 4. $O(1)$ with `dynamic-contour-tracking` (default); $O(G + B\log B)$ rebuild without.
 5. `#[doc(hidden)]` — available but not part of the stable surface.
-7. Requires `dynamic-contour-tracking` feature (enabled by default).
-6. **Bound abbreviations:** `Insp` = `Inspectable`, `Att` = `Attenuatable`, `Pror` = `Proratable`, `Weigh` = `Weighable`. All methods additionally require the struct-level `V: Accumulator` bound.
+6. Requires `dynamic-contour-tracking` feature (enabled by default).
+7. **Bound abbreviations:** `Insp` = `Inspectable`, `Att` = `Attenuatable`, `Pror` = `Proratable`, `Weigh` = `Weighable`. All methods additionally require the struct-level `V: Accumulator` bound.
 
 #### Construction
 
@@ -830,7 +842,7 @@ accumulated directly on this node (pre-split observations spanning
 the full interval + post-eviction observations routed to the
 vacated half; see §IDEA M-5.5.1).
 
-*Example.* A semi-internal node covers `[4, 8)` with a left child
+_Example._ A semi-internal node covers `[4, 8)` with a left child
 occupying `[4, 6)`. The right half `[6, 8)` has no child —
 `get(7)` returns `Cell { start: 6, end: 8, intensity: g.own, .. }`.
 Conversely, `get(5)` routes through the left child and never stops
@@ -910,16 +922,16 @@ pub fn contour_range(
 ```
 
 Full basis-set decomposition of a lattice-aligned half-open interval
-`[start, end)` (§CR.2–§CR.6).  Endpoints must lie on the endpoint
+`[start, end)` (§CR.2–§CR.6). Endpoints must lie on the endpoint
 lattice — the set of plateau basis edges plus the domain sentinel
-`2^N`.  Returns `None` if either endpoint is not in the lattice or
+`2^N`. Returns `None` if either endpoint is not in the lattice or
 `start >= end`.
 
 The result contains the basis set (§CR.2) plus pre-computed energy
 fields: contour range energy (§CR.6, `Σ basis.sum`), exact energy
 (§CR.13, `range_sum`), plateau energy (`Σ P_j.sum` over constituent
 plateaus, §CR.10.4), and cross-plateau energy (`energy − plateau_energy`,
-§CR.10.4).  See the `ContourRange` field table above for full definitions.
+§CR.10.4). See the `ContourRange` field table above for full definitions.
 
 Cost: $O(N)$ — segment-tree decomposition plus one `range_sum()` pass.
 
@@ -932,8 +944,8 @@ pub fn contour_range_energy(
 ```
 
 Energy-only variant — same lattice-endpoint requirement, same $O(N)$
-cost.  Returns only the scalar energy fields; the basis set is
-computed but not exposed.  (A dedicated fast path that skips the
+cost. Returns only the scalar energy fields; the basis set is
+computed but not exposed. (A dedicated fast path that skips the
 allocation is a natural future optimisation.)
 
 Cost: $O(N)$.
@@ -948,7 +960,7 @@ pub fn select_plateaus(&self, lo: C, hi: C) -> Option<(BasisEdge<C>, BasisEdge<C
 
 Given arbitrary dyadic coordinates `[lo, hi)`, snaps outward to the
 nearest lattice-aligned endpoints that span all overlapping plateaus
-(§CR.12).  The returned pair is valid for `contour_range()` and
+(§CR.12). The returned pair is valid for `contour_range()` and
 `contour_range_energy()`.
 
 Returns `None` if the plateau map is empty, `lo >= hi`, or no plateau
@@ -967,13 +979,21 @@ pub fn sample(&self, rng: &mut impl Rng) -> Option<Cell<C, V>>;
 Weighted random walk from the V-Tree root. Returns `None` if total
 intensity is zero.
 
-When the landing V-entry is backed by a semi-internal G-node, the
-returned `Cell` is narrowed to the uncovered half with
-`intensity = g.own`, exactly as `get()` would return. There is a
-deliberate spatial mismatch between the entry's competitive weight
-(which spans the full node range) and the output interval (uncovered
-half only) — see [ADR-M-016](../adr/016-semi-internal-state.md) and
-§IDEA M-5.5.1 for the rationale.
+The landing V-entry is typically a terminal G-node, but may be
+semi-internal or internal (with frozen pre-split intensity — see
+[ADR-M-019](../adr/019-sampling-semantics.md) and §IDEA M-6.5).
+
+- **Terminal:** `Cell` covers the full `[lo, hi)` range;
+  `intensity = g.own = g.sum`.
+- **Semi-internal:** `Cell` is narrowed to the uncovered half with
+  `intensity = g.own`, exactly as `get()` would return. There is a
+  deliberate spatial mismatch between the entry's competitive weight
+  (which spans the full node range) and the output interval (uncovered
+  half only) — see [ADR-M-016](../adr/016-semi-internal-state.md) and
+  §IDEA M-5.5.1 for the rationale.
+- **Internal:** `Cell` covers the full `[lo, hi)` range;
+  `intensity = g.own` (frozen baseline from before the split).
+  Both halves have children, so no narrowing occurs.
 
 Expected cost: $\leq 1.44\,H + O(1)$ node visits, where $H$ is the
 Shannon entropy of the weight distribution. See §THEORY M-4.3 for
@@ -1039,7 +1059,7 @@ $0^{\text{exponent}}$, using the convention $0^0 = 1$. At $q < 1$
 every exponent is positive, so the entire subtree is zeroed. At
 $q = 1$ the subtree root's exponent is $1 - q = 0$, giving
 $0^0 = 1$ — the root is preserved while all descendants are zeroed.
-This is the *detail flush* (§THEORY M-7.3): the coarsest codeword
+This is the _detail flush_ (§THEORY M-7.3): the coarsest codeword
 survives; all refinement must be re-earned.
 
 **Infinite amplification** ($\text{att} = \infty$): the per-depth
@@ -1060,9 +1080,9 @@ rebalance.
 >
 > `decay()` panics on a stale `root`; `gnode_info()` and
 > `is_ancestor_of()` return `None` / `false`. The asymmetry is
-> intentional. `gnode_info()` is a *query* — asking "does this node
+> intentional. `gnode_info()` is a _query_ — asking "does this node
 > still exist?" is a reasonable question with a reasonable answer.
-> `decay()` is a *mutation* that walks a subtree, recomputes sums,
+> `decay()` is a _mutation_ that walks a subtree, recomputes sums,
 > and fixes V-I3 violations across the graph. Decaying a freed
 > subtree is structurally incoherent — there is no meaningful
 > partial result or graceful degradation, so the alternatives are
@@ -1234,13 +1254,13 @@ theory-derived triple in §THEORY M-14.2 / ADR-M-032, which lists
 plateaus, PEWEI, and proportional sampling — a stochastic operation
 that doesn't fit a structural-decomposition table):
 
-|              | `extract()` / PEWEI          | `plateaus()` / BTreeMap         | `contour_range()` / decomposition  |
-| ------------ | ---------------------------- | ------------------------------- | ---------------------------------- |
-| **Tree**     | V-Tree (significance)        | G-Tree (spatial)                | G-Tree (spatial)                   |
-| **Ordering** | Significance (V-depth BFS)   | Spatial (left-to-right contour) | Spatial (segment-tree descent)     |
-| **Question** | What's important?            | What shape did adaptation take? | What's the energy breakdown here?  |
-| **Cost**     | $O(n)$, allocates            | $O(1)$ borrow                   | $O(N)$, allocates                  |
-| **Path**     | Cold (checkpointing, export) | Hot (per-query)                 | Warm (analytical strip queries)    |
+|              | `extract()` / PEWEI          | `plateaus()` / BTreeMap         | `contour_range()` / decomposition |
+| ------------ | ---------------------------- | ------------------------------- | --------------------------------- |
+| **Tree**     | V-Tree (significance)        | G-Tree (spatial)                | G-Tree (spatial)                  |
+| **Ordering** | Significance (V-depth BFS)   | Spatial (left-to-right contour) | Spatial (segment-tree descent)    |
+| **Question** | What's important?            | What shape did adaptation take? | What's the energy breakdown here? |
+| **Cost**     | $O(n)$, allocates            | $O(1)$ borrow                   | $O(N)$, allocates                 |
+| **Path**     | Cold (checkpointing, export) | Hot (per-query)                 | Warm (analytical strip queries)   |
 
 No single projection subsumes the others. Together they form the
 complete read surface of the dual-tree.
@@ -1413,7 +1433,7 @@ trait (ADR-M-009 Addendum 3) because it requires `V: Attenuatable` — a
 sub-trait that not all accumulators implement.
 
 `SpatialRead` and `TemporalDecay` are object-safe — every method
-takes only concrete types.  `SpatialWrite` and `WeightedSampler` are
+takes only concrete types. `SpatialWrite` and `WeightedSampler` are
 not (generic / `impl Trait` method parameters) — intended for static
 dispatch and capability bounding, not trait objects.
 
@@ -1435,32 +1455,33 @@ dispatch and capability bounding, not trait objects.
 The concrete (inherent) methods on `GvGraph` carry **minimal**
 bounds — `get()` needs only `Accumulator`, `sample()` needs
 `Accumulator + Weighable` — while the trait impls carry the
-**union** of their methods' bounds.  This creates a visible gap:
+**union** of their methods' bounds. This creates a visible gap:
 
-| Method | Inherent bound | Trait impl bound | Extra |
-|--------|---------------|-----------------|-------|
-| `get()` | `Accumulator` | `Accumulator + Inspectable` (`SpatialRead`) | `Inspectable` |
-| `sample()` | `Accumulator + Weighable` | `Accumulator + Inspectable + Weighable` (`WeightedSampler`) | `Inspectable` |
-| `observe()` | `Accumulator + Inspectable` | `Accumulator + Inspectable` (`SpatialWrite`) | — |
+| Method      | Inherent bound              | Trait impl bound                                            | Extra         |
+| ----------- | --------------------------- | ----------------------------------------------------------- | ------------- |
+| `get()`     | `Accumulator`               | `Accumulator + Inspectable` (`SpatialRead`)                 | `Inspectable` |
+| `sample()`  | `Accumulator + Weighable`   | `Accumulator + Inspectable + Weighable` (`WeightedSampler`) | `Inspectable` |
+| `observe()` | `Accumulator + Inspectable` | `Accumulator + Inspectable` (`SpatialWrite`)                | —             |
 
 The gap is a Rust language constraint, not a design choice.
 A trait impl block must satisfy every method in the trait
 simultaneously; since `SpatialRead` groups `get()` (needs only
 `Accumulator`) with `plateaus()` (needs `Inspectable` for
 diagnostic assertions in the plateau mirror), the impl must carry
-`Inspectable` for both.  Splitting `SpatialRead` into `PointQuery`
-+ `PlateauRead` would narrow the bounds but fragment the capability
-model — one read capability is cleaner than two micro-traits.
+`Inspectable` for both. Splitting `SpatialRead` into `PointQuery`
+
+- `PlateauRead` would narrow the bounds but fragment the capability
+  model — one read capability is cleaner than two micro-traits.
 
 **Practical impact is small.** `Inspectable` is implemented by every
 built-in type (`u8`–`u128`, `f32`, `f64`), and any graph that calls
-`observe()` already requires it.  The gap only surfaces for custom
+`observe()` already requires it. The gap only surfaces for custom
 accumulator types used through read-only or sample-only trait bounds.
 
 **Escape hatch.** Callers who need only `get()` or `sample()` and
 want to avoid pulling in `Inspectable` should call the inherent
 methods directly on `GvGraph<C, V, N>` rather than going through
-trait bounds.  This preserves the minimal per-method bounds shown
+trait bounds. This preserves the minimal per-method bounds shown
 in the method index.
 
 > **Implementation note.** The `Inspectable` requirement on
@@ -1492,7 +1513,7 @@ per-call amortised cost (§IDEA M-8.3), not a cheaper bulk insert.
 **Ordering matters structurally, not algebraically.** Because
 `Accumulator::add` is commutative (P0), aggregate values like
 `total_sum()` are permutation-invariant — the same multiset of
-observations always produces the same total. Internal *structure*,
+observations always produces the same total. Internal _structure_,
 however, is order-dependent: the sequence determines when thresholds
 are crossed, which nodes split first, which rebalance rotations
 fire, and which eviction candidates are spared (see §IDEA M-12.4
@@ -1514,23 +1535,23 @@ differ — an intentional consequence of the online, adaptive design.
 `pub(crate)` **internal machinery**. Users never see or depend on
 these. Listed here for completeness — not part of the public API.
 
-| Module          | Contents                                                                             |
-| --------------- | ------------------------------------------------------------------------------------ |
-| `arena`         | `Arena<T>` — typed slab allocator                                                    |
-| `gnode`         | `GNode<C, V>` — spatial node with all fields                                         |
-| `vnode`         | `VNode<V>`, `VKind<V>`, `PackedChildren<V>`                                          |
-| `gtree`         | G-Tree routing, propagation, recomputation                                           |
-| `vtree`         | V-Tree insert, remove, depth, propagation                                            |
-| `rebalance`     | Violation detection, promote, contract, resolve                                      |
-| `split`         | `attempt_split` — subdivision logic                                                  |
-| `evict`         | `evict_tip`, `scan_for_candidates`                                                   |
-| `observe`       | `observe()` hot-path implementation                                                  |
-| `decay`         | `decay()` implementation                                                             |
+| Module          | Contents                                                                               |
+| --------------- | -------------------------------------------------------------------------------------- |
+| `arena`         | `Arena<T>` — typed slab allocator                                                      |
+| `gnode`         | `GNode<C, V>` — spatial node with all fields                                           |
+| `vnode`         | `VNode<V>`, `VKind<V>`, `PackedChildren<V>`                                            |
+| `gtree`         | G-Tree routing, propagation, recomputation                                             |
+| `vtree`         | V-Tree insert, remove, depth, propagation                                              |
+| `rebalance`     | Violation detection, promote, contract, resolve                                        |
+| `split`         | `attempt_split` — subdivision logic                                                    |
+| `evict`         | `evict_tip`, `scan_for_candidates`                                                     |
+| `observe`       | `observe()` hot-path implementation                                                    |
+| `decay`         | `decay()` implementation                                                               |
 | `diagnostic`    | Consolidated audit functions (ADR-M-028)                                               |
 | `graph_budget`  | Budget enforcement, depth-gate adjustment (ADR-M-030)                                  |
 | `graph_extract` | PEWEI extraction, layer iteration (ADR-M-030)                                          |
-| `graph_plateau` | Plateau mirror maintenance                                                           |
-| `graph_query`   | Sampling, point query, range sum, contour range decomposition (ADR-M-030, ADR-M-037)  |
+| `graph_plateau` | Plateau mirror maintenance                                                             |
+| `graph_query`   | Sampling, point query, range sum, contour range decomposition (ADR-M-030, ADR-M-037)   |
 | `graph_traits`  | `SpatialRead` / `SpatialWrite` / `TemporalDecay` / `WeightedSampler` impls (ADR-M-030) |
 
 Two modules are **`pub`** + `#[doc(hidden)]` as testing affordances
@@ -1561,11 +1582,11 @@ Concurrent writes require external `RwLock` or `Mutex`.
 
 ### 7.3 Feature gates
 
-| Feature                    | Default | Effect                                                                                                            |
-| -------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
-| `dynamic-contour-tracking` | yes     | Live plateau mirror; `plateaus()` returns `Cow::Borrowed` in O(1).                                                |
+| Feature                    | Default | Effect                                                                                                                            |
+| -------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `dynamic-contour-tracking` | yes     | Live plateau mirror; `plateaus()` returns `Cow::Borrowed` in O(1).                                                                |
 | `serde`                    | no      | `Serialize`/`Deserialize` on all Surface 1 types (view, PEWEI, plateau, `GState`, handles). Handles serialize their opaque index. |
-| `rand`                     | yes     | Blanket `Rng` impl for all `rand_core::Rng` types.                                                            |
+| `rand`                     | yes     | Blanket `Rng` impl for all `rand_core::Rng` types.                                                                                |
 
 > **`rand` is default-on — rationale.**
 >
@@ -1579,10 +1600,10 @@ Concurrent writes require external `RwLock` or `Mutex`.
 >    V-Tree exists precisely to maintain O(log n) proportional
 >    sampling weights. A `GvGraph` without `sample()` is a spatial
 >    index that throws away the structure that makes it interesting.
->    Gating the *ability to call* `sample()` behind a feature would be
+>    Gating the _ability to call_ `sample()` behind a feature would be
 >    misleading — the method is always present; the feature only
 >    controls whether `rand` ecosystem types satisfy its `Rng`
->    argument *automatically*.
+>    argument _automatically_.
 > 2. **The alternative is worse ergonomics, not a smaller API.**
 >    Without `rand`, callers must write a manual `impl Rng` wrapper
 >    around their `rand::rngs::StdRng` (or whatever they use). The
@@ -1598,7 +1619,7 @@ Concurrent writes require external `RwLock` or `Mutex`.
 >    anything stochastic. The marginal cost of pulling it in is
 >    effectively zero.
 >
-> The case *against* default-on is real but thin: a hypothetical
+> The case _against_ default-on is real but thin: a hypothetical
 > embedded consumer who needs `observe` + `get` + `plateaus` but not
 > `sample`, and who cannot tolerate even `rand_core` in the dependency
 > tree. That consumer already needs `default-features = false` to

@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
 pub mod arena;
+pub mod config_validation;
 pub mod decay;
 #[cfg(feature = "dynamic-contour-tracking")]
 pub mod decay_f64_depth;
+pub mod decompose_basis;
 pub mod diagnostic;
 pub mod evict;
 pub mod gnode;
@@ -12,6 +14,7 @@ pub mod graph;
 pub mod graph_init;
 pub mod gtree;
 pub mod handle;
+pub mod invariant_self;
 pub mod observe;
 pub mod pewei;
 pub mod plan_builders;

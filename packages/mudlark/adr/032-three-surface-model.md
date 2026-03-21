@@ -129,10 +129,10 @@ method and at least one public **consuming** method. A handle with
 only producers or only consumers is a dead-end API — it implies a
 capability the crate does not expose — and belongs on Surface 3.
 
-| Handle      | Producing methods                                    | Consuming methods                             | Verdict           |
-| ----------- | ---------------------------------------------------- | --------------------------------------------- | ----------------- |
-| `GNodeId`   | `g_root()`, `Node.gnode_id`, `BasisElement.gnode_id` | `gnode_info()`, `is_ancestor_of()`, `decay()` | **Pass**          |
-| `BasisEdge` | `plateaus()`, `select_plateaus()`                    | `contour_range()`, `contour_range_energy()`   | **Pass**          |
+| Handle      | Producing methods                                    | Consuming methods                             | Verdict                 |
+| ----------- | ---------------------------------------------------- | --------------------------------------------- | ----------------------- |
+| `GNodeId`   | `g_root()`, `Node.gnode_id`, `BasisElement.gnode_id` | `gnode_info()`, `is_ancestor_of()`, `decay()` | **Pass**                |
+| `BasisEdge` | `plateaus()`, `select_plateaus()`                    | `contour_range()`, `contour_range_energy()`   | **Pass**                |
 | `VNodeId`   | `v_root()`                                           | _(none)_                                      | **Fail** — `pub(crate)` |
 
 ### Snapshot test
@@ -165,23 +165,23 @@ Test: **is the relationship determined at the entity's creation and
 immutable for its lifetime (Print), or does it reflect the graph's
 evolving refinement state (Emulsion)?**
 
-| Field      | Determined                                | Changes after creation | Verdict                           |
-| ---------- | ----------------------------------------- | ---------------------- | --------------------------------- |
-| `gnode_id` | Creation                                  | Never                  | Self-identity — Print             |
-| `parent`   | Creation (split)                          | Never                  | Stable provenance — Print         |
-| `left`     | Split / eviction / legacy promote         | Yes — continuously     | Mutable topology — Emulsion       |
-| `right`    | Split / eviction / legacy promote         | Yes — continuously     | Mutable topology — Emulsion       |
+| Field      | Determined                        | Changes after creation | Verdict                     |
+| ---------- | --------------------------------- | ---------------------- | --------------------------- |
+| `gnode_id` | Creation                          | Never                  | Self-identity — Print       |
+| `parent`   | Creation (split)                  | Never                  | Stable provenance — Print   |
+| `left`     | Split / eviction / legacy promote | Yes — continuously     | Mutable topology — Emulsion |
+| `right`    | Split / eviction / legacy promote | Yes — continuously     | Mutable topology — Emulsion |
 
 ### Application
 
-| Finding                             | Which test   | Current state                                                    |
-| ----------------------------------- | ------------ | ---------------------------------------------------------------- |
-| `from_index()`/`index()` on handles | Primary test | `#[doc(hidden)]` — serialisation uses `serde`, not raw indices   |
-| `VNodeId` / `v_root()`              | Handle test  | Both `pub(crate)` — `VNodeId` has no public consumer             |
-| `build_plateaus()`                  | Primary test | `#[doc(hidden)]` — serves diagnostics, not projections           |
-| `debug_plateau_basis()`             | Primary test | `#[doc(hidden)]` — serves testing only                           |
-| `ScalableObservation`               | Primary test | Sub-trait of `Observation` with a required `scale` method (§2.4) |
-| `Node.parent`                       | Snapshot test | Stable provenance — on `Node` as `parent: Option<GNodeId>` (`None` at root) |
+| Finding                             | Which test    | Current state                                                                    |
+| ----------------------------------- | ------------- | -------------------------------------------------------------------------------- |
+| `from_index()`/`index()` on handles | Primary test  | `#[doc(hidden)]` — serialisation uses `serde`, not raw indices                   |
+| `VNodeId` / `v_root()`              | Handle test   | Both `pub(crate)` — `VNodeId` has no public consumer                             |
+| `build_plateaus()`                  | Primary test  | `#[doc(hidden)]` — serves diagnostics, not projections                           |
+| `debug_plateau_basis()`             | Primary test  | `#[doc(hidden)]` — serves testing only                                           |
+| `ScalableObservation`               | Primary test  | Sub-trait of `Observation` with a required `scale` method (§2.4)                 |
+| `Node.parent`                       | Snapshot test | Stable provenance — on `Node` as `parent: Option<GNodeId>` (`None` at root)      |
 | `GNodeChildren.left`/`.right`       | Snapshot test | Mutable topology — `#[doc(hidden)]` `gnode_children()` returning `GNodeChildren` |
 
 `check_evictions()` **passes** the primary test — it serves the
@@ -594,7 +594,7 @@ not hold.
 | `observe(coord, delta)`             | **Load-bearing** | Photon strike. `delta` accumulation = multi-hit cluster growth on a grain.                                                                                                                                                                                                                   |
 | `decay(att, q)` where att ∈ (0,1)   | **Load-bearing** | Latent image regression. Sub-critical silver clusters thermally disperse; the grain re-sensitizes. `q` maps to cluster-size threshold — small clusters regress first, large ones persist.                                                                                                    |
 | `decay(att, q)` where att > 1       | **Breaks**       | Amplification — artificially increasing latent image density. Real thermal processes only destroy latent image, never create it. There is no physical process for reinforcing latent image centers after exposure.                                                                           |
-| `decay(att=0, q=1)`                 | **Illustrative** | Extreme heating destroying all latent image in a region. Plausible direction, but the $0^0=1$ convention (root preserved, descendants zeroed; §IDEA M-7.3) has no thermal analog.                                                                                                                         |
+| `decay(att=0, q=1)`                 | **Illustrative** | Extreme heating destroying all latent image in a region. Plausible direction, but the $0^0=1$ convention (root preserved, descendants zeroed; §IDEA M-7.3) has no thermal analog.                                                                                                            |
 | `extract()` → `Pewei`               | **Load-bearing** | Contact print from the negative — stable, detached, owning. The **never-fixed** property explains why there is no "finalize" step.                                                                                                                                                           |
 | `plateaus()`                        | **Illustrative** | Isodensity contour map. The defining property is uniform _depth_ (resolution), not uniform intensity. Depth correlates with density but does not determine it.                                                                                                                               |
 | `contour_range(s, e)`               | **Illustrative** | Microdensitometer strip reading. The decomposition maps well; `is_boundary_thatch` as "scattered-light leakage" is decorative — it is a segment-tree partial-overlap artefact.                                                                                                               |
@@ -749,7 +749,7 @@ pub trait WeightedSampler: SpatialRead {
 `decay()` was split from `SpatialWrite` into its own `TemporalDecay`
 trait (ADR-M-009 Addendum 3) because it requires `V: Attenuatable`.
 `SpatialRead` and `TemporalDecay` are object-safe — every method
-takes only concrete types.  `SpatialWrite` and `WeightedSampler` are
+takes only concrete types. `SpatialWrite` and `WeightedSampler` are
 not (generic / `impl Trait` method parameters).
 
 | Trait             | Analog             |
@@ -761,22 +761,22 @@ not (generic / `impl Trait` method parameters).
 
 ### 2.6 Extended concept mapping
 
-| Concept                              | Fidelity         | Analog                                                                                                |
-| ------------------------------------ | ---------------- | ----------------------------------------------------------------------------------------------------- |
-| `GvGraph`                            | **Load-bearing** | Undeveloped film — perpetually latent, never fixed                                                    |
-| `Config` (threshold, depth gates)    | **Illustrative** | Film stock specification. `budget` / `bounded_eviction` have no physical counterpart.                 |
-| `Accumulator` trait                  | **Load-bearing** | Emulsion chemistry — different crystals, different combination rules                                  |
-| `Observation` / `ScalableObservation` | **Illustrative** | Photon characteristics. `accumulate` maps well; `ScalableObservation::scale` has no photon analog. |
-| `Coordinate`                         | **Load-bearing** | Position on the film plane                                                                            |
-| G-node spatial cells                 | **Illustrative** | Individual grains accumulating silver                                                                 |
-| `GState`                             | **Illustrative** | Crystal structure class. `SemiInternal` (one child) has no crystallographic meaning — see §breaks.    |
-| `Arena<T>` (slab allocator)          | **Illustrative** | Gelatin matrix — the transparent substrate holding crystals in position                               |
-| View types (`Span`, `Cell`, `Node`)  | **Load-bearing** | Loupe readings — lightweight, informational, detached                                                 |
-| Contour range decomposition          | **Illustrative** | Microdensitometer strip analysis                                                                      |
-| Subtree-scoped `decay(root, ...)`    | **Illustrative** | Localised regression via masked heating (IR laser through a mask)                                     |
-| G-Tree depth = resolution            | **Load-bearing** | Grain size = acuity (Velvia 50 vs. HP5 at 3200)                                                       |
-| `rebalance` / `promote` / `contract` | **Illustrative** | Ostwald ripening during emulsion manufacture                                                          |
-| `GvGraph: Clone`                     | **Breaks**       | You cannot duplicate a piece of partially-exposed film. Rust capability with no physical counterpart. |
+| Concept                               | Fidelity         | Analog                                                                                                |
+| ------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------- |
+| `GvGraph`                             | **Load-bearing** | Undeveloped film — perpetually latent, never fixed                                                    |
+| `Config` (threshold, depth gates)     | **Illustrative** | Film stock specification. `budget` / `bounded_eviction` have no physical counterpart.                 |
+| `Accumulator` trait                   | **Load-bearing** | Emulsion chemistry — different crystals, different combination rules                                  |
+| `Observation` / `ScalableObservation` | **Illustrative** | Photon characteristics. `accumulate` maps well; `ScalableObservation::scale` has no photon analog.    |
+| `Coordinate`                          | **Load-bearing** | Position on the film plane                                                                            |
+| G-node spatial cells                  | **Illustrative** | Individual grains accumulating silver                                                                 |
+| `GState`                              | **Illustrative** | Crystal structure class. `SemiInternal` (one child) has no crystallographic meaning — see §breaks.    |
+| `Arena<T>` (slab allocator)           | **Illustrative** | Gelatin matrix — the transparent substrate holding crystals in position                               |
+| View types (`Span`, `Cell`, `Node`)   | **Load-bearing** | Loupe readings — lightweight, informational, detached                                                 |
+| Contour range decomposition           | **Illustrative** | Microdensitometer strip analysis                                                                      |
+| Subtree-scoped `decay(root, ...)`     | **Illustrative** | Localised regression via masked heating (IR laser through a mask)                                     |
+| G-Tree depth = resolution             | **Load-bearing** | Grain size = acuity (Velvia 50 vs. HP5 at 3200)                                                       |
+| `rebalance` / `promote` / `contract`  | **Illustrative** | Ostwald ripening during emulsion manufacture                                                          |
+| `GvGraph: Clone`                      | **Breaks**       | You cannot duplicate a piece of partially-exposed film. Rust capability with no physical counterpart. |
 
 ---
 
@@ -816,12 +816,12 @@ The following methods on `GvGraph` are `#[doc(hidden)]` testing/diagnostic
 affordances — public for integration-test access, not part of the stable
 surface:
 
-| Method                  | Purpose                                     | Why `#[doc(hidden)]`                                 |
-| ----------------------- | ------------------------------------------- | ---------------------------------------------------- |
-| `build_plateaus()`      | Rebuild plateau map from scratch via DFS    | Serves invariant checking, not user queries          |
-| `debug_plateau_basis()` | Expose per-plateau basis bookkeeping        | Integration-test diagnostics only                    |
-| `gnode_children()`      | Return current child handles of a G-node    | Mutable topology, not snapshot content (§ snapshot test) |
-| `v_root()`              | Return V-Tree root handle                   | Returns `VNodeId` (`pub(crate)`); no public consumer |
+| Method                  | Purpose                                  | Why `#[doc(hidden)]`                                     |
+| ----------------------- | ---------------------------------------- | -------------------------------------------------------- |
+| `build_plateaus()`      | Rebuild plateau map from scratch via DFS | Serves invariant checking, not user queries              |
+| `debug_plateau_basis()` | Expose per-plateau basis bookkeeping     | Integration-test diagnostics only                        |
+| `gnode_children()`      | Return current child handles of a G-node | Mutable topology, not snapshot content (§ snapshot test) |
+| `v_root()`              | Return V-Tree root handle                | Returns `VNodeId` (`pub(crate)`); no public consumer     |
 
 ---
 

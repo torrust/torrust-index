@@ -163,11 +163,11 @@ weakening uncle shields. The spec defines four push functions
 dispatched by the V-parent's pre-removal child count:
 
 | Child count | Case                          | Push functions                                           | §IDEA M-11.12 source |
-| ----------- | ----------------------------- | -------------------------------------------------------- | ------------- |
-| any         | Ancestor intensity decrease   | `push_leaf_removal_violations(change_point)`             | 6             |
-| 2           | Collapse (V-parent destroyed) | `push_collapse_violations(collapse_sibling)`             | 7             |
-| 2           | Cousins' children             | `push_cousin_violations(collapse_sibling, change_point)` | 9             |
-| 3           | 3→2 transition                | `push_remaining_sibling_violations(v_parent, v_id)`      | 8             |
+| ----------- | ----------------------------- | -------------------------------------------------------- | -------------------- |
+| any         | Ancestor intensity decrease   | `push_leaf_removal_violations(change_point)`             | 6                    |
+| 2           | Collapse (V-parent destroyed) | `push_collapse_violations(collapse_sibling)`             | 7                    |
+| 2           | Cousins' children             | `push_cousin_violations(collapse_sibling, change_point)` | 9                    |
+| 3           | 3→2 transition                | `push_remaining_sibling_violations(v_parent, v_id)`      | 8                    |
 
 Step 6 pre-captures the V-Tree context (change point, surviving
 sibling) before `vtree_remove_leaf` potentially destroys the

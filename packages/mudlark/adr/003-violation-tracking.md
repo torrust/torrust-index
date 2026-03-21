@@ -67,11 +67,11 @@ configurations — not a separate source.
 The ten sources arise in three contexts, served by eight push
 functions (§IDEA M-11.11):
 
-| Context      | Sources    | Push functions                                                                                                            | Cost   |
-| ------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------- | ------ |
-| Observation  | 1–2        | Ancestor walk (inline in `observe()`)                                                                                     | O(h_V) |
+| Context      | Sources     | Push functions                                                                                                              | Cost   |
+| ------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------- | ------ |
+| Observation  | 1–2         | Ancestor walk (inline in `observe()`)                                                                                       | O(h_V) |
 | Rebalancing  | 3–5, 5b, 10 | `push_side_effect_violations`, `push_promoted_violations`, `push_contraction_child_violations`, `push_source_10_violations` | O(1)   |
-| Leaf removal | 6–9        | `push_leaf_removal_violations`, `push_collapse_violations`, `push_remaining_sibling_violations`, `push_cousin_violations` | O(h_V) |
+| Leaf removal | 6–9         | `push_leaf_removal_violations`, `push_collapse_violations`, `push_remaining_sibling_violations`, `push_cousin_violations`   | O(h_V) |
 
 Source 5 (split preprocessing, §IDEA M-10.1) reuses the same
 `push_side_effect_violations` and `push_promoted_violations` calls

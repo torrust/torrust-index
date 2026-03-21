@@ -23,29 +23,29 @@
 
 ADR-M-037 (2026-03-11) introduced `contour_range()` and
 `contour_range_energy()` based on an earlier draft of the Contour
-Ranges extension (§CR.1–§CR.9).  That draft defined contour ranges
+Ranges extension (§CR.1–§CR.9). That draft defined contour ranges
 in terms of a **three-set partition** of G-nodes: interior
 ($\mathcal{I}$), boundary ($\mathcal{B}$), and straddling ancestors
-($\mathcal{S}$).  The implementation shipped five public types
+($\mathcal{S}$). The implementation shipped five public types
 (`ContourRange`, `ContourRangeEnergy`, `InteriorElement`,
 `BoundaryElement`, `StraddlingAncestor`) and a decomposition identity
 tying the three sets to the energy scalar.
 
-A pre-1.0 audit found the original definition lacking.  The spec was
+A pre-1.0 audit found the original definition lacking. The spec was
 rewritten (§CR.1–§CR.13) with a significantly simpler model:
 
 - A contour range is defined by its **basis set** — the same minimal
   G-node cover used for single plateaus, applied to the wider
   interval (§CR.2).
 - **Thatching** (§CR.3) is the central structural phenomenon, not a
-  three-set partition.  Basis elements that are semi-internal at the
+  three-set partition. Basis elements that are semi-internal at the
   range boundary have `.sum` that leaks energy outside the range.
   Interior thatching between constituent plateaus is resolved by
   **basis consolidation** (§CR.4).
 - The contour range **energy** is simply $\sum_{\text{basis}}
   R.\text{sum}$ (§CR.6) — the same formula used for single plateaus.
 - The three-set partition ($\mathcal{I}$/$\mathcal{B}$/$\mathcal{S}$)
-  no longer appears.  Straddling ancestors with pro-rated fractions
+  no longer appears. Straddling ancestors with pro-rated fractions
   are the province of `range_sum` (§CR.13, exact energy), not of
   contour ranges.
 - Two new concepts were added: **Plateau Selection** (§CR.12) bridges
@@ -54,29 +54,29 @@ rewritten (§CR.1–§CR.13) with a significantly simpler model:
   complementary measure.
 
 The existing implementation must be revised to align with the new
-spec.  This ADR proposes six decisions that reshape the public API.
+spec. This ADR proposes six decisions that reshape the public API.
 
 ### What exists today (implemented from original ADR)
 
-| Method | Returns | Notes |
-|--------|---------|-------|
-| `contour_range(start, end)` | `ContourRange<C, V>` with three `Vec`s + 6 energy fields | Three-set partition |
-| `contour_range_energy(start, end)` | `ContourRangeEnergy<V>` (`Copy`, 6 scalars) | Delegates to full decomposition |
-| `range_sum(range)` | `V` (scalar) | Arbitrary `RangeBounds<C>`, pro-rates |
-| `plateaus()` | `BTreeMap<BasisEdge, Plateau>` | Full contour map |
+| Method                             | Returns                                                  | Notes                                 |
+| ---------------------------------- | -------------------------------------------------------- | ------------------------------------- |
+| `contour_range(start, end)`        | `ContourRange<C, V>` with three `Vec`s + 6 energy fields | Three-set partition                   |
+| `contour_range_energy(start, end)` | `ContourRangeEnergy<V>` (`Copy`, 6 scalars)              | Delegates to full decomposition       |
+| `range_sum(range)`                 | `V` (scalar)                                             | Arbitrary `RangeBounds<C>`, pro-rates |
+| `plateaus()`                       | `BTreeMap<BasisEdge, Plateau>`                           | Full contour map                      |
 
 Public types from original ADR: `InteriorElement`, `BoundaryElement`,
 `StraddlingAncestor`, `ContourRange`, `ContourRangeEnergy`.
 
 ### What the spec now says
 
-| Spec section | Concept | API implication |
-|---|---|---|
-| §CR.2 | Basis set — single flat set of G-nodes | Replace three `Vec`s with one `Vec<BasisElement>` |
-| §CR.3 | Thatching — ≤2 boundary semi-internals whose `.sum` leaks | Mark basis elements, don't separate them |
-| §CR.6 | Energy = $\sum_{\text{basis}} R.\text{sum}$ | Not `range_sum`; different value when thatching exists |
-| §CR.12 | Plateau selection: arbitrary coords → lattice endpoints | New method needed |
-| §CR.13 | Exact energy = `range_sum(l, r)` with pro-rating | Complementary to contour range energy |
+| Spec section | Concept                                                   | API implication                                        |
+| ------------ | --------------------------------------------------------- | ------------------------------------------------------ |
+| §CR.2        | Basis set — single flat set of G-nodes                    | Replace three `Vec`s with one `Vec<BasisElement>`      |
+| §CR.3        | Thatching — ≤2 boundary semi-internals whose `.sum` leaks | Mark basis elements, don't separate them               |
+| §CR.6        | Energy = $\sum_{\text{basis}} R.\text{sum}$               | Not `range_sum`; different value when thatching exists |
+| §CR.12       | Plateau selection: arbitrary coords → lattice endpoints   | New method needed                                      |
+| §CR.13       | Exact energy = `range_sum(l, r)` with pro-rating          | Complementary to contour range energy                  |
 
 ### Divergences between implementation and spec
 
@@ -85,7 +85,7 @@ Public types from original ADR: `InteriorElement`, `BoundaryElement`,
 
 2. **`energy` field is wrong.** The implementation computes
    `self.range_sum(start..end)` — the exact energy (§CR.13) — and
-   stores it as `energy`.  The spec's contour range energy (§CR.6)
+   stores it as `energy`. The spec's contour range energy (§CR.6)
    is $\sum_{\text{basis}} R.\text{sum}$, which differs when
    boundary thatching or ancestor pro-ration exists (§CR.13.6).
    The two are **not generally ordered** — neither
@@ -97,7 +97,7 @@ Public types from original ADR: `InteriorElement`, `BoundaryElement`,
    the basis set (§CR.2).
 
 4. **No plateau selection.** The spec adds §CR.12 as the bridge from
-   arbitrary coordinates to lattice-aligned contour ranges.  The API
+   arbitrary coordinates to lattice-aligned contour ranges. The API
    has no equivalent.
 
 5. **Stale §CR references.** Every `§CR.N` reference in the original
@@ -109,26 +109,26 @@ Public types from original ADR: `InteriorElement`, `BoundaryElement`,
 
 ### Q1: Return type shape (DC-037-1, revised)
 
-The spec defines one basis set, not three disjoint sets.  What
+The spec defines one basis set, not three disjoint sets. What
 should `contour_range()` return?
 
-| Option | Shape | Notes |
-|--------|-------|-------|
-| A | **Single `Vec<BasisElement>`** with an `is_boundary_thatch` flag per element | One flat list. Flag marks the ≤2 boundary thatchers. Simple, aligns with §CR.2–§CR.3. |
-| B | **Two lists:** `Vec<BasisElement>` + `Vec<BoundaryThatch>` (at most 2) | Separates thatching elements. Slightly richer boundary info. |
-| C | **`Vec<GNodeId>` only** — caller uses `gnode_info()` for detail | Minimal. Requires per-element round-trips. |
-| D | **Keep three `Vec`s** (status quo) | Preserves original API. Contradicts spec. |
+| Option | Shape                                                                        | Notes                                                                                 |
+| ------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| A      | **Single `Vec<BasisElement>`** with an `is_boundary_thatch` flag per element | One flat list. Flag marks the ≤2 boundary thatchers. Simple, aligns with §CR.2–§CR.3. |
+| B      | **Two lists:** `Vec<BasisElement>` + `Vec<BoundaryThatch>` (at most 2)       | Separates thatching elements. Slightly richer boundary info.                          |
+| C      | **`Vec<GNodeId>` only** — caller uses `gnode_info()` for detail              | Minimal. Requires per-element round-trips.                                            |
+| D      | **Keep three `Vec`s** (status quo)                                           | Preserves original API. Contradicts spec.                                             |
 
 **Considerations:**
 
 - The spec's §CR.3 defines thatching as a property of certain basis
-  elements, not a separate set.  A boolean flag on each element
+  elements, not a separate set. A boolean flag on each element
   captures this naturally.
 - Boundary thatching elements are rare (at most 2) and callers need
-  to identify them to understand energy leakage.  The flag avoids a
+  to identify them to understand energy leakage. The flag avoids a
   second lookup.
 - Option C loses the snapshot property — callers must re-traverse to
-  get `own`/`sum`/`depth`.  The basis set is bounded ($\leq 2N$), so
+  get `own`/`sum`/`depth`. The basis set is bounded ($\leq 2N$), so
   the `Vec` allocation is modest.
 - Option D contradicts the revised spec.
 
@@ -147,19 +147,19 @@ The sign of $B - A$ is indeterminate.
 
 How should the `ContourRange` struct represent energy?
 
-| Option | Fields | Notes |
-|--------|--------|-------|
-| A | `energy` (= $\sum_{\text{basis}} R.\text{sum}$) only | Matches §CR.6. Caller uses `range_sum()` separately if exact energy needed. |
-| B | **Both**: `energy` (§CR.6) + `exact_energy` (§CR.13) | Both measures in one result. Makes the gap ($B - A$) inspectable. One extra $O(N)$ traversal (or fused pass). |
-| C | `energy` (= `range_sum`, status quo) | Contradicts spec naming. Confusing. |
+| Option | Fields                                               | Notes                                                                                                         |
+| ------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| A      | `energy` (= $\sum_{\text{basis}} R.\text{sum}$) only | Matches §CR.6. Caller uses `range_sum()` separately if exact energy needed.                                   |
+| B      | **Both**: `energy` (§CR.6) + `exact_energy` (§CR.13) | Both measures in one result. Makes the gap ($B - A$) inspectable. One extra $O(N)$ traversal (or fused pass). |
+| C      | `energy` (= `range_sum`, status quo)                 | Contradicts spec naming. Confusing.                                                                           |
 
 **Considerations:**
 
 - Providing both makes the relationship between the two measures
-  explicit.  Callers can inspect the gap $B - A$ (§CR.13.6):
+  explicit. Callers can inspect the gap $B - A$ (§CR.13.6):
   boundary thatching leakage minus ancestor pro-ration.
 - The extra `range_sum` call is $O(N)$ and shares the same tree
-  traversal structure.  It could be fused into the basis walk, but
+  traversal structure. It could be fused into the basis walk, but
   even as a separate call the cost is marginal.
 - Option C uses the spec's name for the wrong value — a source of
   bugs for anyone reading both spec and code.
@@ -175,21 +175,21 @@ The spec defines:
 
 Which energy scalars should the struct carry?
 
-| Current field | Spec status | Recommendation |
-|---|---|---|
-| `energy` | Misaligned (currently `range_sum`) | **Redefine** to §CR.6: $\sum_{\text{basis}} R.\text{sum}$ |
-| `exact_energy` | §CR.13 (new) | **Add** — the pro-rated `range_sum` result |
-| `interior_energy` | Not in spec | **Drop** — artifact of three-set partition |
-| `thatched_energy` | Not in spec | **Drop** — artifact of three-set partition |
-| `plateau_energy` | §CR.10.4 | **Keep** — needed for $E_\times$ |
-| `cross_plateau_energy` | §CR.10.4 | **Keep** — $E - \sum P.\text{sum}$ |
-| `plateau_count` | Useful metadata | **Keep** |
+| Current field          | Spec status                        | Recommendation                                            |
+| ---------------------- | ---------------------------------- | --------------------------------------------------------- |
+| `energy`               | Misaligned (currently `range_sum`) | **Redefine** to §CR.6: $\sum_{\text{basis}} R.\text{sum}$ |
+| `exact_energy`         | §CR.13 (new)                       | **Add** — the pro-rated `range_sum` result                |
+| `interior_energy`      | Not in spec                        | **Drop** — artifact of three-set partition                |
+| `thatched_energy`      | Not in spec                        | **Drop** — artifact of three-set partition                |
+| `plateau_energy`       | §CR.10.4                           | **Keep** — needed for $E_\times$                          |
+| `cross_plateau_energy` | §CR.10.4                           | **Keep** — $E - \sum P.\text{sum}$                        |
+| `plateau_count`        | Useful metadata                    | **Keep**                                                  |
 
-| Option | Scalars | Notes |
-|--------|---------|-------|
-| A | `energy`, `exact_energy`, `plateau_energy`, `cross_plateau_energy`, `plateau_count` | Aligns with spec. Drops two obsolete fields. |
-| B | All of A plus `interior_energy`, `thatched_energy` | Backwards-compatible. Carries dead weight. |
-| C | `energy`, `plateau_energy`, `cross_plateau_energy`, `plateau_count` only | Omits exact energy — caller uses `range_sum` separately. |
+| Option | Scalars                                                                             | Notes                                                    |
+| ------ | ----------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| A      | `energy`, `exact_energy`, `plateau_energy`, `cross_plateau_energy`, `plateau_count` | Aligns with spec. Drops two obsolete fields.             |
+| B      | All of A plus `interior_energy`, `thatched_energy`                                  | Backwards-compatible. Carries dead weight.               |
+| C      | `energy`, `plateau_energy`, `cross_plateau_energy`, `plateau_count` only            | Omits exact energy — caller uses `range_sum` separately. |
 
 ### Q4: Plateau selection method (DC-037-4, new)
 
@@ -199,33 +199,33 @@ contour range endpoints.
 
 Should a public method be added?
 
-| Option | Method | Notes |
-|--------|--------|-------|
-| A | `pub fn select_plateaus(&self, lo: C, hi: C) -> Option<(BasisEdge<C>, BasisEdge<C>)>` | Direct bridge from arbitrary coords to lattice endpoints. $O(\log P)$. |
-| B | No method — callers walk `plateaus()` manually | Boilerplate. Error-prone. |
-| C | Accept `RangeBounds<C>` in `contour_range` directly, snap internally | Violates CR-I1; silently changes the queried range. Already rejected by original ADR (A2). |
+| Option | Method                                                                                | Notes                                                                                      |
+| ------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| A      | `pub fn select_plateaus(&self, lo: C, hi: C) -> Option<(BasisEdge<C>, BasisEdge<C>)>` | Direct bridge from arbitrary coords to lattice endpoints. $O(\log P)$.                     |
+| B      | No method — callers walk `plateaus()` manually                                        | Boilerplate. Error-prone.                                                                  |
+| C      | Accept `RangeBounds<C>` in `contour_range` directly, snap internally                  | Violates CR-I1; silently changes the queried range. Already rejected by original ADR (A2). |
 
 **Considerations:**
 
 - The pattern "I have coordinates, I want a contour range" is the
-  natural entry point for most callers.  Without `select_plateaus`,
+  natural entry point for most callers. Without `select_plateaus`,
   every caller reimplements the floor-index lookup.
 - Option A composes cleanly: `select_plateaus` returns endpoints,
-  `contour_range` consumes them.  The type system enforces that
+  `contour_range` consumes them. The type system enforces that
   contour ranges use lattice-aligned endpoints.
 - §CR.12.5: cost is $O(\log P)$ — two lookups in the plateau ordered
   map.
 
 ### Q5: Keep `ContourRangeEnergy`? (DC-037-5, revised)
 
-The original ADR provided a `Copy` energy-only struct.  With the
+The original ADR provided a `Copy` energy-only struct. With the
 simplified scalar set (Q3), should it be retained?
 
-| Option | Approach | Notes |
-|--------|----------|-------|
-| A | **Keep**, updated to new scalar set | Clean API for callers who want only scalars. No `Vec` allocation. Can have a dedicated $O(N)$ pass that skips collection. |
-| B | **Drop** — callers ignore the `basis` field on `ContourRange` | One fewer type. The `Vec` allocation is bounded ($\leq 2N$), so savings are small. |
-| C | **Replace** with a method that returns `(V, V)` tuple (energy, exact_energy) | Minimal. Loses plateau/cross-plateau breakdown. |
+| Option | Approach                                                                     | Notes                                                                                                                     |
+| ------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| A      | **Keep**, updated to new scalar set                                          | Clean API for callers who want only scalars. No `Vec` allocation. Can have a dedicated $O(N)$ pass that skips collection. |
+| B      | **Drop** — callers ignore the `basis` field on `ContourRange`                | One fewer type. The `Vec` allocation is bounded ($\leq 2N$), so savings are small.                                        |
+| C      | **Replace** with a method that returns `(V, V)` tuple (energy, exact_energy) | Minimal. Loses plateau/cross-plateau breakdown.                                                                           |
 
 **Considerations:**
 
@@ -236,7 +236,7 @@ simplified scalar set (Q3), should it be retained?
   `BasisElement` construction entirely — useful for hot-path callers
   (e.g. sentinel monitoring).
 - Current implementation delegates to `contour_range()` and discards
-  the `Vec`s.  Even if the dedicated path is deferred, retaining the
+  the `Vec`s. Even if the dedicated path is deferred, retaining the
   type preserves the option.
 
 ### Q6: Endpoint validation (DC-037-6, unchanged)
@@ -245,16 +245,16 @@ How should endpoints be validated against the lattice $\mathcal{E}$?
 
 This question is carried forward from the original ADR unchanged.
 
-| Option | Behaviour | Notes |
-|--------|-----------|-------|
-| A | **Panic** if either endpoint is not in $\mathcal{E}$ | Strict.  Matches `observe()` NaN panic convention (§API M-7.1). |
-| B | **Return `None`** for invalid endpoints | Lenient.  Matches `gnode_info()` returning `None` for stale handles. |
-| C | **Snap to nearest lattice point** | Magical.  Changes the caller's intent. |
+| Option | Behaviour                                            | Notes                                                               |
+| ------ | ---------------------------------------------------- | ------------------------------------------------------------------- |
+| A      | **Panic** if either endpoint is not in $\mathcal{E}$ | Strict. Matches `observe()` NaN panic convention (§API M-7.1).      |
+| B      | **Return `None`** for invalid endpoints              | Lenient. Matches `gnode_info()` returning `None` for stale handles. |
+| C      | **Snap to nearest lattice point**                    | Magical. Changes the caller's intent.                               |
 
 **Considerations (unchanged):**
 
 - The endpoint lattice changes with every mutation ($O(1)$ elements
-  per mutation, §CR.10.3).  Staleness is a timing issue, not a
+  per mutation, §CR.10.3). Staleness is a timing issue, not a
   programmer error.
 - Panicking (A) is appropriate for hard errors (like NaN), not for
   stale handles.
@@ -271,10 +271,11 @@ Each element carries an `is_boundary_thatch` flag indicating whether
 it is a boundary thatching semi-internal (§CR.3.2).
 
 This eliminates `InteriorElement`, `BoundaryElement`, and
-`StraddlingAncestor` as public types.  One new type `BasisElement`
+`StraddlingAncestor` as public types. One new type `BasisElement`
 replaces all three.
 
 Rationale:
+
 - Directly models the spec's basis set definition.
 - The flag captures the only classification the spec makes within
   the basis: boundary thatch vs not.
@@ -290,12 +291,13 @@ The `ContourRange` struct carries two energy measures:
 - `exact_energy`: the spec's exact energy (§CR.13),
   `range_sum(start..end)`.
 
-The two are **not generally ordered** (§CR.13.6).  The
+The two are **not generally ordered** (§CR.13.6). The
 relationship $E = \text{exact} + B - A$ decomposes into boundary
 thatching $B \geq 0$ and ancestor pro-ration $A \geq 0$; the sign
-of $B - A$ is indeterminate.  The gap is inspectable.
+of $B - A$ is indeterminate. The gap is inspectable.
 
 Rationale:
+
 - The old `energy` field was actually `range_sum` (exact energy).
   Callers who depended on that value get it as `exact_energy`.
 - The spec's energy (§CR.6) is the structurally meaningful measure —
@@ -308,15 +310,15 @@ Rationale:
 
 Five energy scalars plus `plateau_count`:
 
-| Field | Definition | Source |
-|---|---|---|
-| `energy` | $\sum_{\text{basis}} R.\text{sum}$ | §CR.6 |
-| `exact_energy` | `range_sum(start..end)` | §CR.13 |
-| `plateau_energy` | $\sum_{j=s}^{e} E(P_j)$ | §CR.10.4 |
-| `cross_plateau_energy` | `energy - plateau_energy` | §CR.10.4 |
-| `plateau_count` | Number of constituent plateaus | §CR.1 |
+| Field                  | Definition                         | Source   |
+| ---------------------- | ---------------------------------- | -------- |
+| `energy`               | $\sum_{\text{basis}} R.\text{sum}$ | §CR.6    |
+| `exact_energy`         | `range_sum(start..end)`            | §CR.13   |
+| `plateau_energy`       | $\sum_{j=s}^{e} E(P_j)$            | §CR.10.4 |
+| `cross_plateau_energy` | `energy - plateau_energy`          | §CR.10.4 |
+| `plateau_count`        | Number of constituent plateaus     | §CR.1    |
 
-Dropped: `interior_energy`, `thatched_energy`.  These were artifacts
+Dropped: `interior_energy`, `thatched_energy`. These were artifacts
 of the three-set partition and have no counterpart in the revised
 spec.
 
@@ -344,6 +346,7 @@ pub fn select_plateaus(
 ```
 
 Rationale:
+
 - §CR.12 is the natural entry point: callers have coordinates, not
   `BasisEdge` values.
 - The method composes with `contour_range()`:
@@ -354,7 +357,7 @@ Rationale:
 ### DC-037-5 (revised): Option A — Keep `ContourRangeEnergy`, updated
 
 The `ContourRangeEnergy` struct is retained with the new scalar set
-from DC-037-3.  It remains a `Copy` type.
+from DC-037-3. It remains a `Copy` type.
 
 ```rust
 pub fn contour_range_energy(
@@ -370,7 +373,7 @@ if profiling warrants.
 
 ### DC-037-6 (unchanged): Option B — Return `None` for invalid endpoints
 
-Unchanged from the original ADR.  Stale endpoints are a timing
+Unchanged from the original ADR. Stale endpoints are a timing
 issue; returning `None` lets callers retry after re-reading the
 plateau map.
 
@@ -528,7 +531,7 @@ pub struct ContourRangeEnergy<V: Accumulator> {
 
 ### Basis decomposition (§CR.8.1)
 
-The decomposition is a recursive G-Tree descent.  It collects the
+The decomposition is a recursive G-Tree descent. It collects the
 basis set directly — no three-way classification, no pro-ration.
 
 ```
@@ -589,7 +592,7 @@ function decompose(g, start, end, basis):
 1. **No straddling ancestor classification.** G-nodes that partially
    overlap but have children are traversed through those children.
    Only semi-internal nodes with uncovered halves in-range become
-   basis elements (with thatching).  Fully-terminal partial-overlap
+   basis elements (with thatching). Fully-terminal partial-overlap
    nodes are not basis elements of a lattice-aligned contour range —
    their boundaries are already lattice-aligned and handled by the
    recursion.
@@ -598,7 +601,7 @@ function decompose(g, start, end, basis):
    When a semi-internal node is not fully contained but both its
    present-child half and absent-child half overlap the range, the
    algorithm selects it directly and returns — preventing recursion
-   into the present child.  Without this guard, the present-child
+   into the present child. Without this guard, the present-child
    recursion would select descendants that are also subsumed by the
    semi-internal's `.sum` (via G-I1), producing an ancestor–descendant
    pair in the basis that violates CR-I4 and double-counts energy.
@@ -614,7 +617,7 @@ energy       = Σ basis[i].sum               // §CR.6
 exact_energy = range_sum(g_root, a_s, a_{e+1})  // §CR.13
 ```
 
-Both are $O(N)$.  The `range_sum` call reuses the existing
+Both are $O(N)$. The `range_sum` call reuses the existing
 implementation unchanged (ADR-M-020).
 
 ### Plateau selection (§CR.12)
@@ -633,17 +636,17 @@ $O(\log P)$.
 > _Note (floating-point coordinates)._ `floor_index(r - 1)` assumes
 > integer coordinates where $r - 1$ is the last included point.
 > For floating-point `C`, the subtraction is not meaningful in the
-> dyadic framework (§3.2.6).  Floating-point implementations should
+> dyadic framework (§3.2.6). Floating-point implementations should
 > use an exclusive-upper-bound variant `floor_index_strict_less(r)`
-> returning the largest $a_j$ strictly less than $r$.  See §CR.12.4
+> returning the largest $a_j$ strictly less than $r$. See §CR.12.4
 > for the full discussion.
 
 ### Shared core with `range_sum_inner`
 
 The decision to keep separate recursive functions (not a generic
-visitor) is carried forward.  The basis decomposition diverges from
+visitor) is carried forward. The basis decomposition diverges from
 `range_sum_inner` even more now: no pro-ration arithmetic at all,
-just basis collection and thatch flagging.  The two code paths share
+just basis collection and thatch flagging. The two code paths share
 only the recursion skeleton.
 
 ---
@@ -652,22 +655,22 @@ only the recursion skeleton.
 
 Updated to match the revised spec invariants (§CR.7):
 
-| Invariant | Check |
-|---|---|
-| **CR-I2 (Complete Cover)** | Union of basis effective tiles = `[start, end)` |
-| **CR-I3 (Disjointness)** | Pairwise non-overlapping effective tiles |
-| **CR-I4 (Minimality)** | No proper ancestor of any basis element also qualifies |
-| **CR-I6 (Determinism)** | Two calls on unmutated graph produce identical `basis` and energy fields |
-| **CR-I8 (Boundary Thatch)** | `basis.iter().filter(\|b\| b.is_boundary_thatch).count() ≤ 2` |
-| **Energy (§CR.6)** | `energy == basis.iter().map(\|b\| b.sum).sum()` |
-| **Energy gap (§CR.13.6)** | `energy == exact_energy + B - A` (structural identity; both $B, A \geq 0$ under P1) |
-| **Cross-plateau** | `cross_plateau_energy == energy - plateau_energy` |
-| **CR-I7 (Consistency)** | Single-plateau case: basis matches plateau's basis |
+| Invariant                   | Check                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------- |
+| **CR-I2 (Complete Cover)**  | Union of basis effective tiles = `[start, end)`                                     |
+| **CR-I3 (Disjointness)**    | Pairwise non-overlapping effective tiles                                            |
+| **CR-I4 (Minimality)**      | No proper ancestor of any basis element also qualifies                              |
+| **CR-I6 (Determinism)**     | Two calls on unmutated graph produce identical `basis` and energy fields            |
+| **CR-I8 (Boundary Thatch)** | `basis.iter().filter(\|b\| b.is_boundary_thatch).count() ≤ 2`                       |
+| **Energy (§CR.6)**          | `energy == basis.iter().map(\|b\| b.sum).sum()`                                     |
+| **Energy gap (§CR.13.6)**   | `energy == exact_energy + B - A` (structural identity; both $B, A \geq 0$ under P1) |
+| **Cross-plateau**           | `cross_plateau_energy == energy - plateau_energy`                                   |
+| **CR-I7 (Consistency)**     | Single-plateau case: basis matches plateau's basis                                  |
 
 Removed: the _old_ CR-I6 (decomposition identity with the three-set
-partition) — no longer applicable.  The revised spec reuses the
+partition) — no longer applicable. The revised spec reuses the
 CR-I6 label for **Determinism** (the basis is uniquely determined by
-the G-Tree state and the range).  This is verified by the
+the G-Tree state and the range). This is verified by the
 `determinism` test and is included in the table above.
 
 The new energy identity (`energy = Σ basis.sum`) is trivially true
@@ -682,32 +685,32 @@ This requires parent-lookup capability, already available via
 
 ## Testing
 
-Updated test matrix.  Tests marked ★ are new or substantially
+Updated test matrix. Tests marked ★ are new or substantially
 changed.
 
-| Test | Validates |
-|------|-----------|
-| `single_plateau_range` | Range spanning one plateau: basis matches plateau's basis elements (CR-I7). |
-| `full_domain_range` | `[0, 2^N)`: single basis element (G-root), `energy == total_sum()`, `exact_energy == energy`. |
-| ★ `basis_is_flat_list` | `basis` is a single `Vec`, not three separate collections. All elements are `BasisElement`. |
-| ★ `boundary_thatch_flag` | At most 2 basis elements have `is_boundary_thatch == true`.  They are semi-internal nodes at the range boundaries. |
-| `two_plateau_concatenation` | Concatenation energy consistency: each sub-range energy ≤ combined energy (nesting); discrepancy bounded (§CR.9.1). |
-| `split_and_nesting` | Each sub-range energy ≤ full range energy (nesting monotonicity, §CR.9.3). |
-| `nesting_monotonicity` | Wider range has ≥ energy of inner range. |
-| ★ `energy_exact_gap` | `energy == exact_energy + B - A`: verify the structural identity (§CR.13.6) where $B$ = boundary thatching, $A$ = ancestor pro-ration. |
-| ★ `energy_equals_basis_sum` | `energy == basis.iter().map(\|b\| b.sum).sum()` — trivially true by construction but verifies the assembly. |
-| `invalid_endpoint_returns_none` | Non-lattice endpoints produce `None`. |
-| `stale_endpoint_returns_none` | Mutation invalidates previous endpoints → `None`. |
-| `cross_plateau_energy_consistency` | `cross_plateau_energy == energy - plateau_energy` (§CR.10.4); sign is indeterminate. |
-| `energy_only_matches_full` | `contour_range_energy()` scalars match `contour_range()` scalars. |
-| `determinism` | Two calls on unmutated graph produce identical results. |
-| `empty_range_rejected` | `start >= end` returns `None`. |
-| ★ `select_plateaus_basic` | Arbitrary coordinates snap outward to lattice endpoints.  Returned endpoints are valid for `contour_range()`. |
-| ★ `select_plateaus_aligned` | Lattice-aligned input returns unchanged endpoints. |
-| ★ `select_plateaus_single_plateau` | Both coords in same plateau → single-plateau contour range. |
-| ★ `select_plateaus_full_domain` | `select_plateaus(0, 2^N)` → full domain contour range. |
-| ★ `select_plateaus_compose` | `select_plateaus(l, r)` → `contour_range(start, end)` round-trip succeeds. |
-| ★ `no_straddling_ancestors` | Contour range has no pro-rated fractional elements — all contributions are whole `.sum` values. |
+| Test                               | Validates                                                                                                                              |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `single_plateau_range`             | Range spanning one plateau: basis matches plateau's basis elements (CR-I7).                                                            |
+| `full_domain_range`                | `[0, 2^N)`: single basis element (G-root), `energy == total_sum()`, `exact_energy == energy`.                                          |
+| ★ `basis_is_flat_list`             | `basis` is a single `Vec`, not three separate collections. All elements are `BasisElement`.                                            |
+| ★ `boundary_thatch_flag`           | At most 2 basis elements have `is_boundary_thatch == true`. They are semi-internal nodes at the range boundaries.                      |
+| `two_plateau_concatenation`        | Concatenation energy consistency: each sub-range energy ≤ combined energy (nesting); discrepancy bounded (§CR.9.1).                    |
+| `split_and_nesting`                | Each sub-range energy ≤ full range energy (nesting monotonicity, §CR.9.3).                                                             |
+| `nesting_monotonicity`             | Wider range has ≥ energy of inner range.                                                                                               |
+| ★ `energy_exact_gap`               | `energy == exact_energy + B - A`: verify the structural identity (§CR.13.6) where $B$ = boundary thatching, $A$ = ancestor pro-ration. |
+| ★ `energy_equals_basis_sum`        | `energy == basis.iter().map(\|b\| b.sum).sum()` — trivially true by construction but verifies the assembly.                            |
+| `invalid_endpoint_returns_none`    | Non-lattice endpoints produce `None`.                                                                                                  |
+| `stale_endpoint_returns_none`      | Mutation invalidates previous endpoints → `None`.                                                                                      |
+| `cross_plateau_energy_consistency` | `cross_plateau_energy == energy - plateau_energy` (§CR.10.4); sign is indeterminate.                                                   |
+| `energy_only_matches_full`         | `contour_range_energy()` scalars match `contour_range()` scalars.                                                                      |
+| `determinism`                      | Two calls on unmutated graph produce identical results.                                                                                |
+| `empty_range_rejected`             | `start >= end` returns `None`.                                                                                                         |
+| ★ `select_plateaus_basic`          | Arbitrary coordinates snap outward to lattice endpoints. Returned endpoints are valid for `contour_range()`.                           |
+| ★ `select_plateaus_aligned`        | Lattice-aligned input returns unchanged endpoints.                                                                                     |
+| ★ `select_plateaus_single_plateau` | Both coords in same plateau → single-plateau contour range.                                                                            |
+| ★ `select_plateaus_full_domain`    | `select_plateaus(0, 2^N)` → full domain contour range.                                                                                 |
+| ★ `select_plateaus_compose`        | `select_plateaus(l, r)` → `contour_range(start, end)` round-trip succeeds.                                                             |
+| ★ `no_straddling_ancestors`        | Contour range has no pro-rated fractional elements — all contributions are whole `.sum` values.                                        |
 
 ---
 
@@ -715,38 +718,39 @@ changed.
 
 ### Types removed (pre-1.0 breaking change)
 
-| Type | Replacement |
-|---|---|
-| `InteriorElement<C, V>` | `BasisElement<C, V>` with `is_boundary_thatch == false` |
-| `BoundaryElement<C, V>` | `BasisElement<C, V>` with `is_boundary_thatch == true` |
-| `StraddlingAncestor<C, V>` | Removed entirely.  No equivalent in contour range context. |
+| Type                       | Replacement                                               |
+| -------------------------- | --------------------------------------------------------- |
+| `InteriorElement<C, V>`    | `BasisElement<C, V>` with `is_boundary_thatch == false`   |
+| `BoundaryElement<C, V>`    | `BasisElement<C, V>` with `is_boundary_thatch == true`    |
+| `StraddlingAncestor<C, V>` | Removed entirely. No equivalent in contour range context. |
 
 ### Fields removed on `ContourRange`
 
-| Field | Migration |
-|---|---|
-| `interior` | `cr.basis.iter().filter(\|b\| !b.is_boundary_thatch)` |
-| `boundary` | `cr.basis.iter().filter(\|b\| b.is_boundary_thatch)` |
-| `straddling` | Removed.  Use `range_sum()` for pro-rated energy. |
-| `interior_energy` | Removed.  Compute from basis if needed. |
-| `thatched_energy` | Removed.  `energy` (§CR.6) subsumes this concept. |
+| Field             | Migration                                             |
+| ----------------- | ----------------------------------------------------- |
+| `interior`        | `cr.basis.iter().filter(\|b\| !b.is_boundary_thatch)` |
+| `boundary`        | `cr.basis.iter().filter(\|b\| b.is_boundary_thatch)`  |
+| `straddling`      | Removed. Use `range_sum()` for pro-rated energy.      |
+| `interior_energy` | Removed. Compute from basis if needed.                |
+| `thatched_energy` | Removed. `energy` (§CR.6) subsumes this concept.      |
 
 ### Fields renamed/redefined on `ContourRange`
 
-| Field | Old meaning | New meaning |
-|---|---|---|
+| Field    | Old meaning                            | New meaning                                                      |
+| -------- | -------------------------------------- | ---------------------------------------------------------------- |
 | `energy` | `range_sum(start..end)` (exact energy) | $\sum_{\text{basis}} R.\text{sum}$ (contour range energy, §CR.6) |
 
 ### Fields added
 
-| Field | Meaning |
-|---|---|
+| Field          | Meaning                                                  |
+| -------------- | -------------------------------------------------------- |
 | `exact_energy` | `range_sum(start..end)` (§CR.13) — what old `energy` was |
-| `basis` | `Vec<BasisElement<C, V>>` — the flat basis set |
+| `basis`        | `Vec<BasisElement<C, V>>` — the flat basis set           |
 
 ### Re-exports in `lib.rs`
 
 Old:
+
 ```rust
 pub use contour_range::{
     BoundaryElement, ContourRange, ContourRangeEnergy,
@@ -755,6 +759,7 @@ pub use contour_range::{
 ```
 
 New:
+
 ```rust
 pub use contour_range::{BasisElement, ContourRange, ContourRangeEnergy};
 ```
@@ -765,22 +770,23 @@ pub use contour_range::{BasisElement, ContourRange, ContourRangeEnergy};
 
 ### File changes in `packages/mudlark/`
 
-| File | Change | Surface |
-|------|--------|---------|
-| `src/contour_range.rs` | Replace five types with three (`BasisElement`, `ContourRange`, `ContourRangeEnergy`).  Update `validate_endpoints`, `compute_plateau_energy`.  Update debug invariant assertions. | 1 |
-| `src/graph_query.rs` | Rewrite `decompose_inner` to collect `Vec<BasisElement>` (no three-way classification).  Add semi-internal early selection guard (§CR.8.1).  Add `select_plateaus()`.  Compute `energy` as `Σ basis.sum`, `exact_energy` via `range_sum()`. | 2 |
-| `src/lib.rs` | Update re-exports: remove `InteriorElement`, `BoundaryElement`, `StraddlingAncestor`; add `BasisElement`. | 1 |
-| `tests/contour_range.rs` | Rewrite tests to use `.basis` and `.is_boundary_thatch`.  Add new tests for `select_plateaus`, energy ordering, thatch flag. | (test-only) |
+| File                     | Change                                                                                                                                                                                                                                   | Surface     |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `src/contour_range.rs`   | Replace five types with three (`BasisElement`, `ContourRange`, `ContourRangeEnergy`). Update `validate_endpoints`, `compute_plateau_energy`. Update debug invariant assertions.                                                          | 1           |
+| `src/graph_query.rs`     | Rewrite `decompose_inner` to collect `Vec<BasisElement>` (no three-way classification). Add semi-internal early selection guard (§CR.8.1). Add `select_plateaus()`. Compute `energy` as `Σ basis.sum`, `exact_energy` via `range_sum()`. | 2           |
+| `src/lib.rs`             | Update re-exports: remove `InteriorElement`, `BoundaryElement`, `StraddlingAncestor`; add `BasisElement`.                                                                                                                                | 1           |
+| `tests/contour_range.rs` | Rewrite tests to use `.basis` and `.is_boundary_thatch`. Add new tests for `select_plateaus`, energy ordering, thatch flag.                                                                                                              | (test-only) |
 
 ### Trait bounds
 
 Methods require `V: Accumulator + Proratable + Inspectable`:
+
 - `Proratable` for `range_sum()` (exact energy computation).
 - `Inspectable` for plateau access via `self.plateaus()`.
 - `Accumulator` for `V::zero()`, `V::add()`.
 
 `select_plateaus` requires only `V: Accumulator + Inspectable` (no
-pro-ration).  Note: api.md currently lists `V: Proratable +
+pro-ration). Note: api.md currently lists `V: Proratable +
 Inspectable` for `select_plateaus` — this is an over-strict bound
 that should be corrected to `V: Inspectable` (plateau access is all
 that is needed).
@@ -794,7 +800,7 @@ that is needed).
 Retain `InteriorElement`, `BoundaryElement`, `StraddlingAncestor`.
 
 **Rejected** because the revised spec (§CR.1–§CR.13) defines a
-single basis set, not a three-set partition.  Keeping the old model
+single basis set, not a three-set partition. Keeping the old model
 creates a permanent divergence between spec and implementation,
 making the spec's invariants and algebra untestable.
 
@@ -803,9 +809,9 @@ making the spec's invariants and algebra untestable.
 Let `contour_range` accept `a..b` for any `a`, `b` and snap or clamp
 to lattice points internally.
 
-**Rejected** (carried forward from original ADR).  Contour ranges
-are defined only for lattice-aligned endpoints (CR-I1).  Silently
-snapping violates the decomposition identity.  `select_plateaus`
+**Rejected** (carried forward from original ADR). Contour ranges
+are defined only for lattice-aligned endpoints (CR-I1). Silently
+snapping violates the decomposition identity. `select_plateaus`
 (DC-037-4) provides the explicit snapping step.
 
 ### A3 — Omit `exact_energy` from the struct
@@ -816,7 +822,7 @@ separately.
 **Rejected** because the structural identity
 $E = \text{exact} + B - A$ (§CR.13.6) is a key diagnostic — it
 exposes the interplay of boundary thatching and ancestor
-pro-ration.  The cost of computing both in the same call is
+pro-ration. The cost of computing both in the same call is
 marginal.
 
 ### A4 — Return `Vec<GNodeId>` instead of `Vec<BasisElement>`
@@ -830,7 +836,7 @@ recompute.
 
 ### A5 — Add `is_lattice_point` convenience method
 
-**Deferred** (carried forward).  Callers can check via
+**Deferred** (carried forward). Callers can check via
 `plateaus().contains_key(&BasisEdge(coord))`.
 
 ---
@@ -840,7 +846,7 @@ recompute.
 - **Surface 1 drops three types, gains one:** `InteriorElement`,
   `BoundaryElement`, `StraddlingAncestor` → `BasisElement`.
   `ContourRange` and `ContourRangeEnergy` are retained with updated
-  fields.  Net Surface 1 type count: 3 (was 5).
+  fields. Net Surface 1 type count: 3 (was 5).
 
 - **Surface 2 gains one method:** `select_plateaus()`.
   `contour_range()` and `contour_range_energy()` retain their
@@ -857,11 +863,11 @@ recompute.
   correct sections in the revised spec (§CR.1–§CR.13).
 
 - **Pre-1.0 breaking change.** This removes three public types and
-  restructures two public structs.  No external consumers use these
-  types (sentinel does not import them).  The migration is contained
+  restructures two public structs. No external consumers use these
+  types (sentinel does not import them). The migration is contained
   within `packages/mudlark/`.
 
 - **Future path: algebraic operations.** Concatenation (§CR.9.1) and
-  splitting (§CR.9.2) remain deferred.  The simpler `ContourRange`
+  splitting (§CR.9.2) remain deferred. The simpler `ContourRange`
   struct makes future algebra methods easier to add — they operate on
   the basis set directly rather than juggling three sets.

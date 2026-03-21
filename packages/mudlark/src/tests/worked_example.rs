@@ -3,16 +3,71 @@
 
 //! Worked example integration test (§IDEA M-16).
 //!
-//! Exercises three observations on a `GvGraph<u64, u64, 3>` covering
-//! domain `[0, 8)` with θ = 5, `D_create` = 3, `D_evict` = 6.
+//! Exercises the three-observation sequence from the spec on a
+//! `GvGraph<u64, u64, 3>` covering domain `[0, 8)` with θ = 5,
+//! `D_create` = 3, `D_evict` = 6.  Each step is tested in isolation
+//! for G-tree structure, V-tree shape, and node counts, and then
+//! the full sequence is replayed in one shot as a cross-check.
 //!
-//! Step 1: `observe(3, 10)` → bootstrap split
-//! Step 2: `observe(3, 15)` → catalytic split + violation + skip-promote
-//! Step 3: `observe(6,  8)` → catalytic split, no violation (uncle shield)
+//! | Step | Observation      | Mechanism                                      |
+//! |------|------------------|------------------------------------------------|
+//! |  1   | `observe(3, 10)` | bootstrap split                                |
+//! |  2   | `observe(3, 15)` | catalytic split + violation + skip-promote      |
+//! |  3   | `observe(6,  8)` | catalytic split, no violation (uncle shield)    |
 //!
-//! **Expanded coverage:** additional steps exercising routing into deeper
-//! subtrees, energy conservation across all steps, and the full
-//! four-observation sequence from the spec's extended example.
+//! **Expanded coverage:** additional steps exercising routing into
+//! deeper subtrees, energy conservation across all steps, atomic-
+//! interval splits, serialisation round-trips, and depth-gate
+//! stability.
+//!
+//! # Test index
+//!
+//! ## Step 1 — bootstrap split
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`step1_g_tree_structure`] | root own/sum, two children at `[0,4)` and `[4,8)` |
+//! | [`step1_v_tree_structure`] | SR is a 2-node; root entry frozen, L/R entries terminal |
+//! | [`step1_node_count_and_violations`] | 3 nodes, no pending violations |
+//!
+//! ## Step 2 — catalytic split + skip-promote
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`step2_g_tree_structure`] | L gains children LL/LR; R still terminal |
+//! | [`step2_v_tree_after_skip_promote`] | SR becomes 3-node; L.entry promoted to depth 1 |
+//! | [`step2_node_count_and_violations`] | 5 nodes, violations drained by rebalance |
+//!
+//! ## Step 3 — catalytic split, uncle shield
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`step3_g_tree_structure`] | R gains children RL/RR; total sum = 33 |
+//! | [`step3_v_tree_uncle_shield`] | L.entry stays at depth 1 (uncle shield); R.entry frozen |
+//! | [`step3_final_node_count`] | 7 nodes, no pending violations |
+//!
+//! ## Full sequence & energy conservation
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`worked_example_full_sequence`] | end-to-end replay; aggregate sums, depths, V-root shape |
+//! | [`energy_conserved_at_every_step`] | `total_sum()` matches cumulative delta after each observe |
+//!
+//! ## Continued observations (step 4)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`step4_routing_into_deep_subtree`] | route into LL without split (4 < θ) |
+//! | [`step4_split_into_atomic_interval`] | LL splits into `[0,1)` and `[1,2)` (atomic for u64) |
+//! | [`step4_v_tree_after_atomic_split`] | LL.entry frozen; LLL/LLR terminal at max depth |
+//!
+//! ## Serialisation & invariants
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`plan_serializes_and_deserializes`] | JSON round-trip produces identical graph (feature = "serde") |
+//! | [`invariants_hold_at_every_step`] | `run_checked` validates invariants after every observation |
+//! | [`depth_gates_unchanged_without_budget`] | `D_create`, `D_evict`, soft limit stay at initial values |
 
 use crate::graph::GvGraph;
 use crate::handle::VNodeId;
@@ -275,7 +330,8 @@ fn worked_example_full_sequence() {
     let _t = init_tracing();
     let g = run::<u64, u64, 3>(worked_example_config(), &step3_plan());
 
-    // Step 1 outcomes.
+    // Aggregate outcomes (public API + internal cross-check).
+    assert_eq!(g.total_sum(), 33);
     assert_eq!(g.gnodes().get(g.g_root().index()).sum, 33);
     assert_eq!(g.node_count(), 7);
 
@@ -313,17 +369,13 @@ fn energy_conserved_at_every_step() {
     let plan = step3_plan();
     let cfg = worked_example_config();
 
-    // Check after each observation.
+    // Check after each observation via the public total_sum() API.
     let mut g = GvGraph::<u64, u64, 3>::new(cfg);
     let mut total: u64 = 0;
     for &(coord, delta) in &plan.observations {
         total += delta;
         g.observe(coord, delta);
-        assert_eq!(
-            g.gnodes().get(g.g_root().index()).sum,
-            total,
-            "energy conservation violated at total={total}"
-        );
+        assert_eq!(g.total_sum(), total, "energy conservation violated at total={total}");
     }
     assert_invariants(&g);
 }
@@ -347,7 +399,7 @@ fn step4_routing_into_deep_subtree() {
     assert!(ll.left.is_none());
 
     // Total energy: 10 + 15 + 8 + 4 = 37.
-    assert_eq!(g.gnodes().get(g.g_root().index()).sum, 37);
+    assert_eq!(g.total_sum(), 37);
     assert_invariants(&g);
 }
 
@@ -355,6 +407,7 @@ fn step4_routing_into_deep_subtree() {
 fn step4_split_into_atomic_interval() {
     let _t = init_tracing();
     // Observe enough into LL=[0,2) to trigger a split.
+    // LL.entry is at v_depth=3, D_create=3, so depth gate passes (3 > 3 is false).
     // After split: LL has children [0,1) and [1,2) — atomic for u64.
     let plan = step3_plan().observe(1, 6);
     let g = run::<u64, u64, 3>(worked_example_config(), &plan);
@@ -362,14 +415,44 @@ fn step4_split_into_atomic_interval() {
     let left_id = g.gnodes().get(g.g_root().index()).left.unwrap();
     let left_left_id = g.gnodes().get(left_id.index()).left.unwrap();
     let ll = g.gnodes().get(left_left_id.index());
-    // If depth gate allowed the split, we get 2 new nodes.
-    if let (Some(left_child), Some(right_child)) = (ll.left, ll.right) {
-        let lll = g.gnodes().get(left_child.index());
-        let llr = g.gnodes().get(right_child.index());
-        assert_eq!((lll.lo, lll.hi), (0, 1));
-        assert_eq!((llr.lo, llr.hi), (1, 2));
-        assert_eq!(g.node_count(), 9);
-    }
+
+    // Split must occur: 6 > θ=5 and depth gate allows it.
+    let left_child = ll.left.expect("LL should have split — left child missing");
+    let right_child = ll.right.expect("LL should have split — right child missing");
+    let lll = g.gnodes().get(left_child.index());
+    let llr = g.gnodes().get(right_child.index());
+    assert_eq!((lll.lo, lll.hi), (0, 1));
+    assert_eq!((llr.lo, llr.hi), (1, 2));
+    assert_eq!((lll.own, lll.sum), (0, 0));
+    assert_eq!((llr.own, llr.sum), (0, 0));
+    assert_eq!(g.node_count(), 9, "root + L + R + LL + LR + RL + RR + LLL + LLR");
+    assert_invariants(&g);
+}
+
+#[test]
+fn step4_v_tree_after_atomic_split() {
+    let _t = init_tracing();
+    let plan = step3_plan().observe(1, 6);
+    let g = run::<u64, u64, 3>(worked_example_config(), &plan);
+
+    // LL.entry: frozen (split occurred), intensity 6.
+    let left_id = g.gnodes().get(g.g_root().index()).left.unwrap();
+    let left_left_id = g.gnodes().get(left_id.index()).left.unwrap();
+    let ll_entry = g.gnodes().get(left_left_id.index()).entry.unwrap();
+    assert_eq!(g.vnodes().get(ll_entry.index()).intensity, 6);
+    assert_terminal(&g, ll_entry, false);
+
+    // LLL and LLR entries: terminal, intensity 0, at maximum depth.
+    let ll = g.gnodes().get(left_left_id.index());
+    let left_left_left_entry = g.gnodes().get(ll.left.unwrap().index()).entry.unwrap();
+    let left_left_right_entry = g.gnodes().get(ll.right.unwrap().index()).entry.unwrap();
+    assert_eq!(g.vnodes().get(left_left_left_entry.index()).intensity, 0);
+    assert_eq!(g.vnodes().get(left_left_right_entry.index()).intensity, 0);
+    assert_terminal(&g, left_left_left_entry, true);
+    assert_terminal(&g, left_left_right_entry, true);
+
+    // Total energy: 10 + 15 + 8 + 6 = 39.
+    assert_eq!(g.total_sum(), 39);
     assert_invariants(&g);
 }
 

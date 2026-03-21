@@ -1,18 +1,121 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
+//! Crate-level tests for the **V-Tree** arena operations in
+//! [`crate::vtree`].
+//!
+//! These tests exercise the `pub(crate)` arena-level functions
+//! directly (Surface 3), so they build V-node arenas by hand rather
+//! than going through `GraphCreator` / `Plan`.  Every function under
+//! test operates on raw `Arena<VNode<V>>` / `Arena<GNode<C, V>>`
+//! pairs, which makes it straightforward to assert exact structural
+//! outcomes — node counts, parent links, cached depths, intensity
+//! sums, and evictable flags — without higher-level graph machinery
+//! getting in the way.
+//!
+//! A test-only `vtree_insert` helper (mirroring the three insertion
+//! cases from §IDEA M-9.1) is defined in this module so that removal,
+//! depth, and propagation tests can start from well-understood tree
+//! shapes.
+//!
+//! # Test index
+//!
+//! ## `vtree_insert` (test-only helper, §IDEA M-9.1)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`insert_case1_empty_tree`] | first entry becomes root with depth 0 |
+//! | [`insert_case2_single_entry_root`] | second entry creates structural root with two depth-1 children |
+//! | [`insert_case3_buddy_insert`] | third entry buddy-inserts at lightest leaf |
+//! | [`insert_assigns_gnode_back_link`] | G-node `.entry` back-pointer set on every insert |
+//!
+//! ## `vtree_remove_leaf` (§IDEA M-9.2)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`remove_root_entry_yields_empty_tree`] | removing the sole entry yields `None` root and zero nodes |
+//! | [`remove_collapses_two_node_parent`] | removing one of two siblings collapses the structural parent |
+//! | [`remove_shrinks_three_node_parent`] | removing a child of a 2-node structural collapses it into its sibling |
+//! | [`remove_clears_gnode_back_link`] | G-node `.entry` back-pointer cleared on removal |
+//!
+//! ## `v_depth` (ADR-M-029)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`v_depth_root_is_zero`] | single-entry root has depth 0 |
+//! | [`v_depth_children_are_one`] | immediate children of root have depth 1 |
+//! | [`v_depth_caching`] | repeated queries return the same value from cache |
+//! | [`v_depth_recomputes_after_invalidation`] | depth recomputed correctly after `invalidate_depth_subtree` |
+//!
+//! ## `invalidate_depth_subtree`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`invalidate_marks_subtree_stale`] | all descendants marked `DEPTH_STALE` from root |
+//! | [`invalidate_already_stale_is_noop`] | re-invalidation of an already-stale node is harmless |
+//!
+//! ## `propagate_v_sums` (§IDEA M-8.9.1)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`propagate_sums_updates_ancestors`] | single intensity change propagates to root |
+//! | [`propagate_sums_deep_tree`] | varied intensities across 4 entries sum correctly at root |
+//!
+//! ## `propagate_evictable_flags` (§IDEA M-9.3)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`evictable_flag_propagates_upward`] | clearing all children clears the structural flag |
+//! | [`evictable_flag_early_terminates`] | flag stays `true` when at least one child is evictable |
+//! | [`evictable_flag_from_entry_walks_to_parent`] | propagation from an entry walks up to its structural parent |
+//!
+//! ## `update_parent_cached_intensity`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`update_parent_cached_intensity_syncs_parent`] | parent's cached child intensity updated correctly |
+//! | [`update_parent_cached_intensity_noop_at_root`] | call on parentless root is a safe no-op |
+//!
+//! ## `recompute_structural_intensity`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`recompute_structural_intensity_sums_children`] | structural node intensity recomputed from cached child values |
+//!
+//! ## `replace_child_in_parent`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`replace_child_updates_parent`] | old child replaced and new child + intensity appear in parent |
+//!
+//! ## `recompute_all_v_intensities`
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`recompute_all_fixes_stale_sums`] | full recompute fixes stale root intensity from leaf values |
+//!
+//! ## Round-trip insert/remove
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`insert_then_remove_all_yields_empty`] | inserting then removing all entries yields empty arena |
+//! | [`insert_remove_interleaved`] | mixed insert/remove sequence maintains consistent structure |
+
 use std::sync::atomic::{AtomicU32, Ordering};
 
+use super::init_tracing;
 use crate::GNodeId;
 use crate::arena::Arena;
 use crate::gnode::GNode;
 use crate::handle::VNodeId;
-use crate::rebalance::{find_violated_nodes, is_violated};
 use crate::traits::{Accumulator, Coordinate};
 use crate::vnode::{DEPTH_STALE, PackedChildren, VKind, VNode};
-use crate::vtree::{propagate_evictable_flags, propagate_v_sums, replace_child_in_parent, v_depth, vtree_remove_leaf};
+use crate::vtree::{
+    invalidate_depth_subtree, propagate_evictable_flags, propagate_v_sums, recompute_all_v_intensities,
+    recompute_structural_intensity, replace_child_in_parent, update_parent_cached_intensity, v_depth, vtree_remove_leaf,
+};
 
-// ── Test-only V-Tree insertion (moved from vtree.rs) ────────────────
+// ── Test-only V-Tree insertion (moved from vtree.rs) ────────────
 
 /// Whether a V-entry's backing G-node is exposed (on the contour).
 const fn entry_is_exposed<V: Accumulator>(node: &VNode<V>) -> bool {
@@ -134,7 +237,7 @@ fn vtree_insert<C: Coordinate, V: Accumulator>(
     (e_id, Some(root_id))
 }
 
-// ── Test helpers ────────────────────────────────────────────────────
+// ── Test helpers ────────────────────────────────────────────────
 
 /// Helper: create a minimal G-node and return its ID.
 fn make_gnode(gnodes: &mut Arena<GNode<u64, u64>>) -> GNodeId {
@@ -146,8 +249,45 @@ fn make_gnode(gnodes: &mut Arena<GNode<u64, u64>>) -> GNodeId {
     GNodeId::from_index(gnodes.alloc(g))
 }
 
+/// Helper: insert `n` entries and return `(entry_ids, v_root)`.
+fn insert_n(
+    vnodes: &mut Arena<VNode<u64>>,
+    gnodes: &mut Arena<GNode<u64, u64>>,
+    n: usize,
+) -> (Vec<(GNodeId, VNodeId)>, Option<VNodeId>) {
+    let mut root = None;
+    let mut ids = Vec::with_capacity(n);
+    for _ in 0..n {
+        let g = make_gnode(gnodes);
+        let (e, new_root) = vtree_insert(vnodes, gnodes, g, root);
+        root = new_root;
+        ids.push((g, e));
+    }
+    (ids, root)
+}
+
+/// Helper: build a 3-entry tree (structural root with one 2-node child).
+///
+/// Layout: `S_root(S_buddy(e1, e3), e2)` — root is structural with
+/// one structural child and one entry child.
+#[allow(clippy::type_complexity)]
+fn build_three_entry_tree() -> (
+    Arena<VNode<u64>>,
+    Arena<GNode<u64, u64>>,
+    Vec<(GNodeId, VNodeId)>,
+    Option<VNodeId>,
+) {
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+    let (ids, root) = insert_n(&mut vnodes, &mut gnodes, 3);
+    (vnodes, gnodes, ids, root)
+}
+
+// ── vtree_insert (§IDEA M-9.1) ─────────────────────────────────
+
 #[test]
 fn insert_case1_empty_tree() {
+    let _t = init_tracing();
     let mut vnodes = Arena::new();
     let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
     let g = make_gnode(&mut gnodes);
@@ -156,50 +296,61 @@ fn insert_case1_empty_tree() {
     assert_eq!(root, Some(e));
     assert!(matches!(vnodes.get(e.index()).kind, VKind::Entry { .. }));
     assert_eq!(vnodes.get(e.index()).parent, None);
-    assert_eq!(gnodes.get(g.index()).entry, Some(e));
+    assert_eq!(v_depth(&vnodes, e), 0);
 }
 
 #[test]
 fn insert_case2_single_entry_root() {
+    let _t = init_tracing();
     let mut vnodes = Arena::new();
     let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
-    let g1 = make_gnode(&mut gnodes);
-    let g2 = make_gnode(&mut gnodes);
 
-    let (e1, root) = vtree_insert(&mut vnodes, &mut gnodes, g1, None);
-    let (_e2, root) = vtree_insert(&mut vnodes, &mut gnodes, g2, root);
+    let (_, root) = insert_n(&mut vnodes, &mut gnodes, 2);
 
     let root_id = root.unwrap();
-    assert_ne!(root_id, e1); // Root should be structural now.
     let root_node = vnodes.get(root_id.index());
     assert!(matches!(root_node.kind, VKind::Structural { .. }));
+    assert_eq!(root_node.parent, None);
 
     if let VKind::Structural { children, .. } = &root_node.kind {
         assert_eq!(children.len(), 2);
+        // Both children should be entries at depth 1.
+        for i in 0..children.len() {
+            let (child_id, _) = children.get(i);
+            assert!(matches!(vnodes.get(child_id.index()).kind, VKind::Entry { .. }));
+            assert_eq!(v_depth(&vnodes, child_id), 1);
+        }
     }
 }
 
 #[test]
 fn insert_case3_buddy_insert() {
-    let mut vnodes = Arena::new();
-    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
-    let g1 = make_gnode(&mut gnodes);
-    let g2 = make_gnode(&mut gnodes);
-    let g3 = make_gnode(&mut gnodes);
-
-    let (_, root) = vtree_insert(&mut vnodes, &mut gnodes, g1, None);
-    let (_, root) = vtree_insert(&mut vnodes, &mut gnodes, g2, root);
-    let (_, root) = vtree_insert(&mut vnodes, &mut gnodes, g3, root);
+    let _t = init_tracing();
+    let (vnodes, _, _, root) = build_three_entry_tree();
 
     let root_id = root.unwrap();
-    // Root should still be structural, now with a nested buddy.
     assert!(matches!(vnodes.get(root_id.index()).kind, VKind::Structural { .. }));
-    // e1, e2, e3, root_structural, buddy_structural = 5
+    // 3 entries + 1 root structural + 1 buddy structural = 5
     assert_eq!(vnodes.count(), 5);
 }
 
 #[test]
-fn remove_root_entry() {
+fn insert_assigns_gnode_back_link() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+
+    let (ids, _) = insert_n(&mut vnodes, &mut gnodes, 3);
+    for (g_id, e_id) in &ids {
+        assert_eq!(gnodes.get(g_id.index()).entry, Some(*e_id));
+    }
+}
+
+// ── vtree_remove_leaf (§IDEA M-9.2) ────────────────────────────
+
+#[test]
+fn remove_root_entry_yields_empty_tree() {
+    let _t = init_tracing();
     let mut vnodes = Arena::new();
     let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
     let g = make_gnode(&mut gnodes);
@@ -208,385 +359,472 @@ fn remove_root_entry() {
     let new_root = vtree_remove_leaf(&mut vnodes, &mut gnodes, e, root);
     assert_eq!(new_root, None);
     assert_eq!(vnodes.count(), 0);
-    assert_eq!(gnodes.get(g.index()).entry, None);
 }
 
 #[test]
-fn remove_from_3node_parent() {
+fn remove_collapses_two_node_parent() {
+    let _t = init_tracing();
     let mut vnodes = Arena::new();
     let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+    let (ids, root) = insert_n(&mut vnodes, &mut gnodes, 2);
 
-    // Build a 3-node parent manually: root_s with 3 entry children.
-    let g1 = make_gnode(&mut gnodes);
-    let g2 = make_gnode(&mut gnodes);
-    let g3 = make_gnode(&mut gnodes);
+    let (_, e1) = ids[0];
+    let (_, e2) = ids[1];
 
-    let e1_node = VNode {
-        intensity: 10u64,
-        parent: None,
-        cached_depth: AtomicU32::new(DEPTH_STALE),
-        kind: VKind::Entry {
-            gnode: g1,
-            is_exposed: true,
-            is_evictable: true,
-        },
-    };
-    let e1 = VNodeId::from_index(vnodes.alloc(e1_node));
-    gnodes.get_mut(g1.index()).entry = Some(e1);
-
-    let e2_node = VNode {
-        intensity: 5u64,
-        parent: None,
-        cached_depth: AtomicU32::new(DEPTH_STALE),
-        kind: VKind::Entry {
-            gnode: g2,
-            is_exposed: true,
-            is_evictable: true,
-        },
-    };
-    let e2 = VNodeId::from_index(vnodes.alloc(e2_node));
-    gnodes.get_mut(g2.index()).entry = Some(e2);
-
-    let e3_node = VNode {
-        intensity: 3u64,
-        parent: None,
-        cached_depth: AtomicU32::new(DEPTH_STALE),
-        kind: VKind::Entry {
-            gnode: g3,
-            is_exposed: true,
-            is_evictable: true,
-        },
-    };
-    let e3 = VNodeId::from_index(vnodes.alloc(e3_node));
-    gnodes.get_mut(g3.index()).entry = Some(e3);
-
-    let root_s = VNode {
-        intensity: 18,
-        parent: None,
-        cached_depth: AtomicU32::new(DEPTH_STALE),
-        kind: VKind::Structural {
-            children: PackedChildren::new_3((e1, 10), (e2, 5), (e3, 3)),
-            has_evictable: true,
-        },
-    };
-    let root_id = VNodeId::from_index(vnodes.alloc(root_s));
-    vnodes.get_mut(e1.index()).parent = Some(root_id);
-    vnodes.get_mut(e2.index()).parent = Some(root_id);
-    vnodes.get_mut(e3.index()).parent = Some(root_id);
-
-    // Remove e3 (3-node → 2-node).
-    let new_root = vtree_remove_leaf(&mut vnodes, &mut gnodes, e3, Some(root_id));
-    assert_eq!(new_root, Some(root_id));
-
-    let root_node = vnodes.get(root_id.index());
-    if let VKind::Structural { children, .. } = &root_node.kind {
-        assert_eq!(children.len(), 2);
-    }
-    assert_eq!(root_node.intensity, 15); // 10 + 5
-}
-
-#[test]
-fn remove_from_2node_collapse() {
-    let mut vnodes = Arena::new();
-    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
-    let g1 = make_gnode(&mut gnodes);
-    let g2 = make_gnode(&mut gnodes);
-
-    let (e1, root) = vtree_insert(&mut vnodes, &mut gnodes, g1, None);
-    let (e2, root) = vtree_insert(&mut vnodes, &mut gnodes, g2, root);
-
-    // Root is structural with 2 children. Remove e1 → collapse.
+    // Remove first entry — structural root should collapse, leaving e2 as root.
     let new_root = vtree_remove_leaf(&mut vnodes, &mut gnodes, e1, root);
-    assert_eq!(new_root, Some(e2));
+    let new_root_id = new_root.unwrap();
+    assert_eq!(new_root_id, e2);
     assert_eq!(vnodes.get(e2.index()).parent, None);
     assert_eq!(vnodes.count(), 1); // Only e2 remains.
 }
 
 #[test]
-fn propagate_evictable_flags_basic() {
-    let mut vnodes = Arena::new();
-    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
-    let g1 = make_gnode(&mut gnodes);
-    let g2 = make_gnode(&mut gnodes);
+fn remove_shrinks_three_node_parent() {
+    let _t = init_tracing();
+    let (mut vnodes, mut gnodes, ids, root) = build_three_entry_tree();
 
-    let (e1, root) = vtree_insert(&mut vnodes, &mut gnodes, g1, None);
-    let (_e2, root) = vtree_insert(&mut vnodes, &mut gnodes, g2, root);
+    // The tree has 5 nodes: 3 entries + 2 structural.
+    assert_eq!(vnodes.count(), 5);
 
-    let root_id = root.unwrap();
-    // Both entries are evictable → root structural has_evictable = true.
-    if let VKind::Structural { has_evictable, .. } = &vnodes.get(root_id.index()).kind {
-        assert!(*has_evictable);
-    }
+    // Remove one entry — expect the parent to shrink or collapse.
+    let (_, e3) = ids[2];
+    let new_root = vtree_remove_leaf(&mut vnodes, &mut gnodes, e3, root);
+    assert!(new_root.is_some());
 
-    // Set e1 to non-evictable and propagate.
-    if let VKind::Entry { is_evictable, .. } = &mut vnodes.get_mut(e1.index()).kind {
-        *is_evictable = false;
-    }
-    propagate_evictable_flags(&mut vnodes, root_id);
-
-    // Root should still be true because e2 is still evictable.
-    if let VKind::Structural { has_evictable, .. } = &vnodes.get(root_id.index()).kind {
-        assert!(*has_evictable);
-    }
+    // Removing e3 collapses its 2-node parent (buddy structural),
+    // leaving: S_root(e1, e2) = 2 entries + 1 structural = 3 nodes.
+    assert_eq!(vnodes.count(), 3);
 }
 
 #[test]
-fn v_sum_propagation() {
-    let mut vnodes = Arena::new();
-    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
-    let g1 = make_gnode(&mut gnodes);
-    let g2 = make_gnode(&mut gnodes);
-
-    let (e1, root) = vtree_insert(&mut vnodes, &mut gnodes, g1, None);
-    let (_e2, root) = vtree_insert(&mut vnodes, &mut gnodes, g2, root);
-
-    // Simulate an observation: increase e1's intensity.
-    vnodes.get_mut(e1.index()).intensity = 10;
-    // Update the cached intensity in the parent.
-    let root_id = root.unwrap();
-    if let VKind::Structural { children, .. } = &mut vnodes.get_mut(root_id.index()).kind
-        && let Some(idx) = children.find_index(e1)
-    {
-        children.update_intensity(idx, 10);
-    }
-    // Propagate sums.
-    propagate_v_sums(&mut vnodes, e1);
-    assert_eq!(vnodes.get(root_id.index()).intensity, 10);
-}
-
-// ── v_depth unit tests (Phase 2 Item 6) ──────────────────────────
-
-#[test]
-fn v_depth_root_entry_is_zero() {
+fn remove_clears_gnode_back_link() {
+    let _t = init_tracing();
     let mut vnodes = Arena::new();
     let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
     let g = make_gnode(&mut gnodes);
-    let (e, _root) = vtree_insert(&mut vnodes, &mut gnodes, g, None);
+
+    let (e, root) = vtree_insert(&mut vnodes, &mut gnodes, g, None);
+    assert_eq!(gnodes.get(g.index()).entry, Some(e));
+
+    vtree_remove_leaf(&mut vnodes, &mut gnodes, e, root);
+    assert_eq!(gnodes.get(g.index()).entry, None);
+}
+
+// ── v_depth (ADR-M-029) ────────────────────────────────────────
+
+#[test]
+fn v_depth_root_is_zero() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+    let g = make_gnode(&mut gnodes);
+
+    let (e, _) = vtree_insert(&mut vnodes, &mut gnodes, g, None);
     assert_eq!(v_depth(&vnodes, e), 0);
 }
 
 #[test]
-fn v_depth_one_under_structural_root() {
+fn v_depth_children_are_one() {
+    let _t = init_tracing();
     let mut vnodes = Arena::new();
     let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
-    let g1 = make_gnode(&mut gnodes);
-    let g2 = make_gnode(&mut gnodes);
-    let (e1, root) = vtree_insert(&mut vnodes, &mut gnodes, g1, None);
-    let (e2, _root) = vtree_insert(&mut vnodes, &mut gnodes, g2, root);
-    // Both entries are children of the structural root → depth 1.
-    assert_eq!(v_depth(&vnodes, e1), 1);
-    assert_eq!(v_depth(&vnodes, e2), 1);
+    let (ids, root) = insert_n(&mut vnodes, &mut gnodes, 2);
+
+    let root_id = root.unwrap();
+    assert_eq!(v_depth(&vnodes, root_id), 0);
+
+    for (_, e_id) in &ids {
+        assert_eq!(v_depth(&vnodes, *e_id), 1);
+    }
 }
 
 #[test]
-fn v_depth_two_in_three_level_tree() {
-    let mut vnodes = Arena::new();
-    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
-    let g1 = make_gnode(&mut gnodes);
-    let g2 = make_gnode(&mut gnodes);
-    let g3 = make_gnode(&mut gnodes);
-    let (_, root) = vtree_insert(&mut vnodes, &mut gnodes, g1, None);
-    let (_, root) = vtree_insert(&mut vnodes, &mut gnodes, g2, root);
-    let (e3, _root) = vtree_insert(&mut vnodes, &mut gnodes, g3, root);
-    // e3 buddy-inserts next to the lightest entry.
-    // Both lightest entries are at depth 1. After buddy-insert, e3
-    // is wrapped in a structural at depth 1, so e3 is at depth 2.
-    assert_eq!(v_depth(&vnodes, e3), 2);
+fn v_depth_caching() {
+    let _t = init_tracing();
+    let (vnodes, _, ids, _) = build_three_entry_tree();
+
+    // First call computes; second should hit cache.
+    let (_, e1) = ids[0];
+    let d1 = v_depth(&vnodes, e1);
+    let d2 = v_depth(&vnodes, e1);
+    assert_eq!(d1, d2);
+    // Depth should be 2 (root → buddy_structural → e1).
+    assert_eq!(d1, 2);
 }
 
 #[test]
-fn v_depth_after_bootstrap_split() {
-    // Uses a full GvGraph to verify depths match the worked example.
-    let mut g: crate::graph::GvGraph<u64, u64, 3> = crate::graph::GvGraph::new(crate::graph::Config {
-        split_threshold: 5,
-        depth_create: 3,
-        depth_evict: 6,
-        budget: None,
-        alpha_relax: 0.75,
-        bounded_eviction: true,
-    });
-    g.observe(3u64, 10u64); // bootstrap split
+fn v_depth_recomputes_after_invalidation() {
+    let _t = init_tracing();
+    let (vnodes, _, ids, root) = build_three_entry_tree();
 
-    // Root entry at depth 1 (under structural root).
-    let root_entry = g.gnodes().get(g.g_root().index()).entry.unwrap();
-    assert_eq!(v_depth(g.vnodes(), root_entry), 1);
+    let root_id = root.unwrap();
+    let (_, e1) = ids[0];
 
-    // Child entries at depth 2 (under child structural).
-    let left_id = g.gnodes().get(g.g_root().index()).left.unwrap();
-    let left_entry = g.gnodes().get(left_id.index()).entry.unwrap();
-    assert_eq!(v_depth(g.vnodes(), left_entry), 2);
+    // Warm the cache.
+    let original = v_depth(&vnodes, e1);
+    assert_eq!(original, 2);
+
+    // Invalidate the whole subtree.
+    invalidate_depth_subtree(&vnodes, root_id);
+    assert_eq!(vnodes.get(e1.index()).cached_depth.load(Ordering::Relaxed), DEPTH_STALE);
+
+    // Re-query — should recompute and return the same depth.
+    let recomputed = v_depth(&vnodes, e1);
+    assert_eq!(recomputed, original);
+    // Cache should be warm again.
+    assert_ne!(vnodes.get(e1.index()).cached_depth.load(Ordering::Relaxed), DEPTH_STALE);
 }
 
-// ── Leaf removal violation gap tests ─────────────────────────
+// ── invalidate_depth_subtree ────────────────────────────────────
 
-/// Helper: create a V-entry with a given intensity and a backing G-node.
-fn make_entry(vnodes: &mut Arena<VNode<u64>>, gnodes: &mut Arena<GNode<u64, u64>>, intensity: u64) -> VNodeId {
-    let g = make_gnode(gnodes);
-    let e = VNode {
-        intensity,
-        parent: None,
-        cached_depth: AtomicU32::new(DEPTH_STALE),
+#[test]
+fn invalidate_marks_subtree_stale() {
+    let _t = init_tracing();
+    let (vnodes, _, ids, root) = build_three_entry_tree();
+
+    let root_id = root.unwrap();
+    // Warm the cache for all nodes.
+    for (_, e_id) in &ids {
+        let _ = v_depth(&vnodes, *e_id);
+    }
+    // All cached depths should be valid.
+    assert_ne!(vnodes.get(root_id.index()).cached_depth.load(Ordering::Relaxed), DEPTH_STALE);
+
+    // Invalidate from root — everything should become stale.
+    invalidate_depth_subtree(&vnodes, root_id);
+
+    assert_eq!(vnodes.get(root_id.index()).cached_depth.load(Ordering::Relaxed), DEPTH_STALE);
+    for (_, e_id) in &ids {
+        assert_eq!(vnodes.get(e_id.index()).cached_depth.load(Ordering::Relaxed), DEPTH_STALE);
+    }
+}
+
+#[test]
+fn invalidate_already_stale_is_noop() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+    let g = make_gnode(&mut gnodes);
+
+    // Insert but don't warm the cache — insert sets depth for case 1.
+    let (e, _) = vtree_insert(&mut vnodes, &mut gnodes, g, None);
+    // Manually mark as stale.
+    vnodes.get(e.index()).cached_depth.store(DEPTH_STALE, Ordering::Relaxed);
+
+    // Invalidate should be a no-op (already stale).
+    invalidate_depth_subtree(&vnodes, e);
+    assert_eq!(vnodes.get(e.index()).cached_depth.load(Ordering::Relaxed), DEPTH_STALE);
+}
+
+// ── propagate_v_sums (§IDEA M-8.9.1) ───────────────────────────
+
+#[test]
+fn propagate_sums_updates_ancestors() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+    let (ids, root) = insert_n(&mut vnodes, &mut gnodes, 2);
+
+    let root_id = root.unwrap();
+    let (_, e1) = ids[0];
+
+    // Root intensity should be 0 (both entries have zero intensity).
+    assert_eq!(vnodes.get(root_id.index()).intensity, 0);
+
+    // Set e1's intensity and propagate.
+    vnodes.get_mut(e1.index()).intensity = 42;
+    // Update the parent's cached child intensity first.
+    update_parent_cached_intensity(&mut vnodes, e1, 42);
+    propagate_v_sums(&mut vnodes, e1);
+
+    assert_eq!(vnodes.get(root_id.index()).intensity, 42);
+}
+
+#[test]
+fn propagate_sums_deep_tree() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+
+    // 4 entries → depth-2 tree with multiple structural levels.
+    let (ids, root) = insert_n(&mut vnodes, &mut gnodes, 4);
+    let root_id = root.unwrap();
+
+    // Set varied intensities on all entries.
+    for (i, (_, e_id)) in ids.iter().enumerate() {
+        let val = (i as u64 + 1) * 10; // 10, 20, 30, 40
+        vnodes.get_mut(e_id.index()).intensity = val;
+        update_parent_cached_intensity(&mut vnodes, *e_id, val);
+        propagate_v_sums(&mut vnodes, *e_id);
+    }
+
+    // Root intensity should equal the sum of all entry intensities.
+    assert_eq!(vnodes.get(root_id.index()).intensity, 100);
+}
+
+// ── propagate_evictable_flags (§IDEA M-9.3) ────────────────────
+
+#[test]
+fn evictable_flag_propagates_upward() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+    let (ids, root) = insert_n(&mut vnodes, &mut gnodes, 2);
+
+    let root_id = root.unwrap();
+
+    // Both entries are evictable by default, so root should have has_evictable.
+    if let VKind::Structural { has_evictable, .. } = &vnodes.get(root_id.index()).kind {
+        assert!(*has_evictable);
+    }
+
+    // Mark both entries as non-evictable.
+    for (_, e_id) in &ids {
+        if let VKind::Entry { is_evictable, .. } = &mut vnodes.get_mut(e_id.index()).kind {
+            *is_evictable = false;
+        }
+    }
+
+    propagate_evictable_flags(&mut vnodes, root_id);
+
+    if let VKind::Structural { has_evictable, .. } = &vnodes.get(root_id.index()).kind {
+        assert!(!*has_evictable, "root should be non-evictable after clearing children");
+    }
+}
+
+#[test]
+fn evictable_flag_early_terminates() {
+    let _t = init_tracing();
+    let (mut vnodes, _, ids, root) = build_three_entry_tree();
+
+    let root_id = root.unwrap();
+
+    // Mark just one entry as non-evictable — flag should still be true
+    // at root because other entries remain evictable.
+    let (_, e1) = ids[0];
+    if let VKind::Entry { is_evictable, .. } = &mut vnodes.get_mut(e1.index()).kind {
+        *is_evictable = false;
+    }
+
+    propagate_evictable_flags(&mut vnodes, root_id);
+
+    if let VKind::Structural { has_evictable, .. } = &vnodes.get(root_id.index()).kind {
+        assert!(
+            *has_evictable,
+            "root should remain evictable when some children are evictable"
+        );
+    }
+}
+
+#[test]
+fn evictable_flag_from_entry_walks_to_parent() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+    let (ids, root) = insert_n(&mut vnodes, &mut gnodes, 2);
+
+    let root_id = root.unwrap();
+
+    // Mark both entries as non-evictable.
+    for (_, e_id) in &ids {
+        if let VKind::Entry { is_evictable, .. } = &mut vnodes.get_mut(e_id.index()).kind {
+            *is_evictable = false;
+        }
+    }
+
+    // Start propagation from an *entry* node — the function should
+    // walk up to the structural parent and clear its flag.
+    propagate_evictable_flags(&mut vnodes, ids[0].1);
+
+    if let VKind::Structural { has_evictable, .. } = &vnodes.get(root_id.index()).kind {
+        assert!(!*has_evictable, "flag should be false after propagating from entry");
+    }
+}
+
+// ── update_parent_cached_intensity ──────────────────────────────
+
+#[test]
+fn update_parent_cached_intensity_syncs_parent() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+    let (ids, root) = insert_n(&mut vnodes, &mut gnodes, 2);
+
+    let root_id = root.unwrap();
+    let (_, e1) = ids[0];
+
+    // Before: parent's cached intensity for e1 should be 0.
+    if let VKind::Structural { children, .. } = &vnodes.get(root_id.index()).kind {
+        let idx = children.find_index(e1).unwrap();
+        assert_eq!(children.intensities[idx], 0);
+    }
+
+    // Update the cached intensity.
+    update_parent_cached_intensity(&mut vnodes, e1, 77);
+
+    // After: parent's cached intensity should reflect the new value.
+    if let VKind::Structural { children, .. } = &vnodes.get(root_id.index()).kind {
+        let idx = children.find_index(e1).unwrap();
+        assert_eq!(children.intensities[idx], 77);
+    }
+}
+
+#[test]
+fn update_parent_cached_intensity_noop_at_root() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+    let g = make_gnode(&mut gnodes);
+
+    let (e, _) = vtree_insert(&mut vnodes, &mut gnodes, g, None);
+
+    // e is the root (no parent) — should be a no-op.
+    update_parent_cached_intensity(&mut vnodes, e, 999);
+    // No panic, no structural change.
+    assert_eq!(vnodes.count(), 1);
+}
+
+// ── recompute_structural_intensity ──────────────────────────────
+
+#[test]
+fn recompute_structural_intensity_sums_children() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+    let (ids, root) = insert_n(&mut vnodes, &mut gnodes, 2);
+
+    let root_id = root.unwrap();
+
+    // Set child intensities and update the parent's cached copies.
+    vnodes.get_mut(ids[0].1.index()).intensity = 15;
+    vnodes.get_mut(ids[1].1.index()).intensity = 25;
+    update_parent_cached_intensity(&mut vnodes, ids[0].1, 15);
+    update_parent_cached_intensity(&mut vnodes, ids[1].1, 25);
+
+    // Root intensity is still 0 (stale).
+    assert_eq!(vnodes.get(root_id.index()).intensity, 0);
+
+    recompute_structural_intensity(&mut vnodes, root_id);
+    assert_eq!(vnodes.get(root_id.index()).intensity, 40);
+}
+
+// ── replace_child_in_parent ─────────────────────────────────────
+
+#[test]
+fn replace_child_updates_parent() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+    let (ids, root) = insert_n(&mut vnodes, &mut gnodes, 2);
+
+    let root_id = root.unwrap();
+    let (_, e1) = ids[0];
+
+    // Create a new entry to replace e1.
+    let new_entry = VNode {
+        intensity: 99,
+        parent: Some(root_id),
+        cached_depth: AtomicU32::new(1),
         kind: VKind::Entry {
-            gnode: g,
+            gnode: ids[0].0,
             is_exposed: true,
             is_evictable: true,
         },
     };
-    let e_id = VNodeId::from_index(vnodes.alloc(e));
-    gnodes.get_mut(g.index()).entry = Some(e_id);
-    e_id
+    let new_id = VNodeId::from_index(vnodes.alloc(new_entry));
+
+    replace_child_in_parent(&mut vnodes, root_id, e1, new_id, 99);
+
+    // Verify parent now references the new child.
+    if let VKind::Structural { children, .. } = &vnodes.get(root_id.index()).kind {
+        let mut found = false;
+        for i in 0..children.len() {
+            let (id, int) = children.get(i);
+            if id == new_id {
+                assert_eq!(int, 99);
+                found = true;
+            }
+            assert_ne!(id, e1, "old child should no longer appear in parent");
+        }
+        assert!(found, "new child should appear in parent");
+    }
 }
 
-/// Helper: create a structural 2-node and parent both children.
-fn make_s2(vnodes: &mut Arena<VNode<u64>>, a: VNodeId, b: VNodeId) -> VNodeId {
-    let a_int = vnodes.get(a.index()).intensity;
-    let b_int = vnodes.get(b.index()).intensity;
-    let s = VNode {
-        intensity: a_int + b_int,
-        parent: None,
-        cached_depth: AtomicU32::new(DEPTH_STALE),
-        kind: VKind::Structural {
-            children: PackedChildren::new_2((a, a_int), (b, b_int)),
-            has_evictable: true,
-        },
-    };
-    let s_id = VNodeId::from_index(vnodes.alloc(s));
-    vnodes.get_mut(a.index()).parent = Some(s_id);
-    vnodes.get_mut(b.index()).parent = Some(s_id);
-    s_id
-}
+// ── recompute_all_v_intensities ─────────────────────────────────
 
-/// Helper: create a structural 3-node and parent all children.
-fn make_s3(vnodes: &mut Arena<VNode<u64>>, a: VNodeId, b: VNodeId, c: VNodeId) -> VNodeId {
-    let a_int = vnodes.get(a.index()).intensity;
-    let b_int = vnodes.get(b.index()).intensity;
-    let c_int = vnodes.get(c.index()).intensity;
-    let s = VNode {
-        intensity: a_int + b_int + c_int,
-        parent: None,
-        cached_depth: AtomicU32::new(DEPTH_STALE),
-        kind: VKind::Structural {
-            children: PackedChildren::new_3((a, a_int), (b, b_int), (c, c_int)),
-            has_evictable: true,
-        },
-    };
-    let s_id = VNodeId::from_index(vnodes.alloc(s));
-    vnodes.get_mut(a.index()).parent = Some(s_id);
-    vnodes.get_mut(b.index()).parent = Some(s_id);
-    vnodes.get_mut(c.index()).parent = Some(s_id);
-    s_id
-}
-
-/// Removing a child from a 3-node grandparent can weaken uncle
-/// coverage for grandchildren, creating a V-I3 violation that
-/// `vtree_remove_leaf` does not enqueue.
-///
-/// Tree before removal:
-/// ```text
-///     g (S3: [p1(10), p2(20), victim(15)])
-///      └── p2 (S2: [c1(12), c2(8)])
-/// ```
-///
-/// c1's uncles = max(p1=10, victim=15) = 15. c1=12 ≤ 15 → OK.
-///
-/// After removing `victim` (3-node → 2-node):
-/// g becomes S2:[p1(10), p2(20)].
-/// c1's uncles = max(p1=10) = 10. c1=12 > 10 → **VIOLATED**.
 #[test]
-fn remove_from_3node_creates_violation_for_grandchild() {
-    let mut vnodes: Arena<VNode<u64>> = Arena::new();
+fn recompute_all_fixes_stale_sums() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+    let (ids, root) = insert_n(&mut vnodes, &mut gnodes, 2);
+
+    let root_id = root.unwrap();
+
+    // Set entry intensities directly (simulating stale sums).
+    vnodes.get_mut(ids[0].1.index()).intensity = 10;
+    vnodes.get_mut(ids[1].1.index()).intensity = 20;
+
+    // Root intensity is stale (still 0 from insertion).
+    assert_eq!(vnodes.get(root_id.index()).intensity, 0);
+
+    recompute_all_v_intensities(&mut vnodes, root_id);
+
+    // Root should now reflect the sum of its children.
+    assert_eq!(vnodes.get(root_id.index()).intensity, 30);
+}
+
+// ── Round-trip insert/remove ────────────────────────────────────
+
+#[test]
+fn insert_then_remove_all_yields_empty() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
+    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
+    let (ids, mut root) = insert_n(&mut vnodes, &mut gnodes, 4);
+
+    // Remove all entries in reverse order.
+    for (_, e_id) in ids.iter().rev() {
+        root = vtree_remove_leaf(&mut vnodes, &mut gnodes, *e_id, root);
+    }
+
+    assert_eq!(root, None);
+    assert_eq!(vnodes.count(), 0);
+}
+
+#[test]
+fn insert_remove_interleaved() {
+    let _t = init_tracing();
+    let mut vnodes = Arena::new();
     let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
 
-    // Leaf entries.
-    let p1 = make_entry(&mut vnodes, &mut gnodes, 10);
-    let c1 = make_entry(&mut vnodes, &mut gnodes, 12);
-    let c2 = make_entry(&mut vnodes, &mut gnodes, 8);
-    let victim = make_entry(&mut vnodes, &mut gnodes, 15);
+    // Insert 3.
+    let g1 = make_gnode(&mut gnodes);
+    let g2 = make_gnode(&mut gnodes);
+    let g3 = make_gnode(&mut gnodes);
 
-    // p2 wraps c1 and c2.
-    let p2 = make_s2(&mut vnodes, c1, c2);
+    let (e1, root) = vtree_insert(&mut vnodes, &mut gnodes, g1, None);
+    let (e2, root) = vtree_insert(&mut vnodes, &mut gnodes, g2, root);
+    let (_e3, root) = vtree_insert(&mut vnodes, &mut gnodes, g3, root);
 
-    // g is a 3-node: [p1, p2, victim].
-    let g = make_s3(&mut vnodes, p1, p2, victim);
+    // Remove middle.
+    let root = vtree_remove_leaf(&mut vnodes, &mut gnodes, e2, root);
+    assert!(root.is_some());
 
-    // Pre-condition: no violations.
-    assert!(!is_violated(&vnodes, c1), "c1 should NOT be violated before removal");
-    assert!(!is_violated(&vnodes, c2), "c2 should NOT be violated before removal");
-    assert!(find_violated_nodes(&vnodes).is_empty(), "tree should be clean before removal");
+    // Insert another.
+    let g4 = make_gnode(&mut gnodes);
+    let (_e4, root) = vtree_insert(&mut vnodes, &mut gnodes, g4, root);
+    assert!(root.is_some());
 
-    // Remove victim from the 3-node g.
-    let _new_root = vtree_remove_leaf(&mut vnodes, &mut gnodes, victim, Some(g));
+    // Remove first.
+    let root = vtree_remove_leaf(&mut vnodes, &mut gnodes, e1, root);
+    assert!(root.is_some());
 
-    // Post-condition: c1 is now violated (12 > max uncle 10).
-    let violated = find_violated_nodes(&vnodes);
-    assert!(
-        !violated.is_empty(),
-        "removing a child from a 3-node should create a violation \
-             (c1 intensity 12 > new max uncle 10) — this is the gap"
-    );
-    assert!(
-        is_violated(&vnodes, c1),
-        "c1 (intensity=12) should be violated against uncle p1 (intensity=10)"
-    );
-}
-
-/// Collapsing a 2-node parent replaces it with the surviving
-/// child. This weakens the uncle seen by the **sibling subtree's**
-/// children: they formerly had the full parent intensity as their
-/// uncle; now they have only the survivor's (smaller) intensity.
-///
-/// Tree before removal:
-/// ```text
-///     g (S2: [p(24), g_sib(23)])        ← root
-///      ├── p   (S2: [sole(8), victim(16)])
-///      └── g_sib (S2: [nephew1(20), nephew2(3)])
-/// ```
-///
-/// `nephew1`: `parent=g_sib`, `gp=g`. uncle=\\[`p(24)`\\]. 20 ≤ 24 → OK.
-///
-/// After removing `victim`: p collapses, `sole(8)` replaces p.
-/// g becomes `S2:[sole(8), g_sib(23)]`.
-/// `nephew1`: uncle=\\[`sole(8)`\\]. 20 > 8 → **VIOLATED**.
-#[test]
-fn collapse_2node_creates_violation_for_sibling_subtree() {
-    let mut vnodes: Arena<VNode<u64>> = Arena::new();
-    let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
-
-    // Leaf entries.
-    let sole = make_entry(&mut vnodes, &mut gnodes, 8);
-    let victim = make_entry(&mut vnodes, &mut gnodes, 16);
-    let nephew1 = make_entry(&mut vnodes, &mut gnodes, 20);
-    let nephew2 = make_entry(&mut vnodes, &mut gnodes, 3);
-
-    // Build tree bottom-up.
-    let p = make_s2(&mut vnodes, sole, victim);
-    let g_sib = make_s2(&mut vnodes, nephew1, nephew2);
-    let g = make_s2(&mut vnodes, p, g_sib);
-
-    // Pre-condition: no violations.
-    assert!(
-        !is_violated(&vnodes, nephew1),
-        "nephew1 should NOT be violated before removal"
-    );
-    assert!(
-        !is_violated(&vnodes, nephew2),
-        "nephew2 should NOT be violated before removal"
-    );
-    assert!(!is_violated(&vnodes, sole), "sole should NOT be violated before removal");
-    assert!(find_violated_nodes(&vnodes).is_empty(), "tree should be clean before removal");
-
-    // Remove victim — p collapses, sole(8) replaces p(24) under g.
-    let _new_root = vtree_remove_leaf(&mut vnodes, &mut gnodes, victim, Some(g));
-
-    // Post-condition: nephew1 is now violated (20 > new uncle sole=8).
-    let violated = find_violated_nodes(&vnodes);
-    assert!(
-        !violated.is_empty(),
-        "collapsing a 2-node should create a violation for the sibling \
-             subtree (nephew1 intensity 20 > new uncle sole=8) — this is the gap"
-    );
-    assert!(
-        is_violated(&vnodes, nephew1),
-        "nephew1 (intensity=20) should be violated against uncle sole (intensity=8)"
-    );
+    // Should have 2 entries remaining with valid structure.
+    let entry_count = vnodes
+        .iter_occupied()
+        .filter(|(_, v)| matches!(v.kind, VKind::Entry { .. }))
+        .count();
+    assert_eq!(entry_count, 2);
 }

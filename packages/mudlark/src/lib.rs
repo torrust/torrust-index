@@ -131,6 +131,12 @@ pub mod testing;
 #[cfg(test)]
 mod tests;
 
+// README doc-tests: compile and run every code block in the README
+// as part of `cargo test --doc`.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+mod _readme {}
+
 // ── Public re-exports (ADR-M-032) ──────────────────────────────────
 //
 // One canonical path per public type. Downstream code should

@@ -145,7 +145,7 @@ pub struct GNodeChildren {
 /// assert!(g.soft_limit().is_some());
 /// assert!(g.headroom() > 0);
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Config<V: Accumulator> {
     /// Minimum accumulated intensity a cell must exceed before
     /// subdividing ($\theta$ in the formal spec).

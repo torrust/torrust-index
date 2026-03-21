@@ -29,8 +29,8 @@ What does `sample()` return?
 
 | Option | Type                 | Notes                                                            |
 | ------ | -------------------- | ---------------------------------------------------------------- |
-| A      | `Option<Cell<C, V>>` | Snapshot view (ADR-M-008 addendum: no lifetime, copied fields).    |
-| B      | `Option<Span<C, V>>` | Owned copy. No lifetime. Already decided in ADR-M-008.             |
+| A      | `Option<Cell<C, V>>` | Snapshot view (ADR-M-008 addendum: no lifetime, copied fields).  |
+| B      | `Option<Span<C, V>>` | Owned copy. No lifetime. Already decided in ADR-M-008.           |
 | C      | `Option<GNodeId>`    | Raw handle — caller dereferences via graph. Minimal API surface. |
 
 **Considerations:**
