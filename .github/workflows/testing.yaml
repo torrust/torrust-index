@@ -15,7 +15,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - id: setup
         name: Setup Toolchain
@@ -32,6 +32,50 @@ jobs:
         name: Run Formatting-Checks
         run: cargo fmt --check
 
+  msrv:
+    name: MSRV
+    runs-on: ubuntu-latest
+    needs: format
+
+    steps:
+      - id: checkout
+        name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - id: msrv
+        name: Read MSRV from Cargo.toml
+        run: |
+          MSRV=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          echo "version=$MSRV" >> "$GITHUB_OUTPUT"
+
+      - id: setup
+        name: Setup Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+
+      - id: cache
+        name: Enable Workflow Cache
+        uses: Swatinem/rust-cache@v2
+
+      - id: check
+        name: Run Build Checks
+        run: cargo check --workspace --all-targets --all-features
+
+      - id: imdl
+        name: Install Intermodal
+        run: |
+          rustup install stable
+          cargo +stable install imdl
+
+      - id: test-docs
+        name: Run Documentation Tests
+        run: cargo test --doc
+
+      - id: test
+        name: Run Unit Tests
+        run: cargo test --workspace --all-targets --all-features
+
   check:
     name: Static Analysis
     runs-on: ubuntu-latest
@@ -44,7 +88,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - id: setup
         name: Setup Toolchain
@@ -97,7 +141,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - id: setup
         name: Setup Toolchain
@@ -134,7 +178,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - id: setup
         name: Setup Toolchain

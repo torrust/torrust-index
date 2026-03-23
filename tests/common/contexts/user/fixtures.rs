@@ -1,4 +1,4 @@
-use rand::RngExt;
+use rand::Rng;
 
 use crate::common::contexts::user::forms::RegistrationForm;
 

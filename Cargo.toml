@@ -29,8 +29,8 @@ keywords = ["bittorrent", "file-sharing", "index", "peer-to-peer", "torrent"]
 license = "AGPL-3.0-only"
 publish = true
 repository = "https://github.com/torrust/torrust-tracker"
-rust-version = "1.80"
-version = "3.0.0-develop"
+rust-version = "1.83"
+version = "3.1.0-develop"
 
 [features]
 default = []
@@ -39,7 +39,7 @@ default = []
 opt-level = 3
 
 [dependencies]
-torrust-index-located-error = { version = "3.0.0-develop", path = "packages/located-error" }
+torrust-index-located-error = { version = "3.1.0-develop", path = "packages/located-error" }
 torrust-index-render-text-as-image = { version = "0.1.0", path = "packages/render-text-as-image" }
 
 anyhow = "1"
@@ -64,7 +64,7 @@ http-body = "1"
 hyper = "1"
 hyper-util = { version = "0", features = ["http1", "http2", "tokio"] }
 indexmap = "2"
-jsonwebtoken = { version = "10", features = ["rust_crypto"] }
+jsonwebtoken = "9.3"
 lettre = { version = "0", features = [
     "builder",
     "file-transport-envelope",
@@ -77,7 +77,7 @@ log = "0"
 mockall = "0"
 pbkdf2 = { version = "0", features = ["simple"] }
 pin-project-lite = "0"
-rand = "0"
+rand = "0.9"
 regex = "1"
 reqwest = { version = "0", features = ["json", "multipart", "query"] }
 serde = { version = "1", features = ["derive", "rc"] }

@@ -1,7 +1,7 @@
 //! Render short text strings as PNG images.
 //!
 //! See §SPEC R-1 for the full specification.
-//! Module structure defined in §ADR R-003.
+//! Module structure defined in ADR-R-003.
 
 mod blend;
 mod encode;

@@ -34,23 +34,40 @@ API, perhaps using `#[doc(hidden)]` helpers when appropriate.
 | Crate       | `pub(crate)` | `/src/tests/` |
 | Integration | `pub`        | `/tests/`     |
 
+
+## Test Doc-Headers
+
+Every test file (module) should maintain an index of the tests contained in the module-doc. The primary purpose is to make it easy to scan the test files to detect duplicates or overlapping coverage. Please opportunistically create if missing.
+
 ## Cross-Reference Conventions
 
 Eagerly corrected when spotted in **any** file!
 
 Cross-references use the `§` (section sign) prefix. Every reference
-carries a **package qualifier** — `T-` for Torrust —
-so the target document is never ambiguous.
+carries a **package qualifier** so the target document is never ambiguous.
+ADR references (`ADR-T-001`, `ADR-R-001`, …) are an exception — they
+use their own `ADR-<PREFIX>-<NNN>` form without the `§` prefix.
+
+| Prefix | Package              | Example document                     |
+|--------|----------------------|--------------------------------------|
+| `T-`   | Torrust (root crate) | *(none yet)*                         |
+| `R-`   | render-text-as-image | `packages/render-text-as-image/`     |
 
 ### General Rules
 
-- Use `§§` for ranges: e.g. `§§ALGO M-12.2–12.5`.
+- Use `§§` for ranges: e.g. `§§IDEA M-12.2–12.5`.
 - Bare `§N` (no label) is acceptable **within** a document that already
-  establishes context (e.g. inside `algorithm.md` itself), but in source
+  establishes context (e.g. inside `idea.md` itself), but in source
   code and cross-package references always use the fully qualified
   `§BOOK PACKAGE_PREFIX-N` form.
+- Example: `§SPEC R-1.1` refers to §1.1 of `packages/render-text-as-image/docs/specification.md`.
+- ADRs live in an `adr/` directory per package (`/adr/` for the
+  root crate) and use sequential numbering: `NNN-slug.md`. Referenced
+  as `ADR-T-001`, `ADR-R-001`, `ADR-R-002`.
 
 ## Replacing a File
+
+To avoid partial or corrupted writes, always replace files atomically:
 
 1. Read the file.
 2. Using the CLI, `rm` the file.
