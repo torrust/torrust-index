@@ -3970,7 +3970,6 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "toml 1.0.7+spec-1.1.0",
- "torrust-index-located-error",
  "torrust-index-render-text-as-image",
  "tower",
  "tower-http",
@@ -3980,14 +3979,6 @@ dependencies = [
  "urlencoding",
  "uuid",
  "which",
-]
-
-[[package]]
-name = "torrust-index-located-error"
-version = "3.1.0-develop"
-dependencies = [
- "thiserror 2.0.18",
- "tracing",
 ]
 
 [[package]]

@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, NoneAsEmptyString};
 use thiserror::Error;
 use tokio::sync::RwLock;
-use torrust_index_located_error::LocatedError;
 
 use crate::web::api::server::DynError;
 
@@ -216,20 +215,14 @@ pub enum Error {
     /// This error only occurs if there is no configuration file and the
     /// `TORRUST_INDEX_CONFIG_TOML` environment variable is not set.
     #[error("Unable to load from Environmental Variable: {source}")]
-    UnableToLoadFromEnvironmentVariable {
-        source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
-    },
+    UnableToLoadFromEnvironmentVariable { source: DynError },
 
     #[error("Unable to load from Config File: {source}")]
-    UnableToLoadFromConfigFile {
-        source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
-    },
+    UnableToLoadFromConfigFile { source: DynError },
 
     /// Unable to load the configuration from the configuration file.
     #[error("Failed processing the configuration: {source}")]
-    ConfigError {
-        source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
-    },
+    ConfigError { source: DynError },
 
     #[error("The error for errors that can never happen.")]
     Infallible,
@@ -242,11 +235,9 @@ pub enum Error {
 }
 
 impl From<figment::Error> for Error {
-    #[track_caller]
     fn from(err: figment::Error) -> Self {
-        Self::ConfigError {
-            source: (Arc::new(err) as DynError).into(),
-        }
+        tracing::error!(%err, "Failed processing the configuration");
+        Self::ConfigError { source: Arc::new(err) }
     }
 }
 

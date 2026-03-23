@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "packages/located-error", "packages/render-text-as-image"]
+members = [".", "packages/render-text-as-image"]
 
 [package]
 default-run = "torrust-index"
@@ -39,7 +39,6 @@ default = []
 opt-level = 3
 
 [dependencies]
-torrust-index-located-error = { version = "3.1.0-develop", path = "packages/located-error" }
 torrust-index-render-text-as-image = { version = "0.1.0", path = "packages/render-text-as-image" }
 
 anyhow = "1"
