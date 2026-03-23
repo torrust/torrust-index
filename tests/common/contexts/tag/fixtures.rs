@@ -1,4 +1,4 @@
-use rand::RngExt;
+use rand::Rng;
 
 pub fn random_tag_name() -> String {
     format!("tag name {}", random_id())

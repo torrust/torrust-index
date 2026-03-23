@@ -63,10 +63,10 @@ so long as the public type is `Copy + Debug + Default`.
    image height is determined by the font metrics (ascent + descent) plus
    twice the padding.
 
-2. **Font** — a single embedded monospaced font (see §ADR R-002) compiled
+2. **Font** — a single embedded monospaced font (see ADR-R-002) compiled
    into the binary via `include_bytes!()`. There is no runtime font discovery.
 
-3. **Rasterisation** — glyphs are rasterised by `ab_glyph` (see §ADR R-001).
+3. **Rasterisation** — glyphs are rasterised by `ab_glyph` (see ADR-R-001).
    The rasteriser's default anti-aliasing is used; no additional quality
    knobs are exposed.
 
@@ -98,9 +98,9 @@ for each `cache::image::manager::Error` variant.
 
 ## Dependencies
 
-Dependency selection is tracked in §ADR R-001.
+Dependency selection is tracked in ADR-R-001.
 
 ## Cross-References
 
-- §ADR R-001 — Dependency Selection for Text-to-PNG Rendering.
-- §ADR R-002 — Embedded Font Selection.
+- ADR-R-001 — Dependency Selection for Text-to-PNG Rendering.
+- ADR-R-002 — Embedded Font Selection.

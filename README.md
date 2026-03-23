@@ -2,7 +2,7 @@
 
 [![container_wf_b]][container_wf] [![coverage_wf_b]][coverage_wf] [![deployment_wf_b]][deployment_wf] [![testing_wf_b]][testing_wf] [![labels_wf_b]][labels_wf]
 
-__Torrust Index__ is a library for [BitTorrent][bittorrent] Files. Written in [Rust Language][rust] with the [Axum] web framework. ___This index aims to be respectful to established standards, (both [formal][BEP 00] and [otherwise][torrent_source_felid]).___
+__Torrust Index__ is a library for [BitTorrent][bittorrent] Files. Written in [Rust Language][rust] (edition 2021, MSRV 1.83) with the [Axum] web framework. ___This index aims to be respectful to established standards, (both [formal][BEP 00] and [otherwise][torrent_source_felid]).___
 
 > This is a [Torrust][torrust] project and is in active development. It is community supported as well as sponsored by [Nautilus Cyberneering][nautilus].
 
@@ -118,6 +118,12 @@ The following services are provided by the default configuration:
 ## Documentation
 
 - [API (Version 1)][api]
+
+## Architecture Decision Records
+
+- [ADR-T-001: Lowercase Infohashes](adr/001-lowercase-infohashes.md) — All infohashes are normalized to lowercase throughout the codebase, database, and API.
+- [ADR-T-002: Ignore Non-Standard Fields in Info Dictionary](adr/002-ignore-non-standard-info-fields.md) — Non-standard fields in the torrent info dictionary are ignored to prevent info-hash mismatches.
+- [ADR-T-003: Preparing for Rust Edition 2024](adr/003-edition-2024-preparation.md) — Pin dependencies to avoid edition-2024-only crates while the workspace remains on edition 2021; raise MSRV to 1.83.
 
 ## Contributing
 
