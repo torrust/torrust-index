@@ -9,7 +9,7 @@ use axum::response::{Redirect, Response};
 use axum::routing::get;
 use axum::{Json, Router};
 use hyper::Request;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::propagate_header::PropagateHeaderLayer;

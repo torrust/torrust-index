@@ -2,13 +2,13 @@ use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::sync::{Arc, LazyLock};
 
-use jsonwebtoken::{encode, EncodingKey, Header};
+use jsonwebtoken::{EncodingKey, Header, encode};
 use lettre::message::{MessageBuilder, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 use serde::{Deserialize, Serialize};
-use serde_json::value::{to_value, Value};
-use tera::{try_get_value, Context, Tera};
+use serde_json::value::{Value, to_value};
+use tera::{Context, Tera, try_get_value};
 
 use crate::config::Configuration;
 use crate::errors::ServiceError;

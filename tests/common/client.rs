@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use reqwest::{multipart, Error};
+use reqwest::{Error, multipart};
 use serde::Serialize;
 
 use super::connection_info::ConnectionInfo;

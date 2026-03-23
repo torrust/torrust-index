@@ -1,5 +1,5 @@
 use crate::config::Configuration;
-use crate::services::settings::{extract_public_settings, ConfigurationPublic, EmailOnSignup};
+use crate::services::settings::{ConfigurationPublic, EmailOnSignup, extract_public_settings};
 
 #[tokio::test]
 async fn configuration_should_return_only_public_settings() {

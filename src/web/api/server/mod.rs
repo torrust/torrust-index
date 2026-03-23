@@ -9,7 +9,6 @@ use std::sync::Arc;
 use axum_server::tls_rustls::RustlsConfig;
 use thiserror::Error;
 use tokio::sync::oneshot::{Receiver, Sender};
-use torrust_index_located_error::LocatedError;
 use tracing::{error, info};
 use v1::routes::router;
 
@@ -123,7 +122,7 @@ pub enum Error {
     /// Unable to parse tls Config.
     #[error("bad tls config: {source}")]
     BadTlsConfig {
-        source: LocatedError<'static, dyn std::error::Error + Send + Sync>,
+        source: DynError,
         ssl_cert_path: String,
         ssl_key_path: String,
     },
@@ -138,15 +137,14 @@ pub async fn make_rust_tls(tsl_config: &Option<Tsl>) -> Option<Result<RustlsConf
             let ssl_cert_path = cert.clone().to_string();
             let ssl_key_path = key.clone().to_string();
 
-            Some(
-                RustlsConfig::from_pem_file(cert, key)
-                    .await
-                    .map_err(|err| Error::BadTlsConfig {
-                        source: (Arc::new(err) as DynError).into(),
-                        ssl_cert_path,
-                        ssl_key_path,
-                    }),
-            )
+            Some(RustlsConfig::from_pem_file(cert, key).await.map_err(|err| {
+                tracing::error!(%err, "Bad TLS config");
+                Error::BadTlsConfig {
+                    source: Arc::new(err),
+                    ssl_cert_path,
+                    ssl_key_path,
+                }
+            }))
         } else {
             Some(Err(Error::MissingTlsConfig {
                 location: Location::caller(),

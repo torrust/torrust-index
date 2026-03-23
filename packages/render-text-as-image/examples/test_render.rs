@@ -1,6 +1,6 @@
 use std::fs;
 
-use torrust_index_render_text_as_image::{render_text_to_png, RenderParams, Rgba};
+use torrust_index_render_text_as_image::{RenderParams, Rgba, render_text_to_png};
 
 fn main() {
     let params = RenderParams {

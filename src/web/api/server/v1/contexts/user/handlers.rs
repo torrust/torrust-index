@@ -2,10 +2,10 @@
 //! context.
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::{self, Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde::Deserialize;
 
 use super::forms::{ChangePasswordForm, JsonWebToken, LoginForm, RegistrationForm};

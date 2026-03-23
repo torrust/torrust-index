@@ -1,4 +1,4 @@
-use reqwest::{multipart, Url};
+use reqwest::{Url, multipart};
 
 use super::connection_info::ConnectionInfo;
 use super::contexts::category::forms::{AddCategoryForm, DeleteCategoryForm};

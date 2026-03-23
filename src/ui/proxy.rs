@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
 use bytes::Bytes;
-use torrust_index_render_text_as_image::{render_text_to_png, RenderParams};
+use torrust_index_render_text_as_image::{RenderParams, render_text_to_png};
 
 use crate::cache::image::manager::Error;
 

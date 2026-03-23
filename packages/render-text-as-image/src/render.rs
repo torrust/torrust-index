@@ -7,7 +7,7 @@ use crate::blend::blend_source_over;
 use crate::encode::encode_rgba_png;
 use crate::font::embedded_font;
 use crate::layout::measure_text;
-use crate::types::{RenderError, RenderParams, MAX_TEXT_BYTES};
+use crate::types::{MAX_TEXT_BYTES, RenderError, RenderParams};
 
 /// Saturating cast from `f32` to `u32`, clamped to `[0, u32::MAX]`.
 fn f32_to_u32_sat(v: f32) -> u32 {

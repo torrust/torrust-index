@@ -1,6 +1,6 @@
 //! Random data generators for testing.
+use rand::RngExt;
 use rand::distr::Alphanumeric;
-use rand::Rng;
 
 /// Returns a random alphanumeric string of a certain size.
 ///

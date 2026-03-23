@@ -1,6 +1,6 @@
 use axum::response::{IntoResponse, Response};
 use bytes::Bytes;
-use hyper::{header, StatusCode};
+use hyper::{StatusCode, header};
 
 #[must_use]
 pub fn png_image(bytes: Bytes) -> Response {

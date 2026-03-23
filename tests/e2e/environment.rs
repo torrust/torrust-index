@@ -4,7 +4,7 @@ use torrust_index::config::ApiToken;
 use torrust_index::web::api::Version;
 use url::Url;
 
-use super::config::{initialize_configuration, ENV_VAR_DB_CONNECT_URL, ENV_VAR_INDEX_SHARED};
+use super::config::{ENV_VAR_DB_CONNECT_URL, ENV_VAR_INDEX_SHARED, initialize_configuration};
 use crate::common::contexts::settings::Settings;
 use crate::environments::{isolated, shared};
 

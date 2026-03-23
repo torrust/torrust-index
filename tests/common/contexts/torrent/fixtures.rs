@@ -4,12 +4,12 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 use torrust_index::services::hasher::sha1;
 use torrust_index::utils::hex::into_bytes;
 use uuid::Uuid;
 
-use super::file::{create_torrent, parse_torrent, TorrentFileInfo};
+use super::file::{TorrentFileInfo, create_torrent, parse_torrent};
 use super::forms::{BinaryFile, UploadTorrentMultipartForm};
 use super::requests::InfoHash;
 use super::responses::Id;

@@ -3,8 +3,8 @@
 //! Refer to the [API endpoint documentation](crate::web::api::server::v1::contexts::user).
 use std::sync::Arc;
 
-use axum::routing::{delete, get, post};
 use axum::Router;
+use axum::routing::{delete, get, post};
 
 use super::handlers::{
     ban_handler, change_password_handler, email_verification_handler, get_user_profiles_handler, login_handler,

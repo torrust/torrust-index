@@ -7,8 +7,8 @@ use tracing::info;
 use crate::bootstrap::logging;
 use crate::cache::image::manager::ImageCacheService;
 use crate::common::AppData;
-use crate::config::validator::Validator;
 use crate::config::Configuration;
+use crate::config::validator::Validator;
 use crate::databases::database;
 use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
 use crate::services::authorization::{CasbinConfiguration, CasbinEnforcer};
@@ -21,9 +21,9 @@ use crate::services::torrent::{
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository, Repository};
 use crate::services::{about, authorization, proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
+use crate::web::api::Version;
 use crate::web::api::server::signals::Halted;
 use crate::web::api::server::v1::auth::Authentication;
-use crate::web::api::Version;
 use crate::{console, mailer, tracker, web};
 
 pub struct Running {

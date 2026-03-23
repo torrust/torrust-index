@@ -3,7 +3,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use tempfile::TempDir;
 use torrust_index::config;
 use torrust_index::config::v2::registration::{Email, Registration};
-use torrust_index::config::{Threshold, FREE_PORT};
+use torrust_index::config::{FREE_PORT, Threshold};
 use torrust_index::web::api::Version;
 use url::Url;
 

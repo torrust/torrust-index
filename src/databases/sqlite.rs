@@ -5,10 +5,10 @@ use async_trait::async_trait;
 use bittorrent_primitives::info_hash::InfoHash;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use sqlx::{query, query_as, Acquire, ConnectOptions, SqlitePool};
+use sqlx::{Acquire, ConnectOptions, SqlitePool, query, query_as};
 use url::Url;
 
-use super::database::{UsersFilters, UsersSorting, TABLES_TO_TRUNCATE};
+use super::database::{TABLES_TO_TRUNCATE, UsersFilters, UsersSorting};
 use crate::databases::database;
 use crate::databases::database::{Category, Database, Driver, Sorting, TorrentCompact};
 use crate::models::category::CategoryId;
@@ -21,7 +21,7 @@ use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::{User, UserAuthentication, UserCompact, UserId, UserListing, UserProfile};
 use crate::services::torrent::{CanonicalInfoHashGroup, DbTorrentInfoHash};
-use crate::utils::clock::{self, datetime_now, DATETIME_FORMAT};
+use crate::utils::clock::{self, DATETIME_FORMAT, datetime_now};
 use crate::utils::hex::from_bytes;
 
 pub struct Sqlite {

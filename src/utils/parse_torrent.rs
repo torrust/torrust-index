@@ -4,7 +4,7 @@ use bittorrent_primitives::info_hash::InfoHash;
 use derive_more::{Display, Error};
 use serde::{Deserialize, Serialize};
 use serde_bencode::value::Value;
-use serde_bencode::{de, Error as SerdeError};
+use serde_bencode::{Error as SerdeError, de};
 use sha1::{Digest, Sha1};
 
 use crate::models::torrent_file::Torrent;

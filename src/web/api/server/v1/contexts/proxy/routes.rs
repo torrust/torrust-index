@@ -3,8 +3,8 @@
 //! Refer to the [API endpoint documentation](crate::web::api::server::v1::contexts::proxy).
 use std::sync::Arc;
 
-use axum::routing::get;
 use axum::Router;
+use axum::routing::get;
 
 use super::handlers::get_proxy_image_handler;
 use crate::common::AppData;

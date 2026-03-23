@@ -26,8 +26,8 @@ fn default_config_toml() -> String {
 /// We just want to load that file without overriding with env var or other
 /// configuration loading behavior.
 fn default_settings() -> Settings {
-    use figment::providers::{Format, Toml};
     use figment::Figment;
+    use figment::providers::{Format, Toml};
 
     let figment = Figment::from(Toml::string(&default_config_toml()));
     let settings: Settings = figment.extract().expect("Invalid configuration");
@@ -199,8 +199,8 @@ async fn configuration_should_allow_to_override_the_authentication_user_claim_to
 mod semantic_validation {
     use url::Url;
 
-    use crate::config::validator::Validator;
     use crate::config::Configuration;
+    use crate::config::validator::Validator;
 
     #[tokio::test]
     async fn udp_trackers_in_private_mode_are_not_supported() {
