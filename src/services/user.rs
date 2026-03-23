@@ -5,7 +5,7 @@ use std::sync::Arc;
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
 use async_trait::async_trait;
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 #[cfg(test)]
 use mockall::automock;
 use pbkdf2::password_hash::rand_core::OsRng;
@@ -23,7 +23,7 @@ use crate::models::user::{UserCompact, UserId, UserProfile, Username};
 use crate::services::authentication::verify_password;
 use crate::utils::validation::validate_email_address;
 use crate::web::api::server::v1::contexts::user::forms::{ChangePasswordForm, RegistrationForm};
-use crate::{mailer, AsCSV};
+use crate::{AsCSV, mailer};
 
 /// Since user email could be optional, we need a way to represent "no email"
 /// in the database. This function returns the string that should be used for
@@ -125,11 +125,7 @@ impl RegistrationService {
                 }
                 registration_form.email.as_ref().and_then(
                     |email| {
-                        if email.trim().is_empty() {
-                            None
-                        } else {
-                            Some(email.clone())
-                        }
+                        if email.trim().is_empty() { None } else { Some(email.clone()) }
                     },
                 )
             }

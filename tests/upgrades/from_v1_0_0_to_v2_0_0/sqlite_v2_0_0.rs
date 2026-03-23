@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePoolOptions;
-use sqlx::{query_as, SqlitePool};
+use sqlx::{SqlitePool, query_as};
 use torrust_index::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::TorrentRecordV2;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]

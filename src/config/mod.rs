@@ -7,10 +7,10 @@ use std::sync::Arc;
 
 use camino::Utf8PathBuf;
 use derive_more::Display;
-use figment::providers::{Env, Format, Serialized, Toml};
 use figment::Figment;
+use figment::providers::{Env, Format, Serialized, Toml};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, NoneAsEmptyString};
+use serde_with::{NoneAsEmptyString, serde_as};
 use thiserror::Error;
 use tokio::sync::RwLock;
 

@@ -21,7 +21,7 @@ use crate::models::user::UserId;
 use crate::services::user::Repository;
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::utils::parse_torrent::decode_and_validate_torrent_file;
-use crate::{tracker, AsCSV};
+use crate::{AsCSV, tracker};
 
 pub struct Index {
     configuration: Arc<Configuration>,

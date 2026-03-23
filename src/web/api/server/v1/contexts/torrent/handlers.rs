@@ -4,9 +4,9 @@ use std::io::{Cursor, Write};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use axum::Json;
 use axum::extract::{self, Multipart, Path, Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
-use axum::Json;
 use bittorrent_primitives::info_hash::InfoHash;
 use serde::Deserialize;
 use tracing::debug;
@@ -77,7 +77,6 @@ pub async fn download_torrent_handler(
 
     debug!("Downloading torrent: {:?}", info_hash.to_hex_string());
 
-    #[allow(if_let_rescope)]
     if let Some(redirect_response) =
         redirect_to_download_url_using_canonical_info_hash_if_needed(&app_data, &info_hash, maybe_user_id).await
     {

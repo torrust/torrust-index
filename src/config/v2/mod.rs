@@ -25,8 +25,8 @@ use self::net::Network;
 use self::tracker::{ApiToken, Tracker};
 use self::tracker_statistics_importer::TrackerStatisticsImporter;
 use self::website::Website;
-use super::validator::{ValidationError, Validator};
 use super::Metadata;
+use super::validator::{ValidationError, Validator};
 
 /// The whole configuration for the index.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

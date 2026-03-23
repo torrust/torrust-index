@@ -1,11 +1,11 @@
 //! Generic responses for the API.
 use axum::response::{IntoResponse, Response};
-use hyper::{header, StatusCode};
+use hyper::{StatusCode, header};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::databases::database;
-use crate::errors::{http_status_code_for_service_error, map_database_error_to_service_error, ServiceError};
+use crate::errors::{ServiceError, http_status_code_for_service_error, map_database_error_to_service_error};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct OkResponseData<T> {

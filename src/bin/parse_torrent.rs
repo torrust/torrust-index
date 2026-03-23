@@ -13,7 +13,9 @@ fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
         eprintln!("Usage:   cargo run --bin parse_torrent <PATH_TO_TORRENT_FILE>");
-        eprintln!("Example: cargo run --bin parse_torrent ./tests/fixtures/torrents/MC_GRID.zip-3cd18ff2d3eec881207dcc5ca5a2c3a2a3afe462.torrent");
+        eprintln!(
+            "Example: cargo run --bin parse_torrent ./tests/fixtures/torrents/MC_GRID.zip-3cd18ff2d3eec881207dcc5ca5a2c3a2a3afe462.torrent"
+        );
         std::process::exit(1);
     }
 

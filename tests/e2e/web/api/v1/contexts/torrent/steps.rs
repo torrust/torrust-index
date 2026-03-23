@@ -4,7 +4,7 @@ use bittorrent_primitives::info_hash::InfoHash;
 use torrust_index::web::api::server::v1::responses::ErrorResponseData;
 
 use crate::common::client::Client;
-use crate::common::contexts::torrent::fixtures::{random_torrent, TestTorrent, TorrentIndexInfo, TorrentListedInIndex};
+use crate::common::contexts::torrent::fixtures::{TestTorrent, TorrentIndexInfo, TorrentListedInIndex, random_torrent};
 use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
 use crate::common::contexts::torrent::responses::UploadedTorrentResponse;
 use crate::common::contexts::user::responses::LoggedInUserData;

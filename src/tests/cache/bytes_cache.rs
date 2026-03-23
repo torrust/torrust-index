@@ -13,8 +13,8 @@ async fn set_bytes_cache_with_capacity_and_entry_size_limit_should_succeed() {
 }
 
 #[tokio::test]
-async fn given_a_bytes_cache_with_a_capacity_and_entry_size_limit_it_should_allow_adding_new_entries_if_the_limit_is_not_exceeded(
-) {
+async fn given_a_bytes_cache_with_a_capacity_and_entry_size_limit_it_should_allow_adding_new_entries_if_the_limit_is_not_exceeded()
+ {
     let bytes: Bytes = Bytes::from("abcdef");
 
     let mut bytes_cache = BytesCache::with_capacity_and_entry_size_limit(bytes.len() * 2, bytes.len()).unwrap();
@@ -30,8 +30,8 @@ async fn given_a_bytes_cache_with_a_capacity_and_entry_size_limit_it_should_allo
 }
 
 #[tokio::test]
-async fn given_a_bytes_cache_with_a_capacity_and_entry_size_limit_it_should_not_allow_adding_new_entries_if_the_capacity_is_exceeded(
-) {
+async fn given_a_bytes_cache_with_a_capacity_and_entry_size_limit_it_should_not_allow_adding_new_entries_if_the_capacity_is_exceeded()
+ {
     let bytes: Bytes = Bytes::from("abcdef");
 
     let mut bytes_cache = BytesCache::with_capacity_and_entry_size_limit(bytes.len() * 2 - 1, bytes.len()).unwrap();

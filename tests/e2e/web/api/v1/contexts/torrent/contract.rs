@@ -272,8 +272,8 @@ mod for_guests {
         }
 
         #[tokio::test]
-        async fn the_downloaded_torrent_should_keep_the_same_info_hash_if_the_torrent_does_not_have_non_standard_fields_in_the_info_dict(
-        ) {
+        async fn the_downloaded_torrent_should_keep_the_same_info_hash_if_the_torrent_does_not_have_non_standard_fields_in_the_info_dict()
+         {
             let mut env = TestEnv::new();
             env.start(api::Version::V1).await;
 
@@ -615,7 +615,7 @@ mod for_authenticated_users {
 
         use crate::common::asserts::assert_json_error_response;
         use crate::common::client::Client;
-        use crate::common::contexts::torrent::fixtures::{random_torrent, TestTorrent};
+        use crate::common::contexts::torrent::fixtures::{TestTorrent, random_torrent};
         use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
         use crate::common::contexts::torrent::responses::UploadedTorrentResponse;
         use crate::e2e::environment::TestEnv;

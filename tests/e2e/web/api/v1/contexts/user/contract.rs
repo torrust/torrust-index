@@ -210,7 +210,7 @@ mod authorization {
         use torrust_index::web::api;
 
         use crate::common::client::Client;
-        use crate::common::contexts::user::fixtures::{random_user_registration_form, DEFAULT_PASSWORD, VALID_PASSWORD};
+        use crate::common::contexts::user::fixtures::{DEFAULT_PASSWORD, VALID_PASSWORD, random_user_registration_form};
         use crate::common::contexts::user::forms::{ChangePasswordForm, Username};
         use crate::e2e::environment::TestEnv;
         use crate::e2e::web::api::v1::contexts::user::steps::{new_logged_in_user, new_registered_user};

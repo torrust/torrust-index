@@ -1,7 +1,7 @@
 //! Crate-level tests for the public API.
 
 use crate::types::MAX_TEXT_BYTES;
-use crate::{render_text_to_png, RenderError, RenderParams, Rgba};
+use crate::{RenderError, RenderParams, Rgba, render_text_to_png};
 
 // --- Rendering tests ---
 

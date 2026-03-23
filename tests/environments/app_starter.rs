@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use tokio::sync::{oneshot, RwLock};
+use tokio::sync::{RwLock, oneshot};
 use tokio::task::JoinHandle;
 use torrust_index::config::Configuration;
 use torrust_index::web::api::Version;

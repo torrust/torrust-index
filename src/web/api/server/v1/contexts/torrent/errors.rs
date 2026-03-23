@@ -2,7 +2,7 @@ use axum::response::{IntoResponse, Response};
 use derive_more::{Display, Error};
 use hyper::StatusCode;
 
-use crate::web::api::server::v1::responses::{json_error_response, ErrorResponseData};
+use crate::web::api::server::v1::responses::{ErrorResponseData, json_error_response};
 
 #[derive(Debug, Display, PartialEq, Eq, Error)]
 pub enum Request {
@@ -21,7 +21,9 @@ pub enum Request {
     #[display("torrent tags string is not a valid JSON.")]
     TagsArrayIsNotValidJson,
 
-    #[display("upload torrent request header `content-type` should be preferably `application/x-bittorrent` or `application/octet-stream`.")]
+    #[display(
+        "upload torrent request header `content-type` should be preferably `application/x-bittorrent` or `application/octet-stream`."
+    )]
     InvalidFileType,
 
     #[display("cannot write uploaded torrent bytes (binary file) into memory.")]

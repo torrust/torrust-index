@@ -1,4 +1,4 @@
-use crate::models::user::{Username, MAX_USERNAME_LENGTH};
+use crate::models::user::{MAX_USERNAME_LENGTH, Username};
 
 #[test]
 fn username_must_consist_of_1_to_20_alphanumeric_characters_or_dashes() {

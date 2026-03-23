@@ -3,7 +3,7 @@
 use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::{SqlitePoolOptions, SqliteQueryResult};
-use sqlx::{query, query_as, SqlitePool};
+use sqlx::{SqlitePool, query, query_as};
 
 use super::sqlite_v1_0_0::{TorrentRecordV1, UserRecordV1};
 use crate::databases::database::{self, TABLES_TO_TRUNCATE};

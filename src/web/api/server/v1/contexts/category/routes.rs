@@ -3,8 +3,8 @@
 //! Refer to the [API endpoint documentation](crate::web::api::server::v1::contexts::category).
 use std::sync::Arc;
 
-use axum::routing::{delete, get, post};
 use axum::Router;
+use axum::routing::{delete, get, post};
 
 use super::handlers::{add_handler, delete_handler, get_all_handler};
 use crate::common::AppData;

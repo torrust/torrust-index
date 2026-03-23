@@ -3,8 +3,8 @@
 //! Refer to the [API endpoint documentation](crate::web::api::server::v1::contexts::settings).
 use std::sync::Arc;
 
-use axum::routing::get;
 use axum::Router;
+use axum::routing::get;
 
 use super::handlers::{get_all_handler, get_public_handler, get_site_name_handler};
 use crate::common::AppData;

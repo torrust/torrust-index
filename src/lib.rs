@@ -321,11 +321,7 @@ where
                     let item = s.trim().parse::<T>().map_err(|_| ())?;
                     acc.push(item);
                 }
-                if acc.is_empty() {
-                    Ok(None)
-                } else {
-                    Ok(Some(acc))
-                }
+                if acc.is_empty() { Ok(None) } else { Ok(Some(acc)) }
             }
             _ => Ok(None),
         }

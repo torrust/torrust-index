@@ -3,8 +3,8 @@
 //! Refer to the [API endpoint documentation](crate::web::api::server::v1::contexts::torrent).
 use std::sync::Arc;
 
-use axum::routing::{delete, get, post, put};
 use axum::Router;
+use axum::routing::{delete, get, post, put};
 
 use super::handlers::{
     create_random_torrent_handler, delete_torrent_handler, download_torrent_handler, get_torrent_info_handler,

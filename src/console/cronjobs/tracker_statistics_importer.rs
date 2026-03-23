@@ -17,7 +17,7 @@ use axum::extract::State;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use chrono::{DateTime, Utc};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use text_colorizer::Colorize;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;

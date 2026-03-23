@@ -6,7 +6,7 @@ use axum::extract::{self, State};
 use axum::response::{IntoResponse, Json, Response};
 
 use super::forms::{AddCategoryForm, DeleteCategoryForm};
-use super::responses::{added_category, deleted_category, Category};
+use super::responses::{Category, added_category, deleted_category};
 use crate::common::AppData;
 use crate::web::api::server::v1::extractors::optional_user_id::ExtractOptionalLoggedInUser;
 use crate::web::api::server::v1::responses::{self};

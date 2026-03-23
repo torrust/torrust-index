@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::RngExt;
 
 pub fn software_category_name() -> String {
     "software".to_string()
