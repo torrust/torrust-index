@@ -52,7 +52,7 @@ src/
 │
 │   ── Surface 1 — Prints ──────────────────────────├── contour_range.rs    # BasisElement, ContourRange, ContourRangeEnergy;
 │                       #   validate_endpoints, compute_plateau_energy (ADR-M-037)├── gnode.rs            # GState (pub), GNode (pub(crate)): Surface 1 + 3
-├── handle.rs           # GNodeId, VNodeId: NonZeroU32 niche-optimized handles
+├── handle.rs           # GNodeId (pub), GSlotPointer, VSlotPointer: arena handles (ADR-M-040)
 ├── pewei.rs            # Pewei, Layer, Transition, Terminal: PEWEI extraction
 ├── plateau.rs          # BasisEdge, Plateau, PlateauBasis: contour types
 ├── view.rs             # Span, Cell, Node: snapshot view types
@@ -190,9 +190,18 @@ in development; compiles to bare array access in release. std-only.
 
 ### 3.2 Handle types
 
-`GNodeId(NonZeroU32)` and `VNodeId(NonZeroU32)` — 4 bytes each.
-`Option<GNodeId>` and `Option<VNodeId>` are also 4 bytes (niche
-optimization). Type-safe: `GNodeId` cannot index the V-node arena.
+`GNodeId` is the public generational handle (8 bytes: slot index +
+generation counter, ADR-M-040). `Option<GNodeId>` is 12 bytes (no
+niche optimisation on `generation`). The generation counter detects
+stale handles after slot reuse — a mismatch panics with a diagnostic
+message.
+
+`GSlotPointer(NonZeroU32)` and `VSlotPointer(NonZeroU32)` are the
+`pub(crate)` internal handles — 4 bytes each.
+`Option<GSlotPointer>` and `Option<VSlotPointer>` are also 4 bytes
+(niche optimization). Type-safe: `GSlotPointer` cannot index the
+V-node arena. Internal hot paths use these 4-byte handles; the
+8-byte `GNodeId` exists only at the public API boundary.
 
 ### 3.3 GNode — spatial node (ADR-M-002)
 
@@ -241,10 +250,10 @@ intensities in one scan, then follows a single child ID.
 pub struct GvGraph<C: Coordinate, V: Accumulator, const N: u32> {
     gnodes: Arena<GNode<C, V>>,
     vnodes: Arena<VNode<V>>,
-    g_root: GNodeId,
-    v_root: Option<VNodeId>,
+    g_root: GSlotPointer,          // pub(crate); public API returns GNodeId via g_root()
+    v_root: Option<VSlotPointer>,
     config: Config<V>,
-    violations: Vec<VNodeId>,         // scoped to one mutation batch (ADR-M-003)
+    violations: Vec<VSlotPointer>,         // scoped to one mutation batch (ADR-M-003)
     node_count: u32,
     terminal_count: u32,              // maintained leaf counter (ADR-M-025)
     live_depth_evict: u32,            // dynamic (ADR-M-017)
@@ -255,7 +264,7 @@ pub struct GvGraph<C: Coordinate, V: Accumulator, const N: u32> {
 
     // ── cfg(feature = "dynamic-contour-tracking") ──
     plateaus: BTreeMap<BasisEdge<C>, Plateau<C, V>>,   // live contour mirror (ADR-M-026)
-    pending_p_i4: Vec<(GNodeId, BasisEdge<C>)>,        // thatch-hop repair queue
+    pending_p_i4: Vec<(GSlotPointer, BasisEdge<C>)>,        // thatch-hop repair queue
     plateau_basis: PlateauBasis<C>,                     // bidirectional basis bookkeeping
     plateaus_dirty: bool,                               // normalize gate (ADR-M-031)
 }
@@ -327,7 +336,7 @@ child. Handles 3→2 node contraction and root-entry removal.
 
 ### 5.3 Rebalancing — `rebalance::rebalance` (ADR-M-003)
 
-Eager violation tracking with `Vec<VNodeId>` work queue. Ten
+Eager violation tracking with `Vec<VSlotPointer>` work queue. Ten
 violation sources (§IDEA M-11.12). The `rebalance` loop drains
 the queue with stale/resolved guards. Always empty when a mutation
 batch returns.

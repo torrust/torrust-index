@@ -181,7 +181,7 @@ At $q > 0$: $\text{SNR}'_d = \frac{\text{att}^{1+q'} \cdot I_d}{\text{att}^{1-q'
 ///     the deepest terminals decay at `attenuation²`.
 pub fn decay(
     &mut self,
-    root: GNodeId,
+    root: GSlotPointer,
     attenuation: f64,
     q: f64,
 );
@@ -320,7 +320,7 @@ Computed per-node during the decay walk via
 
 | ID       | Decision                                                                                                                                   | Option |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
-| DC-024-1 | `fn decay(&mut self, root: GNodeId, attenuation: f64, q: f64)` — three parameters, one method, `f64` attenuation (not `O: Observation<V>`) | See Q1 |
+| DC-024-1 | `fn decay(&mut self, root: GSlotPointer, attenuation: f64, q: f64)` — three parameters, one method, `f64` attenuation (not `O: Observation<V>`) | See Q1 |
 | DC-024-2 | Bottom-up G-sum recompute for both $q = 0$ and $q > 0$ (integer truncation prevents single-pass scale)                                     | See Q2 |
 | DC-024-3 | No auto-eviction — `decay()` only applies the temporal filter                                                                              | B      |
 | DC-024-4 | Log-linear interpolation (Q-invariant under repetition)                                                                                    | A      |

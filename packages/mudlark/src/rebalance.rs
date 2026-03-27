@@ -47,7 +47,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::arena::Arena;
 use crate::gnode::GNode;
-use crate::handle::{GNodeId, VNodeId};
+use crate::handle::{GSlotPointer, VSlotPointer};
 use crate::traits::{Accumulator, Coordinate, Inspectable};
 use crate::vnode::{DEPTH_STALE, PackedChildren, VKind, VNode};
 use crate::vtree::{
@@ -115,7 +115,7 @@ impl ViolationSources {
 // unless a subscriber actually captures the formatted output.
 
 /// Compact node label: `v5(S2,42)` or `v3(E,18)` or `v9(DEAD)`.
-pub struct Nd<'a, V: Accumulator>(pub &'a Arena<VNode<V>>, pub VNodeId);
+pub struct Nd<'a, V: Accumulator>(pub &'a Arena<VNode<V>>, pub VSlotPointer);
 
 impl<V: Accumulator> fmt::Display for Nd<'_, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -134,7 +134,7 @@ impl<V: Accumulator> fmt::Display for Nd<'_, V> {
 }
 
 /// Bracketed children list: `[v1(18), v2(15)]` or `∅` for entries.
-struct Ch<'a, V: Accumulator>(&'a Arena<VNode<V>>, VNodeId);
+struct Ch<'a, V: Accumulator>(&'a Arena<VNode<V>>, VSlotPointer);
 
 impl<V: Accumulator> fmt::Display for Ch<'_, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -159,7 +159,7 @@ impl<V: Accumulator> fmt::Display for Ch<'_, V> {
 ///
 /// Example output:
 /// `v3(E,18) ← v5(S2,21) [v3(18), v4(3)] ← v7(S2,42) [v5(21), v6(21)]  uncle_max=21`
-pub struct Ctx<'a, V: Accumulator>(pub &'a Arena<VNode<V>>, pub VNodeId);
+pub struct Ctx<'a, V: Accumulator>(pub &'a Arena<VNode<V>>, pub VSlotPointer);
 
 impl<V: Accumulator> fmt::Display for Ctx<'_, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -187,7 +187,7 @@ impl<V: Accumulator> fmt::Display for Ctx<'_, V> {
 /// An uncle of `c` is a sibling of `c`'s parent `p` under
 /// grandparent `g`.
 #[must_use]
-pub fn max_uncle_intensity<V: Accumulator>(vnodes: &Arena<VNode<V>>, c: VNodeId) -> Option<V> {
+pub fn max_uncle_intensity<V: Accumulator>(vnodes: &Arena<VNode<V>>, c: VSlotPointer) -> Option<V> {
     let parent = vnodes.get(c.index()).parent?;
     let grandparent = vnodes.get(parent.index()).parent?;
 
@@ -211,7 +211,7 @@ pub fn max_uncle_intensity<V: Accumulator>(vnodes: &Arena<VNode<V>>, c: VNodeId)
 /// A node is violated when `c.int > max { u.int : u ∈ uncles(c) }`.
 /// Returns false if `c` has no grandparent (no uncle relationship).
 #[must_use]
-pub fn is_violated<V: Accumulator>(vnodes: &Arena<VNode<V>>, c: VNodeId) -> bool {
+pub fn is_violated<V: Accumulator>(vnodes: &Arena<VNode<V>>, c: VSlotPointer) -> bool {
     let c_int = vnodes.get(c.index()).intensity;
     max_uncle_intensity(vnodes, c).is_some_and(|max_uncle| c_int > max_uncle)
 }
@@ -229,7 +229,7 @@ pub fn is_violated<V: Accumulator>(vnodes: &Arena<VNode<V>>, c: VNodeId) -> bool
 /// # Panics
 ///
 /// Panics if `p` is not a structural 3-node.
-pub fn contract<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, p: VNodeId) -> VNodeId {
+pub fn contract<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, p: VSlotPointer) -> VSlotPointer {
     let _span = tracing::debug_span!(
         "contract",
         p = %Nd(vnodes, p),
@@ -246,7 +246,7 @@ pub fn contract<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, p: VNodeId) -> VNo
         };
         assert!(children.len() == 3, "contract: p must be a 3-node");
         let h = children.heaviest_child_index();
-        let data: [(VNodeId, V); 3] = [children.get(0), children.get(1), children.get(2)];
+        let data: [(VSlotPointer, V); 3] = [children.get(0), children.get(1), children.get(2)];
         (h, data)
     };
 
@@ -279,7 +279,7 @@ pub fn contract<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, p: VNodeId) -> VNo
             has_evictable: a_terminal || b_terminal,
         },
     };
-    let m_id = VNodeId::from_index(vnodes.alloc(merged));
+    let m_id = VSlotPointer::from_index(vnodes.alloc(merged).0);
 
     // Re-parent a and b.
     vnodes.get_mut(a_id.index()).parent = Some(m_id);
@@ -324,7 +324,7 @@ pub fn contract<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, p: VNodeId) -> VNo
 /// # Panics
 ///
 /// Panics if `c` is not a structural 2-node, or if `c` has no parent.
-pub fn standard_promote<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, c: VNodeId) {
+pub fn standard_promote<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, c: VSlotPointer) {
     let p = vnodes.get(c.index()).parent.expect("standard_promote: c must have a parent");
     let _span = tracing::debug_span!(
         "standard_promote",
@@ -408,7 +408,7 @@ pub fn standard_promote<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, c: VNodeId
 /// # Panics
 ///
 /// Panics if `c` has no parent, or if `p` has no parent (grandparent).
-pub fn skip_promote<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, c: VNodeId) -> Option<VNodeId> {
+pub fn skip_promote<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, c: VSlotPointer) -> Option<VSlotPointer> {
     let p = vnodes.get(c.index()).parent.expect("skip_promote: c must have a parent");
     let g = vnodes.get(p.index()).parent.expect("skip_promote: p must have a grandparent");
     let _span = tracing::debug_span!(
@@ -500,7 +500,7 @@ pub fn skip_promote<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, c: VNodeId) ->
 /// # Panics
 ///
 /// Panics if `parent` is not structural, or if `child` is not found.
-fn sibling_of<V: Accumulator>(vnodes: &Arena<VNode<V>>, parent: VNodeId, child: VNodeId) -> (VNodeId, V) {
+fn sibling_of<V: Accumulator>(vnodes: &Arena<VNode<V>>, parent: VSlotPointer, child: VSlotPointer) -> (VSlotPointer, V) {
     let p_node = vnodes.get(parent.index());
     match &p_node.kind {
         VKind::Structural { children, .. } => {
@@ -525,7 +525,7 @@ fn sibling_of<V: Accumulator>(vnodes: &Arena<VNode<V>>, parent: VNodeId, child: 
 /// **Precondition:** `c` is a V-entry backing a semi-internal G-node.
 /// `p` is a 2-node. `g` is a 2-node.
 ///
-/// Returns the newly created `GNodeId` so the caller can handle
+/// Returns the newly created `GSlotPointer` so the caller can handle
 /// `node_count` and plateau maintenance.
 ///
 /// See §IDEA M-11.6.
@@ -537,8 +537,8 @@ fn sibling_of<V: Accumulator>(vnodes: &Arena<VNode<V>>, parent: VNodeId, child: 
 pub fn legacy_promote<C: Coordinate, V: Accumulator>(
     vnodes: &mut Arena<VNode<V>>,
     gnodes: &mut Arena<GNode<C, V>>,
-    c: VNodeId,
-) -> GNodeId {
+    c: VSlotPointer,
+) -> GSlotPointer {
     let p = vnodes.get(c.index()).parent.expect("legacy_promote: c must have a parent");
     let g = vnodes
         .get(p.index())
@@ -579,7 +579,7 @@ pub fn legacy_promote<C: Coordinate, V: Accumulator>(
         parent: Some(gnode_id),
         entry: None,
     };
-    let new_child_id = GNodeId::from_index(gnodes.alloc(new_child));
+    let new_child_id = GSlotPointer::from_index(gnodes.alloc(new_child).0);
 
     // Link into parent's empty slot.
     {
@@ -605,7 +605,7 @@ pub fn legacy_promote<C: Coordinate, V: Accumulator>(
             is_evictable: true, // new terminal: no dependents
         },
     };
-    let ne_id = VNodeId::from_index(vnodes.alloc(ne));
+    let ne_id = VSlotPointer::from_index(vnodes.alloc(ne).0);
     gnodes.get_mut(new_child_id.index()).entry = Some(ne_id);
 
     // ── V-Tree: replace c with ne in p's children ───────────────
@@ -667,7 +667,11 @@ pub fn legacy_promote<C: Coordinate, V: Accumulator>(
 ///
 /// After restructuring at `node`, its grandchildren may have weakened
 /// uncle shields.  See §IDEA M-11.11.1.
-pub fn push_side_effect_violations<V: Accumulator>(vnodes: &Arena<VNode<V>>, node: VNodeId, violations: &mut Vec<VNodeId>) {
+pub fn push_side_effect_violations<V: Accumulator>(
+    vnodes: &Arena<VNode<V>>,
+    node: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
+) {
     push_side_effect_violations_with_config(vnodes, node, violations, ViolationSources::all_enabled());
 }
 
@@ -677,8 +681,8 @@ pub fn push_side_effect_violations<V: Accumulator>(vnodes: &Arena<VNode<V>>, nod
 #[inline]
 pub fn push_side_effect_violations_with_config<V: Accumulator>(
     vnodes: &Arena<VNode<V>>,
-    node: VNodeId,
-    violations: &mut Vec<VNodeId>,
+    node: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
     config: ViolationSources,
 ) {
     if !config.source_3_contraction_grandchildren {
@@ -692,7 +696,11 @@ pub fn push_side_effect_violations_with_config<V: Accumulator>(
 ///
 /// Same grandchild scan as source 3, but gated by `source_10` for
 /// independent test coverage.  In production, both sources are enabled.
-pub fn push_source_10_violations<V: Accumulator>(vnodes: &Arena<VNode<V>>, node: VNodeId, violations: &mut Vec<VNodeId>) {
+pub fn push_source_10_violations<V: Accumulator>(
+    vnodes: &Arena<VNode<V>>,
+    node: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
+) {
     push_source_10_violations_with_config(vnodes, node, violations, ViolationSources::all_enabled());
 }
 
@@ -700,8 +708,8 @@ pub fn push_source_10_violations<V: Accumulator>(vnodes: &Arena<VNode<V>>, node:
 #[inline]
 pub fn push_source_10_violations_with_config<V: Accumulator>(
     vnodes: &Arena<VNode<V>>,
-    node: VNodeId,
-    violations: &mut Vec<VNodeId>,
+    node: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
     config: ViolationSources,
 ) {
     if !config.source_10_g_contraction_promotion {
@@ -711,8 +719,8 @@ pub fn push_source_10_violations_with_config<V: Accumulator>(
 }
 
 /// Shared grandchild-scan logic used by sources 3 and 10.
-fn push_grandchild_violations<V: Accumulator>(vnodes: &Arena<VNode<V>>, node: VNodeId, violations: &mut Vec<VNodeId>) {
-    let child_ids: Vec<VNodeId> = match &vnodes.get(node.index()).kind {
+fn push_grandchild_violations<V: Accumulator>(vnodes: &Arena<VNode<V>>, node: VSlotPointer, violations: &mut Vec<VSlotPointer>) {
+    let child_ids: Vec<VSlotPointer> = match &vnodes.get(node.index()).kind {
         VKind::Structural { children, .. } => children.iter().map(|(id, _)| id).collect(),
         VKind::Entry { .. } => return,
     };
@@ -734,7 +742,11 @@ fn push_grandchild_violations<V: Accumulator>(vnodes: &Arena<VNode<V>>, node: VN
 /// After promotion or contraction, children move to a new uncle
 /// context.  The spec's `find_deepest_violated_node()` (§IDEA M-11.8) would
 /// discover these; our queue-based approach pushes them explicitly.
-pub fn push_promoted_violations<V: Accumulator>(vnodes: &Arena<VNode<V>>, node: VNodeId, violations: &mut Vec<VNodeId>) {
+pub fn push_promoted_violations<V: Accumulator>(
+    vnodes: &Arena<VNode<V>>,
+    node: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
+) {
     push_promoted_violations_with_config(vnodes, node, violations, ViolationSources::all_enabled());
 }
 
@@ -744,14 +756,14 @@ pub fn push_promoted_violations<V: Accumulator>(vnodes: &Arena<VNode<V>>, node: 
 #[inline]
 pub fn push_promoted_violations_with_config<V: Accumulator>(
     vnodes: &Arena<VNode<V>>,
-    node: VNodeId,
-    violations: &mut Vec<VNodeId>,
+    node: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
     config: ViolationSources,
 ) {
     if !config.source_4_promotion_children {
         return;
     }
-    let child_ids: Vec<VNodeId> = match &vnodes.get(node.index()).kind {
+    let child_ids: Vec<VSlotPointer> = match &vnodes.get(node.index()).kind {
         VKind::Structural { children, .. } => children.iter().map(|(id, _)| id).collect(),
         VKind::Entry { .. } => return,
     };
@@ -770,11 +782,11 @@ pub fn push_promoted_violations_with_config<V: Accumulator>(
 /// resolved (Phase 2 handles it).
 pub fn push_contraction_child_violations<V: Accumulator>(
     vnodes: &Arena<VNode<V>>,
-    node: VNodeId,
-    skip: VNodeId,
-    violations: &mut Vec<VNodeId>,
+    node: VSlotPointer,
+    skip: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
 ) {
-    let child_ids: Vec<VNodeId> = match &vnodes.get(node.index()).kind {
+    let child_ids: Vec<VSlotPointer> = match &vnodes.get(node.index()).kind {
         VKind::Structural { children, .. } => children.iter().map(|(id, _)| id).collect(),
         VKind::Entry { .. } => return,
     };
@@ -802,7 +814,11 @@ pub fn push_contraction_child_violations<V: Accumulator>(
 /// 3→2 case, or the grandparent in the 2-node collapse case.
 ///
 /// See §IDEA M-11.11.3.
-pub fn push_leaf_removal_violations<V: Accumulator>(vnodes: &Arena<VNode<V>>, start: VNodeId, violations: &mut Vec<VNodeId>) {
+pub fn push_leaf_removal_violations<V: Accumulator>(
+    vnodes: &Arena<VNode<V>>,
+    start: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
+) {
     push_leaf_removal_violations_with_config(vnodes, start, violations, ViolationSources::all_enabled());
 }
 
@@ -812,8 +828,8 @@ pub fn push_leaf_removal_violations<V: Accumulator>(vnodes: &Arena<VNode<V>>, st
 #[inline]
 pub fn push_leaf_removal_violations_with_config<V: Accumulator>(
     vnodes: &Arena<VNode<V>>,
-    start: VNodeId,
-    violations: &mut Vec<VNodeId>,
+    start: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
     config: ViolationSources,
 ) {
     if !config.source_6_leaf_removal_ancestors {
@@ -822,7 +838,7 @@ pub fn push_leaf_removal_violations_with_config<V: Accumulator>(
     let mut ancestor = start;
     while let Some(parent) = vnodes.get(ancestor.index()).parent {
         // Iterate siblings of `ancestor` under `parent`.
-        let sibling_ids: Vec<VNodeId> = match &vnodes.get(parent.index()).kind {
+        let sibling_ids: Vec<VSlotPointer> = match &vnodes.get(parent.index()).kind {
             VKind::Structural { children, .. } => children.iter().map(|(id, _)| id).filter(|&id| id != ancestor).collect(),
             VKind::Entry { .. } => break,
         };
@@ -861,7 +877,11 @@ pub fn push_leaf_removal_violations_with_config<V: Accumulator>(
 /// `sole` is now a child of the grandparent, not a sibling.
 ///
 /// See §IDEA M-11.11.3.
-pub fn push_collapse_violations<V: Accumulator>(vnodes: &Arena<VNode<V>>, sole: VNodeId, violations: &mut Vec<VNodeId>) {
+pub fn push_collapse_violations<V: Accumulator>(
+    vnodes: &Arena<VNode<V>>,
+    sole: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
+) {
     push_collapse_violations_with_config(vnodes, sole, violations, ViolationSources::all_enabled());
 }
 
@@ -871,8 +891,8 @@ pub fn push_collapse_violations<V: Accumulator>(vnodes: &Arena<VNode<V>>, sole: 
 #[inline]
 pub fn push_collapse_violations_with_config<V: Accumulator>(
     vnodes: &Arena<VNode<V>>,
-    sole: VNodeId,
-    violations: &mut Vec<VNodeId>,
+    sole: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
     config: ViolationSources,
 ) {
     if !config.source_7_collapse_children {
@@ -898,9 +918,9 @@ pub fn push_collapse_violations_with_config<V: Accumulator>(
 /// See §IDEA M-11.11.3.
 pub fn push_remaining_sibling_violations<V: Accumulator>(
     vnodes: &Arena<VNode<V>>,
-    p: VNodeId,
-    removed: VNodeId,
-    violations: &mut Vec<VNodeId>,
+    p: VSlotPointer,
+    removed: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
 ) {
     push_remaining_sibling_violations_with_config(vnodes, p, removed, violations, ViolationSources::all_enabled());
 }
@@ -911,16 +931,16 @@ pub fn push_remaining_sibling_violations<V: Accumulator>(
 #[inline]
 pub fn push_remaining_sibling_violations_with_config<V: Accumulator>(
     vnodes: &Arena<VNode<V>>,
-    p: VNodeId,
-    removed: VNodeId,
-    violations: &mut Vec<VNodeId>,
+    p: VSlotPointer,
+    removed: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
     config: ViolationSources,
 ) {
     if !config.source_8_three_to_two_siblings {
         return;
     }
     // Get the remaining children of p (excluding removed).
-    let remaining: Vec<VNodeId> = match &vnodes.get(p.index()).kind {
+    let remaining: Vec<VSlotPointer> = match &vnodes.get(p.index()).kind {
         VKind::Structural { children, .. } => children.iter().map(|(id, _)| id).filter(|&id| id != removed).collect(),
         VKind::Entry { .. } => return,
     };
@@ -965,9 +985,9 @@ pub fn push_remaining_sibling_violations_with_config<V: Accumulator>(
 /// * `grandparent` - the grandparent of the evicted entry
 pub fn push_cousin_violations<V: Accumulator>(
     vnodes: &Arena<VNode<V>>,
-    sole: VNodeId,
-    grandparent: VNodeId,
-    violations: &mut Vec<VNodeId>,
+    sole: VSlotPointer,
+    grandparent: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
 ) {
     push_cousin_violations_with_config(vnodes, sole, grandparent, violations, ViolationSources::all_enabled());
 }
@@ -978,16 +998,16 @@ pub fn push_cousin_violations<V: Accumulator>(
 #[inline]
 pub fn push_cousin_violations_with_config<V: Accumulator>(
     vnodes: &Arena<VNode<V>>,
-    sole: VNodeId,
-    grandparent: VNodeId,
-    violations: &mut Vec<VNodeId>,
+    sole: VSlotPointer,
+    grandparent: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
     config: ViolationSources,
 ) {
     if !config.source_9_collapse_cousins {
         return;
     }
     // Get the OTHER children of grandparent (excluding sole, which was just promoted)
-    let cousins: Vec<VNodeId> = match &vnodes.get(grandparent.index()).kind {
+    let cousins: Vec<VSlotPointer> = match &vnodes.get(grandparent.index()).kind {
         VKind::Structural { children, .. } => children.iter().map(|(id, _)| id).filter(|&id| id != sole).collect(),
         VKind::Entry { .. } => return,
     };
@@ -1011,12 +1031,12 @@ pub fn push_cousin_violations_with_config<V: Accumulator>(
 /// and source 9 (collapse cousins).
 fn push_children_violations<V: Accumulator>(
     vnodes: &Arena<VNode<V>>,
-    node: VNodeId,
+    node: VSlotPointer,
     source: &str,
-    violations: &mut Vec<VNodeId>,
+    violations: &mut Vec<VSlotPointer>,
 ) {
     // Only structural nodes have children to check.
-    let children: Vec<VNodeId> = match &vnodes.get(node.index()).kind {
+    let children: Vec<VSlotPointer> = match &vnodes.get(node.index()).kind {
         VKind::Structural { children, .. } => (0..children.len()).map(|i| children.get(i).0).collect(),
         VKind::Entry { .. } => {
             tracing::debug!(
@@ -1058,7 +1078,7 @@ fn push_children_violations<V: Accumulator>(
 // ── Internal helpers ─────────────────────────────────────────────────
 
 /// Whether a V-node carries the evictable flag (entry or structural).
-fn node_has_evictable<V: Accumulator>(vnodes: &Arena<VNode<V>>, id: VNodeId) -> bool {
+fn node_has_evictable<V: Accumulator>(vnodes: &Arena<VNode<V>>, id: VSlotPointer) -> bool {
     match &vnodes.get(id.index()).kind {
         VKind::Entry { is_evictable, .. } => *is_evictable,
         VKind::Structural { has_evictable, .. } => *has_evictable,
@@ -1066,7 +1086,7 @@ fn node_has_evictable<V: Accumulator>(vnodes: &Arena<VNode<V>>, id: VNodeId) -> 
 }
 
 /// Get the child count of a structural node.  Returns 0 for entries.
-fn structural_child_count<V: Accumulator>(vnodes: &Arena<VNode<V>>, id: VNodeId) -> usize {
+fn structural_child_count<V: Accumulator>(vnodes: &Arena<VNode<V>>, id: VSlotPointer) -> usize {
     match &vnodes.get(id.index()).kind {
         VKind::Structural { children, .. } => children.len(),
         VKind::Entry { .. } => 0,
@@ -1079,7 +1099,7 @@ fn structural_child_count<V: Accumulator>(vnodes: &Arena<VNode<V>>, id: VNodeId)
 /// child `h` is violated, resolving it would contract `p` (undoing
 /// the promote) and create a merged node whose standard-promote
 /// recreates the 3-node — an infinite cycle.
-fn any_child_violated<V: Accumulator>(vnodes: &Arena<VNode<V>>, node: VNodeId) -> bool {
+fn any_child_violated<V: Accumulator>(vnodes: &Arena<VNode<V>>, node: VSlotPointer) -> bool {
     match &vnodes.get(node.index()).kind {
         VKind::Structural { children, .. } => {
             for i in 0..children.len() {
@@ -1107,7 +1127,7 @@ fn any_child_violated<V: Accumulator>(vnodes: &Arena<VNode<V>>, node: VNodeId) -
 ///
 /// **Action:** contract `p` (isolating `h`), optionally contract `g`,
 /// then skip-promote `h` up to `g`.
-fn escalate_after_promote<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, p: VNodeId, violations: &mut Vec<VNodeId>) {
+fn escalate_after_promote<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, p: VSlotPointer, violations: &mut Vec<VSlotPointer>) {
     let heaviest = match &vnodes.get(p.index()).kind {
         VKind::Structural { children, .. } if children.len() == 3 => children.get(children.heaviest_child_index()).0,
         _ => return,
@@ -1186,7 +1206,7 @@ fn escalate_after_promote<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, p: VNode
 ///
 /// Side-effect violations are pushed onto `violations`.
 ///
-/// Returns `Some(GNodeId)` if a legacy promotion created a new G-node,
+/// Returns `Some(GSlotPointer)` if a legacy promotion created a new G-node,
 /// `None` otherwise.
 ///
 /// `depth_evict` is the current live $D_{\text{evict}}$ gate.  When a
@@ -1197,10 +1217,10 @@ fn escalate_after_promote<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, p: VNode
 pub fn resolve<C: Coordinate, V: Accumulator>(
     vnodes: &mut Arena<VNode<V>>,
     gnodes: &mut Arena<GNode<C, V>>,
-    c: VNodeId,
-    violations: &mut Vec<VNodeId>,
+    c: VSlotPointer,
+    violations: &mut Vec<VSlotPointer>,
     depth_evict: u32,
-) -> Option<GNodeId> {
+) -> Option<GSlotPointer> {
     let _span = tracing::debug_span!("resolve", node = c.index()).entered();
     tracing::debug!(ctx = %Ctx(vnodes, c), "begin");
 
@@ -1334,9 +1354,9 @@ pub fn resolve<C: Coordinate, V: Accumulator>(
 pub fn rebalance<C: Coordinate, V: Accumulator + Inspectable>(
     vnodes: &mut Arena<VNode<V>>,
     gnodes: &mut Arena<GNode<C, V>>,
-    violations: &mut Vec<VNodeId>,
+    violations: &mut Vec<VSlotPointer>,
     depth_evict: u32,
-) -> Vec<GNodeId> {
+) -> Vec<GSlotPointer> {
     let mut new_gnodes = Vec::new();
     // Safety-net ceiling — proportional to tree size so that large
     // but valid workloads are never rejected.  Each resolve() pushes
@@ -1459,10 +1479,10 @@ pub fn rebalance<C: Coordinate, V: Accumulator + Inspectable>(
 /// Used by the `debug_assert!` at the end of [`rebalance`] to confirm
 /// the queue-based loop left no violations behind.
 #[must_use]
-pub fn find_violated_nodes<V: Accumulator>(vnodes: &Arena<VNode<V>>) -> Vec<VNodeId> {
-    let mut violated: Vec<(VNodeId, u32)> = Vec::new();
+pub fn find_violated_nodes<V: Accumulator>(vnodes: &Arena<VNode<V>>) -> Vec<VSlotPointer> {
+    let mut violated: Vec<(VSlotPointer, u32)> = Vec::new();
     for (idx, _) in vnodes.iter_occupied() {
-        let id = VNodeId::from_index(idx);
+        let id = VSlotPointer::from_index(idx);
         if is_violated(vnodes, id) {
             violated.push((id, v_depth(vnodes, id)));
         }

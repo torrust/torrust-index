@@ -312,7 +312,7 @@ fn gn_display_after_split() {
 fn gn_display_dead_node() {
     let g = make_graph(100);
     // Index 99 is not allocated.
-    let dead_id = crate::handle::GNodeId::from_index(99);
+    let dead_id = crate::handle::GSlotPointer::from_index(99);
     let display = format!("{}", diagnostic::Gn(&g.gnodes, dead_id));
     assert_eq!(display, "G99(DEAD)");
 }
@@ -328,7 +328,7 @@ fn gn_display_semi_internal() {
     // Walk all occupied G-nodes and check that each formats without panic.
     let mut seen_states = Vec::new();
     for (idx, _) in g.gnodes.iter_occupied() {
-        let id = crate::handle::GNodeId::from_index(idx);
+        let id = crate::handle::GSlotPointer::from_index(idx);
         let display = format!("{}", diagnostic::Gn(&g.gnodes, id));
         assert!(
             display.starts_with(&format!("G{idx}(")),
@@ -514,7 +514,7 @@ fn decay_creates_span() {
         let mut g = make_graph(5);
         g.observe(3u64, 10u64);
         g.observe(12u64, 10u64);
-        g.decay(g.g_root, 0.5, 0.0);
+        g.decay(g.g_root(), 0.5, 0.0);
     });
     assert!(
         names.iter().any(|n| n.starts_with("decay")),
@@ -720,7 +720,7 @@ fn pl_display_for_root() {
 fn pl_display_for_non_basis_node() {
     let g = make_graph(100);
     // Unallocated node → not in any plateau basis.
-    let dead_id = crate::handle::GNodeId::from_index(99);
+    let dead_id = crate::handle::GSlotPointer::from_index(99);
     let display = format!("{}", diagnostic::Pl(&g, dead_id));
     assert!(
         display.contains("not_basis"),
@@ -735,7 +735,7 @@ fn pl_display_contains_range_and_depth() {
     // Find a G-node that is in a plateau basis.
     let mut found = false;
     for (idx, _) in g.gnodes.iter_occupied() {
-        let id = crate::handle::GNodeId::from_index(idx);
+        let id = crate::handle::GSlotPointer::from_index(idx);
         let display = format!("{}", diagnostic::Pl(&g, id));
         if display.starts_with("P(") && display.contains("d=") && display.contains("sum=") {
             // Verify the display contains the expected structure:

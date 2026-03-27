@@ -9,7 +9,7 @@
 
 use crate::arena::Arena;
 use crate::gnode::GNode;
-use crate::handle::GNodeId;
+use crate::handle::GSlotPointer;
 use crate::traits::{Accumulator, Coordinate};
 
 /// Route to the terminal or semi-internal G-node that should receive
@@ -23,7 +23,7 @@ use crate::traits::{Accumulator, Coordinate};
 ///
 /// See §IDEA M-5.2 `route_to_receiver`.
 #[must_use]
-pub fn route_to_receiver<C: Coordinate, V: Accumulator>(gnodes: &Arena<GNode<C, V>>, root: GNodeId, x: C) -> GNodeId {
+pub fn route_to_receiver<C: Coordinate, V: Accumulator>(gnodes: &Arena<GNode<C, V>>, root: GSlotPointer, x: C) -> GSlotPointer {
     let mut current = root;
     loop {
         let g = gnodes.get(current.index());
@@ -81,7 +81,7 @@ pub fn gnode_depth_from_interval<C: Coordinate>(lo: C, hi: C, n: u32) -> u32 {
 ///
 /// Cost: `O(depth_geo)`, with one extra sibling read per level vs
 /// delta propagation.
-pub fn recompute_g_sums<C: Coordinate, V: Accumulator>(gnodes: &mut Arena<GNode<C, V>>, start: GNodeId) {
+pub fn recompute_g_sums<C: Coordinate, V: Accumulator>(gnodes: &mut Arena<GNode<C, V>>, start: GSlotPointer) {
     let mut current = Some(start);
     while let Some(id) = current {
         let (left_sum, right_sum) = {
@@ -105,7 +105,7 @@ pub fn recompute_g_sums<C: Coordinate, V: Accumulator>(gnodes: &mut Arena<GNode<
 /// Cost: $O(|\text{preorder}|)$.
 ///
 /// Used by `decay()` after scaling `g.own` values.
-pub fn recompute_g_sums_subtree<C: Coordinate, V: Accumulator>(gnodes: &mut Arena<GNode<C, V>>, preorder: &[GNodeId]) {
+pub fn recompute_g_sums_subtree<C: Coordinate, V: Accumulator>(gnodes: &mut Arena<GNode<C, V>>, preorder: &[GSlotPointer]) {
     for &gid in preorder.iter().rev() {
         let (left_sum, right_sum) = {
             let g = gnodes.get(gid.index());

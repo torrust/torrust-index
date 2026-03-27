@@ -161,7 +161,7 @@ use std::collections::BTreeMap;
 use crate::arena::Arena;
 use crate::gnode::GNode;
 use crate::graph::GvGraph;
-use crate::handle::GNodeId;
+use crate::handle::GSlotPointer;
 use crate::plateau::{BasisEdge, Plateau, basis_edge_of};
 use crate::testing::default_config;
 use crate::tests::init_tracing;
@@ -169,28 +169,32 @@ use crate::vnode::{VKind, VNode};
 
 // ── Helpers ─────────────────────────────────────────────────────
 
-/// Allocate a `GNode` in the arena and return its `GNodeId`.
-fn alloc_gnode(arena: &mut Arena<GNode<u64, u64>>, lo: u64, hi: u64) -> GNodeId {
-    GNodeId::from_index(arena.alloc(GNode {
-        lo,
-        hi,
-        sum: 0,
-        own: 0,
-        left: None,
-        right: None,
-        parent: None,
-        entry: None,
-    }))
+/// Allocate a `GNode` in the arena and return its `GSlotPointer`.
+fn alloc_gnode(arena: &mut Arena<GNode<u64, u64>>, lo: u64, hi: u64) -> GSlotPointer {
+    GSlotPointer::from_index(
+        arena
+            .alloc(GNode {
+                lo,
+                hi,
+                sum: 0,
+                own: 0,
+                left: None,
+                right: None,
+                parent: None,
+                entry: None,
+            })
+            .0,
+    )
 }
 
 /// Wire `child` as the left child of `parent`.
-fn set_left(gnodes: &mut Arena<GNode<u64, u64>>, parent: GNodeId, child: GNodeId) {
+fn set_left(gnodes: &mut Arena<GNode<u64, u64>>, parent: GSlotPointer, child: GSlotPointer) {
     gnodes.get_mut(parent.index()).left = Some(child);
     gnodes.get_mut(child.index()).parent = Some(parent);
 }
 
 /// Wire `child` as the right child of `parent`.
-fn set_right(gnodes: &mut Arena<GNode<u64, u64>>, parent: GNodeId, child: GNodeId) {
+fn set_right(gnodes: &mut Arena<GNode<u64, u64>>, parent: GSlotPointer, child: GSlotPointer) {
     gnodes.get_mut(parent.index()).right = Some(child);
     gnodes.get_mut(child.index()).parent = Some(parent);
 }
@@ -199,14 +203,14 @@ fn set_right(gnodes: &mut Arena<GNode<u64, u64>>, parent: GNodeId, child: GNodeI
 /// a manually constructed topology.
 ///
 /// The caller provides a closure that receives a mutable arena
-/// reference and must return the root `GNodeId` of the new tree.
+/// reference and must return the root `GSlotPointer` of the new tree.
 ///
 /// The graph's plateau mirror is then rebuilt from scratch via
 /// `build_plateaus` so the initial state is always consistent.
-fn make_graph_with_topology(build_tree: impl FnOnce(&mut Arena<GNode<u64, u64>>) -> GNodeId) -> GvGraph<u64, u64, 8> {
+fn make_graph_with_topology(build_tree: impl FnOnce(&mut Arena<GNode<u64, u64>>) -> GSlotPointer) -> GvGraph<u64, u64, 8> {
     use std::sync::atomic::AtomicU32;
 
-    use crate::handle::VNodeId;
+    use crate::handle::VSlotPointer;
     use crate::plateau::PlateauBasis;
 
     let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
@@ -224,7 +228,7 @@ fn make_graph_with_topology(build_tree: impl FnOnce(&mut Arena<GNode<u64, u64>>)
             is_evictable: true,
         },
     };
-    let v_root = VNodeId::from_index(vnodes.alloc(v_entry));
+    let v_root = VSlotPointer::from_index(vnodes.alloc(v_entry).0);
     gnodes.get_mut(root.index()).entry = Some(v_root);
 
     // Count nodes.
@@ -297,7 +301,7 @@ fn rebuild_plateau_basis(graph: &mut GvGraph<u64, u64, 8>) {
     let mut pb = PlateauBasis::new();
 
     // DFS collect basis elements with their basis_edge.
-    let mut basis: Vec<(GNodeId, BasisEdge<u64>)> = Vec::new();
+    let mut basis: Vec<(GSlotPointer, BasisEdge<u64>)> = Vec::new();
     let mut stack = vec![graph.g_root];
     while let Some(gid) = stack.pop() {
         let g = graph.gnodes.get(gid.index());
@@ -1357,7 +1361,7 @@ fn shape_m_nonuniform_internal_no_si() {
 #[test]
 #[allow(clippy::too_many_lines)]
 fn divergence_summary() {
-    type BuildFn = Box<dyn FnOnce(&mut Arena<GNode<u64, u64>>) -> GNodeId>;
+    type BuildFn = Box<dyn FnOnce(&mut Arena<GNode<u64, u64>>) -> GSlotPointer>;
 
     let _t = init_tracing();
 

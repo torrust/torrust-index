@@ -19,7 +19,7 @@
 //! $$\ln\lambda(d) = \ln(\text{att}) \cdot (1 + q \cdot (2d_\text{local}/D - 1))$$
 
 use crate::graph::GvGraph;
-use crate::handle::GNodeId;
+use crate::handle::{GNodeId, GSlotPointer};
 use crate::traits::{Accumulator, Attenuatable, Coordinate, Inspectable};
 use crate::{gtree, rebalance, vtree};
 
@@ -81,14 +81,24 @@ impl<C: Coordinate, V: Accumulator + Attenuatable + Inspectable, const N: u32> G
     /// assert!(g.total_sum() < before);
     /// ```
     pub fn decay(&mut self, root: GNodeId, attenuation: f64, q: f64) {
-        let _span = tracing::debug_span!("decay", root = root.index(), attenuation, q,).entered();
+        let _span = tracing::debug_span!(
+            "decay",
+            root_index = root.index(),
+            root_generation = root.generation(),
+            attenuation,
+            q,
+        )
+        .entered();
+
+        let root: GSlotPointer = self.resolve_gnode_id(root, "decay").unwrap_or_else(|| {
+            panic!(
+                "decay: root handle (index {}, generation {}) does not refer to a live G-node",
+                root.index(),
+                root.generation()
+            )
+        });
 
         // ── Validation ──────────────────────────────────────────
-        assert!(
-            self.gnodes.is_occupied(root.index()),
-            "decay: root handle (index {}) does not refer to a live G-node",
-            root.index()
-        );
         assert!(
             attenuation >= 0.0 && !attenuation.is_nan(),
             "decay: attenuation must be >= 0 and not NaN, got {attenuation}"
@@ -119,7 +129,7 @@ impl<C: Coordinate, V: Accumulator + Attenuatable + Inspectable, const N: u32> G
 
     /// Single-pass scale: λ(a + b) = λa + λb, so scaling both `own`
     /// and `sum` by the same factor preserves G-I1 within the subtree.
-    fn decay_uniform(&mut self, root: GNodeId, att: f64, is_global: bool) {
+    fn decay_uniform(&mut self, root: GSlotPointer, att: f64, is_global: bool) {
         let _span = tracing::debug_span!("decay_uniform", root = root.index(), att, is_global,).entered();
 
         // 1. DFS walk: scale g.own and collect nodes in pre-order.
@@ -210,7 +220,7 @@ impl<C: Coordinate, V: Accumulator + Attenuatable + Inspectable, const N: u32> G
     /// For float coordinates, G-tree depth can exceed N because
     /// `attempt_split` gates on V-tree depth, not `is_final`.
     #[allow(clippy::too_many_lines)]
-    fn decay_selective(&mut self, root: GNodeId, att: f64, q: f64, is_global: bool) {
+    fn decay_selective(&mut self, root: GSlotPointer, att: f64, q: f64, is_global: bool) {
         let _span = tracing::debug_span!("decay_selective", root = root.index(), att, q, is_global,).entered();
 
         let d_root = self.gnode_depth(root);

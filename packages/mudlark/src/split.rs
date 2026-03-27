@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use crate::arena::Arena;
 use crate::gnode::GNode;
 use crate::graph::GvGraph;
-use crate::handle::{GNodeId, VNodeId};
+use crate::handle::{GSlotPointer, VSlotPointer};
 use crate::rebalance::{Nd, contract, push_promoted_violations, push_side_effect_violations};
 use crate::traits::{Accumulator, Coordinate, Inspectable};
 use crate::vnode::{DEPTH_STALE, PackedChildren, VKind, VNode};
@@ -34,7 +34,10 @@ use crate::vtree::{propagate_evictable_flags, v_depth};
 ///
 /// Panics if the entry's V-parent link is inconsistent (the parent
 /// was confirmed to exist but is `None` after the bootstrap check).
-pub fn attempt_split<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(graph: &mut GvGraph<C, V, N>, g_id: GNodeId) {
+pub fn attempt_split<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(
+    graph: &mut GvGraph<C, V, N>,
+    g_id: GSlotPointer,
+) {
     let g = graph.gnodes.get(g_id.index());
 
     // Guard: must be terminal (no G-children).
@@ -101,7 +104,7 @@ pub fn attempt_split<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(
 /// Flips old entry's `is_exposed` to false. Updates `v_root`.
 ///
 /// See §IDEA M-10.3.
-fn bootstrap_split<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(graph: &mut GvGraph<C, V, N>, g_id: GNodeId) {
+fn bootstrap_split<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(graph: &mut GvGraph<C, V, N>, g_id: GSlotPointer) {
     let (lo, hi, entry_id) = {
         let g = graph.gnodes.get(g_id.index());
         (g.lo, g.hi, g.entry.expect("bootstrap_split: g must have an entry"))
@@ -133,7 +136,7 @@ fn bootstrap_split<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(gr
             has_evictable: true,
         },
     };
-    let root_s_id = VNodeId::from_index(graph.vnodes.alloc(root_structural));
+    let root_s_id = VSlotPointer::from_index(graph.vnodes.alloc(root_structural).0);
     graph.vnodes.get_mut(entry_id.index()).parent = Some(root_s_id);
     graph.vnodes.get_mut(cs_id.index()).parent = Some(root_s_id);
     // Set depths for children: entry and cs at depth 1, le/re at depth 2
@@ -182,7 +185,7 @@ fn bootstrap_split<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(gr
 ///
 /// See §IDEA M-10.2.
 #[allow(clippy::too_many_lines)] // Plateau maintenance adds ~50 lines.
-fn catalytic_split<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(graph: &mut GvGraph<C, V, N>, g_id: GNodeId) {
+fn catalytic_split<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(graph: &mut GvGraph<C, V, N>, g_id: GSlotPointer) {
     let (lo, hi, entry_id) = {
         let g = graph.gnodes.get(g_id.index());
         (g.lo, g.hi, g.entry.expect("catalytic_split: g must have an entry"))
@@ -220,7 +223,7 @@ fn catalytic_split<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(gr
             has_evictable: true,
         },
     };
-    let s_id = VNodeId::from_index(graph.vnodes.alloc(s));
+    let s_id = VSlotPointer::from_index(graph.vnodes.alloc(s).0);
     graph.vnodes.get_mut(le_id.index()).parent = Some(s_id);
     graph.vnodes.get_mut(re_id.index()).parent = Some(s_id);
     // Set child depths
@@ -272,7 +275,12 @@ fn catalytic_split<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(gr
 // ── Allocation helpers ──────────────────────────────────────────────
 
 /// Allocate a terminal G-child covering `[lo, hi)` under `parent`.
-fn alloc_g_child<C: Coordinate, V: Accumulator>(gnodes: &mut Arena<GNode<C, V>>, lo: C, hi: C, parent: GNodeId) -> GNodeId {
+fn alloc_g_child<C: Coordinate, V: Accumulator>(
+    gnodes: &mut Arena<GNode<C, V>>,
+    lo: C,
+    hi: C,
+    parent: GSlotPointer,
+) -> GSlotPointer {
     let g = GNode {
         lo,
         hi,
@@ -283,15 +291,15 @@ fn alloc_g_child<C: Coordinate, V: Accumulator>(gnodes: &mut Arena<GNode<C, V>>,
         parent: Some(parent),
         entry: None,
     };
-    GNodeId::from_index(gnodes.alloc(g))
+    GSlotPointer::from_index(gnodes.alloc(g).0)
 }
 
 /// Allocate a zero-intensity V-entry for `gnode` and link the G-node to it.
 fn alloc_v_entry<C: Coordinate, V: Accumulator>(
     vnodes: &mut Arena<VNode<V>>,
     gnodes: &mut Arena<GNode<C, V>>,
-    gnode: GNodeId,
-) -> VNodeId {
+    gnode: GSlotPointer,
+) -> VSlotPointer {
     let e = VNode {
         intensity: V::zero(),
         parent: None,
@@ -302,13 +310,13 @@ fn alloc_v_entry<C: Coordinate, V: Accumulator>(
             is_evictable: true,
         },
     };
-    let e_id = VNodeId::from_index(vnodes.alloc(e));
+    let e_id = VSlotPointer::from_index(vnodes.alloc(e).0);
     gnodes.get_mut(gnode.index()).entry = Some(e_id);
     e_id
 }
 
 /// Allocate a structural 2-node wrapping two V-children and parent them.
-fn alloc_v_structural_2<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, a: VNodeId, b: VNodeId) -> VNodeId {
+fn alloc_v_structural_2<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, a: VSlotPointer, b: VSlotPointer) -> VSlotPointer {
     let a_int = vnodes.get(a.index()).intensity;
     let b_int = vnodes.get(b.index()).intensity;
     let s = VNode {
@@ -320,7 +328,7 @@ fn alloc_v_structural_2<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, a: VNodeId
             has_evictable: true, // new entries are always exposed (terminal → evictable)
         },
     };
-    let s_id = VNodeId::from_index(vnodes.alloc(s));
+    let s_id = VSlotPointer::from_index(vnodes.alloc(s).0);
     vnodes.get_mut(a.index()).parent = Some(s_id);
     vnodes.get_mut(b.index()).parent = Some(s_id);
     s_id

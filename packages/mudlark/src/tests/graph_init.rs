@@ -101,7 +101,7 @@ fn g_root_covers_full_domain_n64() {
 #[test]
 fn g_root_is_first_arena_slot() {
     let graph: GvGraph<u64, u64, 32> = GvGraph::new(default_config());
-    assert_eq!(graph.g_root(), GNodeId::from_index(0));
+    assert_eq!(graph.g_root(), GNodeId::from_parts(0, 0));
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn v_root_is_entry_backed_by_g_root() {
     let graph: GvGraph<u64, u64, 32> = GvGraph::new(default_config());
     let v = graph.vnodes().get(graph.v_root().unwrap().index());
     match &v.kind {
-        VKind::Entry { gnode, .. } => assert_eq!(*gnode, graph.g_root()),
+        VKind::Entry { gnode, .. } => assert_eq!(*gnode, graph.g_root().slot()),
         VKind::Structural { .. } => panic!("V-root should be an Entry, not Structural"),
     }
 }

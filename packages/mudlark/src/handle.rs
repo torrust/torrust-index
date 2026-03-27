@@ -3,21 +3,26 @@
 
 //! Opaque handles for G-tree and V-tree nodes.
 //!
-//! [`GNodeId`] is a lightweight, `Copy` identity token
-//! that lets you refer to a specific node inside a [`GvGraph`] without
-//! exposing how nodes are stored internally. Think of it as a serial
-//! number stamped onto a film grain: the number is enough to locate
-//! the grain later, but reveals nothing about the crystal structure
-//! underneath.
+//! [`GNodeId`] is the public, generational handle that lets you refer
+//! to a specific G-node inside a [`GvGraph`] without exposing how nodes
+//! are stored internally. Think of it as a serial number stamped onto
+//! a film grain: the number is enough to locate the grain later, but
+//! reveals nothing about the crystal structure underneath. The
+//! generation counter (ADR-M-040) detects stale handles after slot
+//! reuse — a mismatch panics with a diagnostic message.
 //!
-//! `VNodeId` is the corresponding handle for the V-tree (significance
-//! hierarchy) but is `pub(crate)` — it has no public consuming method
-//! (ADR-M-032 handle test).
+//! `GSlotPointer` is the lightweight, generation-free `pub(crate)`
+//! handle used internally for intra-arena tree walks where no
+//! eviction can interleave and the generation check is unnecessary
+//! overhead. `VSlotPointer` is the corresponding internal handle for
+//! the V-tree (significance hierarchy); it also has no public
+//! consuming method (ADR-M-032 handle test).
 //!
-//! | Handle    | Identifies                                     | Photography analogy               |
-//! |-----------|-------------------------------------------------|-----------------------------------|
-//! | `GNodeId` | A spatial node in the G-tree (`[0, 2^N)`)       | Grain serial number               |
-//! | `VNodeId` | A significance node in the V-tree (tournament)  | Developing priority tag           |
+//! | Handle           | Visibility   | Identifies                                     | Photography analogy               |
+//! |------------------|--------------|-------------------------------------------------|-----------------------------------|
+//! | `GNodeId`        | `pub`        | A spatial node in the G-tree (`[0, 2^N)`)       | Grain serial number (dated)       |
+//! | `GSlotPointer`   | `pub(crate)` | Same, without generation — internal fast path   | Grain serial number (undated)     |
+//! | `VSlotPointer`   | `pub(crate)` | A significance node in the V-tree (tournament)  | Developing priority tag           |
 //!
 //! # When you need handles
 //!
@@ -49,20 +54,23 @@
 //!
 //! # Obtaining handles
 //!
-//! | Method              | Returns             |
-//! |---------------------|---------------------|
-//! | [`GvGraph::g_root`] | `GNodeId` (always)  |
+//! | Method              | Returns                |
+//! |---------------------|------------------------|
+//! | [`GvGraph::g_root`] | `GNodeId` (always)     |
 //!
 //! The root handle is assigned at construction and never changes.
 //! (`v_root()` is `pub(crate)` — available inside the crate only.)
 //!
 //! # Representation
 //!
-//! Internally both types wrap [`NonZeroU32`], so `Option<GNodeId>` and
-//! `Option<VNodeId>` are niche-optimized to 4 bytes with no
-//! discriminant overhead. The zero-based arena index is accessible via
-//! [`index()`](GNodeId::index) and can be round-tripped through
-//! [`from_index()`](GNodeId::from_index) for serialization or logging.
+//! `GNodeId` is 8 bytes (slot index + generation counter).
+//! `Option<GNodeId>` is 8 bytes (niche-optimised via `NonZeroU32`).
+//!
+//! Internally, `GSlotPointer` and `VSlotPointer` wrap [`NonZeroU32`],
+//! so `Option<GSlotPointer>` and `Option<VSlotPointer>` are
+//! niche-optimized to 4 bytes with no discriminant overhead. The hot
+//! internal paths use these 4-byte handles; the 8-byte `GNodeId`
+//! exists only at the public API boundary.
 //!
 //! [`GvGraph`]: crate::GvGraph
 //! [`observe`]: crate::SpatialWrite::observe
@@ -75,51 +83,42 @@
 
 use std::num::NonZeroU32;
 
-/// Opaque handle to a node in the G-tree (spatial hierarchy).
+/// Internal, generation-free handle to a G-tree node.
 ///
-/// A `GNodeId` is a lightweight identity token — a *grain serial
-/// number* in the [photography analogy] — that refers to a single node
-/// in the geometric tree partitioning `[0, 2^N)` into dyadic
-/// intervals. The handle is cheap (`Copy`, 4 bytes) and carries no
-/// spatial or value data: you pass it back to the [`GvGraph`] to
-/// obtain that information.
+/// `GSlotPointer` is a lightweight `Copy` token (4 bytes) used
+/// internally for tree walks where no eviction can interleave and
+/// the generational check would be unnecessary overhead.
 ///
-/// Every graph begins with a root G-node covering the full domain;
-/// splits create children as observations arrive. The root handle is
-/// always index `0` and never changes.
+/// The public API uses [`GNodeId`] (8 bytes, generational) instead.
+/// `GSlotPointer` is `pub(crate)` — never exposed to downstream
+/// crates (ADR-M-040 D3, D6).
 ///
-/// # Where you use it
+/// `GSlotPointer` implements `Copy`, `Debug`, `PartialEq`, `Eq`,
+/// `PartialOrd`, `Ord`, and `Hash`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct GSlotPointer(NonZeroU32);
+
+/// Opaque identity token for a G-node in the spatial hierarchy.
 ///
-/// | Operation                    | Role of `GNodeId`                          |
-/// |------------------------------|--------------------------------------------|
-/// | [`TemporalDecay::decay`]     | Selects the subtree to attenuate           |
-/// | [`Node::gnode_id`]           | Map key for per-cell tracker state         |
-/// | [`GvGraph::gnode_info`]      | Read-only structural snapshot              |
-/// | [`GvGraph::is_ancestor_of`]  | Ancestry check for coordination walks      |
-/// | [`from_index`] / [`index`]   | Serialization round-trips and logging      |
+/// A `GNodeId` is a generational handle — it carries the slot index
+/// and a generation counter, allowing detection of use-after-free
+/// when a slot is reused (ADR-M-040).
 ///
-/// Most common workflow: obtain the root via [`GvGraph::g_root`], then
-/// pass it to [`decay()`](crate::TemporalDecay::decay).
+/// Both consuming methods (`decay`, `gnode_info`, `is_ancestor_of`)
+/// and snapshot types (`Node`, `BasisElement`) use `GNodeId`.
+/// The generation check is always performed; a mismatch panics with
+/// a diagnostic message.
 ///
-/// `GNodeId` implements `Copy`, `Debug`, `PartialEq`, `Eq`, and
-/// `Hash` — you can store it, compare it, and use it as a map key.
-///
-/// [photography analogy]: crate#three-surface-visibility-model-adr-032
-/// [`GvGraph`]: crate::GvGraph
-/// [`GvGraph::g_root`]: crate::GvGraph::g_root
-/// [`GvGraph::gnode_info`]: crate::GvGraph::gnode_info
-/// [`GvGraph::is_ancestor_of`]: crate::GvGraph::is_ancestor_of
-/// [`Node::gnode_id`]: crate::Node::gnode_id
-/// [`TemporalDecay::decay`]: crate::TemporalDecay::decay
-/// [`from_index`]: Self::from_index
-/// [`index`]: Self::index
+/// `GNodeId` implements `Copy`, `Debug`, `PartialEq`, `Eq`,
+/// `PartialOrd`, `Ord`, and `Hash`.
 ///
 /// # Examples
 ///
-/// Retrieve the root handle and pass it to `decay()`:
+/// Obtain the root handle and use it for decay:
 ///
 /// ```
-/// use torrust_mudlark::{Config, GvGraph, GNodeId, TemporalDecay};
+/// use torrust_mudlark::{Config, GvGraph, TemporalDecay};
 ///
 /// let cfg = Config {
 ///     split_threshold: 5u64,
@@ -132,38 +131,90 @@ use std::num::NonZeroU32;
 /// let mut g = GvGraph::<u64, u64, 8>::new(cfg);
 /// g.observe(42, 100u64);
 ///
-/// // The root handle is always index 0 and never changes.
-/// let root: GNodeId = g.g_root();
-/// assert_eq!(root.index(), 0);
-///
-/// // Use it to decay the entire tree by 50 %.
+/// let root = g.g_root();
 /// let before = g.total_sum();
 /// g.decay(root, 0.5, 0.0);
 /// assert!(g.total_sum() < before);
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct GNodeId(NonZeroU32);
+pub struct GNodeId {
+    /// 1-indexed arena slot (encoded as `NonZeroU32`).
+    index: NonZeroU32,
+    /// Generation counter at handle creation time.
+    generation: u32,
+}
+
+impl GNodeId {
+    /// Create a `GNodeId` from a slot index and generation.
+    ///
+    /// This is the inverse of [`Self::index`] + [`Self::generation`].
+    /// Primarily used for serialization and diagnostics (`#[doc(hidden)]`).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index >= u32::MAX as usize` (exhausts the address space).
+    #[doc(hidden)]
+    #[must_use]
+    pub fn from_parts(index: usize, generation: u32) -> Self {
+        let raw = u32::try_from(index)
+            .ok()
+            .and_then(|i| i.checked_add(1))
+            .and_then(NonZeroU32::new)
+            .expect("GNodeId::from_parts: index out of range");
+        Self { index: raw, generation }
+    }
+
+    /// Return the 0-based arena index.
+    ///
+    /// The inverse of [`Self::from_parts`]. Primarily used for
+    /// serialization and diagnostics (`#[doc(hidden)]`).
+    #[doc(hidden)]
+    #[must_use]
+    #[inline]
+    pub const fn index(self) -> usize {
+        (self.index.get() - 1) as usize
+    }
+
+    /// Return the generation counter at handle creation time.
+    ///
+    /// Used for serialization and diagnostics (`#[doc(hidden)]`).
+    #[doc(hidden)]
+    #[must_use]
+    #[inline]
+    pub const fn generation(self) -> u32 {
+        self.generation
+    }
+
+    /// Internal: extract the raw slot pointer (no generation check).
+    ///
+    /// Used internally where we elide the generation check (e.g.,
+    /// within a single alloc/observe cycle where no interleaving
+    /// eviction can occur).
+    pub(crate) const fn slot(self) -> GSlotPointer {
+        GSlotPointer(self.index)
+    }
+}
 
 /// Opaque handle to a node in the V-tree (significance hierarchy).
 ///
-/// A `VNodeId` is a *developing priority tag* — it identifies a node
+/// A `VSlotPointer` is a *developing priority tag* — it identifies a node
 /// in the value tree, the tournament bracket that orders entries by
 /// intensity so high-value regions sit near the root for efficient
 /// proportional sampling.
 ///
 /// # Visibility
 ///
-/// `VNodeId` is `pub(crate)` (ADR-M-032 handle test: no public
+/// `VSlotPointer` is `pub(crate)` (ADR-M-032 handle test: no public
 /// consuming method). The V-tree drives [`sample()`] and [`extract()`]
 /// internally; those methods return [`Cell`] and [`Pewei`] values
 /// instead of raw handles.
 ///
 /// Within the crate, obtain the root handle via `GvGraph::v_root()`,
-/// which returns `Option<VNodeId>` — always `Some` for a graph
+/// which returns `Option<VSlotPointer>` — always `Some` for a graph
 /// created with [`GvGraph::new`].
 ///
-/// `VNodeId` implements `Copy`, `Debug`, `PartialEq`, `Eq`, and
+/// `VSlotPointer` implements `Copy`, `Debug`, `PartialEq`, `Eq`, and
 /// `Hash` — same ergonomics as [`GNodeId`].
 ///
 /// [`sample()`]: crate::WeightedSampler::sample
@@ -174,13 +225,14 @@ pub struct GNodeId(NonZeroU32);
 ///
 /// # Examples
 ///
-/// `VNodeId` is `pub(crate)` — see crate-level tests in
+/// `VSlotPointer` is `pub(crate)` — see crate-level tests in
 /// `src/tests/worked_example.rs` for usage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct VNodeId(NonZeroU32);
+#[allow(clippy::redundant_pub_crate)]
+pub(crate) struct VSlotPointer(NonZeroU32);
 
-macro_rules! impl_handle {
+macro_rules! impl_slot_handle {
     ($ty:ident) => {
         impl $ty {
             /// Create a handle from a 0-based arena index
@@ -205,32 +257,12 @@ macro_rules! impl_handle {
             ///
             /// Round-trip an index through a handle:
             ///
-            /// ```
-            /// use torrust_mudlark::GNodeId;
-            ///
-            /// let g = GNodeId::from_index(42);
+            /// ```ignore
+            /// // GSlotPointer/VSlotPointer are pub(crate); this
+            /// // example illustrates the API but cannot compile
+            /// // as a standalone doc test.
+            /// let g = GSlotPointer::from_index(42);
             /// assert_eq!(g.index(), 42);
-            /// ```
-            ///
-            /// Reconstruct a handle from a previously stored index:
-            ///
-            /// ```
-            /// # use torrust_mudlark::{Config, GvGraph, GNodeId};
-            /// # let cfg = Config {
-            /// #     split_threshold: 5u64,
-            /// #     depth_create: 3,
-            /// #     depth_evict: 6,
-            /// #     budget: None,
-            /// #     alpha_relax: 0.75,
-            /// #     bounded_eviction: true,
-            /// # };
-            /// # let g = GvGraph::<u64, u64, 8>::new(cfg);
-            /// // Suppose we stored the root's index earlier.
-            /// let saved_index = g.g_root().index();
-            ///
-            /// // Later, reconstitute the handle.
-            /// let restored = GNodeId::from_index(saved_index);
-            /// assert_eq!(restored, g.g_root());
             /// ```
             #[doc(hidden)]
             #[must_use]
@@ -254,30 +286,12 @@ macro_rules! impl_handle {
             ///
             /// # Examples
             ///
-            /// ```
-            /// use torrust_mudlark::GNodeId;
-            ///
-            /// let h = GNodeId::from_index(7);
+            /// ```ignore
+            /// // GSlotPointer/VSlotPointer are pub(crate); this
+            /// // example illustrates the API but cannot compile
+            /// // as a standalone doc test.
+            /// let h = GSlotPointer::from_index(7);
             /// assert_eq!(h.index(), 7);
-            /// ```
-            ///
-            /// Use the index to tag external per-node data:
-            ///
-            /// ```
-            /// # use torrust_mudlark::{Config, GvGraph};
-            /// # let cfg = Config {
-            /// #     split_threshold: 5u64,
-            /// #     depth_create: 3,
-            /// #     depth_evict: 6,
-            /// #     budget: None,
-            /// #     alpha_relax: 0.75,
-            /// #     bounded_eviction: true,
-            /// # };
-            /// # let g = GvGraph::<u64, u64, 8>::new(cfg);
-            /// let root = g.g_root();
-            /// let mut labels: Vec<&str> = vec![""; 64];
-            /// labels[root.index()] = "root";
-            /// assert_eq!(labels[0], "root");
             /// ```
             #[doc(hidden)]
             #[must_use]
@@ -289,8 +303,8 @@ macro_rules! impl_handle {
     };
 }
 
-impl_handle!(GNodeId);
-impl_handle!(VNodeId);
+impl_slot_handle!(GSlotPointer);
+impl_slot_handle!(VSlotPointer);
 
 #[cfg(test)]
 mod tests {}

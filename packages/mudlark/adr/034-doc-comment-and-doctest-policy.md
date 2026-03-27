@@ -57,7 +57,7 @@ The coverage mandate applies to:
 
 | Category             | Items                                                                                                                                                                          |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Structs**          | `Span`, `Cell`, `Node`, `Pewei`, `Layer`, `Transition`, `Terminal`, `BasisEdge`, `Plateau`, `GNodeId`, `VNodeId`, `Config`, `GvGraph`                                          |
+| **Structs**          | `Span`, `Cell`, `Node`, `Pewei`, `Layer`, `Transition`, `Terminal`, `BasisEdge`, `Plateau`, `GSlotPointer`, `VSlotPointer`, `Config`, `GvGraph`                                          |
 | **Enums**            | `GState`                                                                                                                                                                       |
 | **Traits**           | `Coordinate`, `Accumulator`, `Attenuatable`, `Weighable`, `Proratable`, `Inspectable`, `Observation`, `Rng`, `SpatialRead`, `SpatialWrite`, `TemporalDecay`, `WeightedSampler` |
 | **Inherent methods** | Every `pub fn` and `pub const fn` on the above types                                                                                                                           |
@@ -303,12 +303,12 @@ implementation backlog.
 
 | Item                  | Doc-test |
 | --------------------- | -------- |
-| `GNodeId` (struct)    | ☑        |
-| `GNodeId::from_index` | ☑        |
-| `GNodeId::index`      | ☑        |
-| `VNodeId` (struct)    | ☑        |
-| `VNodeId::from_index` | ☑        |
-| `VNodeId::index`      | ☑        |
+| `GSlotPointer` (struct)    | ☑        |
+| `GSlotPointer::from_index` | ☑        |
+| `GSlotPointer::index`      | ☑        |
+| `VSlotPointer` (struct)    | ☑        |
+| `VSlotPointer::from_index` | ☑        |
+| `VSlotPointer::index`      | ☑        |
 
 ### Surface 2 — Film
 

@@ -462,7 +462,7 @@ pub struct GvGraph<C: Coordinate, V: Accumulator, const N: u32> {
     // ... existing fields ...
     gnodes: Arena<GNode<C, V>>,
     vnodes: Arena<VNode<V>>,
-    g_root: GNodeId,
+    g_root: GSlotPointer,
     // ...
 
     /// Live plateau mirror of the G-Tree contour.
@@ -730,10 +730,10 @@ disjointness).
 /// Maintains the basis assignments that satisfy P-I1 through P-I5.
 /// Updated atomically by split/evict/decay code paths.
 pub(crate) struct PlateauBasis<C: Coordinate> {
-    /// Forward: basis edge → basis element GNodeIds.
-    forward: BTreeMap<BasisEdge<C>, HashSet<GNodeId>>,
+    /// Forward: basis edge → basis element GSlotPointers.
+    forward: BTreeMap<BasisEdge<C>, HashSet<GSlotPointer>>,
     /// Back: basis element → basis edge.
-    back: HashMap<GNodeId, BasisEdge<C>>,
+    back: HashMap<GSlotPointer, BasisEdge<C>>,
 }
 ```
 
@@ -802,7 +802,7 @@ pub fn get(&self, coord: C) -> Cell<C, V>
 
 ### Q5: Back-pointer mechanism (DC-026-5)
 
-**Decided: Option B — `HashMap<GNodeId, BasisEdge<C>>` inside
+**Decided: Option B — `HashMap<GSlotPointer, BasisEdge<C>>` inside
 `PlateauBasis`.**
 
 How does the `observe` propagation path find which basis elements
@@ -822,8 +822,8 @@ code paths that maintain P-I1 through P-I5:
 
 ```rust
 pub(crate) struct PlateauBasis<C: Coordinate> {
-    forward: BTreeMap<BasisEdge<C>, HashSet<GNodeId>>,
-    back: HashMap<GNodeId, BasisEdge<C>>,
+    forward: BTreeMap<BasisEdge<C>, HashSet<GSlotPointer>>,
+    back: HashMap<GSlotPointer, BasisEdge<C>>,
 }
 ```
 
@@ -907,8 +907,8 @@ impl<C: Coordinate> Eq for BasisEdge<C> {}
 | Structure              | Before                       | After                                      |
 | ---------------------- | ---------------------------- | ------------------------------------------ |
 | `GvGraph` field        | `BTreeMap<C, Plateau<C, V>>` | `BTreeMap<BasisEdge<C>, Plateau<C, V>>`    |
-| `PlateauBasis` forward | `BTreeMap<C, Vec<GNodeId>>`  | `BTreeMap<BasisEdge<C>, HashSet<GNodeId>>` |
-| `PlateauBasis` back    | `HashMap<GNodeId, C>`        | `HashMap<GNodeId, BasisEdge<C>>`           |
+| `PlateauBasis` forward | `BTreeMap<C, Vec<GSlotPointer>>`  | `BTreeMap<BasisEdge<C>, HashSet<GSlotPointer>>` |
+| `PlateauBasis` back    | `HashMap<GSlotPointer, C>`        | `HashMap<GSlotPointer, BasisEdge<C>>`           |
 | `GvGraph` bound        | `C: Coordinate + Ord`        | `C: Coordinate` (no `Ord`)                 |
 
 **Why this is correct:**
@@ -939,7 +939,7 @@ This supersedes the original Q7 decision ("floats excluded").
 | Q2  | Keep `get()` returning `Cell` alongside BTreeMap.                                          | Two abstractions, two questions. Routing truth (trimmed) vs structural truth (thatched).          |
 | Q3  | Three metrics: `plateaus().len()`, `node_count()`, `terminal_count()`.                     | Each `O(1)`.                                                                                      |
 | Q4  | Infallible `Cell<C, V>` with domain clamping. NaN panics.                                  | Consistent with `range_sum` and `observe`.                                                        |
-| Q5  | `HashMap<GNodeId, BasisEdge<C>>` inside `PlateauBasis`.                                    | GNode stays 48 bytes. `O(1)` amortized.                                                           |
+| Q5  | `HashMap<GSlotPointer, BasisEdge<C>>` inside `PlateauBasis`.                                    | GNode stays 48 bytes. `O(1)` amortized.                                                           |
 | Q6  | Complementary projections — no unification.                                                | `extract()` = V-Tree (cold). `plateaus()` = G-Tree (hot).                                         |
 | Q7  | `BasisEdge<C>` newtype + `Coordinate::total_cmp`. No `Ord` on `GvGraph`. Floats supported. | Zero-cost `Ord` wrapper. Semantic key naming (P-I1). No float exclusion.                          |
 
@@ -972,8 +972,8 @@ This supersedes the original Q7 decision ("floats excluded").
   floor-key lookups. Semantic name derived from P-I1.
 
 - **`PlateauBasis<C>` is a private bookkeeping struct** inside
-  `GvGraph`. Forward map (`BTreeMap<BasisEdge<C>, HashSet<GNodeId>>`)
-  and back-pointer map (`HashMap<GNodeId, BasisEdge<C>>`).
+  `GvGraph`. Forward map (`BTreeMap<BasisEdge<C>, HashSet<GSlotPointer>>`)
+  and back-pointer map (`HashMap<GSlotPointer, BasisEdge<C>>`).
   Updated atomically by `split`/`evict`/`decay`. GNode stays at
   48 bytes.
 

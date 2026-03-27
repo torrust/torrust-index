@@ -25,7 +25,7 @@ entry's intensity grows past its max uncle. The rebalance loop
 
 ## Decision
 
-**Eager tracking with a `Vec<VNodeId>` work queue.**
+**Eager tracking with a `Vec<VSlotPointer>` work queue.**
 
 ### Rationale
 
@@ -34,7 +34,7 @@ during sum propagation. The uncle check reads the grandparent's
 `PackedChildren` — which is in the same cache line, already loaded.
 The violation check is **free in cache terms**.
 
-Pushing a `VNodeId` onto a `Vec` is a single write. Scanning the
+Pushing a `VSlotPointer` onto a `Vec` is a single write. Scanning the
 entire V-Tree to find the same violations would re-read nodes
 already in hand.
 
@@ -49,7 +49,7 @@ struct GvGraph<C, V, const N: u32> {
 
     /// Work queue — scoped to one mutation batch (observe, evict, decay).
     /// Built during propagation, drained by rebalance(), empty on return.
-    violations: Vec<VNodeId>,
+    violations: Vec<VSlotPointer>,
 }
 ```
 
@@ -303,7 +303,7 @@ The implementation includes a safety-net iteration limit proportional
 to arena size (`20 × node_count`, floor 10 000). In debug builds
 the limit panics; in release builds it breaks out with an error log.
 
-`rebalance()` returns `Vec<GNodeId>` — the G-nodes created by
+`rebalance()` returns `Vec<GSlotPointer>` — the G-nodes created by
 legacy promotions (§IDEA M-11.6) during the drain, so the caller can handle
 plateau and depth-control bookkeeping.
 

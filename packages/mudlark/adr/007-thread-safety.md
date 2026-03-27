@@ -56,10 +56,10 @@ Rust auto-derives `Send + Sync` for the entire struct.
 | ------------------- | --------------------------------------- | ----------------------------- |
 | `gnodes`            | `Arena<GNode<C, V>>`                    | `Send + Sync` when `C, V` are |
 | `vnodes`            | `Arena<VNode<V>>`                       | `Send + Sync` when `V` is ¹   |
-| `g_root`            | `GNodeId` (`NonZeroU32`)                | `Copy + Send + Sync`          |
-| `v_root`            | `Option<VNodeId>` (`NonZeroU32` niche)  | `Copy + Send + Sync`          |
+| `g_root`            | `GSlotPointer` (`NonZeroU32`)                | `Copy + Send + Sync`          |
+| `v_root`            | `Option<VSlotPointer>` (`NonZeroU32` niche)  | `Copy + Send + Sync`          |
 | `config`            | `Config<V>`                             | `Send + Sync` when `V` is     |
-| `violations`        | `Vec<VNodeId>`                          | `Send + Sync`                 |
+| `violations`        | `Vec<VSlotPointer>`                          | `Send + Sync`                 |
 | `node_count`        | `u32`                                   | `Send + Sync`                 |
 | `terminal_count`    | `u32`                                   | `Send + Sync`                 |
 | `live_depth_evict`  | `u32`                                   | `Send + Sync`                 |
@@ -68,7 +68,7 @@ Rust auto-derives `Send + Sync` for the entire struct.
 | `headroom`          | `usize`                                 | `Send + Sync`                 |
 | `soft_limit`        | `Option<usize>`                         | `Send + Sync`                 |
 | `plateaus`†         | `BTreeMap<BasisEdge<C>, Plateau<C, V>>` | `Send + Sync` when `C, V` are |
-| `pending_p_i4`†     | `Vec<(GNodeId, BasisEdge<C>)>`          | `Send + Sync` when `C` is     |
+| `pending_p_i4`†     | `Vec<(GSlotPointer, BasisEdge<C>)>`          | `Send + Sync` when `C` is     |
 | `plateau_basis`†    | `PlateauBasis<C>` ²                     | `Send + Sync` when `C` is     |
 | `plateaus_dirty`†   | `bool`                                  | `Send + Sync`                 |
 
@@ -79,7 +79,7 @@ Rust auto-derives `Send + Sync` for the entire struct.
 auto-trait depends only on `V`.
 
 ² `PlateauBasis<C>` is backed by a `BTreeMap<BasisEdge<C>,
-HashSet<GNodeId>>` (forward map) and a `HashMap<GNodeId,
+HashSet<GSlotPointer>>` (forward map) and a `HashMap<GSlotPointer,
 BasisEdge<C>>` (back map). All three collections are `Send + Sync`
 when their element types are — satisfied when `C: Send + Sync`.
 

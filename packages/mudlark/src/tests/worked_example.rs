@@ -70,7 +70,7 @@
 //! | [`depth_gates_unchanged_without_budget`] | `D_create`, `D_evict`, soft limit stay at initial values |
 
 use crate::graph::GvGraph;
-use crate::handle::VNodeId;
+use crate::handle::VSlotPointer;
 use crate::invariants::assert_invariants;
 use crate::testing::{Plan, run, run_checked, worked_example_config};
 use crate::tests::init_tracing;
@@ -93,7 +93,7 @@ fn step3_plan() -> Plan<u64, u64> {
 }
 
 /// Return the child count of a V-structural node (0 for entries).
-fn v_child_count(graph: &GvGraph<u64, u64, 3>, v_id: VNodeId) -> usize {
+fn v_child_count(graph: &GvGraph<u64, u64, 3>, v_id: VSlotPointer) -> usize {
     match &graph.vnodes().get(v_id.index()).kind {
         VKind::Structural { children, .. } => children.len(),
         VKind::Entry { .. } => 0,
@@ -101,7 +101,7 @@ fn v_child_count(graph: &GvGraph<u64, u64, 3>, v_id: VNodeId) -> usize {
 }
 
 /// Assert a V-entry has the expected exposed flag.
-fn assert_terminal(graph: &GvGraph<u64, u64, 3>, v_id: VNodeId, expected: bool) {
+fn assert_terminal(graph: &GvGraph<u64, u64, 3>, v_id: VSlotPointer, expected: bool) {
     match &graph.vnodes().get(v_id.index()).kind {
         VKind::Entry { is_exposed, .. } => {
             assert_eq!(*is_exposed, expected, "exposed flag mismatch at {v_id:?}");

@@ -267,7 +267,7 @@ Governed by [ADR-M-034](../adr/034-doc-comment-and-doctest-policy.md):
 | `graph.rs`                 | Graph-level construction, accessors, round-trips     |
 | `graph_init.rs`            | Graph initialisation edge cases                      |
 | `gtree.rs`                 | G-tree routing, depth computation, sum recomputation |
-| `handle.rs`                | Handle (GNodeId, VNodeId) identity and validity      |
+| `handle.rs`                | Handle (GNodeId, GSlotPointer, VSlotPointer) identity and validity      |
 | `invariant_self.rs`        | Invariant checker self-tests (ADR-M-039 §D5)         |
 | `observe.rs`               | Observation pipeline internals                       |
 | `pewei.rs`                 | PEWEI extraction and reconstruction                  |

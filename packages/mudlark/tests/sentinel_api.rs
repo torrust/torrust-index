@@ -52,6 +52,7 @@
 mod support;
 
 use std::collections::HashSet;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use torrust_mudlark::invariants::assert_invariants;
 use torrust_mudlark::testing::{default_config, plan_range_tree, range_tree_config, run};
@@ -217,10 +218,8 @@ fn gnode_info_dead_handle() {
 
     for id in &initial_ids {
         if !live_ids.contains(id) {
-            assert!(
-                g.gnode_info(*id).is_none(),
-                "evicted handle {id:?} should return None from gnode_info",
-            );
+            let result = catch_unwind(AssertUnwindSafe(|| g.gnode_info(*id)));
+            assert!(result.is_err(), "stale handle {id:?} should panic in gnode_info");
         }
     }
 }
@@ -255,10 +254,8 @@ fn gnode_children_dead_handle() {
 
     for id in &initial_ids {
         if !live_ids.contains(id) {
-            assert!(
-                g.gnode_children(*id).is_none(),
-                "evicted handle {id:?} should return None from gnode_children",
-            );
+            let result = catch_unwind(AssertUnwindSafe(|| g.gnode_children(*id)));
+            assert!(result.is_err(), "stale handle {id:?} should panic in gnode_children");
         }
     }
 }
@@ -398,11 +395,15 @@ fn is_ancestor_of_stale_handles() {
     let (g, initial_ids) = build_with_dead_handles();
     let live_ids: HashSet<GNodeId> = g.layers().map(|(_, n)| n.gnode_id).collect();
 
-    // For any evicted handle, is_ancestor_of should return false.
+    // For any evicted handle, is_ancestor_of should panic due to
+    // generation mismatch validation.
     for id in &initial_ids {
         if !live_ids.contains(id) {
-            assert!(!g.is_ancestor_of(*id, g.g_root()));
-            assert!(!g.is_ancestor_of(g.g_root(), *id));
+            let stale_as_ancestor = catch_unwind(AssertUnwindSafe(|| g.is_ancestor_of(*id, g.g_root())));
+            assert!(stale_as_ancestor.is_err(), "stale ancestor handle {id:?} should panic");
+
+            let stale_as_descendant = catch_unwind(AssertUnwindSafe(|| g.is_ancestor_of(g.g_root(), *id)));
+            assert!(stale_as_descendant.is_err(), "stale descendant handle {id:?} should panic");
         }
     }
 }

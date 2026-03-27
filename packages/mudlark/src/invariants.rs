@@ -14,7 +14,7 @@ use crate::graph::GvGraph;
 #[cfg(feature = "dynamic-contour-tracking")]
 use crate::graph::uniform_contour_depth_of;
 use crate::gtree::gnode_depth_from_interval;
-use crate::handle::{GNodeId, VNodeId};
+use crate::handle::{GSlotPointer, VSlotPointer};
 #[cfg(feature = "dynamic-contour-tracking")]
 use crate::plateau::BasisEdge;
 use crate::rebalance::is_violated;
@@ -32,8 +32,8 @@ const fn state_label(s: GState) -> &'static str {
     }
 }
 
-/// Format an `Option<GNodeId>` as its index or a fallback string.
-fn fmt_optional_gnode(opt: Option<GNodeId>, fallback: &str) -> String {
+/// Format an `Option<GSlotPointer>` as its index or a fallback string.
+fn fmt_optional_gnode(opt: Option<GSlotPointer>, fallback: &str) -> String {
     opt.map_or_else(|| fallback.to_string(), |id| format!("{}", id.index()))
 }
 
@@ -100,7 +100,7 @@ pub fn check_p_i3_only<C: Coordinate, V: Accumulator + Inspectable, const N: u32
 /// child, etc.).
 fn semi_internal_lineage<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(
     graph: &GvGraph<C, V, N>,
-    gnode: GNodeId,
+    gnode: GSlotPointer,
 ) -> String {
     let mut parts = Vec::new();
 
@@ -152,14 +152,14 @@ pub fn dump_gtree<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(gra
     let mut out = String::new();
     writeln!(
         out,
-        "═══ G-Tree dump (root=GNodeId({}), {} nodes) ═══",
+        "═══ G-Tree dump (root=GSlotPointer({}), {} nodes) ═══",
         graph.g_root().index(),
         graph.node_count()
     )
     .unwrap();
 
     for (idx, g) in graph.gnodes().iter_occupied() {
-        let gnode_id = GNodeId::from_index(idx);
+        let gnode_id = GSlotPointer::from_index(idx);
         let state = state_label(g.state());
         let depth = gnode_depth_from_interval(g.lo, g.hi, N);
         let parent_str = fmt_optional_gnode(g.parent, "None");
@@ -237,7 +237,7 @@ pub fn dump_plateaus<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(
 
         for &gid in elements {
             if !graph.gnodes().is_occupied(gid.index()) {
-                writeln!(out, "    !! DANGLING GNodeId({}) — slot deallocated !!", gid.index()).unwrap();
+                writeln!(out, "    !! DANGLING GSlotPointer({}) — slot deallocated !!", gid.index()).unwrap();
                 continue;
             }
             let g = graph.gnodes().get(gid.index());
@@ -404,7 +404,7 @@ fn check_g_i4_entry_consistency<C: Coordinate, V: Accumulator + Inspectable, con
             // Back-link: entry must be a VKind::Entry pointing back.
             match &v.kind {
                 VKind::Entry { gnode, .. } => {
-                    let g_id = GNodeId::from_index(idx);
+                    let g_id = GSlotPointer::from_index(idx);
                     if *gnode != g_id {
                         errors.push(format!(
                             "G-I4 violated at G-node {idx}: entry's gnode={gnode:?}, expected {g_id:?}"
@@ -491,7 +491,7 @@ fn check_v_i3_max_uncle<C: Coordinate, V: Accumulator + Inspectable, const N: u3
     errors: &mut Vec<String>,
 ) {
     for (idx, v) in graph.vnodes().iter_occupied() {
-        let v_id = VNodeId::from_index(idx);
+        let v_id = VSlotPointer::from_index(idx);
         if is_violated(graph.vnodes(), v_id) {
             let int = v.intensity.to_f64_approx();
             let uncle = crate::rebalance::max_uncle_intensity(graph.vnodes(), v_id).map_or(f64::NAN, Inspectable::to_f64_approx);
@@ -655,7 +655,7 @@ fn check_parent_link_consistency<C: Coordinate, V: Accumulator + Inspectable, co
 ) {
     // G-Tree parent links.
     for (idx, g) in graph.gnodes().iter_occupied() {
-        let g_id = GNodeId::from_index(idx);
+        let g_id = GSlotPointer::from_index(idx);
         if let Some(left) = g.left
             && graph.gnodes().is_occupied(left.index())
         {
@@ -684,7 +684,7 @@ fn check_parent_link_consistency<C: Coordinate, V: Accumulator + Inspectable, co
 
     // V-Tree parent links.
     for (idx, v) in graph.vnodes().iter_occupied() {
-        let v_id = VNodeId::from_index(idx);
+        let v_id = VSlotPointer::from_index(idx);
         if let VKind::Structural { children, .. } = &v.kind {
             for i in 0..children.len() {
                 let (child_id, _) = children.get(i);
@@ -1007,7 +1007,7 @@ fn contour_steps<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(grap
     // Collect (lo, depth) for every contour cell (terminal or
     // null-child semi-internal half).
     let mut cells: Vec<(C, u32)> = Vec::new();
-    let mut stack = vec![graph.g_root()];
+    let mut stack = vec![graph.g_root().slot()];
     while let Some(gid) = stack.pop() {
         let g = graph.gnodes().get(gid.index());
         match g.state() {
@@ -1462,7 +1462,7 @@ fn check_p_i5_thatch_depth<C: Coordinate, V: Accumulator + Inspectable, const N:
 /// G-Tree depth (number of edges from root).
 #[cfg(feature = "dynamic-contour-tracking")]
 fn route_to_depth<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(graph: &GvGraph<C, V, N>, x: C) -> u32 {
-    let mut cur = graph.g_root();
+    let mut cur = graph.g_root().slot();
     for _ in 0..=N + 1 {
         let g = graph.gnodes().get(cur.index());
         if g.is_terminal() {

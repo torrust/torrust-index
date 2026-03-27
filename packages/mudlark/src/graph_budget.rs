@@ -9,7 +9,7 @@
 //! ADR-M-018 (hard budget guarantee).
 
 use crate::graph::GvGraph;
-use crate::handle::GNodeId;
+use crate::handle::GSlotPointer;
 use crate::traits::{Accumulator, Coordinate, Inspectable};
 use crate::{evict, rebalance, vtree};
 
@@ -26,7 +26,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// elements are sorted by `BasisEdge` and placed left-to-right
     /// in a single batch.  This prevents cross-promote ordering
     /// issues when multiple legacy promotes occur in one `observe()`.
-    pub(crate) fn handle_legacy_promotes(&mut self, new_gnodes: &[GNodeId]) {
+    pub(crate) fn handle_legacy_promotes(&mut self, new_gnodes: &[GSlotPointer]) {
         for &_new_gid in new_gnodes {
             self.node_count += 1;
             // Legacy promote creates a new terminal child and transitions
@@ -152,7 +152,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// Shared implementation for bounded and unbounded eviction.
     ///
     /// Two-phase collect-then-evict (ADR-M-015):
-    /// 1. `scan_for_candidates()` — snapshot of eligible `VNodeId`s.
+    /// 1. `scan_for_candidates()` — snapshot of eligible `VSlotPointer`s.
     /// 2. Iterate, re-verify eligibility (slot occupied, still
     ///    evictable, depth still exceeds `D_evict`, not G-root),
     ///    then call `evict_tip()`.

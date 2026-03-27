@@ -170,9 +170,9 @@ the coverage.
 /// O(n) scan — guards behind `tracing::enabled!(Level::DEBUG)`.
 pub(crate) fn audit_violations<V: Accumulator>(
     vnodes: &Arena<VNode<V>>,
-    violations: &[VNodeId],
+    violations: &[VSlotPointer],
     checkpoint: &str,
-) -> Vec<VNodeId>;
+) -> Vec<VSlotPointer>;
 
 /// Post-mutation plateau consistency check.
 /// Forward/back map agreement, plateau count, P-I4 spot-check.
@@ -187,7 +187,7 @@ pub(crate) fn audit_plateau_consistency<C, V, const N: u32>(
 
 /// Structured eviction context for diagnostics.
 pub(crate) struct PlateauAuditContext {
-    pub parent_id: GNodeId,
+    pub parent_id: GSlotPointer,
     pub parent_state: GState,
 }
 
@@ -195,7 +195,7 @@ pub(crate) struct PlateauAuditContext {
 /// Emits `tracing::error!` with full context.
 pub(crate) fn diagnose_missed_violation<V: Accumulator>(
     vnodes: &Arena<VNode<V>>,
-    violated: VNodeId,
+    violated: VSlotPointer,
     context: &EvictionContext,
 );
 

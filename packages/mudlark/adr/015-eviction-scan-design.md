@@ -518,7 +518,7 @@ Option A).
 
 ```rust
 fn check_evictions(&mut self) -> u32 {
-    // Phase 1: collect eligible entry VNodeIds
+    // Phase 1: collect eligible entry VSlotPointers
     let candidates = evict::scan_for_candidates(self);
 
     // Phase 2: evict each candidate
@@ -565,7 +565,7 @@ if soft_limit_exceeded {
 
 ### Recommendation: Two-phase collect-then-evict with single trailing rebalance
 
-Phase 1 (scan) collects candidates into a `Vec<VNodeId>`. Phase 2
+Phase 1 (scan) collects candidates into a `Vec<VSlotPointer>`. Phase 2
 evicts each with re-verification. Violations accumulate during
 phase 2. Phase 3 is a single `rebalance()` call to drain all
 violations. This avoids mutating the tree during traversal, avoids

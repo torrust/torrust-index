@@ -90,7 +90,7 @@ requires subtraction internally — reduces to Option A or B.
 ```rust
 pub fn recompute_g_sums<C: Coordinate, V: Accumulator>(
     gnodes: &mut Arena<GNode<C, V>>,
-    start: GNodeId,
+    start: GSlotPointer,
 ) {
     let mut current = Some(start);
     while let Some(id) = current {

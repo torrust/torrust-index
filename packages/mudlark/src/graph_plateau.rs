@@ -15,7 +15,7 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use crate::graph::{GvGraph, uniform_contour_depth_of};
-use crate::handle::GNodeId;
+use crate::handle::GSlotPointer;
 #[cfg(feature = "dynamic-contour-tracking")]
 use crate::plateau::PlateauBasis;
 use crate::plateau::{BasisEdge, Plateau};
@@ -328,7 +328,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     }
 
     /// Diagnostic: for each plateau, return the `BasisEdge` key and
-    /// the list of `(GNodeId_index, lo, hi, state, g_depth)` tuples
+    /// the list of `(GSlotPointer_index, lo, hi, state, g_depth)` tuples
     /// for its basis elements.
     ///
     /// This exposes `pub(crate)` basis bookkeeping for integration
@@ -427,7 +427,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     ///
     /// Called by split / evict plateau maintenance (Step 2).
     #[cfg(feature = "dynamic-contour-tracking")]
-    pub(crate) fn place_basis_element(&mut self, gnode: GNodeId, depth: u32) {
+    pub(crate) fn place_basis_element(&mut self, gnode: GSlotPointer, depth: u32) {
         use crate::plateau::{BasisEdge, Plateau, basis_edge_of};
 
         let g = self.gnodes.get(gnode.index());
@@ -549,7 +549,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
         }
     }
 
-    /// Collect `(GNodeId, u32)` pairs for a subtree's basis elements
+    /// Collect `(GSlotPointer, u32)` pairs for a subtree's basis elements
     /// without placing them.  Read-only counterpart to
     /// `place_subtree_basis_elements`.
     ///
@@ -582,7 +582,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// ADR-M-031 Phase 1a: enables callers to collect elements, sort by
     /// `BasisEdge`, and place left-to-right via `place_sorted`.
     #[cfg(feature = "dynamic-contour-tracking")]
-    pub(crate) fn collect_subtree_basis_elements(&self, gid: GNodeId, out: &mut Vec<(GNodeId, u32)>) {
+    pub(crate) fn collect_subtree_basis_elements(&self, gid: GSlotPointer, out: &mut Vec<(GSlotPointer, u32)>) {
         use crate::gnode::GState;
         let g = self.gnodes.get(gid.index());
         match g.state() {
@@ -605,14 +605,14 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
         }
     }
 
-    /// Sort collected `(GNodeId, u32)` pairs by `BasisEdge` and place
+    /// Sort collected `(GSlotPointer, u32)` pairs by `BasisEdge` and place
     /// left-to-right.  With sorted placement the existing
     /// left-neighbour merge in `place_basis_element` is sufficient to
     /// produce the correct partition — no post-hoc normalize is needed.
     ///
     /// ADR-M-031 Phase 1b.
     #[cfg(feature = "dynamic-contour-tracking")]
-    pub(crate) fn place_sorted(&mut self, elements: &mut [(GNodeId, u32)]) {
+    pub(crate) fn place_sorted(&mut self, elements: &mut [(GSlotPointer, u32)]) {
         use crate::plateau::basis_edge_of;
         elements.sort_by(|a, b| {
             let a_key = basis_edge_of(self.gnodes.get(a.0.index()));
@@ -638,7 +638,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// + `place_sorted` instead. Retained for potential future use.
     #[cfg(feature = "dynamic-contour-tracking")]
     #[allow(dead_code)]
-    pub(crate) fn place_subtree_basis_elements(&mut self, gid: GNodeId) {
+    pub(crate) fn place_subtree_basis_elements(&mut self, gid: GSlotPointer) {
         use crate::gnode::GState;
 
         let g = self.gnodes.get(gid.index());
@@ -673,7 +673,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     #[cfg(not(feature = "dynamic-contour-tracking"))]
     #[inline(always)]
     #[allow(dead_code, clippy::unused_self, clippy::needless_pass_by_ref_mut)]
-    pub(crate) const fn place_subtree_basis_elements(&mut self, _gid: GNodeId) {}
+    pub(crate) const fn place_subtree_basis_elements(&mut self, _gid: GSlotPointer) {}
 
     // ── Consolidation + normalization ───────────────────────────
 
@@ -692,7 +692,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// plateaus.  The uniform check catches this.
     #[cfg(feature = "dynamic-contour-tracking")]
     #[allow(clippy::too_many_lines)]
-    fn consolidate_basis_up(&mut self, mut gid: GNodeId) {
+    fn consolidate_basis_up(&mut self, mut gid: GSlotPointer) {
         use crate::gnode::GState;
 
         loop {
@@ -846,9 +846,9 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
         //    A `seen` set prevents double-collection when a
         //    SemiInternal's DFS recurses into a node that is also
         //    a top-level old basis element.
-        let mut elems: Vec<(GNodeId, BasisEdge<C>, u32, C, C, V)> = Vec::new();
+        let mut elems: Vec<(GSlotPointer, BasisEdge<C>, u32, C, C, V)> = Vec::new();
         let mut seen = std::collections::HashSet::new();
-        let basis_ids: Vec<GNodeId> = self.plateau_basis.back_map().keys().copied().collect();
+        let basis_ids: Vec<GSlotPointer> = self.plateau_basis.back_map().keys().copied().collect();
         for gid in basis_ids {
             let mut stack = vec![gid];
             while let Some(nid) = stack.pop() {
@@ -894,7 +894,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
         }
         elems.sort_by_key(|e| e.1);
 
-        // ── Step 1 assert: no duplicate GNodeIds ────────────────
+        // ── Step 1 assert: no duplicate GSlotPointers ────────────────
         #[cfg(debug_assertions)]
         {
             let mut ids: Vec<usize> = elems.iter().map(|e| e.0.index()).collect();
@@ -902,7 +902,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
             for w in ids.windows(2) {
                 debug_assert_ne!(
                     w[0], w[1],
-                    "normalize_plateaus step 1: duplicate GNodeId({}) in DFS collection",
+                    "normalize_plateaus step 1: duplicate GSlotPointer({}) in DFS collection",
                     w[0],
                 );
             }
@@ -910,7 +910,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
 
         // ── Step 2: left-to-right sweep ─────────────────────────
         let mut new_plateaus: std::collections::BTreeMap<BasisEdge<C>, Plateau<C, V>> = std::collections::BTreeMap::new();
-        let mut assignments: Vec<(BasisEdge<C>, GNodeId)> = Vec::with_capacity(elems.len());
+        let mut assignments: Vec<(BasisEdge<C>, GSlotPointer)> = Vec::with_capacity(elems.len());
 
         for (gid, be, depth, lo, hi, sum) in &elems {
             let merge_key = new_plateaus
@@ -1006,7 +1006,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// may have introduced new fine-grained basis elements.
     #[cfg(feature = "dynamic-contour-tracking")]
     pub(crate) fn consolidate_all_basis(&mut self) {
-        let basis_snapshot: Vec<GNodeId> = self.plateau_basis.back_map().keys().copied().collect();
+        let basis_snapshot: Vec<GSlotPointer> = self.plateau_basis.back_map().keys().copied().collect();
         let count = basis_snapshot.len();
         let mut merged = 0u32;
         for gid in basis_snapshot {
@@ -1090,7 +1090,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
         use crate::plateau::{BasisEdge, Plateau, basis_edge_of};
 
         // Snapshot element IDs up-front so we can mutate `self` below.
-        let element_ids: Vec<GNodeId> = self.plateau_basis.basis_elements(&old_key).iter().copied().collect();
+        let element_ids: Vec<GSlotPointer> = self.plateau_basis.basis_elements(&old_key).iter().copied().collect();
 
         if element_ids.is_empty() {
             self.plateaus.remove(&old_key);
@@ -1113,7 +1113,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
         // `place_sorted` — this is O(k log P) where k is the
         // (typically small) number of co-basis members.
         if element_ids.len() > 1 {
-            let mut intervals: Vec<(GNodeId, C, C)> = element_ids
+            let mut intervals: Vec<(GSlotPointer, C, C)> = element_ids
                 .iter()
                 .map(|&gid| {
                     let g = self.gnodes.get(gid.index());
@@ -1132,7 +1132,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
                     n_elements = element_ids.len(),
                     "fixup_plateau: non-contiguous remainder, evacuating"
                 );
-                let mut displaced: Vec<(GNodeId, u32)> = Vec::with_capacity(element_ids.len());
+                let mut displaced: Vec<(GSlotPointer, u32)> = Vec::with_capacity(element_ids.len());
                 for &gid in &element_ids {
                     self.plateau_basis.remove(gid);
                     let g = self.gnodes.get(gid.index());
@@ -1221,7 +1221,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
         // Phase 1: one-time scan of all semi-internal basis elements
         // to catch violations from tile boundary changes not tracked
         // by the place_basis_element work-list.
-        let mut candidates: Vec<(GNodeId, BasisEdge<C>)> = Vec::new();
+        let mut candidates: Vec<(GSlotPointer, BasisEdge<C>)> = Vec::new();
         for (&key, elements) in self.plateau_basis.iter() {
             for &gid in elements {
                 if self.gnodes.is_occupied(gid.index()) && self.gnodes.get(gid.index()).state() == GState::SemiInternal {
@@ -1275,7 +1275,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// re-inserts it as a standalone so the `BTreeMap` key sequence
     /// includes a key between the parent and the child's `lo`.
     #[cfg(feature = "dynamic-contour-tracking")]
-    fn split_for_p_i4(&mut self, parent_pk: crate::plateau::BasisEdge<C>, child_id: GNodeId) {
+    fn split_for_p_i4(&mut self, parent_pk: crate::plateau::BasisEdge<C>, child_id: GSlotPointer) {
         use crate::gnode::GState;
         use crate::plateau::{Plateau, basis_edge_of};
 
@@ -1320,7 +1320,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// `basis_edge > parent_pk`.  Prefers the leftmost such node
     /// (to split as close to the parent as possible).
     #[cfg(feature = "dynamic-contour-tracking")]
-    fn find_boundary_node(&self, gid: GNodeId, parent_pk: crate::plateau::BasisEdge<C>) -> Option<GNodeId> {
+    fn find_boundary_node(&self, gid: GSlotPointer, parent_pk: crate::plateau::BasisEdge<C>) -> Option<GSlotPointer> {
         use crate::plateau::basis_edge_of;
 
         let g = self.gnodes.get(gid.index());
@@ -1352,7 +1352,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// Post-observe: delta-propagate plateau sums along the
     /// receiver → root path.
     #[cfg(feature = "dynamic-contour-tracking")]
-    pub(crate) fn plateau_after_observe<O: crate::traits::Observation<V>>(&mut self, g_id: GNodeId, delta: O) {
+    pub(crate) fn plateau_after_observe<O: crate::traits::Observation<V>>(&mut self, g_id: GSlotPointer, delta: O) {
         let value_v: V = O::accumulate(V::zero(), delta);
         let mut cur = Some(g_id);
         while let Some(id) = cur {
@@ -1404,12 +1404,12 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     #[cfg(not(feature = "dynamic-contour-tracking"))]
     #[inline(always)]
     #[allow(clippy::unused_self, clippy::needless_pass_by_ref_mut)]
-    pub(crate) const fn plateau_after_observe<O: crate::traits::Observation<V>>(&mut self, _g_id: GNodeId, _delta: O) {}
+    pub(crate) const fn plateau_after_observe<O: crate::traits::Observation<V>>(&mut self, _g_id: GSlotPointer, _delta: O) {}
 
     /// Post-bootstrap-split: parent was terminal → now balanced
     /// internal. Remove old basis element and re-place at child depth.
     #[cfg(feature = "dynamic-contour-tracking")]
-    pub(crate) fn plateau_after_bootstrap_split(&mut self, g_id: GNodeId, left_id: GNodeId) {
+    pub(crate) fn plateau_after_bootstrap_split(&mut self, g_id: GSlotPointer, left_id: GSlotPointer) {
         let _span = tracing::debug_span!("plateau_after_bootstrap_split", g_id = g_id.index(), left = left_id.index(),).entered();
 
         // ADR-M-031: mark dirty for trailing normalize in observe().
@@ -1460,13 +1460,13 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     #[cfg(not(feature = "dynamic-contour-tracking"))]
     #[inline(always)]
     #[allow(clippy::unused_self, clippy::needless_pass_by_ref_mut)]
-    pub(crate) const fn plateau_after_bootstrap_split(&mut self, _g_id: GNodeId, _left_id: GNodeId) {}
+    pub(crate) const fn plateau_after_bootstrap_split(&mut self, _g_id: GSlotPointer, _left_id: GSlotPointer) {}
 
     /// Post-catalytic-split: `g_id` was terminal → now balanced internal.
     /// Decompose covering ancestor (if any), place displaced siblings,
     /// then place `g_id` at the new child depth.
     #[cfg(feature = "dynamic-contour-tracking")]
-    pub(crate) fn plateau_after_catalytic_split(&mut self, g_id: GNodeId, left_id: GNodeId) {
+    pub(crate) fn plateau_after_catalytic_split(&mut self, g_id: GSlotPointer, left_id: GSlotPointer) {
         let _span = tracing::debug_span!("plateau_after_catalytic_split", g_id = g_id.index(), left = left_id.index(),).entered();
 
         // ADR-M-031: mark dirty for trailing normalize in observe().
@@ -1501,19 +1501,19 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
         let (old_key, displaced) = if let Some(key) = self.plateau_basis.remove(g_id) {
             // g_id was itself a basis element.  Evacuate all remaining
             // basis elements of the same plateau so they are re-placed.
-            let co_members: Vec<GNodeId> = self.plateau_basis.basis_elements(&key).iter().copied().collect();
+            let co_members: Vec<GSlotPointer> = self.plateau_basis.basis_elements(&key).iter().copied().collect();
             for &m in &co_members {
                 self.plateau_basis.remove(m);
             }
             (key, co_members)
         } else {
-            let mut path: Vec<GNodeId> = vec![g_id];
+            let mut path: Vec<GSlotPointer> = vec![g_id];
             let mut parent_opt = self.gnodes.get(g_id.index()).parent;
             let mut result = None;
 
             while let Some(p_id) = parent_opt {
                 if let Some(key) = self.plateau_basis.remove(p_id) {
-                    let mut displaced: Vec<GNodeId> = Vec::new();
+                    let mut displaced: Vec<GSlotPointer> = Vec::new();
                     for &path_node in &path {
                         let par = self
                             .gnodes
@@ -1529,7 +1529,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
                     // Also evacuate remaining co-basis elements of the
                     // same plateau (they may become non-contiguous after
                     // the ancestor's removal).
-                    let co_members: Vec<GNodeId> = self.plateau_basis.basis_elements(&key).iter().copied().collect();
+                    let co_members: Vec<GSlotPointer> = self.plateau_basis.basis_elements(&key).iter().copied().collect();
                     for &m in &co_members {
                         self.plateau_basis.remove(m);
                     }
@@ -1566,7 +1566,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     #[cfg(not(feature = "dynamic-contour-tracking"))]
     #[inline(always)]
     #[allow(clippy::unused_self, clippy::needless_pass_by_ref_mut)]
-    pub(crate) const fn plateau_after_catalytic_split(&mut self, _g_id: GNodeId, _left_id: GNodeId) {}
+    pub(crate) const fn plateau_after_catalytic_split(&mut self, _g_id: GSlotPointer, _left_id: GSlotPointer) {}
 
     /// Post-legacy-promote: parent transitioned semi-internal →
     /// internal. Remove parent from basis, place existing child and
@@ -1576,7 +1576,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// potential future single-promote callers.
     #[cfg(feature = "dynamic-contour-tracking")]
     #[allow(dead_code)]
-    pub(crate) fn plateau_after_legacy_promote(&mut self, new_gid: GNodeId) {
+    pub(crate) fn plateau_after_legacy_promote(&mut self, new_gid: GSlotPointer) {
         use crate::gnode::GState;
 
         let ng = self.gnodes.get(new_gid.index());
@@ -1607,7 +1607,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     #[cfg(not(feature = "dynamic-contour-tracking"))]
     #[inline(always)]
     #[allow(dead_code, clippy::unused_self, clippy::needless_pass_by_ref_mut)]
-    pub(crate) const fn plateau_after_legacy_promote(&mut self, _new_gid: GNodeId) {}
+    pub(crate) const fn plateau_after_legacy_promote(&mut self, _new_gid: GSlotPointer) {}
 
     /// Batched legacy-promote plateau maintenance (ADR-M-031).
     ///
@@ -1620,7 +1620,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// This prevents cross-promote ordering issues when multiple
     /// legacy promotes occur within one `observe()` or `decay()` call.
     #[cfg(feature = "dynamic-contour-tracking")]
-    pub(crate) fn plateau_after_legacy_promotes_batched(&mut self, new_gnodes: &[GNodeId]) {
+    pub(crate) fn plateau_after_legacy_promotes_batched(&mut self, new_gnodes: &[GSlotPointer]) {
         use crate::gnode::GState;
 
         if new_gnodes.is_empty() {
@@ -1665,7 +1665,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     #[cfg(not(feature = "dynamic-contour-tracking"))]
     #[inline(always)]
     #[allow(clippy::unused_self, clippy::needless_pass_by_ref_mut)]
-    pub(crate) const fn plateau_after_legacy_promotes_batched(&mut self, _new_gnodes: &[GNodeId]) {}
+    pub(crate) const fn plateau_after_legacy_promotes_batched(&mut self, _new_gnodes: &[GSlotPointer]) {}
 
     /// Post-decay: recompute plateau sums from authoritative g.sum
     /// values. Decay changes magnitudes only — no structural changes.

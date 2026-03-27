@@ -8,7 +8,7 @@
 //! `VNode` is the virtual-tree node that mirrors each `GNode` in the
 //! grid tree.  It carries an intensity, an optional parent link, a
 //! lazily-cached depth, and a `VKind` discriminant that is either an
-//! *entry* (leaf, pointing at a `GNodeId`) or a *structural* node
+//! *entry* (leaf, pointing at a `GSlotPointer`) or a *structural* node
 //! (holding a `PackedChildren` array of 2 or 3 children).
 //!
 //! `PackedChildren` is a fixed-capacity inline array (max 3 slots)
@@ -75,7 +75,7 @@
 use std::mem::size_of;
 use std::sync::atomic::Ordering;
 
-use crate::handle::{GNodeId, VNodeId};
+use crate::handle::{GSlotPointer, VSlotPointer};
 use crate::vnode::{DEPTH_STALE, PackedChildren, VKind, VNode};
 
 // ── Test-only PackedChildren methods ────────────────────────────────
@@ -99,12 +99,12 @@ impl<V: Copy + Default + PartialOrd> PackedChildren<V> {
 // ── Layout ──────────────────────────────────────────────────────
 
 /// Compile-time structural check: `VKind` discriminant + payload.
-/// Entry: `GNodeId`(4) + bool(1) = 5, padded.
+/// Entry: `GSlotPointer`(4) + bool(1) = 5, padded.
 /// Structural: `PackedChildren`(40) + bool(1) = 41, padded.
 /// `VKind` discriminant picks the larger variant.
 #[test]
 fn vnode_size() {
-    // VNode<u64>: intensity(8) + Option<VNodeId>(4) + VKind<u64>(~48 padded)
+    // VNode<u64>: intensity(8) + Option<VSlotPointer>(4) + VKind<u64>(~48 padded)
     // Exact size: 64 bytes — fits one cache line.
     let size = size_of::<VNode<u64>>();
     assert!(size <= 64, "VNode<u64> should fit in one cache line, got {size}");
@@ -125,7 +125,7 @@ fn vnode_default_fields() {
             is_exposed,
             is_evictable,
         } => {
-            assert_eq!(*gnode, GNodeId::from_index(0));
+            assert_eq!(*gnode, GSlotPointer::from_index(0));
             assert!(!is_exposed);
             assert!(!is_evictable);
         }
@@ -137,10 +137,10 @@ fn vnode_default_fields() {
 fn vnode_clone_preserves_all_fields() {
     let node = VNode {
         intensity: 42u64,
-        parent: Some(VNodeId::from_index(7)),
+        parent: Some(VSlotPointer::from_index(7)),
         cached_depth: std::sync::atomic::AtomicU32::new(3),
         kind: VKind::Entry {
-            gnode: GNodeId::from_index(5),
+            gnode: GSlotPointer::from_index(5),
             is_exposed: true,
             is_evictable: false,
         },
@@ -148,7 +148,7 @@ fn vnode_clone_preserves_all_fields() {
     #[allow(clippy::redundant_clone)]
     let cloned = node.clone();
     assert_eq!(cloned.intensity, 42);
-    assert_eq!(cloned.parent, Some(VNodeId::from_index(7)));
+    assert_eq!(cloned.parent, Some(VSlotPointer::from_index(7)));
     // AtomicU32 round-trips through the manual Clone impl.
     assert_eq!(cloned.cached_depth.load(Ordering::Relaxed), 3);
     match &cloned.kind {
@@ -157,7 +157,7 @@ fn vnode_clone_preserves_all_fields() {
             is_exposed,
             is_evictable,
         } => {
-            assert_eq!(*gnode, GNodeId::from_index(5));
+            assert_eq!(*gnode, GSlotPointer::from_index(5));
             assert!(*is_exposed);
             assert!(!is_evictable);
         }
@@ -169,8 +169,8 @@ fn vnode_clone_preserves_all_fields() {
 
 #[test]
 fn packed_children_new_2() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
     let pc = PackedChildren::new_2((a, 10u64), (b, 20));
     assert_eq!(pc.len(), 2);
     assert_eq!(pc.get(0), (a, 10));
@@ -181,9 +181,9 @@ fn packed_children_new_2() {
 
 #[test]
 fn packed_children_new_3() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
-    let c = VNodeId::from_index(2);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
+    let c = VSlotPointer::from_index(2);
     let pc = PackedChildren::new_3((a, 5u64), (b, 15), (c, 10));
     assert_eq!(pc.len(), 3);
     assert_eq!(pc.lightest_child_index(), 0);
@@ -201,9 +201,9 @@ fn default_packed_children_is_empty() {
 
 #[test]
 fn packed_children_add_remove() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
-    let c = VNodeId::from_index(2);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
+    let c = VSlotPointer::from_index(2);
     let mut pc = PackedChildren::new_2((a, 10u64), (b, 20));
 
     pc.add_child(c, 5);
@@ -218,9 +218,9 @@ fn packed_children_add_remove() {
 
 #[test]
 fn remove_child_last_index_no_shift() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
-    let c = VNodeId::from_index(2);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
+    let c = VSlotPointer::from_index(2);
     let mut pc = PackedChildren::new_3((a, 10u64), (b, 20), (c, 30));
 
     // Removes the last child (idx 2) — no shift needed.
@@ -233,9 +233,9 @@ fn remove_child_last_index_no_shift() {
 
 #[test]
 fn packed_children_replace() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
-    let c = VNodeId::from_index(2);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
+    let c = VSlotPointer::from_index(2);
     let mut pc = PackedChildren::new_2((a, 10u64), (b, 20));
 
     pc.replace_child(a, c, 99);
@@ -245,8 +245,8 @@ fn packed_children_replace() {
 
 #[test]
 fn update_intensity_reflects_in_get() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
     let mut pc = PackedChildren::new_2((a, 10u64), (b, 20));
     pc.update_intensity(0, 99);
     assert_eq!(pc.get(0), (a, 99));
@@ -257,9 +257,9 @@ fn update_intensity_reflects_in_get() {
 
 #[test]
 fn lightest_tiebreak_leftmost() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
-    let c = VNodeId::from_index(2);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
+    let c = VSlotPointer::from_index(2);
     let pc = PackedChildren::new_3((a, 5u64), (b, 5), (c, 5));
     // All equal — leftmost wins.
     assert_eq!(pc.lightest_child_index(), 0);
@@ -268,9 +268,9 @@ fn lightest_tiebreak_leftmost() {
 
 #[test]
 fn find_index_returns_some_for_present_id() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
-    let c = VNodeId::from_index(2);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
+    let c = VSlotPointer::from_index(2);
     let pc = PackedChildren::new_3((a, 10u64), (b, 20), (c, 30));
     assert_eq!(pc.find_index(a), Some(0));
     assert_eq!(pc.find_index(b), Some(1));
@@ -279,17 +279,17 @@ fn find_index_returns_some_for_present_id() {
 
 #[test]
 fn find_index_returns_none_for_absent_id() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
-    let absent = VNodeId::from_index(99);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
+    let absent = VSlotPointer::from_index(99);
     let pc = PackedChildren::new_2((a, 10u64), (b, 20));
     assert_eq!(pc.find_index(absent), None);
 }
 
 #[test]
 fn iter_2node() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
     let pc = PackedChildren::new_2((a, 10u64), (b, 20));
     let items: Vec<_> = pc.iter().collect();
     assert_eq!(items.len(), 2);
@@ -299,9 +299,9 @@ fn iter_2node() {
 
 #[test]
 fn iter_3node() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
-    let c = VNodeId::from_index(2);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
+    let c = VSlotPointer::from_index(2);
     let pc = PackedChildren::new_3((a, 5u64), (b, 15), (c, 10));
     let items: Vec<_> = pc.iter().collect();
     assert_eq!(items.len(), 3);
@@ -315,10 +315,10 @@ fn iter_3node() {
 #[test]
 #[should_panic(expected = "already a 3-node")]
 fn add_child_panics_on_3node() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
-    let c = VNodeId::from_index(2);
-    let d = VNodeId::from_index(3);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
+    let c = VSlotPointer::from_index(2);
+    let d = VSlotPointer::from_index(3);
     let mut pc = PackedChildren::new_3((a, 1u64), (b, 2), (c, 3));
     pc.add_child(d, 4);
 }
@@ -326,8 +326,8 @@ fn add_child_panics_on_3node() {
 #[test]
 #[should_panic(expected = "not a 3-node")]
 fn remove_child_panics_on_2node() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
     let mut pc = PackedChildren::new_2((a, 1u64), (b, 2));
     pc.remove_child(a);
 }
@@ -335,18 +335,18 @@ fn remove_child_panics_on_2node() {
 #[test]
 #[should_panic(expected = "old id not found")]
 fn replace_child_panics_on_absent_id() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
-    let absent = VNodeId::from_index(99);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
+    let absent = VSlotPointer::from_index(99);
     let mut pc = PackedChildren::new_2((a, 1u64), (b, 2));
-    pc.replace_child(absent, VNodeId::from_index(3), 42);
+    pc.replace_child(absent, VSlotPointer::from_index(3), 42);
 }
 
 #[test]
 #[should_panic(expected = "out of bounds")]
 fn get_panics_out_of_bounds() {
-    let a = VNodeId::from_index(0);
-    let b = VNodeId::from_index(1);
+    let a = VSlotPointer::from_index(0);
+    let b = VSlotPointer::from_index(1);
     let pc = PackedChildren::new_2((a, 1u64), (b, 2));
     let _ = pc.get(2);
 }

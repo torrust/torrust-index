@@ -80,7 +80,7 @@ Specifically:
 | `plateau`       | `BasisEdge<C>`, `Plateau<C, V>`                                     |
 | `contour_range` | `BasisElement<C, V>`, `ContourRange<C, V>`, `ContourRangeEnergy<V>` |
 
-**Excluded:** `GNodeId` and `VNodeId` are opaque arena handles —
+**Excluded:** `GSlotPointer` and `VSlotPointer` are opaque arena handles —
 meaningless outside the originating `GvGraph` instance. Serialising
 them would encourage invalid cross-graph handle use. They are
 Surface 1 types by classification (ADR-M-032 §Handles) but not

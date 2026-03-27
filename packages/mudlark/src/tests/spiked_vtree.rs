@@ -50,7 +50,7 @@
 use std::sync::atomic::AtomicU32;
 
 use crate::arena::Arena;
-use crate::handle::{GNodeId, VNodeId};
+use crate::handle::{GSlotPointer, VSlotPointer};
 use crate::rebalance::find_violated_nodes;
 use crate::traits::{Accumulator, Inspectable};
 use crate::vnode::{DEPTH_STALE, PackedChildren, VKind, VNode};
@@ -127,7 +127,7 @@ impl<V: Accumulator + Inspectable> SpikedVTree<V> {
     /// Returns `(arena, root_id, violations)` ready for
     /// `rebalance()`.
     #[must_use]
-    pub fn build(self) -> (Arena<VNode<V>>, VNodeId, Vec<VNodeId>) {
+    pub fn build(self) -> (Arena<VNode<V>>, VSlotPointer, Vec<VSlotPointer>) {
         let mut vnodes = Arena::new();
         let root = build_balanced_2node_tree(&mut vnodes, self.depth, self.base_intensity);
 
@@ -157,22 +157,22 @@ impl<V: Accumulator + Inspectable> SpikedVTree<V> {
 // ── Raw V-tree construction helpers ─────────────────────────────
 
 /// Create a V-entry with the given intensity (dummy G-node).
-fn make_entry<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, intensity: V) -> VNodeId {
+fn make_entry<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, intensity: V) -> VSlotPointer {
     let e = VNode {
         intensity,
         parent: None,
         cached_depth: AtomicU32::new(DEPTH_STALE),
         kind: VKind::Entry {
-            gnode: GNodeId::from_index(0),
+            gnode: GSlotPointer::from_index(0),
             is_exposed: true,
             is_evictable: true,
         },
     };
-    VNodeId::from_index(vnodes.alloc(e))
+    VSlotPointer::from_index(vnodes.alloc(e).0)
 }
 
 /// Create a structural 2-node with children `a` and `b`.
-fn make_structural_2<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, a: VNodeId, b: VNodeId) -> VNodeId {
+fn make_structural_2<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, a: VSlotPointer, b: VSlotPointer) -> VSlotPointer {
     let a_int = vnodes.get(a.index()).intensity;
     let b_int = vnodes.get(b.index()).intensity;
     let s = VNode {
@@ -184,14 +184,14 @@ fn make_structural_2<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, a: VNodeId, b
             has_evictable: true,
         },
     };
-    let s_id = VNodeId::from_index(vnodes.alloc(s));
+    let s_id = VSlotPointer::from_index(vnodes.alloc(s).0);
     vnodes.get_mut(a.index()).parent = Some(s_id);
     vnodes.get_mut(b.index()).parent = Some(s_id);
     s_id
 }
 
 /// Recursively build a balanced binary tree of 2-nodes.
-fn build_balanced_2node_tree<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, depth: u32, leaf_intensity: V) -> VNodeId {
+fn build_balanced_2node_tree<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, depth: u32, leaf_intensity: V) -> VSlotPointer {
     if depth == 0 {
         return make_entry(vnodes, leaf_intensity);
     }
@@ -203,7 +203,7 @@ fn build_balanced_2node_tree<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, depth
 /// Collect all entry (leaf) node IDs in left-to-right order via DFS.
 ///
 /// Children are pushed in reverse so left children are popped first.
-fn collect_leaf_ids<V: Accumulator>(vnodes: &Arena<VNode<V>>, root: VNodeId) -> Vec<VNodeId> {
+fn collect_leaf_ids<V: Accumulator>(vnodes: &Arena<VNode<V>>, root: VSlotPointer) -> Vec<VSlotPointer> {
     let mut leaves = Vec::new();
     let mut stack = vec![root];
     while let Some(id) = stack.pop() {
@@ -327,7 +327,7 @@ mod tests {
         let (vnodes, root, _) = SpikedVTree::<u64>::balanced(4).build();
 
         for (idx, _) in vnodes.iter_occupied() {
-            let id = VNodeId::from_index(idx);
+            let id = VSlotPointer::from_index(idx);
             let node = vnodes.get(idx);
             if id == root {
                 assert!(node.parent.is_none(), "root should have no parent");

@@ -44,7 +44,7 @@ use crate::tests::spiked_vtree::SpikedVTree;
 // ── Helpers ─────────────────────────────────────────────────────
 
 /// Create a minimal gnodes arena with a single dummy terminal G-node
-/// at index 0, matching the dummy `GNodeId` used by [`SpikedVTree`].
+/// at index 0, matching the dummy `GSlotPointer` used by [`SpikedVTree`].
 fn make_dummy_gnodes() -> Arena<GNode<u64, u64>> {
     let mut gnodes = Arena::new();
     gnodes.alloc(GNode::default());
@@ -55,8 +55,8 @@ fn make_dummy_gnodes() -> Arena<GNode<u64, u64>> {
 /// root's total intensity.
 fn assert_clean_rebalance(
     vnodes: &mut Arena<crate::vnode::VNode<u64>>,
-    root: crate::handle::VNodeId,
-    violations: &mut Vec<crate::handle::VNodeId>,
+    root: crate::handle::VSlotPointer,
+    violations: &mut Vec<crate::handle::VSlotPointer>,
 ) {
     let mut gnodes = make_dummy_gnodes();
     let root_intensity_before = vnodes.get(root.index()).intensity;

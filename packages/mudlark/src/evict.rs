@@ -12,7 +12,7 @@
 #[cfg(feature = "dynamic-contour-tracking")]
 use crate::gnode::GState;
 use crate::graph::GvGraph;
-use crate::handle::VNodeId;
+use crate::handle::VSlotPointer;
 use crate::traits::{Accumulator, Coordinate, Inspectable};
 use crate::vnode::VKind;
 use crate::{rebalance, vtree};
@@ -33,7 +33,7 @@ use crate::{rebalance, vtree};
 /// - If the V-entry is not backed by a terminal G-node.
 /// - If the G-node has no parent (G-root eviction is forbidden).
 #[allow(clippy::too_many_lines)] // Plateau maintenance adds ~40 lines.
-pub fn evict_tip<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(graph: &mut GvGraph<C, V, N>, v_id: VNodeId) {
+pub fn evict_tip<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(graph: &mut GvGraph<C, V, N>, v_id: VSlotPointer) {
     let span = tracing::debug_span!(
         "evict_tip",
         v_id = v_id.index(),
@@ -316,8 +316,8 @@ pub fn evict_tip<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(grap
 #[allow(clippy::too_many_lines)]
 fn plateau_after_evict<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(
     graph: &mut GvGraph<C, V, N>,
-    gnode_id: crate::handle::GNodeId,
-    parent_id: crate::handle::GNodeId,
+    gnode_id: crate::handle::GSlotPointer,
+    parent_id: crate::handle::GSlotPointer,
     parent_state_after: GState,
     parent_lo: C,
     parent_hi: C,
@@ -339,8 +339,8 @@ fn plateau_after_evict<C: Coordinate, V: Accumulator + Inspectable, const N: u32
     // Step 2 — Find the covering basis element for the parent's
     // region. Collect displaced nodes (thatched elements that
     // need their own basis membership).
-    let mut displaced: Vec<crate::handle::GNodeId> = Vec::new();
-    let mut displaced_extra: Vec<(crate::handle::GNodeId, u32)> = Vec::new();
+    let mut displaced: Vec<crate::handle::GSlotPointer> = Vec::new();
+    let mut displaced_extra: Vec<(crate::handle::GSlotPointer, u32)> = Vec::new();
 
     let ancestor_key = if let Some(key) = graph.plateau_basis.remove(parent_id) {
         // Case (a): parent was the basis element.
@@ -363,7 +363,7 @@ fn plateau_after_evict<C: Coordinate, V: Accumulator + Inspectable, const N: u32
     } else {
         // Walk up from parent to find the ancestor basis element
         // whose plateau tile actually covers the parent's region.
-        let mut path: Vec<crate::handle::GNodeId> = vec![parent_id];
+        let mut path: Vec<crate::handle::GSlotPointer> = vec![parent_id];
         let mut cur = graph.gnodes.get(parent_id.index()).parent;
         let mut found = None;
 
@@ -481,7 +481,7 @@ fn plateau_after_evict<C: Coordinate, V: Accumulator + Inspectable, const N: u32
             .map(|(&k, _)| k)
             .collect();
         for rk in right_keys {
-            let members: Vec<crate::handle::GNodeId> = graph.plateau_basis.basis_elements(&rk).iter().copied().collect();
+            let members: Vec<crate::handle::GSlotPointer> = graph.plateau_basis.basis_elements(&rk).iter().copied().collect();
             if !members.is_empty() {
                 tracing::trace!(
                     ?rk,
@@ -509,7 +509,7 @@ fn plateau_after_evict<C: Coordinate, V: Accumulator + Inspectable, const N: u32
             .map(|(&k, _)| k)
             .collect();
         for lk in left_keys {
-            let members: Vec<crate::handle::GNodeId> = graph.plateau_basis.basis_elements(&lk).iter().copied().collect();
+            let members: Vec<crate::handle::GSlotPointer> = graph.plateau_basis.basis_elements(&lk).iter().copied().collect();
             if !members.is_empty() {
                 tracing::trace!(
                     ?lk,
@@ -540,13 +540,13 @@ fn plateau_after_evict<C: Coordinate, V: Accumulator + Inspectable, const N: u32
 /// Scan the V-Tree for eviction candidates (ADR-M-013, ADR-M-015).
 ///
 /// Pre-order DFS from the V-root. Prunes subtrees where
-/// `has_evictable == false`. Collects eligible `VNodeId`s:
+/// `has_evictable == false`. Collects eligible `VSlotPointer`s:
 /// entries with `depth_V > D_evict`, `is_evictable == true`,
 /// and backing G-node ≠ G-root.
 ///
-/// Returns a `Vec<VNodeId>` of candidates (Phase 1 of the
+/// Returns a `Vec<VSlotPointer>` of candidates (Phase 1 of the
 /// two-phase collect-then-evict pattern).
-pub fn scan_for_candidates<C: Coordinate, V: Accumulator, const N: u32>(graph: &GvGraph<C, V, N>) -> Vec<VNodeId> {
+pub fn scan_for_candidates<C: Coordinate, V: Accumulator, const N: u32>(graph: &GvGraph<C, V, N>) -> Vec<VSlotPointer> {
     let _span = tracing::trace_span!("scan_for_candidates").entered();
     let mut candidates = Vec::new();
     if let Some(v_root) = graph.v_root {
@@ -559,9 +559,9 @@ pub fn scan_for_candidates<C: Coordinate, V: Accumulator, const N: u32>(graph: &
 /// Internal DFS worker for `scan_for_candidates`.
 fn scan_dfs<C: Coordinate, V: Accumulator, const N: u32>(
     graph: &GvGraph<C, V, N>,
-    v_id: VNodeId,
+    v_id: VSlotPointer,
     depth: u32,
-    candidates: &mut Vec<VNodeId>,
+    candidates: &mut Vec<VSlotPointer>,
 ) {
     let node = graph.vnodes.get(v_id.index());
     match &node.kind {

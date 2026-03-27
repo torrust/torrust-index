@@ -69,7 +69,7 @@
 
 use crate::GvGraph;
 use crate::graph::Config;
-use crate::handle::VNodeId;
+use crate::handle::VSlotPointer;
 use crate::rebalance::is_violated;
 use crate::split::attempt_split;
 use crate::testing::{GraphCreator, Plan, default_config, run};
@@ -88,12 +88,12 @@ fn no_split_when_not_terminal() {
     let entry_id = graph.gnodes.get(root.index()).entry.unwrap();
     graph.vnodes.get_mut(entry_id.index()).intensity = 10;
     // Bootstrap split creates children — root is no longer terminal.
-    attempt_split(&mut graph, root);
+    attempt_split(&mut graph, root.slot());
     assert_eq!(graph.node_count(), 3);
 
     // Second split on the same (now non-terminal) node is rejected.
     let count_before = graph.node_count();
-    attempt_split(&mut graph, root);
+    attempt_split(&mut graph, root.slot());
     assert_eq!(graph.node_count(), count_before);
     crate::invariants::assert_invariants(&graph);
 }
@@ -109,7 +109,7 @@ fn no_split_when_below_threshold() {
     // Manual sum change → keep plateau consistent.
     #[cfg(feature = "dynamic-contour-tracking")]
     graph.recompute_plateau(&crate::plateau::BasisEdge(0u64));
-    attempt_split(&mut graph, root);
+    attempt_split(&mut graph, root.slot());
     // sum=3 < θ=5, no split.
     assert_eq!(graph.node_count(), 1);
     crate::invariants::assert_invariants(&graph);
@@ -126,7 +126,7 @@ fn no_split_when_at_exact_threshold() {
     graph.vnodes.get_mut(entry_id.index()).intensity = 5;
     #[cfg(feature = "dynamic-contour-tracking")]
     graph.recompute_plateau(&crate::plateau::BasisEdge(0u64));
-    attempt_split(&mut graph, root);
+    attempt_split(&mut graph, root.slot());
     // sum=5 == θ=5, guard uses `>` so no split.
     assert_eq!(graph.node_count(), 1);
     crate::invariants::assert_invariants(&graph);
@@ -145,7 +145,7 @@ fn no_split_when_width_1() {
     g.sum = 100;
     let entry_id = graph.gnodes.get(root.index()).entry.unwrap();
     graph.vnodes.get_mut(entry_id.index()).intensity = 100;
-    attempt_split(&mut graph, root);
+    attempt_split(&mut graph, root.slot());
     assert_eq!(graph.node_count(), 1);
     // Note: full invariant check skipped — the manual interval
     // mutation [0,8)→[3,4) intentionally breaks domain coverage
@@ -161,7 +161,7 @@ fn no_split_when_entry_is_none() {
     graph.gnodes.get_mut(root.index()).entry = None;
     graph.gnodes.get_mut(root.index()).own = 100;
     graph.gnodes.get_mut(root.index()).sum = 100;
-    attempt_split(&mut graph, root);
+    attempt_split(&mut graph, root.slot());
     assert_eq!(graph.node_count(), 1);
 }
 
@@ -178,7 +178,7 @@ fn bootstrap_split_creates_correct_structure() {
     let entry_id = graph.gnodes.get(root.index()).entry.unwrap();
     graph.vnodes.get_mut(entry_id.index()).intensity = 10;
 
-    attempt_split(&mut graph, root);
+    attempt_split(&mut graph, root.slot());
 
     // G-Tree: root + 2 children = 3 nodes.
     assert_eq!(graph.node_count(), 3);
@@ -238,7 +238,7 @@ fn catalytic_split_after_bootstrap() {
     graph.gnodes.get_mut(root.index()).own = 10;
     graph.gnodes.get_mut(root.index()).sum = 10;
     graph.vnodes.get_mut(entry_id.index()).intensity = 10;
-    attempt_split(&mut graph, root);
+    attempt_split(&mut graph, root.slot());
     assert_eq!(graph.node_count(), 3);
 
     // Now give left child enough to split.
@@ -305,7 +305,7 @@ fn catalytic_split_is_violation_free() {
     graph.gnodes.get_mut(root.index()).own = 10;
     graph.gnodes.get_mut(root.index()).sum = 10;
     graph.vnodes.get_mut(entry_id.index()).intensity = 10;
-    attempt_split(&mut graph, root);
+    attempt_split(&mut graph, root.slot());
 
     // Catalytic split on left child.
     let left_id = graph.gnodes.get(root.index()).left.unwrap();
@@ -321,7 +321,7 @@ fn catalytic_split_is_violation_free() {
     // Check: no V-node is violated.
     for i in 0..20 {
         if graph.vnodes.is_occupied(i) {
-            let id = VNodeId::from_index(i);
+            let id = VSlotPointer::from_index(i);
             assert!(!is_violated(&graph.vnodes, id), "node at index {i} should not be violated");
         }
     }
@@ -349,7 +349,7 @@ fn depth_gate_rejects_deep_split() {
     graph.gnodes.get_mut(root.index()).own = 10;
     graph.gnodes.get_mut(root.index()).sum = 10;
     graph.vnodes.get_mut(entry_id.index()).intensity = 10;
-    attempt_split(&mut graph, root);
+    attempt_split(&mut graph, root.slot());
     assert_eq!(graph.node_count(), 3);
 
     // Left child's entry is at V-depth 2 (root_s -> cs -> le).
@@ -403,7 +403,7 @@ fn preprocessing_contraction_before_catalytic_split() {
     graph.gnodes.get_mut(root.index()).own = 10;
     graph.gnodes.get_mut(root.index()).sum = 10;
     graph.vnodes.get_mut(entry_id.index()).intensity = 10;
-    attempt_split(&mut graph, root);
+    attempt_split(&mut graph, root.slot());
     assert_eq!(graph.node_count(), 3); // root, left, right
 
     // Catalytic split on left [0,8) -> [0,4), [4,8).
@@ -474,7 +474,7 @@ fn bootstrap_split_plateau_count() {
     crate::vtree::propagate_v_sums(&mut graph.vnodes, entry_id);
     graph.recompute_plateau(&crate::plateau::BasisEdge(0u64));
 
-    attempt_split(&mut graph, root);
+    attempt_split(&mut graph, root.slot());
     crate::invariants::assert_invariants(&graph);
 
     // Still exactly 1 plateau (uniform depth after first split).
@@ -493,7 +493,7 @@ fn bootstrap_split_plateau_depth() {
     crate::vtree::propagate_v_sums(&mut graph.vnodes, entry_id);
     graph.recompute_plateau(&crate::plateau::BasisEdge(0u64));
 
-    attempt_split(&mut graph, root);
+    attempt_split(&mut graph, root.slot());
     crate::invariants::assert_invariants(&graph);
 
     // The sole plateau should have depth = 1 (children are at depth 1).

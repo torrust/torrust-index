@@ -56,7 +56,7 @@ The current public API on `GvGraph` exposes:
 | `extract()`             | 1+2      | `Pewei`                                 | Spatial portrait              |
 | `layers()`              | 1+2      | `impl Iterator<Item = (usize, Node)>`   | **Analysis selector**         |
 | `plateaus()`            | 1+2      | `Cow<'_, BTreeMap<BasisEdge, Plateau>>` | Contour snapshot              |
-| `g_root()`              | 1        | `GNodeId`                               | Decay root, coordination root |
+| `g_root()`              | 1        | `GNodeId`                                | Decay root, coordination root |
 | `node_count()`          | 1        | `u32`                                   | Health reporting              |
 | `terminal_count()`      | 1        | `u32`                                   | Health reporting              |
 | `total_sum()`           | 1        | `V`                                     | Health reporting              |
@@ -73,8 +73,9 @@ is no public way to query a G-node's children or parent given a handle.
    Surface 3 machinery stays `pub(crate)`.
 
 2. **`GNodeId` is already Surface 1.** It is a public `Copy` handle
-   re-exported from the crate root (ADR-M-032 §S1, Handles table). Adding
-   it to `Node` does not promote any internal type.
+   re-exported from the crate root (ADR-M-032 §S1, Handles table;
+   ADR-M-040 renamed from `GSlotPointer` and added generational
+   validation). Adding it to `Node` does not promote any internal type.
 
 3. **Minimal surface principle** (§API M-1). Expose only what the sentinel
    needs, not the full internal structure. The sentinel should not be
@@ -100,19 +101,20 @@ pub struct Node<C: Coordinate, V: Accumulator> {
     pub sum: V,
     pub depth: u32,
     pub state: GState,
-    pub gnode_id: GNodeId,  // NEW — arena handle of the backing G-node
+    pub gnode_id: GNodeId,  // NEW — generational arena handle (ADR-M-040)
 }
 ```
 
 **Rationale:**
 
-- `GNodeId` is already public Surface 1 (`Copy`, opaque, `NonZeroU32`
-  index). Adding it to `Node` doesn't expose any Surface 3 internals.
+- `GNodeId` is already public Surface 1 (`Copy`, opaque,
+  generational). Adding it to `Node` doesn't expose any Surface 3
+  internals.
 - The sentinel uses it to key its per-cell tracker map
   (`BTreeMap<GNodeId, CellState>`), avoiding reverse-lookups from
   `(start, depth)`.
 - `layers()` constructs `Node` in the `Layers` iterator where the
-  `GNodeId` is already in hand (via `VKind::Entry { gnode, .. }`),
+  `GSlotPointer` is already in hand (via `VKind::Entry { gnode, .. }`),
   so the change is non-invasive in the emulsion.
 - The alternative — a parallel `layers_with_ids()` — adds a second
   iterator covering the same traversal with the same logic and an
@@ -222,7 +224,7 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// # Cost
     ///
     /// $O(1)$ — two arena lookups plus interval comparison.
-    pub fn is_ancestor_of(&self, ancestor: GNodeId, descendant: GNodeId) -> bool;
+    pub fn is_ancestor_of(&self, ancestor: GSlotPointer, descendant: GSlotPointer) -> bool;
 }
 ```
 
@@ -247,10 +249,10 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
 
 ## Alternatives considered
 
-### A1 — Use `(start, depth)` as the tracker key instead of `GNodeId`
+### A1 — Use `(start, depth)` as the tracker key instead of `GSlotPointer`
 
 In a dyadic tree, `(start, depth)` uniquely identifies a G-node.
-The sentinel could use this pair instead of `GNodeId`.
+The sentinel could use this pair instead of `GSlotPointer`.
 
 **Rejected** because:
 
@@ -259,26 +261,26 @@ The sentinel could use this pair instead of `GNodeId`.
 - Multi-scale delivery requires testing "is cell A an ancestor of
   cell B?" — with handles this is `is_ancestor_of(a, b)`; with
   `(start, depth)` the caller must implement interval arithmetic.
-- The `GNodeId` is already public and `Copy`. Not exposing it on
+- The `GSlotPointer` is already public and `Copy`. Not exposing it on
   `Node` forces callers into a strictly worse API for no benefit.
 
 ### A2 — Add a separate `layers_with_ids()` iterator
 
 Keep `Node` as-is and add a parallel iterator that yields
-`(usize, GNodeId, Node)`.
+`(usize, GSlotPointer, Node)`.
 
 **Rejected** because:
 
 - Two iterators over the same traversal with the same logic are an
   unnecessary maintenance and documentation burden.
-- `GNodeId` on `Node` is a strict superset — callers who don't need
+- `GSlotPointer` on `Node` is a strict superset — callers who don't need
   it simply ignore the field. There is no cost (it's one `u32`).
 - `Node` already carries `GState` (which is similarly a structural
-  concern), so adding `GNodeId` is consistent.
+  concern), so adding `GSlotPointer` is consistent.
 
 ### A3 — Expose raw `GNode<C, V>` references
 
-Make `GNode` public and add `pub fn gnode(&self, id: GNodeId) -> &GNode`
+Make `GNode` public and add `pub fn gnode(&self, id: GSlotPointer) -> &GNode`
 that returns a borrow.
 
 **Rejected** because:
@@ -289,13 +291,13 @@ that returns a borrow.
 - A borrowed `&GNode` holds a lifetime into the arena, preventing
   concurrent graph mutation. The sentinel needs to iterate nodes
   and then mutate (call `observe()`). A `Copy` snapshot avoids this.
-- `GNode` contains `entry: Option<VNodeId>` and
-  `parent: Option<GNodeId>` which are invariant-laden fields that
+- `GNode` contains `entry: Option<VSlotPointer>` and
+  `parent: Option<GSlotPointer>` which are invariant-laden fields that
   downstream code should not reason about.
 
 ### A4 — Full tree-walking iterator (DFS/BFS from arbitrary root)
 
-Add `pub fn walk(&self, root: GNodeId) -> impl Iterator<Item = GNodeInfo>`.
+Add `pub fn walk(&self, root: GSlotPointer) -> impl Iterator<Item = GNodeInfo>`.
 
 **Rejected for now** because:
 
@@ -329,11 +331,11 @@ callback infrastructure. If needed, a future ADR can introduce a
 
 | File                    | Change                                                           | Surface     |
 | ----------------------- | ---------------------------------------------------------------- | ----------- |
-| `src/view.rs`           | Add `gnode_id: GNodeId` field to `Node`                          | 1           |
+| `src/view.rs`           | Add `gnode_id: GSlotPointer` field to `Node`                          | 1           |
 | `src/graph_extract.rs`  | Set `gnode_id` in `Layers::next()`                               | 3           |
 | `src/graph.rs`          | Add `GNodeInfo` struct, `gnode_info()`, `is_ancestor_of()`       | 1 + 2       |
 | `src/lib.rs`            | Re-export `GNodeInfo`                                            | 1           |
-| `src/handle.rs`         | Add `serde` derives to `GNodeId` and `VNodeId`; expand doc table | 1           |
+| `src/handle.rs`         | Add `serde` derives to `GSlotPointer` and `VSlotPointer`; expand doc table | 1           |
 | `src/tests/view.rs`     | Add `gnode_id` to 12 internal `Node` struct literals             | (test-only) |
 | `tests/sentinel_api.rs` | New integration test file — 14 tests                             | (test-only) |
 
@@ -367,7 +369,7 @@ In `graph.rs`, add:
 
 ```rust
 impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
-    pub fn gnode_info(&self, id: GNodeId) -> Option<GNodeInfo<C, V>> {
+    pub fn gnode_info(&self, id: GSlotPointer) -> Option<GNodeInfo<C, V>> {
         if !self.gnodes.is_occupied(id.index()) {
             return None;
         }
@@ -393,7 +395,7 @@ In `graph.rs`, add:
 
 ```rust
 impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
-    pub fn is_ancestor_of(&self, ancestor: GNodeId, descendant: GNodeId) -> bool {
+    pub fn is_ancestor_of(&self, ancestor: GSlotPointer, descendant: GSlotPointer) -> bool {
         if !self.gnodes.is_occupied(ancestor.index())
             || !self.gnodes.is_occupied(descendant.index())
         {
@@ -446,17 +448,17 @@ Recorded during implementation (2026-03-08).
 
 ### Serde derives on handles
 
-`GNodeId` and `VNodeId` in `handle.rs` gained
+`GSlotPointer` and `VSlotPointer` in `handle.rs` gained
 `#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]`.
 This was not anticipated in the original decision but was required
 because:
 
 - `Node<C, V>` already had the serde derive and now contains a
-  `GNodeId` field. Without the derive on the handle, compilation
+  `GSlotPointer` field. Without the derive on the handle, compilation
   fails when the `serde` feature is enabled.
-- `GNodeInfo<C, V>` contains `Option<GNodeId>` fields (`left`,
+- `GNodeInfo<C, V>` contains `Option<GSlotPointer>` fields (`left`,
   `right`, `parent`), triggering the same requirement.
-- `VNodeId` was given the same treatment for consistency — both
+- `VSlotPointer` was given the same treatment for consistency — both
   handle types share the same derive set.
 
 This is a minor Surface 1 expansion: downstream code with `serde`
@@ -466,7 +468,7 @@ index-based (`NonZeroU32`), consistent with the existing
 
 ### handle.rs documentation update
 
-The `GNodeId` doc table in `handle.rs` was expanded with three new
+The `GSlotPointer` doc table in `handle.rs` was expanded with three new
 rows (`Node::gnode_id`, `GvGraph::gnode_info`, `GvGraph::is_ancestor_of`)
 and corresponding link reference definitions were added so rustdoc
 resolves them correctly.
@@ -474,7 +476,7 @@ resolves them correctly.
 ### Internal test updates (view.rs)
 
 The 12 `Node` struct literal sites in `src/tests/view.rs` required
-the new `gnode_id` field. These use `GNodeId::from_index(0)` as a
+the new `gnode_id` field. These use `GSlotPointer::from_index(0)` as a
 placeholder since the unit tests exercise view-type behaviour, not
 G-tree identity. The ADR noted that "struct literal construction in
 downstream code would break, but `Node` is only constructed inside
@@ -492,8 +494,8 @@ evictions.
 
 ### `HashSet` instead of `BTreeSet`
 
-Test code collects `GNodeId` values into `HashSet<GNodeId>` rather
-than `BTreeSet`, because `GNodeId` implements `Hash + Eq` but not
+Test code collects `GSlotPointer` values into `HashSet<GSlotPointer>` rather
+than `BTreeSet`, because `GSlotPointer` implements `Hash + Eq` but not
 `Ord`. This is correct — arena handles have no meaningful ordering.
 
 ---
@@ -523,8 +525,8 @@ than `BTreeSet`, because `GNodeId` implements `Hash + Eq` but not
   would break, but `Node` is only constructed inside the crate).
 
 - **Serde feature expanded.** When the `serde` feature is enabled,
-  `GNodeId`, `VNodeId`, `Node`, and `GNodeInfo` are all serializable.
-  This was a necessary consequence of adding `GNodeId` to types that
+  `GSlotPointer`, `VSlotPointer`, `Node`, and `GNodeInfo` are all serializable.
+  This was a necessary consequence of adding `GSlotPointer` to types that
   already had serde derives.
 
 - **Future path:** If profiling shows `layers()` is too expensive for

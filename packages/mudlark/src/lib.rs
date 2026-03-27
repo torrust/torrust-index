@@ -148,7 +148,7 @@ mod _readme {}
 //             (contour range decomposition, ADR-M-037)
 //   gnode:    GState           (node state enum)
 //   graph:    GNodeChildren    (#[doc(hidden)] — child linkage, ADR-M-036)
-//   handle:   GNodeId          (opaque arena handle)
+//   handle:   GNodeId               (opaque generational arena handle, ADR-M-040)
 //   pewei:    Pewei, Layer     (extraction snapshots, Clone-only)
 //             Transition, Terminal (Copy leaf/phase nodes)
 //   plateau:  BasisEdge, Plateau  (contour map)

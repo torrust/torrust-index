@@ -23,7 +23,7 @@ Semi-internal nodes arise in eviction when an internal node has one
 child evicted (§IDEA M-12.6); in split construction they appear
 transiently when the first child is linked before the second.
 
-The codebase infers node state entirely from `Option<GNodeId>`
+The codebase infers node state entirely from `Option<GSlotPointer>`
 checks on the `left` / `right` fields. This ADR decides whether to
 add an explicit stored state field.
 
@@ -144,7 +144,7 @@ The strongest argument for a stored enum is readability. However:
 
 ### Option A — Inferred state (status quo + helper methods)
 
-Keep `left: Option<GNodeId>` and `right: Option<GNodeId>` as the
+Keep `left: Option<GSlotPointer>` and `right: Option<GSlotPointer>` as the
 sole source of truth. Provide zero-cost computed helpers:
 
 ```rust
@@ -257,9 +257,9 @@ Represent children as:
 ```rust
 enum GChildren {
     Terminal,
-    Left(GNodeId),
-    Right(GNodeId),
-    Both(GNodeId, GNodeId),
+    Left(GSlotPointer),
+    Right(GSlotPointer),
+    Both(GSlotPointer, GSlotPointer),
 }
 ```
 
@@ -271,7 +271,7 @@ enum GChildren {
 **Cons:**
 
 - **Breaks 48-byte target** — `GChildren` is 12 bytes
-  (discriminant + max variant) vs. 8 bytes for 2 × `Option<GNodeId>`.
+  (discriminant + max variant) vs. 8 bytes for 2 × `Option<GSlotPointer>`.
   Total becomes 52, rounded to 56 with alignment.
 - Every child access requires destructuring instead of a direct
   field read. `route_to_receiver` becomes more verbose, not less.

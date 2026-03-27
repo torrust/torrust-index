@@ -61,7 +61,7 @@ pub trait SpatialWrite: SpatialRead {
 /// Temporal decay: subband-adaptive attenuation.
 /// Requires `Self::Accum: Attenuatable`.
 pub trait TemporalDecay: SpatialRead {
-    fn decay(&mut self, root: GNodeId, attenuation: f64, q: f64);
+    fn decay(&mut self, root: GSlotPointer, attenuation: f64, q: f64);
 }
 
 /// Weighted random sampling over entries by intensity.

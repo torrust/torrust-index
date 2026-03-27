@@ -11,7 +11,7 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use crate::handle::{GNodeId, VNodeId};
+use crate::handle::{GSlotPointer, VSlotPointer};
 
 /// Sentinel indicating cached depth is stale (needs recompute).
 /// See ADR-M-029 for design rationale.
@@ -31,7 +31,7 @@ pub struct VNode<V> {
     /// Intensity (sum for structural, own for entry).
     pub intensity: V,
     /// Parent in the V-Tree.
-    pub parent: Option<VNodeId>,
+    pub parent: Option<VSlotPointer>,
     /// Cached V-Tree depth. `DEPTH_STALE` indicates needs recompute.
     /// Uses `AtomicU32` for thread safety while allowing read-path caching (ADR-M-029).
     pub cached_depth: AtomicU32,
@@ -62,7 +62,7 @@ pub enum VKind<V> {
     /// A V-Tree leaf backed by a G-node (§IDEA M-4.2).
     Entry {
         /// The backing G-node.
-        gnode: GNodeId,
+        gnode: GSlotPointer,
         /// True iff the backing G-node is on the contour
         /// (has uncovered range). True for terminal AND semi-internal. §IDEA M-4.2.
         is_exposed: bool,
@@ -94,7 +94,7 @@ pub enum VKind<V> {
 ///
 /// ```text
 /// intensities: [V; 3]           — 24 bytes (hot: sampling scan)
-/// ids:         [Option<VNodeId>; 3] — 12 bytes (cold: follow after choice)
+/// ids:         [Option<VSlotPointer>; 3] — 12 bytes (cold: follow after choice)
 /// len:         u8                — 1 byte (2 or 3)
 /// ```
 #[derive(Debug, Clone)]
@@ -102,7 +102,7 @@ pub struct PackedChildren<V> {
     /// Cached child intensities (hot data for sampling).
     pub intensities: [V; 3],
     /// Child node IDs.
-    pub ids: [Option<VNodeId>; 3],
+    pub ids: [Option<VSlotPointer>; 3],
     /// Number of children: 2 or 3.
     pub len: u8,
 }
@@ -110,7 +110,7 @@ pub struct PackedChildren<V> {
 impl<V: Copy + Default + PartialOrd> PackedChildren<V> {
     /// Create a 2-child node.
     #[must_use]
-    pub fn new_2(a: (VNodeId, V), b: (VNodeId, V)) -> Self {
+    pub fn new_2(a: (VSlotPointer, V), b: (VSlotPointer, V)) -> Self {
         Self {
             intensities: [a.1, b.1, V::default()],
             ids: [Some(a.0), Some(b.0), None],
@@ -120,7 +120,7 @@ impl<V: Copy + Default + PartialOrd> PackedChildren<V> {
 
     /// Create a 3-child node.
     #[must_use]
-    pub const fn new_3(a: (VNodeId, V), b: (VNodeId, V), c: (VNodeId, V)) -> Self {
+    pub const fn new_3(a: (VSlotPointer, V), b: (VSlotPointer, V), c: (VSlotPointer, V)) -> Self {
         Self {
             intensities: [a.1, b.1, c.1],
             ids: [Some(a.0), Some(b.0), Some(c.0)],
@@ -150,7 +150,7 @@ impl<V: Copy + Default + PartialOrd> PackedChildren<V> {
     /// Panics if `index >= self.len()`.
     #[must_use]
     #[inline]
-    pub fn get(&self, index: usize) -> (VNodeId, V) {
+    pub fn get(&self, index: usize) -> (VSlotPointer, V) {
         assert!(index < self.len(), "PackedChildren::get out of bounds");
         (
             self.ids[index].expect("child ID should be Some within len"),
@@ -159,7 +159,7 @@ impl<V: Copy + Default + PartialOrd> PackedChildren<V> {
     }
 
     /// Iterate over `(id, intensity)` pairs.
-    pub fn iter(&self) -> impl Iterator<Item = (VNodeId, V)> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = (VSlotPointer, V)> + '_ {
         (0..self.len()).map(|i| self.get(i))
     }
 
@@ -179,7 +179,7 @@ impl<V: Copy + Default + PartialOrd> PackedChildren<V> {
 
     /// Find the position of `id` in this node's children.
     #[must_use]
-    pub fn find_index(&self, id: VNodeId) -> Option<usize> {
+    pub fn find_index(&self, id: VSlotPointer) -> Option<usize> {
         (0..self.len()).find(|&i| self.ids[i] == Some(id))
     }
 
@@ -188,7 +188,7 @@ impl<V: Copy + Default + PartialOrd> PackedChildren<V> {
     /// # Panics
     ///
     /// Panics if `old` is not found among the children.
-    pub fn replace_child(&mut self, old: VNodeId, new: VNodeId, new_intensity: V) {
+    pub fn replace_child(&mut self, old: VSlotPointer, new: VSlotPointer, new_intensity: V) {
         let idx = self.find_index(old).expect("replace_child: old id not found");
         self.ids[idx] = Some(new);
         self.intensities[idx] = new_intensity;
@@ -199,7 +199,7 @@ impl<V: Copy + Default + PartialOrd> PackedChildren<V> {
     /// # Panics
     ///
     /// Panics if already a 3-node.
-    pub fn add_child(&mut self, id: VNodeId, intensity: V) {
+    pub fn add_child(&mut self, id: VSlotPointer, intensity: V) {
         assert!(self.len == 2, "add_child: already a 3-node");
         self.ids[2] = Some(id);
         self.intensities[2] = intensity;
@@ -212,7 +212,7 @@ impl<V: Copy + Default + PartialOrd> PackedChildren<V> {
     /// # Panics
     ///
     /// Panics if not a 3-node or if `id` is not found.
-    pub fn remove_child(&mut self, id: VNodeId) -> (VNodeId, V) {
+    pub fn remove_child(&mut self, id: VSlotPointer) -> (VSlotPointer, V) {
         assert!(self.len == 3, "remove_child: not a 3-node");
         let idx = self.find_index(id).expect("remove_child: id not found");
         let removed = self.get(idx);
@@ -245,7 +245,7 @@ impl<V: Default> Default for VNode<V> {
             parent: None,
             cached_depth: AtomicU32::new(DEPTH_STALE),
             kind: VKind::Entry {
-                gnode: GNodeId::from_index(0), // dead sentinel
+                gnode: GSlotPointer::from_index(0), // dead sentinel
                 is_exposed: false,
                 is_evictable: false,
             },

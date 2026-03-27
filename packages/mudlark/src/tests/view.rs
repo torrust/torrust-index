@@ -210,7 +210,7 @@ fn node_terminal_to_cell() {
         sum: 10,
         depth: 2,
         state: GState::Terminal,
-        gnode_id: GNodeId::from_index(0),
+        gnode_id: GNodeId::from_parts(0, 0),
         parent: None,
     };
     let cell = node.to_cell().expect("terminal → Some(Cell)");
@@ -229,7 +229,7 @@ fn node_internal_to_cell_none() {
         sum: 25,
         depth: 1,
         state: GState::Internal,
-        gnode_id: GNodeId::from_index(0),
+        gnode_id: GNodeId::from_parts(0, 0),
         parent: None,
     };
     assert!(node.to_cell().is_none());
@@ -244,7 +244,7 @@ fn node_semi_internal_to_cell_none() {
         sum: 15,
         depth: 1,
         state: GState::SemiInternal,
-        gnode_id: GNodeId::from_index(0),
+        gnode_id: GNodeId::from_parts(0, 0),
         parent: None,
     };
     assert!(node.to_cell().is_none());
@@ -259,7 +259,7 @@ fn node_is_terminal() {
         sum: 1,
         depth: 3,
         state: GState::Terminal,
-        gnode_id: GNodeId::from_index(0),
+        gnode_id: GNodeId::from_parts(0, 0),
         parent: None,
     };
     assert!(terminal.is_terminal());
@@ -271,7 +271,7 @@ fn node_is_terminal() {
         sum: 10,
         depth: 1,
         state: GState::Internal,
-        gnode_id: GNodeId::from_index(0),
+        gnode_id: GNodeId::from_parts(0, 0),
         parent: None,
     };
     assert!(!internal.is_terminal());
@@ -286,7 +286,7 @@ fn node_is_root_true() {
         sum: 100,
         depth: 0,
         state: GState::Internal,
-        gnode_id: GNodeId::from_index(0),
+        gnode_id: GNodeId::from_parts(0, 0),
         parent: None,
     };
     assert!(node.is_root());
@@ -301,8 +301,8 @@ fn node_is_root_false() {
         sum: 50,
         depth: 1,
         state: GState::Terminal,
-        gnode_id: GNodeId::from_index(1),
-        parent: Some(GNodeId::from_index(0)),
+        gnode_id: GNodeId::from_parts(1, 0),
+        parent: Some(GNodeId::from_parts(0, 0)),
     };
     assert!(!node.is_root());
 }
@@ -316,7 +316,7 @@ fn node_to_span_uses_sum() {
         sum: 42,
         depth: 0,
         state: GState::Internal,
-        gnode_id: GNodeId::from_index(0),
+        gnode_id: GNodeId::from_parts(0, 0),
         parent: None,
     };
     let span = node.to_span();
@@ -332,7 +332,7 @@ fn node_width() {
         sum: 0,
         depth: 1,
         state: GState::Terminal,
-        gnode_id: GNodeId::from_index(0),
+        gnode_id: GNodeId::from_parts(0, 0),
         parent: None,
     };
     assert_eq!(node.width(), 8);
@@ -347,7 +347,7 @@ fn node_copy_semantics() {
         sum: 20,
         depth: 1,
         state: GState::Internal,
-        gnode_id: GNodeId::from_index(0),
+        gnode_id: GNodeId::from_parts(0, 0),
         parent: None,
     };
     let b = a;
@@ -363,7 +363,7 @@ fn node_f64_types() {
         sum: 4.5,
         depth: 1,
         state: GState::SemiInternal,
-        gnode_id: GNodeId::from_index(0),
+        gnode_id: GNodeId::from_parts(0, 0),
         parent: None,
     };
     assert!((node.width() - 8.0).abs() < f64::EPSILON);
@@ -383,7 +383,7 @@ fn node_refinement_internal() {
         sum: 25,
         depth: 1,
         state: GState::Internal,
-        gnode_id: GNodeId::from_index(0),
+        gnode_id: GNodeId::from_parts(0, 0),
         parent: None,
     };
     assert_eq!(node.refinement(), 20); // 25 - 5
@@ -398,7 +398,7 @@ fn node_refinement_terminal_is_zero() {
         sum: 10,
         depth: 2,
         state: GState::Terminal,
-        gnode_id: GNodeId::from_index(0),
+        gnode_id: GNodeId::from_parts(0, 0),
         parent: None,
     };
     assert_eq!(node.refinement(), 0);
@@ -413,7 +413,7 @@ fn node_refinement_f64() {
         sum: 4.5,
         depth: 1,
         state: GState::SemiInternal,
-        gnode_id: GNodeId::from_index(0),
+        gnode_id: GNodeId::from_parts(0, 0),
         parent: None,
     };
     assert!((node.refinement() - 3.0).abs() < f64::EPSILON);

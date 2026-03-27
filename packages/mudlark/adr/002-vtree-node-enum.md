@@ -15,7 +15,7 @@ module — `VNode<V>`, `VKind<V>`, `PackedChildren<V>`)
 **Related ADRs:**
 
 - [ADR-M-001](001-node-storage.md): arena topology — determines that
-  `VNode<V>` lives in a single `Arena<VNode<V>>` with `VNodeId`
+  `VNode<V>` lives in a single `Arena<VNode<V>>` with `VSlotPointer`
   handles
 - [ADR-M-013](013-eviction-eligibility.md): eviction eligibility uses
   `is_evictable` on entries and `has_evictable` on structural nodes
@@ -37,7 +37,7 @@ pattern-matching ergonomics, arena design, and traversal code.
 
 1. **Separate types + trait:** `VEntry<V>` and `VStructural<V>` in
    separate arenas, unified by a `VNode` trait. Requires two arena
-   pools and a `VNodeId` enum to distinguish which pool to index.
+   pools and a `VSlotPointer` enum to distinguish which pool to index.
 
 2. **Single enum:** `VNode<V>` with a `VKind<V>` enum. One arena,
    one handle type. Pattern match on `node.kind` at each use site.
@@ -49,14 +49,14 @@ pattern-matching ergonomics, arena design, and traversal code.
 ```rust
 struct VNode<V> {                  // 64 bytes for V = u64 — one cache line
     intensity: V,                  //  8 bytes: sum for structural, own for entry
-    parent: Option<VNodeId>,       //  4 bytes
+    parent: Option<VSlotPointer>,       //  4 bytes
     cached_depth: AtomicU32,       //  4 bytes: padding gap (ADR-M-029)
     kind: VKind<V>,                // 48 bytes
 }
 
 enum VKind<V> {
     Entry {
-        gnode: GNodeId,            // backing G-node (V-I4)
+        gnode: GSlotPointer,            // backing G-node (V-I4)
         is_exposed: bool,          // on contour? (V-I6)
         is_evictable: bool,        // zero G-children? (V-I6b)
     },
@@ -103,7 +103,7 @@ Two booleans on `VKind::Entry`, each serving a distinct purpose:
 ```rust
 struct PackedChildren<V> {         // 40 bytes for V = u64
     intensities: [V; 3],          // 24 bytes — hot: one scan per sampling step
-    ids: [Option<VNodeId>; 3],    // 12 bytes — cold: read only after winner chosen
+    ids: [Option<VSlotPointer>; 3],    // 12 bytes — cold: read only after winner chosen
     len: u8,                      //  1 byte  — 2 or 3
 }
 ```
@@ -119,7 +119,7 @@ visits the parent), so maintenance cost is zero.
 
 ## Consequences
 
-- One arena (`Arena<VNode<V>>`) and one handle type (`VNodeId`) for
+- One arena (`Arena<VNode<V>>`) and one handle type (`VSlotPointer`) for
   all V-Tree nodes. Simpler than two pools + enum handle.
 - Pattern matching on `node.kind` is ergonomic and exhaustive —
   the compiler enforces that both variants are handled.

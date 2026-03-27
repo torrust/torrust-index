@@ -13,7 +13,7 @@ use crate::contour_range::{BasisElement, ContourRange, ContourRangeEnergy, compu
 use crate::gnode::GNode;
 use crate::graph::GvGraph;
 use crate::gtree::gnode_depth_from_interval;
-use crate::handle::{GNodeId, VNodeId};
+use crate::handle::{GSlotPointer, VSlotPointer};
 use crate::plateau::BasisEdge;
 use crate::traits::{Accumulator, Coordinate, Inspectable, Proratable, Weighable};
 
@@ -112,7 +112,7 @@ impl<C: Coordinate, V: Accumulator + Weighable, const N: u32> GvGraph<C, V, N> {
     /// Picks a child with probability `child.intensity / total`.
     /// The hot loop touches only the contiguous `intensities` array
     /// (24 bytes for 3×`u64`) — SoA-optimised for this path.
-    fn sample_child(children: &crate::vnode::PackedChildren<V>, rng: &mut impl crate::traits::Rng) -> VNodeId {
+    fn sample_child(children: &crate::vnode::PackedChildren<V>, rng: &mut impl crate::traits::Rng) -> VSlotPointer {
         let total: f64 = children.intensities[..children.len()].iter().map(|v| v.weight()).sum();
         debug_assert!(total > 0.0, "sample_child: zero-total children");
 
@@ -378,7 +378,7 @@ impl<C: Coordinate, V: Accumulator + Proratable, const N: u32> GvGraph<C, V, N> 
     ///
     /// `query_lo..query_hi` is the half-open query range (already
     /// clamped). `gid` is the current G-node.
-    fn range_sum_inner(&self, gid: crate::handle::GNodeId, query_lo: C, query_hi: C) -> V {
+    fn range_sum_inner(&self, gid: crate::handle::GSlotPointer, query_lo: C, query_hi: C) -> V {
         let g = self.gnodes.get(gid.index());
         let node_lo = g.lo;
         let node_hi = g.hi;
@@ -558,7 +558,7 @@ impl<C: Coordinate, V: Accumulator + Proratable + Inspectable, const N: u32> GvG
     /// Collects the minimal G-node cover of `[query_lo, query_hi)`.
     /// Semi-internal nodes with an uncovered half overlapping the
     /// range are flagged as boundary thatching elements (§CR.3.2).
-    fn decompose_basis(&self, gid: GNodeId, query_lo: C, query_hi: C, basis: &mut Vec<BasisElement<C, V>>) {
+    fn decompose_basis(&self, gid: GSlotPointer, query_lo: C, query_hi: C, basis: &mut Vec<BasisElement<C, V>>) {
         let g = self.gnodes.get(gid.index());
 
         // 1. Disjoint — no overlap with query range.
@@ -569,7 +569,7 @@ impl<C: Coordinate, V: Accumulator + Proratable + Inspectable, const N: u32> GvG
         // 2. Fully contained — this is a basis element (not thatching).
         if query_lo <= g.lo && query_hi >= g.hi {
             basis.push(BasisElement {
-                gnode_id: gid,
+                gnode_id: self.gnode_id_from_slot(gid),
                 start: g.lo,
                 end: g.hi,
                 own: g.own,
@@ -607,7 +607,7 @@ impl<C: Coordinate, V: Accumulator + Proratable + Inspectable, const N: u32> GvG
                 // Both halves overlap — select the node directly.
                 // Coverage: g's interval clipped to the query range (§CR.2.2).
                 basis.push(BasisElement {
-                    gnode_id: gid,
+                    gnode_id: self.gnode_id_from_slot(gid),
                     start: l_lo, // = max(g.lo, query_lo)
                     end: r_hi,   // = min(g.hi, query_hi)
                     own: g.own,
@@ -629,7 +629,7 @@ impl<C: Coordinate, V: Accumulator + Proratable + Inspectable, const N: u32> GvG
             let tile_hi = if query_hi < mid { query_hi } else { mid };
             if tile_lo < tile_hi {
                 basis.push(BasisElement {
-                    gnode_id: gid,
+                    gnode_id: self.gnode_id_from_slot(gid),
                     start: tile_lo,
                     end: tile_hi,
                     own: g.own,
@@ -653,11 +653,11 @@ impl<C: Coordinate, V: Accumulator + Proratable + Inspectable, const N: u32> GvG
                 // reaching here for nodes where both children are null AND
                 // was already pushed as boundary thatch.
                 debug_assert!(
-                    basis.last().is_none_or(|b| b.gnode_id != gid),
+                    basis.last().is_none_or(|b| b.gnode_id != self.gnode_id_from_slot(gid)),
                     "double push for gnode {gid:?}",
                 );
                 basis.push(BasisElement {
-                    gnode_id: gid,
+                    gnode_id: self.gnode_id_from_slot(gid),
                     start: tile_lo,
                     end: tile_hi,
                     own: g.own,

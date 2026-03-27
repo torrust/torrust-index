@@ -50,7 +50,7 @@ const DEPTH_STALE: u32 = u32::MAX;
 
 pub struct VNode<V> {
     pub intensity: V,
-    pub parent: Option<VNodeId>,
+    pub parent: Option<VSlotPointer>,
     pub cached_depth: AtomicU32,  // DEPTH_STALE = needs recompute
     pub kind: VKind<V>,
 }
@@ -59,7 +59,7 @@ pub struct VNode<V> {
 ### Query: Path-warming read
 
 ```rust
-pub fn v_depth<V: Accumulator>(vnodes: &Arena<VNode<V>>, id: VNodeId) -> u32 {
+pub fn v_depth<V: Accumulator>(vnodes: &Arena<VNode<V>>, id: VSlotPointer) -> u32 {
     let node = vnodes.get(id.index());
     let cached = node.cached_depth.load(Ordering::Relaxed);
 
@@ -111,7 +111,7 @@ while both child subtrees are invalidated.
 ### Invalidation: Early-exit propagation
 
 ```rust
-fn invalidate_depth_subtree<V: Accumulator>(vnodes: &Arena<VNode<V>>, root: VNodeId) {
+fn invalidate_depth_subtree<V: Accumulator>(vnodes: &Arena<VNode<V>>, root: VSlotPointer) {
     let mut stack = vec![root];
     while let Some(id) = stack.pop() {
         let node = vnodes.get(id.index());
@@ -205,14 +205,14 @@ The amortized bound holds for the non-invalidated common case.
 **Key finding: zero memory overhead with sentinel encoding.**
 
 The `VNode<u64>` layout has a 4-byte padding gap between `parent`
-(4 bytes, niche-optimized `Option<VNodeId>`) and `kind` (48 bytes,
+(4 bytes, niche-optimized `Option<VSlotPointer>`) and `kind` (48 bytes,
 align 8). The `AtomicU32` cached_depth field fills this gap exactly:
 
 ```
 Offset  Field             Size   Notes
 ──────────────────────────────────────────────
 0       intensity         8      u64
-8       parent            4      Option<VNodeId> (niche-optimized)
+8       parent            4      Option<VSlotPointer> (niche-optimized)
 12      cached_depth      4      AtomicU32 (fills padding gap)
 16      kind              48     VKind<u64> (align 8)
 ──────────────────────────────────────────────

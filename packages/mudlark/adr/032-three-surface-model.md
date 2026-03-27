@@ -131,9 +131,9 @@ capability the crate does not expose — and belongs on Surface 3.
 
 | Handle      | Producing methods                                    | Consuming methods                             | Verdict                 |
 | ----------- | ---------------------------------------------------- | --------------------------------------------- | ----------------------- |
-| `GNodeId`   | `g_root()`, `Node.gnode_id`, `BasisElement.gnode_id` | `gnode_info()`, `is_ancestor_of()`, `decay()` | **Pass**                |
+| `GSlotPointer`   | `g_root()`, `Node.gnode_id`, `BasisElement.gnode_id` | `gnode_info()`, `is_ancestor_of()`, `decay()` | **Pass**                |
 | `BasisEdge` | `plateaus()`, `select_plateaus()`                    | `contour_range()`, `contour_range_energy()`   | **Pass**                |
-| `VNodeId`   | `v_root()`                                           | _(none)_                                      | **Fail** — `pub(crate)` |
+| `VSlotPointer`   | `v_root()`                                           | _(none)_                                      | **Fail** — `pub(crate)` |
 
 ### Snapshot test
 
@@ -177,11 +177,11 @@ evolving refinement state (Emulsion)?**
 | Finding                             | Which test    | Current state                                                                    |
 | ----------------------------------- | ------------- | -------------------------------------------------------------------------------- |
 | `from_index()`/`index()` on handles | Primary test  | `#[doc(hidden)]` — serialisation uses `serde`, not raw indices                   |
-| `VNodeId` / `v_root()`              | Handle test   | Both `pub(crate)` — `VNodeId` has no public consumer                             |
+| `VSlotPointer` / `v_root()`              | Handle test   | Both `pub(crate)` — `VSlotPointer` has no public consumer                             |
 | `build_plateaus()`                  | Primary test  | `#[doc(hidden)]` — serves diagnostics, not projections                           |
 | `debug_plateau_basis()`             | Primary test  | `#[doc(hidden)]` — serves testing only                                           |
 | `ScalableObservation`               | Primary test  | Sub-trait of `Observation` with a required `scale` method (§2.4)                 |
-| `Node.parent`                       | Snapshot test | Stable provenance — on `Node` as `parent: Option<GNodeId>` (`None` at root)      |
+| `Node.parent`                       | Snapshot test | Stable provenance — on `Node` as `parent: Option<GSlotPointer>` (`None` at root)      |
 | `GNodeChildren.left`/`.right`       | Snapshot test | Mutable topology — `#[doc(hidden)]` `gnode_children()` returning `GNodeChildren` |
 
 `check_evictions()` **passes** the primary test — it serves the
@@ -254,8 +254,8 @@ pub struct Node<C: Coordinate, V: Accumulator> {
     pub sum: V,
     pub depth: u32,
     pub state: GState,
-    pub gnode_id: GNodeId,
-    pub parent: Option<GNodeId>,
+    pub gnode_id: GSlotPointer,
+    pub parent: Option<GSlotPointer>,
 }
 ```
 
@@ -441,7 +441,7 @@ One element of the minimal G-node cover of a contour range.
 
 ```rust
 pub struct BasisElement<C: Coordinate, V: Accumulator> {
-    pub gnode_id: GNodeId,
+    pub gnode_id: GSlotPointer,
     pub start: C,
     pub end: C,
     pub own: V,
@@ -501,7 +501,7 @@ numbers, without per-element attribution.
 Opaque references back into the graph.
 
 ```rust
-pub struct GNodeId(/* NonZeroU32 */);
+pub struct GSlotPointer(/* NonZeroU32 */);
 ```
 
 Opaque typed arena index. `Clone`, `Copy`, `Debug`, `PartialEq`, `Eq`,
@@ -512,7 +512,7 @@ _Analog (illustrative):_ **Grain serial number.** A lab notation for
 referring back to a specific crystal without exposing its position
 or chemistry.
 
-**`VNodeId`** is `pub(crate)` — it has no public consuming method
+**`VSlotPointer`** is `pub(crate)` — it has no public consuming method
 (§ handle test). `v_root()` is likewise `pub(crate)`: the accessor
 cannot be more visible than the type it returns. Both serve only
 the diagnostic module and crate-level tests.
@@ -738,7 +738,7 @@ pub trait SpatialWrite: SpatialRead {
 }
 
 pub trait TemporalDecay: SpatialRead {
-    fn decay(&mut self, root: GNodeId, attenuation: f64, q: f64);
+    fn decay(&mut self, root: GSlotPointer, attenuation: f64, q: f64);
 }
 
 pub trait WeightedSampler: SpatialRead {
@@ -821,7 +821,7 @@ surface:
 | `build_plateaus()`      | Rebuild plateau map from scratch via DFS | Serves invariant checking, not user queries              |
 | `debug_plateau_basis()` | Expose per-plateau basis bookkeeping     | Integration-test diagnostics only                        |
 | `gnode_children()`      | Return current child handles of a G-node | Mutable topology, not snapshot content (§ snapshot test) |
-| `v_root()`              | Return V-Tree root handle                | Returns `VNodeId` (`pub(crate)`); no public consumer     |
+| `v_root()`              | Return V-Tree root handle                | Returns `VSlotPointer` (`pub(crate)`); no public consumer     |
 
 ---
 
@@ -929,19 +929,19 @@ in their body text.
   (load-bearing, illustrative, decorative, breaks), so future ADR
   authors know which parts of the metaphor to lean on and which to
   avoid.
-- **`VNodeId`** and **`v_root()`** are both `pub(crate)`
+- **`VSlotPointer`** and **`v_root()`** are both `pub(crate)`
   (§ handle test — the accessor cannot be more visible than the
   type it returns).
 - **`gnode_info()`** returns `Node` — the same Print type that
   `layers()` and PEWEI extraction produce. `GNodeInfo` is removed
   entirely: `Node` serves Surface 1, and Emulsion code reads `GNode`
   fields directly through `pub(crate)` access (crossing rule 4).
-  `gnode_info()` is the only method that accepts a `GNodeId` and
+  `gnode_info()` is the only method that accepts a `GSlotPointer` and
   returns a `Node` for a potentially non-terminal G-node — terminal,
   semi-internal, or internal. The returned `Node`'s `gnode_id` field
   equals the `id` the caller passed in; this redundancy is intentional,
   maintaining consistency with every other `Node`-producing path.
-- **`Node<C, V>`** gains `parent: Option<GNodeId>` — stable
+- **`Node<C, V>`** gains `parent: Option<GSlotPointer>` — stable
   provenance, passing the refined snapshot test. The `parent`
   field is determined at creation (split time) and immutable.
   Shield 3 guarantees the parent outlives the child.

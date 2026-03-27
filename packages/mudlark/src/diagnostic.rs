@@ -18,7 +18,7 @@ use std::fmt;
 
 use crate::arena::Arena;
 use crate::gnode::GNode;
-use crate::handle::{GNodeId, VNodeId};
+use crate::handle::{GSlotPointer, VSlotPointer};
 use crate::rebalance::{self, Ctx};
 use crate::traits::{Accumulator, Coordinate, Inspectable};
 use crate::vnode::{VKind, VNode};
@@ -40,9 +40,9 @@ use crate::{gnode::GState, graph::GvGraph};
 /// `tracing::enabled!(tracing::Level::DEBUG)`.
 pub fn audit_violations<V: Accumulator + Inspectable>(
     vnodes: &Arena<VNode<V>>,
-    violations: &[VNodeId],
+    violations: &[VSlotPointer],
     checkpoint: &str,
-) -> Vec<VNodeId> {
+) -> Vec<VSlotPointer> {
     let all_violated = rebalance::find_violated_nodes(vnodes);
     let queued: std::collections::HashSet<usize> = violations.iter().map(|v| v.index()).collect();
     let mut missed = Vec::new();
@@ -68,7 +68,7 @@ pub fn audit_violations<V: Accumulator + Inspectable>(
 /// plateau than the parent itself.
 #[cfg(feature = "dynamic-contour-tracking")]
 pub struct PlateauAuditContext {
-    pub parent_id: GNodeId,
+    pub parent_id: GSlotPointer,
     pub parent_state: GState,
 }
 
@@ -141,9 +141,9 @@ pub fn audit_plateau_consistency<C: Coordinate, V: Accumulator + Inspectable, co
 
 /// Context describing the eviction that preceded a missed violation.
 pub struct EvictionContext {
-    pub evicted_parent: Option<VNodeId>,
+    pub evicted_parent: Option<VSlotPointer>,
     pub evicted_parent_child_count: usize,
-    pub collapse_sibling: Option<VNodeId>,
+    pub collapse_sibling: Option<VSlotPointer>,
 }
 
 /// Detailed structural diagnosis of a missed violation.
@@ -157,7 +157,7 @@ pub struct EvictionContext {
 #[allow(clippy::too_many_lines)]
 pub fn diagnose_missed_violation<V: Accumulator + Inspectable>(
     vnodes: &Arena<VNode<V>>,
-    violated: VNodeId,
+    violated: VSlotPointer,
     context: &EvictionContext,
 ) {
     let v = vnodes.get(violated.index());
@@ -184,7 +184,7 @@ pub fn diagnose_missed_violation<V: Accumulator + Inspectable>(
 
     // Find uncles (siblings of parent under grandparent).
     let grandparent = vnodes.get(grandparent_id.index());
-    let uncles: Vec<(VNodeId, V)> = match &grandparent.kind {
+    let uncles: Vec<(VSlotPointer, V)> = match &grandparent.kind {
         VKind::Structural { children, .. } => children.iter().filter(|(id, _)| *id != parent_id).collect(),
         VKind::Entry { .. } => vec![],
     };
@@ -210,9 +210,9 @@ pub fn diagnose_missed_violation<V: Accumulator + Inspectable>(
     );
 
     tracing::error!(
-        evicted_parent = ?context.evicted_parent.map(VNodeId::index),
+        evicted_parent = ?context.evicted_parent.map(VSlotPointer::index),
         child_count = context.evicted_parent_child_count,
-        collapse_sibling = ?context.collapse_sibling.map(VNodeId::index),
+        collapse_sibling = ?context.collapse_sibling.map(VSlotPointer::index),
         "eviction context (child_count: 2=collapse, 3=3→2)",
     );
 
@@ -292,7 +292,7 @@ pub fn diagnose_missed_violation<V: Accumulator + Inspectable>(
 }
 
 /// Check if `ancestor` is an ancestor of `descendant` in the V-tree.
-fn is_ancestor<V: Accumulator>(vnodes: &Arena<VNode<V>>, ancestor: VNodeId, mut descendant: VNodeId) -> bool {
+fn is_ancestor<V: Accumulator>(vnodes: &Arena<VNode<V>>, ancestor: VSlotPointer, mut descendant: VSlotPointer) -> bool {
     while let Some(p) = vnodes.get(descendant.index()).parent {
         if p == ancestor {
             return true;
@@ -308,7 +308,7 @@ fn is_ancestor<V: Accumulator>(vnodes: &Arena<VNode<V>>, ancestor: VNodeId, mut 
 ///
 /// Shows the arena index, state (T/S/I for Terminal/SemiInternal/Internal),
 /// interval, and accumulated sum.
-pub struct Gn<'a, C: Coordinate, V: Accumulator + Inspectable>(pub &'a Arena<GNode<C, V>>, pub GNodeId);
+pub struct Gn<'a, C: Coordinate, V: Accumulator + Inspectable>(pub &'a Arena<GNode<C, V>>, pub GSlotPointer);
 
 impl<C: Coordinate, V: Accumulator + Inspectable> fmt::Display for Gn<'_, C, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -336,7 +336,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable> fmt::Display for Gn<'_, C, V> 
 ///
 /// Shows the thatched range, depth, and total energy of the plateau.
 #[cfg(feature = "dynamic-contour-tracking")]
-pub struct Pl<'a, C: Coordinate, V: Accumulator + Inspectable, const N: u32>(pub &'a GvGraph<C, V, N>, pub GNodeId);
+pub struct Pl<'a, C: Coordinate, V: Accumulator + Inspectable, const N: u32>(pub &'a GvGraph<C, V, N>, pub GSlotPointer);
 
 #[cfg(feature = "dynamic-contour-tracking")]
 impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> fmt::Display for Pl<'_, C, V, N> {

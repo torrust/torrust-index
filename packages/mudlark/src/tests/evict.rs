@@ -67,7 +67,7 @@
 
 use crate::evict::{evict_tip, scan_for_candidates};
 use crate::graph::{Config, GvGraph};
-use crate::handle::VNodeId;
+use crate::handle::VSlotPointer;
 use crate::invariants::assert_invariants;
 use crate::testing::{GraphCreator, default_config, evictable_config, plan_evictable, run_checked};
 use crate::traits::{Accumulator, Coordinate, Inspectable};
@@ -86,28 +86,28 @@ fn graph_with_split() -> GvGraph<u64, u64, 4> {
 }
 
 /// Evict a V-entry, rebalance, and handle legacy promotes.
-fn evict_and_rebalance<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(g: &mut GvGraph<C, V, N>, v_id: VNodeId) {
+fn evict_and_rebalance<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(g: &mut GvGraph<C, V, N>, v_id: VSlotPointer) {
     evict_tip(g, v_id);
     let new_gnodes = crate::rebalance::rebalance(&mut g.vnodes, &mut g.gnodes, &mut g.violations, g.live_depth_evict);
     g.handle_legacy_promotes(&new_gnodes);
 }
 
 /// Return the V-entry id for a G-node's left child.
-fn left_entry(g: &GvGraph<u64, u64, 4>) -> VNodeId {
+fn left_entry(g: &GvGraph<u64, u64, 4>) -> VSlotPointer {
     let root = g.g_root();
     let left_id = g.gnodes.get(root.index()).left.expect("root must have a left child");
     g.gnodes.get(left_id.index()).entry.expect("left child must have V-entry")
 }
 
 /// Return the V-entry id for a G-node's right child.
-fn right_entry(g: &GvGraph<u64, u64, 4>) -> VNodeId {
+fn right_entry(g: &GvGraph<u64, u64, 4>) -> VSlotPointer {
     let root = g.g_root();
     let right_id = g.gnodes.get(root.index()).right.expect("root must have a right child");
     g.gnodes.get(right_id.index()).entry.expect("right child must have V-entry")
 }
 
 /// Assert that a V-entry is evictable.
-fn assert_evictable(g: &GvGraph<u64, u64, 4>, v_id: VNodeId) {
+fn assert_evictable(g: &GvGraph<u64, u64, 4>, v_id: VSlotPointer) {
     let VKind::Entry { is_evictable, .. } = &g.vnodes.get(v_id.index()).kind else {
         panic!("V-node {} should be an entry, not structural", v_id.index());
     };
@@ -373,7 +373,7 @@ fn finds_candidates_past_d_evict() {
             panic!("candidate {} should be an entry, not structural", c.index());
         };
         assert!(is_evictable);
-        assert_ne!(*gnode, g.g_root());
+        assert_ne!(*gnode, g.g_root().slot());
     }
 }
 
@@ -427,7 +427,7 @@ fn scan_deep_tree_finds_candidates() {
             panic!("candidate {} should be an entry", c.index());
         };
         assert!(is_evictable, "candidate {} must be evictable", c.index());
-        assert_ne!(*gnode, g.g_root(), "candidate must not be the G-root");
+        assert_ne!(*gnode, g.g_root().slot(), "candidate must not be the G-root");
     }
 }
 

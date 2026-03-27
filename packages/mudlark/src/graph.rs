@@ -13,7 +13,7 @@ use std::sync::atomic::AtomicU32;
 
 use crate::arena::Arena;
 use crate::gnode::GNode;
-use crate::handle::{GNodeId, VNodeId};
+use crate::handle::{GNodeId, GSlotPointer, VSlotPointer};
 #[cfg(feature = "dynamic-contour-tracking")]
 use crate::plateau::{BasisEdge, Plateau, PlateauBasis};
 use crate::traits::{Accumulator, Coordinate};
@@ -244,7 +244,11 @@ impl<V: Accumulator> Config<V> {
 /// without borrowing the whole `GvGraph` — only needs
 /// `&Arena<GNode<C,V>>`.
 #[allow(dead_code)] // Used by recompute_plateau, invariant checks, and normalize_plateaus.
-pub fn uniform_contour_depth_of<C: Coordinate, V: Accumulator>(gnodes: &Arena<GNode<C, V>>, gid: GNodeId, n: u32) -> Option<u32> {
+pub fn uniform_contour_depth_of<C: Coordinate, V: Accumulator>(
+    gnodes: &Arena<GNode<C, V>>,
+    gid: GSlotPointer,
+    n: u32,
+) -> Option<u32> {
     use crate::gnode::GState;
     use crate::gtree::gnode_depth_from_interval;
     let g = gnodes.get(gid.index());
@@ -380,16 +384,16 @@ pub struct GvGraph<C: Coordinate, V: Accumulator, const N: u32> {
     /// V-node arena (tournament nodes).
     pub(crate) vnodes: Arena<VNode<V>>,
     /// G-Tree root — always exists after `new()`.
-    pub(crate) g_root: GNodeId,
+    pub(crate) g_root: GSlotPointer,
     /// V-Tree root — entry or structural; None only if tree is empty
     /// (should not happen after initialization).
-    pub(crate) v_root: Option<VNodeId>,
+    pub(crate) v_root: Option<VSlotPointer>,
     /// Runtime configuration.
     pub(crate) config: Config<V>,
     /// Violation work queue — scoped to one mutation batch (ADR-M-003).
     /// Built during propagation, drained by `rebalance()`, empty on
     /// return.
-    pub(crate) violations: Vec<VNodeId>,
+    pub(crate) violations: Vec<VSlotPointer>,
     /// Live G-node count, for dynamic depth control (§IDEA M-7.4).
     pub(crate) node_count: u32,
     /// Live terminal G-node count (nodes with zero G-children).
@@ -425,7 +429,7 @@ pub struct GvGraph<C: Coordinate, V: Accumulator, const N: u32> {
     /// drained by `repair_p_i4`.  Mirrors the `violations` queue
     /// pattern used for V-I3.
     #[cfg(feature = "dynamic-contour-tracking")]
-    pub(crate) pending_p_i4: Vec<(GNodeId, BasisEdge<C>)>,
+    pub(crate) pending_p_i4: Vec<(GSlotPointer, BasisEdge<C>)>,
 
     /// Bidirectional basis ↔ plateau edge bookkeeping.
     ///
@@ -498,7 +502,8 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
             parent: None,
             entry: None,
         };
-        let g_root = GNodeId::from_index(gnodes.alloc(root_gnode));
+        let (idx, _generation) = gnodes.alloc(root_gnode);
+        let g_root_slot = GSlotPointer::from_index(idx);
 
         // Create the root V-entry for the G-root.
         let root_entry = VNode {
@@ -506,13 +511,13 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
             parent: None,
             cached_depth: AtomicU32::new(0), // Root entry is at depth 0
             kind: crate::vnode::VKind::Entry {
-                gnode: g_root,
+                gnode: g_root_slot,
                 is_exposed: true,
                 is_evictable: true,
             },
         };
-        let v_root_id = VNodeId::from_index(vnodes.alloc(root_entry));
-        gnodes.get_mut(g_root.index()).entry = Some(v_root_id);
+        let v_root_id = VSlotPointer::from_index(vnodes.alloc(root_entry).0);
+        gnodes.get_mut(g_root_slot.index()).entry = Some(v_root_id);
 
         let live_depth_evict = config.depth_evict;
         let live_depth_create = config.depth_create;
@@ -534,7 +539,7 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
             let root_key = BasisEdge(C::zero());
             let root_depth = gnode_depth_from_interval(C::zero(), C::domain_max(N), N);
             let mut pb = PlateauBasis::new();
-            pb.insert(root_key, g_root);
+            pb.insert(root_key, g_root_slot);
             let mut map = BTreeMap::new();
             map.insert(
                 root_key,
@@ -552,7 +557,7 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
         Self {
             gnodes,
             vnodes,
-            g_root,
+            g_root: g_root_slot,
             v_root: Some(v_root_id),
             config,
             violations: Vec::new(),
@@ -725,13 +730,12 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// The G-Tree root handle (always valid).
     ///
     /// Returns the [`GNodeId`] of the root G-node, which covers the
-    /// entire domain `[0, 2^N)`. This handle never changes over the
-    /// lifetime of the graph.
+    /// entire domain `[0, 2^N)`.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use torrust_mudlark::{Config, GvGraph, GNodeId};
+    /// # use torrust_mudlark::{Config, GvGraph};
     /// # let cfg = Config {
     /// #     split_threshold: 5u64,
     /// #     depth_create: 3,
@@ -742,12 +746,43 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// # };
     /// # let g = GvGraph::<u64, u64, 8>::new(cfg);
     /// let root = g.g_root();
-    /// assert_eq!(root, GNodeId::from_index(0));
+    /// // Root is always at index 0.
+    /// assert_eq!(root.index(), 0);
     /// ```
     #[must_use]
     #[inline]
-    pub const fn g_root(&self) -> GNodeId {
-        self.g_root
+    pub fn g_root(&self) -> GNodeId {
+        self.gnode_id_from_slot(self.g_root)
+    }
+
+    /// Build a public G-node handle from an internal slot handle.
+    #[must_use]
+    #[inline]
+    pub(crate) fn gnode_id_from_slot(&self, slot: GSlotPointer) -> GNodeId {
+        GNodeId::from_parts(slot.index(), self.gnodes.generation(slot.index()))
+    }
+
+    /// Resolve a public G-node handle to an internal slot.
+    ///
+    /// Returns `None` when the slot is currently not occupied.
+    /// Panics when the generation does not match the slot's current
+    /// generation (stale-handle detection, ADR-M-040).
+    #[must_use]
+    #[inline]
+    pub(crate) fn resolve_gnode_id(&self, id: GNodeId, context: &str) -> Option<GSlotPointer> {
+        let index = id.index();
+        let current_generation = self.gnodes.generation(index);
+        assert!(
+            id.generation() == current_generation,
+            "{context}: stale GNodeId (index {}, generation {}) does not match current generation {}",
+            index,
+            id.generation(),
+            current_generation
+        );
+        if !self.gnodes.is_occupied(index) {
+            return None;
+        }
+        Some(id.slot())
     }
 
     /// The V-Tree root handle (diagnostic / testing affordance).
@@ -755,12 +790,12 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// Always `Some` after construction — the root V-entry is
     /// created alongside the root G-node by [`GvGraph::new`].
     ///
-    /// `VNodeId` has no public consuming methods — this accessor
+    /// `VSlotPointer` has no public consuming methods — this accessor
     /// exists for diagnostic and crate-level testing only
     /// (ADR-M-032 surface assignment test, handle test).
     #[must_use]
     #[inline]
-    pub(crate) const fn v_root(&self) -> Option<VNodeId> {
+    pub(crate) const fn v_root(&self) -> Option<VSlotPointer> {
         self.v_root
     }
 
@@ -1003,7 +1038,7 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     #[must_use]
     #[inline]
     #[allow(dead_code)] // used by Phase 4 steps 3 and 5 (extraction, decay)
-    pub(crate) fn gnode_depth(&self, gid: GNodeId) -> u32 {
+    pub(crate) fn gnode_depth(&self, gid: GSlotPointer) -> u32 {
         let g = self.gnodes.get(gid.index());
         crate::gtree::gnode_depth_from_interval(g.lo, g.hi, N)
     }
@@ -1051,10 +1086,8 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// ```
     #[must_use]
     pub fn gnode_info(&self, id: GNodeId) -> Option<Node<C, V>> {
-        if !self.gnodes.is_occupied(id.index()) {
-            return None;
-        }
-        let g = self.gnodes.get(id.index());
+        let slot = self.resolve_gnode_id(id, "gnode_info")?;
+        let g = self.gnodes.get(slot.index());
         Some(Node {
             start: g.lo,
             end: g.hi,
@@ -1063,7 +1096,7 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
             depth: crate::gtree::gnode_depth_from_interval(g.lo, g.hi, N),
             state: g.state(),
             gnode_id: id,
-            parent: g.parent,
+            parent: g.parent.map(|parent| self.gnode_id_from_slot(parent)),
         })
     }
 
@@ -1114,13 +1147,11 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     #[doc(hidden)]
     #[must_use]
     pub fn gnode_children(&self, id: GNodeId) -> Option<GNodeChildren> {
-        if !self.gnodes.is_occupied(id.index()) {
-            return None;
-        }
-        let g = self.gnodes.get(id.index());
+        let slot = self.resolve_gnode_id(id, "gnode_children")?;
+        let g = self.gnodes.get(slot.index());
         Some(GNodeChildren {
-            left: g.left,
-            right: g.right,
+            left: g.left.map(|left| self.gnode_id_from_slot(left)),
+            right: g.right.map(|right| self.gnode_id_from_slot(right)),
         })
     }
 
@@ -1167,11 +1198,14 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// ```
     #[must_use]
     pub fn is_ancestor_of(&self, ancestor: GNodeId, descendant: GNodeId) -> bool {
-        if !self.gnodes.is_occupied(ancestor.index()) || !self.gnodes.is_occupied(descendant.index()) {
+        let Some(ancestor_slot) = self.resolve_gnode_id(ancestor, "is_ancestor_of") else {
             return false;
-        }
-        let a = self.gnodes.get(ancestor.index());
-        let d = self.gnodes.get(descendant.index());
+        };
+        let Some(descendant_slot) = self.resolve_gnode_id(descendant, "is_ancestor_of") else {
+            return false;
+        };
+        let a = self.gnodes.get(ancestor_slot.index());
+        let d = self.gnodes.get(descendant_slot.index());
         a.lo <= d.lo && a.hi >= d.hi && (a.lo != d.lo || a.hi != d.hi)
     }
 }

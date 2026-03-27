@@ -85,7 +85,7 @@ What should borrowed view types look like?
 
 | Option | Design                                                                                        | Notes                                                                                                                                     |
 | ------ | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| A      | `Cell<'a, C, V>` borrows `&'a GvGraph` + `GNodeId` — deref to fields lazily                   | Zero-copy, minimal struct (pointer + handle). But every field access goes through a pointer chase.                                        |
+| A      | `Cell<'a, C, V>` borrows `&'a GvGraph` + `GSlotPointer` — deref to fields lazily                   | Zero-copy, minimal struct (pointer + handle). But every field access goes through a pointer chase.                                        |
 | B      | `Cell<'a, C, V>` contains `start: C, end: C, intensity: V, depth: u32` — snapshot at creation | Copied on construction. Self-contained. No borrow escape hazards. Can outlive the graph if `'a` is removed (but then it's just a `Span`). |
 | C      | `Cell<'a, C, V> = &'a Span<C, V>` — `Cell` is a type alias for a reference                    | Simplest. No new struct. But can't add Cell-specific methods without a newtype.                                                           |
 | D      | `Cell<'a, C, V>` borrows individual fields: `start: &'a C, end: &'a C, intensity: &'a V`      | Fine-grained borrows. Unusual in Rust — typically borrow-of-struct patterns use a single reference.                                       |
@@ -98,7 +98,7 @@ What should borrowed view types look like?
 - `Cell` should support `cell.to_span() -> Span<C, V>` for ownership
   transfer regardless of option chosen.
 - `Node` (an internal G-Tree node) could follow the same pattern as
-  Cell, adding `children: (GNodeId, GNodeId)` for traversal. Or it
+  Cell, adding `children: (GSlotPointer, GSlotPointer)` for traversal. Or it
   can be deferred — most API surfaces only expose terminal cells.
 - If `Cell` is just a `Span` with a lifetime, Option C is simplest
   and avoids type proliferation.

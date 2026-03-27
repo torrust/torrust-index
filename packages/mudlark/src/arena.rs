@@ -13,7 +13,8 @@ use std::fmt;
 ///
 /// Slots are reused via a free list. A separate `Vec<u64>` bitset
 /// tracks occupancy — cold data, never touched on the hot read/write
-/// path.
+/// path. A parallel `Vec<u32>` tracks the generation counter for each
+/// slot, allowing generational handle validation (ADR-M-040).
 pub struct Arena<T: Default> {
     slots: Vec<T>,
     /// Bitset: bit `i` is set iff slot `i` is occupied.
@@ -22,6 +23,9 @@ pub struct Arena<T: Default> {
     free: Vec<u32>,
     /// Number of live entries.
     count: u32,
+    /// Generation counter for each slot (incremented on dealloc).
+    /// Enables generational handle validation.
+    generations: Vec<u32>,
 }
 
 impl<T: Default> Arena<T> {
@@ -33,6 +37,7 @@ impl<T: Default> Arena<T> {
             occupied: Vec::new(),
             free: Vec::new(),
             count: 0,
+            generations: Vec::new(),
         }
     }
 
@@ -43,11 +48,11 @@ impl<T: Default> Arena<T> {
         self.count
     }
 
-    /// Allocate a slot, returning its 0-based index.
+    /// Allocate a slot, returning its 0-based index and current generation.
     ///
     /// Reuses a previously freed slot if available, otherwise grows
     /// the backing `Vec`.
-    pub fn alloc(&mut self, value: T) -> usize {
+    pub fn alloc(&mut self, value: T) -> (usize, u32) {
         let index = if let Some(idx) = self.free.pop() {
             let i = idx as usize;
             self.slots[i] = value;
@@ -60,15 +65,22 @@ impl<T: Default> Arena<T> {
             if word >= self.occupied.len() {
                 self.occupied.resize(word + 1, 0);
             }
+            // Grow generations; new slots start at generation 0.
+            if i >= self.generations.len() {
+                self.generations.resize(i + 1, 0);
+            }
             i
         };
         self.set_occupied(index, true);
         self.count += 1;
-        index
+        let generation = self.generations[index];
+        (index, generation)
     }
 
     /// Deallocate the slot at `index`, returning the stored value
     /// and replacing it with `T::default()`.
+    ///
+    /// Increments the generation counter for the slot.
     ///
     /// # Panics (debug only)
     ///
@@ -79,6 +91,8 @@ impl<T: Default> Arena<T> {
         #[allow(clippy::cast_possible_truncation)] // arena indices are always < u32::MAX
         self.free.push(index as u32);
         self.count -= 1;
+        // Increment generation (wrapping is acceptable).
+        self.generations[index] = self.generations[index].wrapping_add(1);
         std::mem::take(&mut self.slots[index])
     }
 
@@ -112,6 +126,17 @@ impl<T: Default> Arena<T> {
         let word = index / 64;
         let bit = index % 64;
         word < self.occupied.len() && (self.occupied[word] & (1u64 << bit)) != 0
+    }
+
+    /// Current generation counter for slot at `index`.
+    ///
+    /// Returns 0 for slots that have never been allocated (or whose
+    /// generation has wrapped). Useful for validating generational
+    /// handles.
+    #[must_use]
+    #[inline]
+    pub fn generation(&self, index: usize) -> u32 {
+        self.generations.get(index).copied().unwrap_or(0)
     }
 
     /// Iterate over all occupied `(index, &T)` pairs.
@@ -160,6 +185,7 @@ impl<T: Default + Clone> Clone for Arena<T> {
             occupied: self.occupied.clone(),
             free: self.free.clone(),
             count: self.count,
+            generations: self.generations.clone(),
         }
     }
 }

@@ -266,7 +266,7 @@ fn decay_uniform_subtree_scales_only_target() {
     let right_child = g.gnodes().get(g_root.index()).right.unwrap();
     let right_before = g.gnodes().get(right_child.index()).sum.to_f64_approx();
 
-    g.decay(left_child, 0.5, 0.0);
+    g.decay(g.gnode_id_from_slot(left_child), 0.5, 0.0);
 
     // Right subtree unchanged.
     let right_after = g.gnodes().get(right_child.index()).sum.to_f64_approx();
@@ -281,7 +281,7 @@ fn decay_uniform_subtree_scales_only_target() {
 fn decay_uniform_subtree_preserves_invariants() {
     let mut g = make_subtree_graph();
     let left_child = g.gnodes().get(g.g_root().index()).left.unwrap();
-    g.decay(left_child, 0.3, 0.0);
+    g.decay(g.gnode_id_from_slot(left_child), 0.3, 0.0);
     assert_invariants(&g);
 }
 
@@ -568,7 +568,7 @@ fn decay_f64_tree() {
 fn decay_selective_subtree_preserves_invariants() {
     let mut g = make_subtree_graph();
     let left_child = g.gnodes().get(g.g_root().index()).left.unwrap();
-    g.decay(left_child, 0.5, 0.5);
+    g.decay(g.gnode_id_from_slot(left_child), 0.5, 0.5);
     assert_invariants(&g);
 }
 
@@ -579,7 +579,7 @@ fn decay_selective_subtree_leaves_other_half_unchanged() {
     let right_child = g.gnodes().get(g.g_root().index()).right.unwrap();
     let right_before = g.gnodes().get(right_child.index()).sum.to_f64_approx();
 
-    g.decay(left_child, 0.5, 0.5);
+    g.decay(g.gnode_id_from_slot(left_child), 0.5, 0.5);
 
     let right_after = g.gnodes().get(right_child.index()).sum.to_f64_approx();
     assert!((right_before - right_after).abs() < f64::EPSILON);
@@ -922,7 +922,7 @@ fn decay_on_leaf_within_tree() {
     let mut g = make_populated_graph();
 
     // Walk to a terminal (leaf) node in the tree.
-    let mut cursor = g.g_root();
+    let mut cursor = g.g_root().slot();
     loop {
         let gn = g.gnodes().get(cursor.index());
         if let Some(left) = gn.left {
@@ -931,10 +931,10 @@ fn decay_on_leaf_within_tree() {
             break; // cursor is a leaf
         }
     }
-    assert_ne!(cursor, g.g_root(), "should have descended to a leaf");
+    assert_ne!(cursor, g.g_root().slot(), "should have descended to a leaf");
 
     let root_sum_before = total_energy(&g);
-    g.decay(cursor, 0.5, 0.0);
+    g.decay(g.gnode_id_from_slot(cursor), 0.5, 0.0);
     let root_sum_after = total_energy(&g);
 
     // Decaying a leaf should reduce total energy.
@@ -947,7 +947,7 @@ fn decay_selective_on_leaf_within_tree() {
     let mut g = make_populated_graph();
 
     // Walk to a terminal (leaf) node.
-    let mut cursor = g.g_root();
+    let mut cursor = g.g_root().slot();
     loop {
         let gn = g.gnodes().get(cursor.index());
         if let Some(left) = gn.left {
@@ -959,7 +959,7 @@ fn decay_selective_on_leaf_within_tree() {
 
     // Single-node subtree: depth_range = 0, so selective
     // collapses to factor = att^1 regardless of q.
-    g.decay(cursor, 0.5, 0.7);
+    g.decay(g.gnode_id_from_slot(cursor), 0.5, 0.7);
     assert_invariants(&g);
 }
 

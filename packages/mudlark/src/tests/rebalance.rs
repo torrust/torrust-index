@@ -145,7 +145,7 @@ use std::sync::atomic::AtomicU32;
 
 use crate::arena::Arena;
 use crate::gnode::GNode;
-use crate::handle::{GNodeId, VNodeId};
+use crate::handle::{GSlotPointer, VSlotPointer};
 use crate::rebalance::{
     ViolationSources, contract, find_violated_nodes, is_violated, max_uncle_intensity, push_collapse_violations_with_config,
     push_contraction_child_violations, push_cousin_violations_with_config, push_leaf_removal_violations_with_config,
@@ -223,18 +223,18 @@ impl ViolationSources {
 }
 
 /// Helper: create a V-entry with given intensity.
-fn make_entry(vnodes: &mut Arena<VNode<u64>>, intensity: u64) -> VNodeId {
+fn make_entry(vnodes: &mut Arena<VNode<u64>>, intensity: u64) -> VSlotPointer {
     let e = VNode {
         intensity,
         parent: None,
         cached_depth: AtomicU32::new(DEPTH_STALE),
         kind: VKind::Entry {
-            gnode: GNodeId::from_index(0), // dummy
+            gnode: GSlotPointer::from_index(0), // dummy
             is_exposed: true,
             is_evictable: true,
         },
     };
-    VNodeId::from_index(vnodes.alloc(e))
+    VSlotPointer::from_index(vnodes.alloc(e).0)
 }
 
 /// Helper: create a gnodes arena with a single terminal G-node at
@@ -248,7 +248,7 @@ fn make_gnodes() -> Arena<GNode<u64, u64>> {
 }
 
 /// Helper: create a structural 2-node with given children.
-fn make_structural_2(vnodes: &mut Arena<VNode<u64>>, a: VNodeId, b: VNodeId) -> VNodeId {
+fn make_structural_2(vnodes: &mut Arena<VNode<u64>>, a: VSlotPointer, b: VSlotPointer) -> VSlotPointer {
     let a_int = vnodes.get(a.index()).intensity;
     let b_int = vnodes.get(b.index()).intensity;
     let s = VNode {
@@ -260,14 +260,14 @@ fn make_structural_2(vnodes: &mut Arena<VNode<u64>>, a: VNodeId, b: VNodeId) -> 
             has_evictable: true,
         },
     };
-    let s_id = VNodeId::from_index(vnodes.alloc(s));
+    let s_id = VSlotPointer::from_index(vnodes.alloc(s).0);
     vnodes.get_mut(a.index()).parent = Some(s_id);
     vnodes.get_mut(b.index()).parent = Some(s_id);
     s_id
 }
 
 /// Helper: create a structural 3-node with given children.
-fn make_structural_3(vnodes: &mut Arena<VNode<u64>>, a: VNodeId, b: VNodeId, c: VNodeId) -> VNodeId {
+fn make_structural_3(vnodes: &mut Arena<VNode<u64>>, a: VSlotPointer, b: VSlotPointer, c: VSlotPointer) -> VSlotPointer {
     let a_int = vnodes.get(a.index()).intensity;
     let b_int = vnodes.get(b.index()).intensity;
     let c_int = vnodes.get(c.index()).intensity;
@@ -280,7 +280,7 @@ fn make_structural_3(vnodes: &mut Arena<VNode<u64>>, a: VNodeId, b: VNodeId, c: 
             has_evictable: true,
         },
     };
-    let s_id = VNodeId::from_index(vnodes.alloc(s));
+    let s_id = VSlotPointer::from_index(vnodes.alloc(s).0);
     vnodes.get_mut(a.index()).parent = Some(s_id);
     vnodes.get_mut(b.index()).parent = Some(s_id);
     vnodes.get_mut(c.index()).parent = Some(s_id);

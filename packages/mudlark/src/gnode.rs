@@ -16,7 +16,7 @@
 //! - **Surface 3 (Emulsion):** [`GNode`] — the full spatial node with
 //!   `pub(crate)` fields. Internal machinery, not part of the public API.
 
-use crate::handle::{GNodeId, VNodeId};
+use crate::handle::{GSlotPointer, VSlotPointer};
 
 /// A spatial node in the G-Tree.
 ///
@@ -38,13 +38,13 @@ pub struct GNode<C, V> {
     /// Direct accumulation at this node (observations received here).
     pub(crate) own: V,
     /// Left G-child, covering `[lo, mid)`.
-    pub(crate) left: Option<GNodeId>,
+    pub(crate) left: Option<GSlotPointer>,
     /// Right G-child, covering `[mid, hi)`.
-    pub(crate) right: Option<GNodeId>,
+    pub(crate) right: Option<GSlotPointer>,
     /// Parent in the G-Tree.
-    pub(crate) parent: Option<GNodeId>,
+    pub(crate) parent: Option<GSlotPointer>,
     /// Cross-tree link: this node's membership token in the V-Tree.
-    pub(crate) entry: Option<VNodeId>,
+    pub(crate) entry: Option<VSlotPointer>,
 }
 
 /// Categorical state of a spatial region in the G-Tree

@@ -15,7 +15,7 @@
 //!
 //! The `PlateauBasis` tests (feature-gated behind
 //! `dynamic-contour-tracking`) exercise the bidirectional index that
-//! maps `GNodeId ↔ BasisEdge` and verify forward/back consistency
+//! maps `GSlotPointer ↔ BasisEdge` and verify forward/back consistency
 //! after insertions, removals, and full rebuilds.
 //!
 //! The integration tests at the end confirm that `GvGraph::plateaus()`
@@ -103,7 +103,7 @@ use std::collections::BTreeMap;
 use std::mem::size_of;
 
 use crate::gnode::GNode;
-use crate::handle::GNodeId;
+use crate::handle::GSlotPointer;
 use crate::plateau::basis_edge_of;
 use crate::testing::{GraphCreator, default_config};
 use crate::{BasisEdge, Coordinate, GvGraph, Plateau};
@@ -384,8 +384,8 @@ mod plateau_basis_tests {
     #[test]
     fn plateau_basis_insert_lookup() {
         let mut pb = PlateauBasis::<u64>::new();
-        let g0 = GNodeId::from_index(0);
-        let g1 = GNodeId::from_index(1);
+        let g0 = GSlotPointer::from_index(0);
+        let g1 = GSlotPointer::from_index(1);
 
         pb.insert(BasisEdge(0), g0);
         pb.insert(BasisEdge(0), g1);
@@ -402,8 +402,8 @@ mod plateau_basis_tests {
     #[test]
     fn plateau_basis_remove() {
         let mut pb = PlateauBasis::<u64>::new();
-        let g0 = GNodeId::from_index(0);
-        let g1 = GNodeId::from_index(1);
+        let g0 = GSlotPointer::from_index(0);
+        let g1 = GSlotPointer::from_index(1);
 
         pb.insert(BasisEdge(0), g0);
         pb.insert(BasisEdge(0), g1);
@@ -426,16 +426,16 @@ mod plateau_basis_tests {
     #[test]
     fn plateau_basis_remove_nonexistent() {
         let mut pb = PlateauBasis::<u64>::new();
-        let g42 = GNodeId::from_index(42);
+        let g42 = GSlotPointer::from_index(42);
         assert_eq!(pb.remove(g42), None);
     }
 
     #[test]
     fn plateau_basis_multiple_plateaus() {
         let mut pb = PlateauBasis::<u64>::new();
-        let g0 = GNodeId::from_index(0);
-        let g1 = GNodeId::from_index(1);
-        let g2 = GNodeId::from_index(2);
+        let g0 = GSlotPointer::from_index(0);
+        let g1 = GSlotPointer::from_index(1);
+        let g2 = GSlotPointer::from_index(2);
 
         pb.insert(BasisEdge(0), g0); // plateau at key 0
         pb.insert(BasisEdge(4), g1); // plateau at key 4
@@ -453,7 +453,7 @@ mod plateau_basis_tests {
     #[test]
     fn plateau_basis_forward_back_consistency() {
         let mut pb = PlateauBasis::<u64>::new();
-        let gnodes: Vec<GNodeId> = (0..5).map(GNodeId::from_index).collect();
+        let gnodes: Vec<GSlotPointer> = (0..5).map(GSlotPointer::from_index).collect();
 
         pb.insert(BasisEdge(0), gnodes[0]);
         pb.insert(BasisEdge(0), gnodes[1]);
@@ -488,9 +488,9 @@ mod plateau_basis_tests {
     #[test]
     fn plateau_basis_iter_ordered() {
         let mut pb = PlateauBasis::<u64>::new();
-        pb.insert(BasisEdge(8), GNodeId::from_index(0));
-        pb.insert(BasisEdge(0), GNodeId::from_index(1));
-        pb.insert(BasisEdge(4), GNodeId::from_index(2));
+        pb.insert(BasisEdge(8), GSlotPointer::from_index(0));
+        pb.insert(BasisEdge(0), GSlotPointer::from_index(1));
+        pb.insert(BasisEdge(4), GSlotPointer::from_index(2));
 
         let keys: Vec<u64> = pb.iter().map(|(k, _)| k.0).collect();
         assert_eq!(keys, vec![0, 4, 8]); // BTreeMap order via BasisEdge
@@ -505,9 +505,9 @@ mod plateau_basis_tests {
     #[test]
     fn plateau_basis_rebuild_replaces_state() {
         let mut pb = PlateauBasis::<u64>::new();
-        let g0 = GNodeId::from_index(0);
-        let g1 = GNodeId::from_index(1);
-        let g2 = GNodeId::from_index(2);
+        let g0 = GSlotPointer::from_index(0);
+        let g1 = GSlotPointer::from_index(1);
+        let g2 = GSlotPointer::from_index(2);
 
         // Populate with initial state.
         pb.insert(BasisEdge(0), g0);
@@ -553,8 +553,8 @@ fn make_internal_gnode(lo: u64, hi: u64) -> GNode<u64, u64> {
         hi,
         sum: 0,
         own: 0,
-        left: Some(GNodeId::from_index(100)),
-        right: Some(GNodeId::from_index(101)),
+        left: Some(GSlotPointer::from_index(100)),
+        right: Some(GSlotPointer::from_index(101)),
         parent: None,
         entry: None,
     }
@@ -567,8 +567,16 @@ fn make_semi_internal_gnode(lo: u64, hi: u64, child_on_left: bool) -> GNode<u64,
         hi,
         sum: 0,
         own: 0,
-        left: if child_on_left { Some(GNodeId::from_index(100)) } else { None },
-        right: if child_on_left { None } else { Some(GNodeId::from_index(101)) },
+        left: if child_on_left {
+            Some(GSlotPointer::from_index(100))
+        } else {
+            None
+        },
+        right: if child_on_left {
+            None
+        } else {
+            Some(GSlotPointer::from_index(101))
+        },
         parent: None,
         entry: None,
     }

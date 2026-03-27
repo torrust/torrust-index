@@ -536,7 +536,7 @@ canonical path per type.
 | `ContourRange<C, V>`    | 1       | Full contour-range decomposition of a lattice-aligned interval       |
 | `ContourRangeEnergy<V>` | 1       | Energy-only result of a contour range query                          |
 | `BasisElement<C, V>`    | 1       | One element of the minimal G-node cover of a contour range           |
-| `GNodeId`               | 1       | Opaque arena handle                                                  |
+| `GNodeId`                    | 1       | Opaque generational arena handle (ADR-M-040)                         |
 
 ### Key operations on `GvGraph`
 

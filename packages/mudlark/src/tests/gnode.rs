@@ -73,8 +73,8 @@
 
 use std::mem::size_of;
 
-use crate::GNodeId;
 use crate::gnode::{GNode, GState};
+use crate::handle::GSlotPointer;
 
 // ── Layout ──────────────────────────────────────────────────────
 
@@ -114,7 +114,7 @@ fn state_terminal() {
 #[test]
 fn state_semi_internal_left() {
     let g: GNode<u64, u64> = GNode {
-        left: Some(GNodeId::from_index(0)),
+        left: Some(GSlotPointer::from_index(0)),
         ..GNode::default()
     };
     assert_eq!(g.state(), GState::SemiInternal);
@@ -124,7 +124,7 @@ fn state_semi_internal_left() {
 #[test]
 fn state_semi_internal_right() {
     let g: GNode<u64, u64> = GNode {
-        right: Some(GNodeId::from_index(0)),
+        right: Some(GSlotPointer::from_index(0)),
         ..GNode::default()
     };
     assert_eq!(g.state(), GState::SemiInternal);
@@ -134,8 +134,8 @@ fn state_semi_internal_right() {
 #[test]
 fn state_internal() {
     let g: GNode<u64, u64> = GNode {
-        left: Some(GNodeId::from_index(0)),
-        right: Some(GNodeId::from_index(1)),
+        left: Some(GSlotPointer::from_index(0)),
+        right: Some(GSlotPointer::from_index(1)),
         ..GNode::default()
     };
     assert_eq!(g.state(), GState::Internal);
@@ -153,7 +153,7 @@ fn has_dependents_terminal() {
 #[test]
 fn has_dependents_semi_left() {
     let g: GNode<u64, u64> = GNode {
-        left: Some(GNodeId::from_index(0)),
+        left: Some(GSlotPointer::from_index(0)),
         ..GNode::default()
     };
     assert!(g.has_dependents());
@@ -162,7 +162,7 @@ fn has_dependents_semi_left() {
 #[test]
 fn has_dependents_semi_right() {
     let g: GNode<u64, u64> = GNode {
-        right: Some(GNodeId::from_index(0)),
+        right: Some(GSlotPointer::from_index(0)),
         ..GNode::default()
     };
     assert!(g.has_dependents());
@@ -171,8 +171,8 @@ fn has_dependents_semi_right() {
 #[test]
 fn has_dependents_internal() {
     let g: GNode<u64, u64> = GNode {
-        left: Some(GNodeId::from_index(0)),
-        right: Some(GNodeId::from_index(1)),
+        left: Some(GSlotPointer::from_index(0)),
+        right: Some(GSlotPointer::from_index(1)),
         ..GNode::default()
     };
     assert!(g.has_dependents());
@@ -189,7 +189,7 @@ fn is_semi_internal_terminal() {
 #[test]
 fn is_semi_internal_left() {
     let g: GNode<u64, u64> = GNode {
-        left: Some(GNodeId::from_index(0)),
+        left: Some(GSlotPointer::from_index(0)),
         ..GNode::default()
     };
     assert!(g.is_semi_internal());
@@ -198,7 +198,7 @@ fn is_semi_internal_left() {
 #[test]
 fn is_semi_internal_right() {
     let g: GNode<u64, u64> = GNode {
-        right: Some(GNodeId::from_index(0)),
+        right: Some(GSlotPointer::from_index(0)),
         ..GNode::default()
     };
     assert!(g.is_semi_internal());
@@ -207,8 +207,8 @@ fn is_semi_internal_right() {
 #[test]
 fn is_semi_internal_internal() {
     let g: GNode<u64, u64> = GNode {
-        left: Some(GNodeId::from_index(0)),
-        right: Some(GNodeId::from_index(1)),
+        left: Some(GSlotPointer::from_index(0)),
+        right: Some(GSlotPointer::from_index(1)),
         ..GNode::default()
     };
     assert!(!g.is_semi_internal());
@@ -232,7 +232,7 @@ fn uncovered_range_semi_left() {
     let g: GNode<u64, u64> = GNode {
         lo: 0,
         hi: 8,
-        left: Some(GNodeId::from_index(0)),
+        left: Some(GSlotPointer::from_index(0)),
         ..GNode::default()
     };
     assert_eq!(g.uncovered_range(), Some((4, 8)));
@@ -244,7 +244,7 @@ fn uncovered_range_semi_right() {
     let g: GNode<u64, u64> = GNode {
         lo: 0,
         hi: 8,
-        right: Some(GNodeId::from_index(0)),
+        right: Some(GSlotPointer::from_index(0)),
         ..GNode::default()
     };
     assert_eq!(g.uncovered_range(), Some((0, 4)));
@@ -255,8 +255,8 @@ fn uncovered_range_internal() {
     let g: GNode<u64, u64> = GNode {
         lo: 0,
         hi: 8,
-        left: Some(GNodeId::from_index(0)),
-        right: Some(GNodeId::from_index(1)),
+        left: Some(GSlotPointer::from_index(0)),
+        right: Some(GSlotPointer::from_index(1)),
         ..GNode::default()
     };
     assert_eq!(g.uncovered_range(), None);
@@ -278,7 +278,7 @@ fn uncovered_range_minimal_interval() {
     let semi: GNode<u64, u64> = GNode {
         lo: 0,
         hi: 1,
-        left: Some(GNodeId::from_index(0)),
+        left: Some(GSlotPointer::from_index(0)),
         ..GNode::default()
     };
     assert_eq!(semi.uncovered_range(), Some((0, 1)));

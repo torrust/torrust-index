@@ -40,8 +40,8 @@ and invalidation safety.
 
 **Option B — Generational `Vec` arenas**, refined with:
 
-- **`NonZeroU32` niche-optimized handles** — `Option<GNodeId>` and
-  `Option<VNodeId>` are exactly 4 bytes (no discriminant overhead).
+- **`NonZeroU32` niche-optimized handles** — `Option<GSlotPointer>` and
+  `Option<VSlotPointer>` are exactly 4 bytes (no discriminant overhead).
 - **Separate `Vec<u64>` bitset** for occupancy tracking instead of
   per-slot generation counters, keeping node structs cache-line sized.
 - **`debug_assert!`** on occupancy for stale-handle detection — catches
@@ -74,11 +74,11 @@ occupancy, compiles to bare array access in release.
 ```rust
 use std::num::NonZeroU32;
 
-struct GNodeId(NonZeroU32);   // 4 bytes, Option = 4 bytes
-struct VNodeId(NonZeroU32);   // 4 bytes, Option = 4 bytes
+struct GSlotPointer(NonZeroU32);   // 4 bytes, Option = 4 bytes
+struct VSlotPointer(NonZeroU32);   // 4 bytes, Option = 4 bytes
 ```
 
-Type-safe: `GNodeId` cannot index the V-node arena (compile error).
+Type-safe: `GSlotPointer` cannot index the V-node arena (compile error).
 Opaque outside the crate — `from_index()` and `index()` are
 currently `pub` (§API M-4.4 notes this as potential future
 tightening).

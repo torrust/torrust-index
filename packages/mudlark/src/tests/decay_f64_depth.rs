@@ -278,7 +278,7 @@ fn f64_decay_subtree_scoped() {
 
     let right_before = g.gnodes().get(right_child.index()).sum;
 
-    g.decay(left_child, 0.5, 0.0);
+    g.decay(g.gnode_id_from_slot(left_child), 0.5, 0.0);
 
     let right_after = g.gnodes().get(right_child.index()).sum;
     assert!(

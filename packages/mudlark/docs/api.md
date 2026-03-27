@@ -277,7 +277,7 @@ pub struct Node<C: Coordinate, V: Accumulator> {
     pub sum: V,
     pub depth: u32,
     pub state: GState,
-    pub gnode_id: GNodeId,   // ADR-M-036 D1
+    pub gnode_id: GNodeId,   // ADR-M-036 D1, ADR-M-040
     pub parent: Option<GNodeId>,  // stable provenance (ADR-M-032)
 }
 ```
@@ -622,13 +622,25 @@ mutable topology, not stable provenance.
 Opaque references back into the graph.
 
 ```rust
-pub struct GNodeId(/* NonZeroU32 */);
+pub struct GNodeId {
+    index: NonZeroU32,       // 1-indexed arena slot
+    generation: u32,         // slot iteration count at creation time
+}
 ```
 
-Opaque typed arena index. Used by `decay()` (`root` parameter),
-`g_root()`, `gnode_info()`, `gnode_children()`, `is_ancestor_of()`.
-Also appears in `Node.gnode_id`, `Node.parent`, and
-`BasisElement.gnode_id`.
+Opaque generational handle (ADR-M-040). Used by `decay()` (`root`
+parameter), `g_root()`, `gnode_info()`, `gnode_children()`,
+`is_ancestor_of()`. Also appears in `Node.gnode_id`, `Node.parent`,
+and `BasisElement.gnode_id`.
+
+The generation counter detects stale handles after arena slot reuse.
+Any consuming method panics with a diagnostic message if the
+generation does not match the slot's current generation.
+
+**Size:** 8 bytes. `Option<GNodeId>` is 12 bytes (no niche
+optimisation on `generation`). The internal hot paths use the
+4-byte `GSlotPointer` (`pub(crate)`) — `GNodeId` exists only at
+the API boundary.
 
 `GNodeId`: `Clone`, `Copy`, `Debug`, `PartialEq`, `Eq`, `PartialOrd`,
 `Ord`, `Hash`.
@@ -636,16 +648,17 @@ Also appears in `Node.gnode_id`, `Node.parent`, and
 `GNodeId` carries
 `#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]`.
 
-`from_index()` and `index()` are `#[doc(hidden)]` — available for
-serialization and diagnostics but not part of the primary API surface.
+`from_parts(index, generation)`, `index()`, and `generation()` are
+`#[doc(hidden)]` — available for serialization and diagnostics but
+not part of the primary API surface.
 
-`VNodeId` is `pub(crate)` — it has no public consuming method
+`VSlotPointer` is `pub(crate)` — it has no public consuming method
 (ADR-M-032 handle test). `v_root()` is likewise `pub(crate)`.
 Neither is re-exported from the crate root.
 
 > **Serde on handles — resolution of §4.5 vs §4.6/§7.3.**
 >
-> The code agrees with §4.5: both `GNodeId` and `VNodeId` carry the
+> The code agrees with §4.5: both `GNodeId` and `VSlotPointer` carry the
 > conditional serde derives. §4.6 ("all Surface 1 types _except
 > handles_") and §7.3 ("except opaque handles") were wrong and have
 > been corrected.
@@ -654,11 +667,12 @@ Neither is re-exported from the crate root.
 > an arbitrary index could mint a handle that bypasses validation — is
 > real but already mitigated: every consuming method (`gnode_info`,
 > `is_ancestor_of`, `decay`) validates the handle against the arena's
-> occupancy bitmap and returns `None` or panics on stale/fabricated
-> indices. The handle is an opaque index, not a capability token.
-> Refusing to serialize it would force callers to use the
-> `#[doc(hidden)]` `from_index()`/`index()` pair manually — strictly
-> worse ergonomics for the same trust boundary.
+> generation counter and occupancy bitmap, panicking on stale or
+> fabricated handles. The handle is an opaque index + generation, not
+> a capability token. Refusing to serialize it would force callers to
+> use the `#[doc(hidden)]` `from_parts()`/`index()`/`generation()`
+> triple manually — strictly worse ergonomics for the same trust
+> boundary.
 >
 > Additionally, `GNodeId` appears as a field inside `Node` and
 > `BasisElement`, both of which are serde-enabled. Excluding the
@@ -666,11 +680,11 @@ Neither is re-exported from the crate root.
 > (the derive would fail to compile because a field's type would not
 > implement `Serialize`/`Deserialize`).
 >
-> The appropriate mental model: handles serialize their opaque index,
-> not a meaningful identity. A deserialized `GNodeId` is only valid
-> against the graph instance that produced it — the same constraint
-> that applies to handles obtained at runtime. Serde adds no new
-> attack surface beyond what `from_index()` already permits.
+> The appropriate mental model: handles serialize their opaque index
+> and generation, not a meaningful identity. A deserialized `GNodeId`
+> is only valid against the graph instance that produced it — the
+> same constraint that applies to handles obtained at runtime. Serde
+> adds no new attack surface beyond what `from_parts()` already permits.
 
 ### 4.6 Invariants
 
@@ -1228,8 +1242,8 @@ pub fn total_sum(&self) -> V;                  // G-root sum (aggregate of all o
 pub const fn config(&self) -> &Config<V>;
 
 // Tree handles.
-pub const fn g_root(&self) -> GNodeId;
-pub(crate) const fn v_root(&self) -> Option<VNodeId>;
+pub fn g_root(&self) -> GNodeId;
+pub(crate) const fn v_root(&self) -> Option<VSlotPointer>;
 ```
 
 ```rust

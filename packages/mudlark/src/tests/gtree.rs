@@ -75,17 +75,17 @@
 //! | [`depth_f64_quarter_n4`] | f64 quarter domain → depth 2 |
 //! | [`depth_f64_sub_unit_n4`] | sub-unit widths via signed-cast path (depth > *N*) |
 
-use crate::GNodeId;
 use crate::arena::Arena;
 use crate::gnode::GNode;
 use crate::gtree::{gnode_depth_from_interval, recompute_g_sums, recompute_g_sums_subtree, route_to_receiver};
+use crate::handle::GSlotPointer;
 use crate::traits::{Accumulator, Coordinate};
 
 // ── Helpers ─────────────────────────────────────────────────
 
 /// Propagate a value delta upward from `start` to the G-Tree root,
 /// maintaining G-I1 (summation invariant).
-fn propagate_g_sums<C: Coordinate, V: Accumulator>(gnodes: &mut Arena<GNode<C, V>>, start: GNodeId, delta: V) {
+fn propagate_g_sums<C: Coordinate, V: Accumulator>(gnodes: &mut Arena<GNode<C, V>>, start: GSlotPointer, delta: V) {
     let mut current = Some(start);
     while let Some(id) = current {
         let g = gnodes.get_mut(id.index());
@@ -94,17 +94,22 @@ fn propagate_g_sums<C: Coordinate, V: Accumulator>(gnodes: &mut Arena<GNode<C, V
     }
 }
 
-fn make_terminal(arena: &mut Arena<GNode<u64, u64>>, lo: u64, hi: u64) -> GNodeId {
+fn make_terminal(arena: &mut Arena<GNode<u64, u64>>, lo: u64, hi: u64) -> GSlotPointer {
     let g = GNode {
         lo,
         hi,
         ..GNode::default()
     };
-    GNodeId::from_index(arena.alloc(g))
+    GSlotPointer::from_index(arena.alloc(g).0)
 }
 
 /// Wire `left` and/or `right` as children of `parent`.
-fn wire_children(arena: &mut Arena<GNode<u64, u64>>, parent: GNodeId, left: Option<GNodeId>, right: Option<GNodeId>) {
+fn wire_children(
+    arena: &mut Arena<GNode<u64, u64>>,
+    parent: GSlotPointer,
+    left: Option<GSlotPointer>,
+    right: Option<GSlotPointer>,
+) {
     arena.get_mut(parent.index()).left = left;
     arena.get_mut(parent.index()).right = right;
     if let Some(l) = left {

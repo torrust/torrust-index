@@ -116,7 +116,7 @@ should `contour_range()` return?
 | ------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | A      | **Single `Vec<BasisElement>`** with an `is_boundary_thatch` flag per element | One flat list. Flag marks the ≤2 boundary thatchers. Simple, aligns with §CR.2–§CR.3. |
 | B      | **Two lists:** `Vec<BasisElement>` + `Vec<BoundaryThatch>` (at most 2)       | Separates thatching elements. Slightly richer boundary info.                          |
-| C      | **`Vec<GNodeId>` only** — caller uses `gnode_info()` for detail              | Minimal. Requires per-element round-trips.                                            |
+| C      | **`Vec<GNodeId>` only** — caller uses `gnode_info()` for detail                 | Minimal. Requires per-element round-trips.                                            |
 | D      | **Keep three `Vec`s** (status quo)                                           | Preserves original API. Contradicts spec.                                             |
 
 **Considerations:**

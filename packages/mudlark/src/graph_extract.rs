@@ -7,7 +7,7 @@
 //! Extracted from `graph.rs` per ADR-M-030 Phase D.
 
 use crate::graph::{Config, GvGraph};
-use crate::handle::VNodeId;
+use crate::handle::VSlotPointer;
 use crate::traits::{Accumulator, Coordinate, Inspectable};
 
 impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N> {
@@ -75,7 +75,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
             };
         };
 
-        // BFS queue: (VNodeId, bfs_depth).
+        // BFS queue: (VSlotPointer, bfs_depth).
         let mut queue = VecDeque::new();
         queue.push_back((v_root, 0u32));
 
@@ -255,7 +255,7 @@ where
 /// output, matching `extract()`'s behavior.
 struct Layers<'a, C: Coordinate, V: Accumulator, const N: u32> {
     graph: &'a GvGraph<C, V, N>,
-    queue: std::collections::VecDeque<(VNodeId, usize)>,
+    queue: std::collections::VecDeque<(VSlotPointer, usize)>,
 }
 
 impl<C: Coordinate, V: Accumulator, const N: u32> Iterator for Layers<'_, C, V, N> {
@@ -286,8 +286,8 @@ impl<C: Coordinate, V: Accumulator, const N: u32> Iterator for Layers<'_, C, V, 
                         sum: g.sum,
                         depth: g_depth,
                         state: g.state(),
-                        gnode_id: *gnode,
-                        parent: g.parent,
+                        gnode_id: self.graph.gnode_id_from_slot(*gnode),
+                        parent: g.parent.map(|parent| self.graph.gnode_id_from_slot(parent)),
                     };
                     return Some((bfs_depth, node));
                 }

@@ -104,10 +104,9 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use super::init_tracing;
-use crate::GNodeId;
 use crate::arena::Arena;
 use crate::gnode::GNode;
-use crate::handle::VNodeId;
+use crate::handle::{GSlotPointer, VSlotPointer};
 use crate::traits::{Accumulator, Coordinate};
 use crate::vnode::{DEPTH_STALE, PackedChildren, VKind, VNode};
 use crate::vtree::{
@@ -127,7 +126,7 @@ const fn entry_is_exposed<V: Accumulator>(node: &VNode<V>) -> bool {
 
 /// Descend from `start` to the lightest entry (V-leaf) by always
 /// following the lightest child at each structural node.
-fn descend_to_lightest<V: Accumulator>(vnodes: &Arena<VNode<V>>, start: VNodeId) -> VNodeId {
+fn descend_to_lightest<V: Accumulator>(vnodes: &Arena<VNode<V>>, start: VSlotPointer) -> VSlotPointer {
     let mut current = start;
     loop {
         let node = vnodes.get(current.index());
@@ -152,9 +151,9 @@ fn descend_to_lightest<V: Accumulator>(vnodes: &Arena<VNode<V>>, start: VNodeId)
 fn vtree_insert<C: Coordinate, V: Accumulator>(
     vnodes: &mut Arena<VNode<V>>,
     gnodes: &mut Arena<GNode<C, V>>,
-    gnode_id: GNodeId,
-    v_root: Option<VNodeId>,
-) -> (VNodeId, Option<VNodeId>) {
+    gnode_id: GSlotPointer,
+    v_root: Option<VSlotPointer>,
+) -> (VSlotPointer, Option<VSlotPointer>) {
     let entry = VNode {
         intensity: V::zero(),
         parent: None,
@@ -165,7 +164,7 @@ fn vtree_insert<C: Coordinate, V: Accumulator>(
             is_evictable: true,
         },
     };
-    let e_id = VNodeId::from_index(vnodes.alloc(entry));
+    let e_id = VSlotPointer::from_index(vnodes.alloc(entry).0);
     gnodes.get_mut(gnode_id.index()).entry = Some(e_id);
 
     // Case 1: empty V-Tree.
@@ -191,7 +190,7 @@ fn vtree_insert<C: Coordinate, V: Accumulator>(
                 has_evictable: root_terminal || new_terminal,
             },
         };
-        let s_id = VNodeId::from_index(vnodes.alloc(structural));
+        let s_id = VSlotPointer::from_index(vnodes.alloc(structural).0);
         vnodes.get_mut(root_id.index()).parent = Some(s_id);
         vnodes.get_mut(e_id.index()).parent = Some(s_id);
         vnodes.get(root_id.index()).cached_depth.store(1, Ordering::Relaxed);
@@ -222,7 +221,7 @@ fn vtree_insert<C: Coordinate, V: Accumulator>(
             has_evictable: true,
         },
     };
-    let s_id = VNodeId::from_index(vnodes.alloc(s));
+    let s_id = VSlotPointer::from_index(vnodes.alloc(s).0);
     vnodes.get_mut(buddy_id.index()).parent = Some(s_id);
     vnodes.get_mut(e_id.index()).parent = Some(s_id);
     vnodes
@@ -240,13 +239,13 @@ fn vtree_insert<C: Coordinate, V: Accumulator>(
 // ── Test helpers ────────────────────────────────────────────────
 
 /// Helper: create a minimal G-node and return its ID.
-fn make_gnode(gnodes: &mut Arena<GNode<u64, u64>>) -> GNodeId {
+fn make_gnode(gnodes: &mut Arena<GNode<u64, u64>>) -> GSlotPointer {
     let g = GNode {
         lo: 0,
         hi: 8,
         ..GNode::default()
     };
-    GNodeId::from_index(gnodes.alloc(g))
+    GSlotPointer::from_index(gnodes.alloc(g).0)
 }
 
 /// Helper: insert `n` entries and return `(entry_ids, v_root)`.
@@ -254,7 +253,7 @@ fn insert_n(
     vnodes: &mut Arena<VNode<u64>>,
     gnodes: &mut Arena<GNode<u64, u64>>,
     n: usize,
-) -> (Vec<(GNodeId, VNodeId)>, Option<VNodeId>) {
+) -> (Vec<(GSlotPointer, VSlotPointer)>, Option<VSlotPointer>) {
     let mut root = None;
     let mut ids = Vec::with_capacity(n);
     for _ in 0..n {
@@ -274,8 +273,8 @@ fn insert_n(
 fn build_three_entry_tree() -> (
     Arena<VNode<u64>>,
     Arena<GNode<u64, u64>>,
-    Vec<(GNodeId, VNodeId)>,
-    Option<VNodeId>,
+    Vec<(GSlotPointer, VSlotPointer)>,
+    Option<VSlotPointer>,
 ) {
     let mut vnodes = Arena::new();
     let mut gnodes: Arena<GNode<u64, u64>> = Arena::new();
@@ -732,7 +731,7 @@ fn replace_child_updates_parent() {
             is_evictable: true,
         },
     };
-    let new_id = VNodeId::from_index(vnodes.alloc(new_entry));
+    let new_id = VSlotPointer::from_index(vnodes.alloc(new_entry).0);
 
     replace_child_in_parent(&mut vnodes, root_id, e1, new_id, 99);
 

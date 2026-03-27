@@ -62,7 +62,7 @@ use crate::arena::Arena;
 #[test]
 fn alloc_and_get() {
     let mut arena = Arena::<u64>::new();
-    let i = arena.alloc(42);
+    let (i, _gen) = arena.alloc(42);
     assert_eq!(*arena.get(i), 42);
     assert_eq!(arena.count(), 1);
 }
@@ -70,7 +70,7 @@ fn alloc_and_get() {
 #[test]
 fn get_mut_updates_value() {
     let mut arena = Arena::<u64>::new();
-    let i = arena.alloc(10);
+    let (i, _gen) = arena.alloc(10);
     *arena.get_mut(i) = 99;
     assert_eq!(*arena.get(i), 99);
 }
@@ -80,8 +80,8 @@ fn get_mut_updates_value() {
 #[test]
 fn dealloc_and_reuse() {
     let mut arena = Arena::<u64>::new();
-    let a = arena.alloc(10);
-    let b = arena.alloc(20);
+    let (a, _ga) = arena.alloc(10);
+    let (b, _gb) = arena.alloc(20);
     assert_eq!(arena.count(), 2);
 
     let val = arena.dealloc(a);
@@ -91,7 +91,7 @@ fn dealloc_and_reuse() {
     assert!(arena.is_occupied(b));
 
     // Realloc reuses the freed slot.
-    let c = arena.alloc(30);
+    let (c, _gc) = arena.alloc(30);
     assert_eq!(c, a, "freed slot should be reused");
     assert_eq!(*arena.get(c), 30);
     assert_eq!(arena.count(), 2);
@@ -102,7 +102,8 @@ fn multiple_alloc_dealloc_cycles() {
     let mut arena = Arena::<u32>::new();
     let mut indices = Vec::new();
     for i in 0..100 {
-        indices.push(arena.alloc(i));
+        let (idx, _gen) = arena.alloc(i);
+        indices.push(idx);
     }
     assert_eq!(arena.count(), 100);
 
@@ -114,7 +115,7 @@ fn multiple_alloc_dealloc_cycles() {
 
     // Reallocate — should reuse freed slots.
     for v in 200..250 {
-        let idx = arena.alloc(v);
+        let (idx, _gen) = arena.alloc(v);
         assert!(idx < 100, "should reuse existing slots");
     }
     assert_eq!(arena.count(), 100);
@@ -127,7 +128,7 @@ fn bitset_grows_past_word_boundary() {
     let mut arena = Arena::<u8>::new();
     // Allocate past the first bitset word boundary (64 slots).
     for i in 0..65 {
-        arena.alloc(u8::try_from(i).unwrap());
+        let (_, _gen) = arena.alloc(u8::try_from(i).unwrap());
     }
     assert_eq!(arena.count(), 65);
     assert!(arena.is_occupied(64));
@@ -145,9 +146,9 @@ fn is_occupied_out_of_range_returns_false() {
 #[test]
 fn iter_occupied_returns_live_entries() {
     let mut arena = Arena::<u64>::new();
-    let a = arena.alloc(10);
-    let b = arena.alloc(20);
-    let c = arena.alloc(30);
+    let (a, _ga) = arena.alloc(10);
+    let (b, _gb) = arena.alloc(20);
+    let (c, _gc) = arena.alloc(30);
     arena.dealloc(b);
 
     let entries: Vec<(usize, &u64)> = arena.iter_occupied().collect();
@@ -174,11 +175,11 @@ fn default_creates_empty_arena() {
 #[test]
 fn clone_is_independent() {
     let mut arena = Arena::<u64>::new();
-    arena.alloc(1);
-    arena.alloc(2);
+    let (_, _g1) = arena.alloc(1);
+    let (_, _g2) = arena.alloc(2);
 
     let mut cloned = arena.clone();
-    let idx = cloned.alloc(3);
+    let (idx, _g3) = cloned.alloc(3);
 
     assert_eq!(arena.count(), 2);
     assert_eq!(cloned.count(), 3);
@@ -188,7 +189,7 @@ fn clone_is_independent() {
 #[test]
 fn debug_format_is_sensible() {
     let mut arena = Arena::<u64>::new();
-    arena.alloc(42);
+    let (_, _gen) = arena.alloc(42);
     let dbg = format!("{arena:?}");
     assert!(dbg.contains("Arena"));
     assert!(dbg.contains("count: 1"));
@@ -201,7 +202,7 @@ fn debug_format_is_sensible() {
 #[should_panic(expected = "not occupied")]
 fn get_stale_handle_panics_in_debug() {
     let mut arena = Arena::<u64>::new();
-    let i = arena.alloc(1);
+    let (i, _gen) = arena.alloc(1);
     arena.dealloc(i);
     let _ = arena.get(i);
 }
@@ -211,7 +212,7 @@ fn get_stale_handle_panics_in_debug() {
 #[should_panic(expected = "not occupied")]
 fn get_mut_stale_handle_panics_in_debug() {
     let mut arena = Arena::<u64>::new();
-    let i = arena.alloc(1);
+    let (i, _gen) = arena.alloc(1);
     arena.dealloc(i);
     let _ = arena.get_mut(i);
 }
@@ -221,7 +222,7 @@ fn get_mut_stale_handle_panics_in_debug() {
 #[should_panic(expected = "not occupied")]
 fn double_dealloc_panics_in_debug() {
     let mut arena = Arena::<u64>::new();
-    let i = arena.alloc(1);
+    let (i, _gen) = arena.alloc(1);
     arena.dealloc(i);
     arena.dealloc(i);
 }

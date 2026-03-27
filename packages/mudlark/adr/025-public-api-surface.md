@@ -199,7 +199,7 @@ iteration for consumers who don't need the full snapshot.
 pub fn layers(&self) -> impl Iterator<Item = (usize, Node<C, V>)> + '_
 ```
 
-The BFS queue already tracks `(VNodeId, bfs_depth)` — the layer
+The BFS queue already tracks `(VSlotPointer, bfs_depth)` — the layer
 index is free. `Node::state` distinguishes Terminal from
 Internal/SemiInternal (equivalent to `extract()`'s
 Transition/Terminal split). `Node::refinement()` computes

@@ -122,7 +122,7 @@ init time via `gnode_depth_from_interval`.
 #### 1a. `collect_subtree_basis_elements`
 
 A read-only counterpart to `place_subtree_basis_elements` that
-collects `(GNodeId, u32)` pairs into a `Vec` without placing.
+collects `(GSlotPointer, u32)` pairs into a `Vec` without placing.
 Follows the same DFS logic as `build_plateaus()`: terminals and
 semi-internals produce elements directly; internal nodes are
 kept as single elements when their subtree contour is uniform
@@ -134,8 +134,8 @@ recursively.
 #[cfg(feature = "dynamic-contour-tracking")]
 pub(crate) fn collect_subtree_basis_elements(
     &self,
-    gid: GNodeId,
-    out: &mut Vec<(GNodeId, u32)>,
+    gid: GSlotPointer,
+    out: &mut Vec<(GSlotPointer, u32)>,
 ) {
     use crate::gnode::GState;
     let g = self.gnodes.get(gid.index());
@@ -170,7 +170,7 @@ and places left-to-right:
 
 ```rust
 #[cfg(feature = "dynamic-contour-tracking")]
-pub(crate) fn place_sorted(&mut self, elements: &mut [(GNodeId, u32)]) {
+pub(crate) fn place_sorted(&mut self, elements: &mut [(GSlotPointer, u32)]) {
     use crate::plateau::basis_edge_of;
     elements.sort_by(|a, b| {
         let a_key = basis_edge_of(self.gnodes.get(a.0.index()));
@@ -239,7 +239,7 @@ The batched method uses two phases:
 ```rust
 pub(crate) fn plateau_after_legacy_promotes_batched(
     &mut self,
-    new_gnodes: &[GNodeId],
+    new_gnodes: &[GSlotPointer],
 ) {
     if new_gnodes.is_empty() { return; }
     self.plateaus_dirty = true;

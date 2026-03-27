@@ -248,7 +248,7 @@ fn gnode_depth_method_matches_free_function() {
     g.observe(96u64, 5u64);
     g.observe(200u64, 20u64);
 
-    assert_eq!(g.gnode_depth(g.g_root()), 0);
+    assert_eq!(g.gnode_depth(g.g_root().slot()), 0);
     let root = g.gnodes.get(g.g_root().index());
     if let Some(left_id) = root.left {
         let left = g.gnodes.get(left_id.index());

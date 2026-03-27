@@ -26,7 +26,7 @@ use std::sync::OnceLock;
 
 use crate::gnode::{GNode, GState};
 #[cfg(feature = "dynamic-contour-tracking")]
-use crate::handle::GNodeId;
+use crate::handle::GSlotPointer;
 use crate::traits::{Accumulator, Coordinate};
 use crate::view::Span;
 
@@ -310,14 +310,14 @@ impl<C: Coordinate, V: Accumulator> Plateau<C, V> {
 #[cfg(feature = "dynamic-contour-tracking")]
 #[derive(Debug, Clone)]
 pub struct PlateauBasis<C: Coordinate> {
-    /// Forward: basis edge → set of basis element `GNodeId`s.
+    /// Forward: basis edge → set of basis element `GSlotPointer`s.
     ///
     /// `HashSet` gives O(1) amortised removal (vs O(n) `Vec::retain`).
     /// Most plateaus have 1–3 basis elements, so the per-element
     /// overhead is negligible.
-    forward: BTreeMap<BasisEdge<C>, HashSet<GNodeId>>,
-    /// Back: basis element `GNodeId` → its basis edge key.
-    back: HashMap<GNodeId, BasisEdge<C>>,
+    forward: BTreeMap<BasisEdge<C>, HashSet<GSlotPointer>>,
+    /// Back: basis element `GSlotPointer` → its basis edge key.
+    back: HashMap<GSlotPointer, BasisEdge<C>>,
 }
 
 #[cfg(feature = "dynamic-contour-tracking")]
@@ -336,7 +336,7 @@ impl<C: Coordinate> PlateauBasis<C> {
     ///
     /// Panics if `gnode` is already registered as a basis element
     /// of any plateau (would violate basis uniqueness).
-    pub(crate) fn insert(&mut self, key: BasisEdge<C>, gnode: GNodeId) {
+    pub(crate) fn insert(&mut self, key: BasisEdge<C>, gnode: GSlotPointer) {
         debug_assert!(
             !self.back.contains_key(&gnode),
             "PlateauBasis::insert: gnode {gnode:?} already in \
@@ -354,7 +354,7 @@ impl<C: Coordinate> PlateauBasis<C> {
     ///
     /// If this was the last basis element for that plateau,
     /// removes the forward entry entirely.
-    pub(crate) fn remove(&mut self, gnode: GNodeId) -> Option<BasisEdge<C>> {
+    pub(crate) fn remove(&mut self, gnode: GSlotPointer) -> Option<BasisEdge<C>> {
         let key = self.back.remove(&gnode)?;
         if let Some(set) = self.forward.get_mut(&key) {
             set.remove(&gnode);
@@ -370,7 +370,7 @@ impl<C: Coordinate> PlateauBasis<C> {
     /// Returns `None` if `gnode` is not a basis element of any
     /// plateau.
     #[inline]
-    pub(crate) fn plateau_key(&self, gnode: GNodeId) -> Option<BasisEdge<C>> {
+    pub(crate) fn plateau_key(&self, gnode: GSlotPointer) -> Option<BasisEdge<C>> {
         self.back.get(&gnode).copied()
     }
 
@@ -378,15 +378,15 @@ impl<C: Coordinate> PlateauBasis<C> {
     ///
     /// Returns an empty set reference if the key has no entry
     /// (should not happen in a well-maintained graph; defensive).
-    pub(crate) fn basis_elements(&self, key: &BasisEdge<C>) -> &HashSet<GNodeId> {
-        static EMPTY: OnceLock<HashSet<GNodeId>> = OnceLock::new();
+    pub(crate) fn basis_elements(&self, key: &BasisEdge<C>) -> &HashSet<GSlotPointer> {
+        static EMPTY: OnceLock<HashSet<GSlotPointer>> = OnceLock::new();
         self.forward.get(key).unwrap_or_else(|| EMPTY.get_or_init(HashSet::new))
     }
 
     /// Whether `gnode` is currently a basis element of any plateau.
     #[inline]
     #[allow(unused)] // Available for future use; not called yet.
-    pub(crate) fn contains(&self, gnode: GNodeId) -> bool {
+    pub(crate) fn contains(&self, gnode: GSlotPointer) -> bool {
         self.back.contains_key(&gnode)
     }
 
@@ -406,14 +406,14 @@ impl<C: Coordinate> PlateauBasis<C> {
     ///
     /// Used by `assert_invariants` for the full O(n) sweep.
     #[allow(unused)] // Available for future use; not called yet.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = (&BasisEdge<C>, &HashSet<GNodeId>)> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&BasisEdge<C>, &HashSet<GSlotPointer>)> {
         self.forward.iter()
     }
 
     /// Reference to the back-pointer map.
     ///
     /// Used by `assert_invariants` for cross-checking.
-    pub(crate) const fn back_map(&self) -> &HashMap<GNodeId, BasisEdge<C>> {
+    pub(crate) const fn back_map(&self) -> &HashMap<GSlotPointer, BasisEdge<C>> {
         &self.back
     }
 
@@ -422,7 +422,7 @@ impl<C: Coordinate> PlateauBasis<C> {
     ///
     /// Called by `normalize_plateaus` to re-key basis elements after
     /// the plateau `BTreeMap` is rebuilt with the correct merge logic.
-    pub(crate) fn rebuild(&mut self, assignments: impl IntoIterator<Item = (BasisEdge<C>, GNodeId)>) {
+    pub(crate) fn rebuild(&mut self, assignments: impl IntoIterator<Item = (BasisEdge<C>, GSlotPointer)>) {
         self.forward.clear();
         self.back.clear();
         for (key, gid) in assignments {

@@ -495,7 +495,7 @@ over `O: Observation<V>`. See [ADR-M-024](024-decay-semantics.md) for
 the full design rationale.
 
 ```rust
-pub fn decay(&mut self, root: GNodeId, attenuation: f64, q: f64);
+pub fn decay(&mut self, root: GSlotPointer, attenuation: f64, q: f64);
 ```
 
 The original design made `decay` generic over `O: Observation<V>`.
