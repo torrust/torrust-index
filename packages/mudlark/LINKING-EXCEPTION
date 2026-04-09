@@ -8,7 +8,9 @@ the resulting combined work under terms of your choice, provided that:
 
   (a) you interact with the library solely through its documented
       public API — Surfaces 1 (Prints) and 2 (Film) as specified in
-      docs/api.md of the library's source distribution; and
+      docs/api.md published by the original copyright holders of the
+      library (the surface definitions in a derivative work's modified
+      docs/api.md do not extend or alter this exception); and
 
   (b) you do not modify the library's source code; and
 
@@ -25,9 +27,10 @@ long as the conditions above are met.
 
 Any code that reaches into Surface 3 (Emulsion) — the library's
 pub(crate) and #[doc(hidden)] internal machinery as defined in
-docs/api.md §6 — or that copies, adapts, or links against internal
-modules directly, is not covered by this exception and remains
-subject to the full terms of the AGPL.
+docs/api.md §6 of the original copyright holders' distribution — or
+that copies, adapts, or links against internal modules directly, is
+not covered by this exception and remains subject to the full terms
+of the AGPL.
 
 If you modify the library, you may extend this exception to your
 modified version, but you are not obligated to do so. If you do not
