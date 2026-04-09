@@ -168,6 +168,9 @@ pub struct Pewei<C: Coordinate, V: Accumulator> {
     pub domain_end: C,
     /// Layers in decreasing significance order (BFS depth 0 first).
     pub layers: Vec<Layer<C, V>>,
+    /// `None` = full extraction (all V-Tree layers present).
+    /// `Some(k)` = extraction was limited to V-Tree BFS depth ≤ k.
+    pub v_depth_limit: Option<u32>,
 }
 
 impl<C: Coordinate, V: Accumulator> Pewei<C, V> {
@@ -224,7 +227,9 @@ impl<C: Coordinate, V: Accumulator> Pewei<C, V> {
 
     /// Total energy: sum of all terminal intensities plus all
     /// transition baselines. Equals the G-root sum when extracted
-    /// from a consistent tree. Returns `V::zero()` for an empty
+    /// from a consistent, fully-extracted tree. For a depth-limited
+    /// extraction (`v_depth_limit.is_some()`), returns only the energy
+    /// of the visible layers. Returns `V::zero()` for an empty
     /// snapshot.
     ///
     /// This walks all layers — $O(n)$ where $n$ is `node_count()`.

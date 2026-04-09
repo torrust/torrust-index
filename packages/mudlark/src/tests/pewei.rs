@@ -96,6 +96,19 @@
 //! |------|-------|
 //! | [`layer_transition_total_ge_baseline`] | `total >= baseline` for every extracted transition |
 //! | [`layer_terminals_have_positive_width`] | `start < end` for every extracted terminal |
+//!
+//! ## Depth-limited extraction (§ADR M-041)
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`extract_to_zero_single_layer`] | `extract_to(0)` emits only layer 0 |
+//! | [`extract_to_equals_extract_at_max`] | `extract_to(u32::MAX)` == `extract()` |
+//! | [`extract_to_energy_subset`] | depth-limited energy ≤ full energy |
+//! | [`extract_to_reconstruct_matches_full_reconstruct_k`] | `reconstruct(all)` on limited == `reconstruct(K)` on full |
+//! | [`extract_to_metadata_none_for_full`] | `v_depth_limit` is `None` for full extraction |
+//! | [`extract_to_metadata_some_for_limited`] | `v_depth_limit` is `Some(K)` when truncated |
+//! | [`layers_to_matches_extract_to`] | `layers_to(K)` count matches `extract_to(K)` node count |
+//! | [`layers_to_full_equals_layers`] | `layers_to(usize::MAX)` == `layers()` |
 
 use crate::Pewei;
 use crate::pewei::{Layer, Terminal, Transition};
@@ -182,6 +195,7 @@ fn empty_pewei_counts() {
     let p = Pewei::<u64, u64> {
         domain_start: 0,
         domain_end: 256,
+        v_depth_limit: None,
         layers: vec![],
     };
     assert_eq!(p.layer_count(), 0);
@@ -194,6 +208,7 @@ fn pewei_node_count_and_energy() {
     let p = Pewei::<u64, u64> {
         domain_start: 0,
         domain_end: 256,
+        v_depth_limit: None,
         layers: vec![
             Layer {
                 transitions: vec![Transition {
@@ -240,6 +255,7 @@ fn total_energy_f64() {
     let p = Pewei::<f64, f64> {
         domain_start: 0.0,
         domain_end: 8.0,
+        v_depth_limit: None,
         layers: vec![Layer {
             transitions: vec![Transition {
                 start: 0.0,
@@ -271,6 +287,7 @@ fn serde_round_trip_json() {
     let original = Pewei::<u64, u64> {
         domain_start: 0,
         domain_end: 256,
+        v_depth_limit: None,
         layers: vec![Layer {
             transitions: vec![],
             terminals: vec![Terminal {
@@ -357,6 +374,7 @@ fn reconstruct_empty_pewei() {
     let p = Pewei::<u64, u64> {
         domain_start: 0,
         domain_end: 256,
+        v_depth_limit: None,
         layers: vec![],
     };
     let spans = p.reconstruct(0);
@@ -372,6 +390,7 @@ fn reconstruct_single_terminal() {
     let p = Pewei::<u64, u64> {
         domain_start: 0,
         domain_end: 256,
+        v_depth_limit: None,
         layers: vec![Layer {
             transitions: vec![],
             terminals: vec![Terminal {
@@ -455,6 +474,7 @@ fn reconstruct_one_visible_one_invisible_remainder() {
     let p = Pewei::<u64, u64> {
         domain_start: 0,
         domain_end: 256,
+        v_depth_limit: None,
         layers: vec![
             Layer {
                 transitions: vec![Transition {
@@ -502,6 +522,7 @@ fn reconstruct_right_visible_left_invisible() {
     let p = Pewei::<u64, u64> {
         domain_start: 0,
         domain_end: 256,
+        v_depth_limit: None,
         layers: vec![
             Layer {
                 transitions: vec![Transition {
@@ -583,6 +604,7 @@ fn reconstruct_integer_rounding() {
     let p = Pewei::<u64, u64> {
         domain_start: 0,
         domain_end: 256,
+        v_depth_limit: None,
         layers: vec![
             Layer {
                 transitions: vec![Transition {
@@ -630,6 +652,7 @@ fn reconstruct_f64_coordinates() {
     let p = Pewei::<f64, f64> {
         domain_start: 0.0,
         domain_end: 8.0,
+        v_depth_limit: None,
         layers: vec![
             Layer {
                 transitions: vec![Transition {
@@ -679,6 +702,7 @@ fn reconstruct_max_layer_clamped() {
     let p = Pewei::<u64, u64> {
         domain_start: 0,
         domain_end: 256,
+        v_depth_limit: None,
         layers: vec![Layer {
             transitions: vec![],
             terminals: vec![Terminal {
@@ -933,6 +957,7 @@ fn two_layer_pewei() -> Pewei<u64, u64> {
     Pewei {
         domain_start: 0,
         domain_end: 256,
+        v_depth_limit: None,
         layers: vec![
             Layer {
                 transitions: vec![Transition {
@@ -980,6 +1005,7 @@ fn three_layer_pewei() -> Pewei<u64, u64> {
     Pewei {
         domain_start: 0,
         domain_end: 256,
+        v_depth_limit: None,
         layers: vec![
             Layer {
                 transitions: vec![Transition {
@@ -1042,4 +1068,151 @@ fn assert_partitions_domain(spans: &[crate::view::Span<u64, u64>], lo: u64, hi: 
     for w in spans.windows(2) {
         assert_eq!(w[0].end, w[1].start, "gap/overlap between {} and {}", w[0].end, w[1].start);
     }
+}
+
+// ── Depth-limited extraction (§ADR M-041) ───────────────────
+
+/// `extract_to(0)` on a multi-layer tree emits only layer 0
+/// (or fewer, if the V-root is structural and has no entries at
+/// depth 0).
+#[test]
+fn extract_to_zero_single_layer() {
+    let g = GraphCreator::<u64, _>::new(low_threshold_config())
+        .sweep(256, 8)
+        .check_every(1)
+        .build::<8>();
+
+    let full = g.extract();
+    assert!(full.layer_count() >= 2, "need multiple layers");
+
+    let limited = g.extract_to(0);
+    assert!(limited.layer_count() <= 1);
+    assert!(limited.total_energy() <= full.total_energy());
+
+    // With depth limit 1 we should get strictly fewer layers.
+    let limited1 = g.extract_to(1);
+    assert!(limited1.layer_count() <= full.layer_count());
+    assert!(limited1.total_energy() <= full.total_energy());
+}
+
+/// `extract_to(u32::MAX)` produces the same result as `extract()`.
+#[test]
+fn extract_to_equals_extract_at_max() {
+    let g = GraphCreator::<u64, _>::new(low_threshold_config())
+        .observe(42u64, 10u64)
+        .observe(200u64, 5u64)
+        .observe(42u64, 20u64)
+        .check_every(1)
+        .build::<8>();
+
+    let full = g.extract();
+    let max = g.extract_to(u32::MAX);
+    assert_eq!(full, max);
+}
+
+/// Depth-limited energy is always ≤ full energy.
+#[test]
+fn extract_to_energy_subset() {
+    let g = GraphCreator::<u64, _>::new(low_threshold_config())
+        .spread(256, 5, 40)
+        .check_every(5)
+        .build::<8>();
+
+    let full = g.extract();
+    let full_energy = full.total_energy();
+
+    #[allow(clippy::cast_possible_truncation)] // layer count ≤ N ≤ 64
+    for k in 0..full.layer_count() as u32 {
+        let limited = g.extract_to(k);
+        assert!(
+            limited.total_energy() <= full_energy,
+            "extract_to({k}) energy {} > full energy {full_energy}",
+            limited.total_energy(),
+        );
+    }
+}
+
+/// `reconstruct(all)` on a depth-limited PEWEI matches
+/// `reconstruct(K)` on the full PEWEI.
+#[test]
+fn extract_to_reconstruct_matches_full_reconstruct_k() {
+    let g = GraphCreator::<u64, _>::new(low_threshold_config())
+        .sweep(256, 8)
+        .check_every(1)
+        .build::<8>();
+
+    let full = g.extract();
+    assert!(full.layer_count() >= 2, "need multiple layers");
+
+    #[allow(clippy::cast_possible_truncation)] // layer count ≤ N ≤ 64
+    for k in 0..full.layer_count() as u32 {
+        let limited = g.extract_to(k);
+        let limited_spans = limited.reconstruct(limited.layer_count().saturating_sub(1));
+        let full_spans = full.reconstruct(k as usize);
+        assert_eq!(
+            limited_spans, full_spans,
+            "extract_to({k}).reconstruct(all) != extract().reconstruct({k})",
+        );
+    }
+}
+
+/// `v_depth_limit` is `None` for a full extraction.
+#[test]
+fn extract_to_metadata_none_for_full() {
+    let g = GraphCreator::<u64, _>::new(low_threshold_config())
+        .observe(42u64, 10u64)
+        .check_every(1)
+        .build::<8>();
+
+    assert!(g.extract().v_depth_limit.is_none());
+    assert!(g.extract_to(u32::MAX).v_depth_limit.is_none());
+}
+
+/// `v_depth_limit` is `Some(K)` when extraction is genuinely truncated.
+#[test]
+fn extract_to_metadata_some_for_limited() {
+    let g = GraphCreator::<u64, _>::new(low_threshold_config())
+        .sweep(256, 8)
+        .check_every(1)
+        .build::<8>();
+
+    let full = g.extract();
+    assert!(full.layer_count() >= 2, "need multiple layers");
+
+    let limited = g.extract_to(0);
+    assert_eq!(limited.v_depth_limit, Some(0));
+}
+
+/// `layers_to(K)` yields the same node count as `extract_to(K)`.
+#[test]
+fn layers_to_matches_extract_to() {
+    let g = GraphCreator::<u64, _>::new(low_threshold_config())
+        .spread(256, 5, 40)
+        .check_every(5)
+        .build::<8>();
+
+    let full = g.extract();
+    #[allow(clippy::cast_possible_truncation)] // layer count ≤ N ≤ 64
+    for k in 0..full.layer_count() as u32 {
+        let extracted_count = g.extract_to(k).node_count();
+        let iterated_count = g.layers_to(k as usize).count();
+        assert_eq!(
+            extracted_count, iterated_count,
+            "extract_to({k}).node_count() != layers_to({k}).count()",
+        );
+    }
+}
+
+/// `layers_to(usize::MAX)` yields the same nodes as `layers()`.
+#[test]
+fn layers_to_full_equals_layers() {
+    let g = GraphCreator::<u64, _>::new(low_threshold_config())
+        .observe(42u64, 10u64)
+        .observe(200u64, 5u64)
+        .check_every(1)
+        .build::<8>();
+
+    let full: Vec<_> = g.layers().collect();
+    let max: Vec<_> = g.layers_to(usize::MAX).collect();
+    assert_eq!(full, max);
 }

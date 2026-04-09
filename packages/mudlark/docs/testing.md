@@ -270,7 +270,7 @@ Governed by [ADR-M-034](../adr/034-doc-comment-and-doctest-policy.md):
 | `handle.rs`                | Handle (GNodeId, GSlotPointer, VSlotPointer) identity and validity      |
 | `invariant_self.rs`        | Invariant checker self-tests (ADR-M-039 §D5)         |
 | `observe.rs`               | Observation pipeline internals                       |
-| `pewei.rs`                 | PEWEI extraction and reconstruction                  |
+| `pewei.rs`                 | PEWEI extraction, reconstruction, and depth-limited extraction (ADR-M-041) |
 | `plan_builders.rs`         | Test-plan builder method correctness                 |
 | `plateau.rs`               | Plateau projection, basis edges, thatching           |
 | `rebalance.rs`             | V-tree rebalancing (2–3 rotations, promotions)       |

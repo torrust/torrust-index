@@ -58,6 +58,42 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// ```
     #[must_use]
     pub fn extract(&self) -> crate::pewei::Pewei<C, V> {
+        self.extract_to(u32::MAX)
+    }
+
+    /// Extract a depth-limited PEWEI snapshot.
+    ///
+    /// Only V-Tree BFS depths `0..=v_depth_limit` are visited.
+    /// Layers beyond `v_depth_limit` are absent from the result.
+    /// Pass `u32::MAX` for a full extraction.
+    ///
+    /// `total_energy()` on a depth-limited PEWEI returns only
+    /// the energy of the visible layers — energy in deeper layers
+    /// is simply absent from the snapshot.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use torrust_mudlark::{Config, GvGraph};
+    /// # let cfg = Config {
+    /// #     split_threshold: 5u64,
+    /// #     depth_create: 3,
+    /// #     depth_evict: 6,
+    /// #     budget: None,
+    /// #     alpha_relax: 0.75,
+    /// #     bounded_eviction: true,
+    /// # };
+    /// # let mut g = GvGraph::<u64, u64, 8>::new(cfg);
+    /// for _ in 0..20 { g.observe(42, 10u64); }
+    /// let full = g.extract();
+    /// let limited = g.extract_to(0);
+    /// assert!(limited.layer_count() <= full.layer_count());
+    /// assert!(limited.total_energy() <= full.total_energy());
+    /// assert_eq!(limited.v_depth_limit, Some(0));
+    /// assert!(full.v_depth_limit.is_none());
+    /// ```
+    #[must_use]
+    pub fn extract_to(&self, v_depth_limit: u32) -> crate::pewei::Pewei<C, V> {
         use std::collections::VecDeque;
 
         use crate::gnode::GState;
@@ -72,6 +108,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
                 domain_start,
                 domain_end,
                 layers: vec![],
+                v_depth_limit: None,
             };
         };
 
@@ -80,6 +117,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
         queue.push_back((v_root, 0u32));
 
         let mut layers: Vec<Layer<C, V>> = Vec::new();
+        let mut truncated = false;
 
         while let Some((vid, bfs_depth)) = queue.pop_front() {
             let vnode = self.vnodes.get(vid.index());
@@ -122,9 +160,15 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
                     }
                 }
                 VKind::Structural { children, .. } => {
-                    for i in 0..children.len() {
-                        let (child_id, _intensity) = children.get(i);
-                        queue.push_back((child_id, bfs_depth + 1));
+                    // Gate: only enqueue children if they'd be within
+                    // the depth limit.
+                    if bfs_depth < v_depth_limit {
+                        for i in 0..children.len() {
+                            let (child_id, _intensity) = children.get(i);
+                            queue.push_back((child_id, bfs_depth + 1));
+                        }
+                    } else if !children.is_empty() {
+                        truncated = true;
                     }
                 }
             }
@@ -134,6 +178,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
             domain_start,
             domain_end,
             layers,
+            v_depth_limit: if truncated { Some(v_depth_limit) } else { None },
         }
     }
 
@@ -167,11 +212,43 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     /// }
     /// ```
     pub fn layers(&self) -> impl Iterator<Item = (usize, crate::view::Node<C, V>)> + '_ {
+        self.layers_to(usize::MAX)
+    }
+
+    /// Depth-limited lazy V-Tree BFS iterator yielding
+    /// `(layer_index, Node<C, V>)`.
+    ///
+    /// Streaming counterpart to [`extract_to()`](Self::extract_to):
+    /// the BFS respects the depth limit, avoiding wasted structural
+    /// expansion below the cutoff.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use torrust_mudlark::{Config, GvGraph};
+    /// # let cfg = Config {
+    /// #     split_threshold: 5u64, depth_create: 3, depth_evict: 6,
+    /// #     budget: None, alpha_relax: 0.75, bounded_eviction: true,
+    /// # };
+    /// # let mut g = GvGraph::<u64, u64, 8>::new(cfg);
+    /// # for _ in 0..20 { g.observe(42, 10u64); }
+    /// let full: Vec<_> = g.layers().collect();
+    /// let limited: Vec<_> = g.layers_to(0).collect();
+    /// assert!(limited.len() <= full.len());
+    /// for (layer, _) in &limited {
+    ///     assert_eq!(*layer, 0);
+    /// }
+    /// ```
+    pub fn layers_to(&self, v_depth_limit: usize) -> impl Iterator<Item = (usize, crate::view::Node<C, V>)> + '_ {
         let mut queue = std::collections::VecDeque::new();
         if let Some(v_root) = self.v_root {
             queue.push_back((v_root, 0usize));
         }
-        Layers { graph: self, queue }
+        Layers {
+            graph: self,
+            queue,
+            v_depth_limit,
+        }
     }
 
     /// Construct a `GvGraph` and populate it with observations from
@@ -250,12 +327,15 @@ where
 
 /// BFS iterator over V-Tree entries, yielding `(layer_index, Node)`.
 ///
-/// Created by [`GvGraph::layers()`]. Structural V-nodes are traversed
-/// but not yielded — only V-Entry nodes (backing G-nodes) produce
-/// output, matching `extract()`'s behavior.
+/// Created by [`GvGraph::layers()`] / [`GvGraph::layers_to()`].
+/// Structural V-nodes are traversed but not yielded — only V-Entry
+/// nodes (backing G-nodes) produce output, matching `extract()`'s
+/// behavior. When `v_depth_limit < usize::MAX`, structural children
+/// beyond the cutoff are not enqueued.
 struct Layers<'a, C: Coordinate, V: Accumulator, const N: u32> {
     graph: &'a GvGraph<C, V, N>,
     queue: std::collections::VecDeque<(VSlotPointer, usize)>,
+    v_depth_limit: usize,
 }
 
 impl<C: Coordinate, V: Accumulator, const N: u32> Iterator for Layers<'_, C, V, N> {
@@ -270,9 +350,11 @@ impl<C: Coordinate, V: Accumulator, const N: u32> Iterator for Layers<'_, C, V, 
 
             match &vnode.kind {
                 VKind::Structural { children, .. } => {
-                    for i in 0..children.len() {
-                        let (child_id, _) = children.get(i);
-                        self.queue.push_back((child_id, bfs_depth + 1));
+                    if bfs_depth < self.v_depth_limit {
+                        for i in 0..children.len() {
+                            let (child_id, _) = children.get(i);
+                            self.queue.push_back((child_id, bfs_depth + 1));
+                        }
                     }
                     // Skip structural nodes — continue loop.
                 }

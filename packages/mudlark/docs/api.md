@@ -327,12 +327,16 @@ pub struct Pewei<C: Coordinate, V: Accumulator> {
     pub domain_start: C,
     pub domain_end: C,
     pub layers: Vec<Layer<C, V>>,
+    /// `None` = full extraction; `Some(k)` = depth-limited to BFS depth ≤ k.
+    pub v_depth_limit: Option<u32>,
 }
 ```
 
 Methods: `layer_count() -> usize` ($O(1)$),
 `node_count() -> usize` ($O(L)$ where $L$ = `layer_count()`),
 `total_energy() -> V` ($O(n)$ where $n$ = `node_count()`).
+For a depth-limited extraction (`v_depth_limit.is_some()`),
+`total_energy()` returns only the energy of the visible layers.
 
 > **Design note — `total_energy()` is $O(n)$, not $O(1)$.**
 > Most `Pewei` accessors are $O(1)$; `total_energy()` (and
@@ -1019,6 +1023,7 @@ Available when `V: Inspectable`.
 
 ```rust
 pub fn extract(&self) -> Pewei<C, V>;
+pub fn extract_to(&self, max_v_depth: u32) -> Pewei<C, V>;
 ```
 
 BFS walk of the V-Tree producing a significance-ordered, layered
@@ -1027,7 +1032,15 @@ entries backed by internal or semi-internal G-nodes become
 `Transition` values. V-structural nodes are scaffolding and are not
 emitted.
 
-Cost: $O(L + S)$ where $L$ = V-entries, $S$ = V-structural nodes — every V-node visited once.
+`extract()` captures all layers (delegates to `extract_to(u32::MAX)`).
+`extract_to(K)` limits the BFS to V-Tree depths `0..=K` — layers
+beyond `K` are absent. The resulting `Pewei` carries
+`v_depth_limit: Some(K)` when truncation occurred, `None` otherwise.
+(ADR-M-041, DC-041-1/DC-041-2.)
+
+Cost: $O(L_K + S_K)$ where $L_K$ and $S_K$ are V-entries and
+V-structural nodes at depths $\leq K$. For `extract()`,
+$L_K = L$, $S_K = S$.
 
 #### Layer iteration
 
@@ -1035,14 +1048,17 @@ Available when `V: Inspectable`.
 
 ```rust
 pub fn layers(&self) -> impl Iterator<Item = (usize, Node<C, V>)> + '_;
+pub fn layers_to(&self, max_v_depth: usize) -> impl Iterator<Item = (usize, Node<C, V>)> + '_;
 ```
 
 Lazy V-Tree BFS yielding `(layer_index, Node)`. Streaming counterpart
-to `extract()` — same traversal order, same node classification, but
-yields `Node` view types without allocating the full `Pewei` snapshot.
+to `extract()` / `extract_to()` — same traversal order, same node
+classification, but yields `Node` view types without allocating the
+full `Pewei` snapshot. `layers()` delegates to `layers_to(usize::MAX)`.
+`layers_to(K)` respects the depth limit in the BFS queue, avoiding
+wasted structural expansion below the cutoff (ADR-M-041, DC-041-3).
 
-Cost: $O(L + S)$ total (same as `extract()`; $L$ = V-entries,
-$S$ = V-structural nodes), amortised across `next()` calls.
+Cost: $O(L_K + S_K)$ total, amortised across `next()` calls.
 
 #### Temporal decay
 

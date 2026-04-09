@@ -537,7 +537,7 @@ max(headroom, 2*(D_c−1))` where `headroom = 3^(buffer+1)`.
 
 ## 11. PEWEI extraction and reconstruction — `pewei.rs` + `graph_extract.rs`
 
-### 11.1 Extraction — `GvGraph::extract` (ADR-M-021, ADR-M-022)
+### 11.1 Extraction — `GvGraph::extract` / `extract_to` (ADR-M-021, ADR-M-022, ADR-M-041)
 
 BFS walk of the V-Tree producing an ordered sequence of layers.
 Each V-entry is classified by backing G-node state:
@@ -550,6 +550,13 @@ Each V-entry is classified by backing G-node state:
 Empty / zero-intensity trees emit 1 layer with 1 zero-intensity
 terminal. All types serde-gated. Implementation lives in
 `graph_extract.rs` (extracted per ADR-M-030 Phase D).
+
+`extract_to(max_v_depth)` limits the BFS to V-Tree depths
+`0..=max_v_depth` — structural nodes at the cutoff do not enqueue
+children (ADR-M-041, DC-041-4). `extract()` delegates to
+`extract_to(u32::MAX)`. The resulting `Pewei` records the limit in
+`v_depth_limit: Option<u32>` (`None` for full, `Some(K)` when
+truncation occurred). `layers_to(K)` is the streaming counterpart.
 
 ### 11.2 Reconstruction — `Pewei::reconstruct` (ADR-M-023)
 
@@ -782,6 +789,7 @@ Corresponding tests live in `src/tests/graph.rs`,
 | [036](../adr/036-sentinel-integration-api.md)               | Sentinel integration API                 | Decided — implemented                        |
 | [037](../adr/037-contour-range-queries.md)                  | Contour range queries                    | Decided — implemented                        |
 | [038](../adr/038-decay-factor-table-depth-bound.md)         | Decay factor table depth bound           | Decided — implemented                        |
+| [041](../adr/041-depth-limited-pewei-extraction.md)         | Depth-limited PEWEI extraction           | Decided — implemented                        |
 
 ---
 
