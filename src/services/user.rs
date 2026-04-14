@@ -186,7 +186,7 @@ impl RegistrationService {
     /// This function will return a `UserError::DatabaseError` if unable to
     /// update the user's email verification status.
     pub async fn verify_email(&self, token: &str) -> Result<bool, UserError> {
-        let Ok(token_data) = self.json_web_token.verify_email_token(token).await else {
+        let Ok(token_data) = self.json_web_token.verify_email_token(token) else {
             return Ok(false);
         };
 

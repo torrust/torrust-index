@@ -114,8 +114,7 @@ impl TestEnv {
 
                 "***".clone_into(&mut settings.mail.smtp.credentials.password);
 
-                "***-redacted-session-signing-key!".clone_into(&mut settings.auth.session_signing_key);
-                "***-redacted-emailverify-secret!".clone_into(&mut settings.auth.email_verification_signing_key);
+                settings.auth.private_key_path = Some("***-redacted***".to_owned());
 
                 Some(settings)
             }

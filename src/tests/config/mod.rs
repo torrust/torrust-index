@@ -2,7 +2,7 @@ mod v2;
 
 use url::Url;
 
-use crate::config::{ApiToken, Configuration, Info, SecretKey, Settings};
+use crate::config::{ApiToken, Configuration, Info, Settings};
 
 fn default_config_toml() -> String {
     use std::fs;
@@ -97,8 +97,8 @@ fn configuration_should_use_the_default_values_when_only_the_mandatory_options_a
                 token = "MyAccessToken"
 
                 [auth]
-                session_signing_key = "MaxVerstappenWC2021-session-key!"
-                email_verification_signing_key = "MaxVerstappenWC2021-emailverify!"
+                private_key_path = "./share/default/jwt/private.pem"
+                public_key_path = "./share/default/jwt/public.pem"
             "#,
         )?;
 
@@ -130,8 +130,8 @@ fn configuration_should_use_the_default_values_when_only_the_mandatory_options_a
                 token = "MyAccessToken"
 
                 [auth]
-                session_signing_key = "MaxVerstappenWC2021-session-key!"
-                email_verification_signing_key = "MaxVerstappenWC2021-emailverify!"
+                private_key_path = "./share/default/jwt/private.pem"
+                public_key_path = "./share/default/jwt/public.pem"
             "#
         .to_string();
 
@@ -172,14 +172,14 @@ async fn configuration_should_allow_to_override_the_tracker_api_token_provided_i
 
 #[tokio::test]
 #[allow(clippy::result_large_err)]
-async fn configuration_should_allow_to_override_the_session_signing_key_provided_in_the_toml_file() {
+async fn configuration_should_allow_to_override_the_private_key_path_provided_in_the_toml_file() {
     figment::Jail::expect_with(|jail| {
         jail.create_dir("templates")?;
         jail.create_file("templates/verify.html", "EMAIL TEMPLATE")?;
 
         jail.set_env(
-            "TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__SESSION_SIGNING_KEY",
-            "OVERRIDDEN-SESSION-SIGNING-SECRET!",
+            "TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PATH",
+            "/custom/path/private.pem",
         );
 
         let info = Info {
@@ -189,10 +189,7 @@ async fn configuration_should_allow_to_override_the_session_signing_key_provided
 
         let settings = Configuration::load_settings(&info).expect("Could not load configuration from file");
 
-        assert_eq!(
-            settings.auth.session_signing_key,
-            SecretKey::new("OVERRIDDEN-SESSION-SIGNING-SECRET!")
-        );
+        assert_eq!(settings.auth.private_key_path, Some("/custom/path/private.pem".to_owned()));
 
         Ok(())
     });

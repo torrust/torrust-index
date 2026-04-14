@@ -95,15 +95,18 @@ TORRUST_INDEX_CONFIG_TOML=$(cat "./storage/index/etc/index.toml") cargo run
 
 _For deployment, you __should__ override:
 
-- The `tracker_api_token` and the JWT signing keys by using environmental variables:_
+- The `tracker_api_token` and RSA key paths by using environmental variables:_
 
 ```sh
-# Please use the secret that you generated for the torrust-tracker configuration.
+# Generate an RSA key pair for JWT signing:
+# openssl genrsa -out private.pem 2048
+# openssl rsa -in private.pem -pubout -out public.pem
+
 # Override secrets in configuration using environmental variables
 TORRUST_INDEX_CONFIG_TOML=$(cat "./storage/index/etc/index.toml") \
   TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN=$(cat "./storage/tracker/lib/tracker_api_admin_token.secret") \
-  TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__SESSION_SIGNING_KEY="your-session-signing-secret-here!" \
-  TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__EMAIL_VERIFICATION_SIGNING_KEY="your-email-verify-secret-here!!" \
+  TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PATH="/path/to/private.pem" \
+  TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PATH="/path/to/public.pem" \
   cargo run
 ```
 
@@ -128,7 +131,7 @@ The following services are provided by the default configuration:
 - [ADR-T-004: Remove `located-error` Package](adr/004-remove-located-error.md) — Replace the `torrust-index-located-error` wrapper with `tracing` for error context.
 - [ADR-T-005: Migrate to Rust Edition 2024](adr/005-edition-2024.md) — Migrate the entire workspace to `edition = "2024"` and raise the MSRV to 1.85.
 - [ADR-T-006: Refactor the Error System](adr/006-error-system-refactor.md) — Replace the 41-variant `ServiceError` god enum with domain-scoped error enums (`AuthError`, `UserError`, `TorrentError`, `CategoryTagError`) and a thin `ApiError` wrapper.
-- [ADR-T-007: Refactor the JWT System](adr/007-jwt-system-refactor.md) — Centralise JWT handling into `src/jwt.rs`, redesign claims to RFC 7519, split into per-purpose signing keys, and enforce minimum secret length.
+- [ADR-T-007: Refactor the JWT System](adr/007-jwt-system-refactor.md) — Centralise JWT handling into `src/jwt.rs`, redesign claims to RFC 7519, and move to RS256 asymmetric signing with a public/private RSA key pair.
 
 ## Contributing
 

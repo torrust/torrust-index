@@ -110,7 +110,7 @@ impl Service {
         const ONE_WEEK_IN_SECONDS: u64 = 604_800;
 
         // Verify if token is valid
-        let claims = self.json_web_token.verify(token).await?;
+        let claims = self.json_web_token.verify(token)?;
 
         let user_compact = self
             .user_repository

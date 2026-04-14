@@ -1,6 +1,6 @@
 # ADR-T-007: Refactor the JWT System
 
-**Status:** Phase 2 implemented
+**Status:** Phase 3 implemented
 **Date:** 2026-04-14
 
 ## Context
@@ -388,21 +388,25 @@ phased rollout that subsumes Options A and B.
 - **Breaking change:** existing HS256 tokens are invalidated;
   users must re-login.
 
-#### Phase 3 — RS256 Asymmetric Signing (Option C scope)
+#### Phase 3 — RS256 Asymmetric Signing (Option C scope) ✅ Implemented
 
-- Replace `HS256` with `RS256` (`Algorithm::RS256`).
-- Config provides:
+- ✅ Replace `HS256` with `RS256` (`Algorithm::RS256`).
+- ✅ Config provides:
   - `auth.private_key_path` (PEM / PKCS#8) for signing.
   - `auth.public_key_path` for verification.
-  - Alternatively, inline PEM via environment variable.
-- Generate a default development key pair on first run (with a
-  loud warning) so the zero-config experience is preserved for
-  local development.
-- Use `EncodingKey::from_rsa_pem` / `DecodingKey::from_rsa_pem`.
-- Only the signing service loads the private key; the
+  - Alternatively, inline PEM via environment variable
+    (`auth.private_key_pem`, `auth.public_key_pem`).
+- ✅ Development key pair shipped at `share/default/jwt/` with loud
+  startup warning when the default dev keys are used.
+- ✅ Use `EncodingKey::from_rsa_pem` / `DecodingKey::from_rsa_pem`.
+- ✅ Only the signing service loads the private key; the
   verification path uses the public key.
-- Add a `kid` (Key ID) field to the JWT header to support future
-  key rotation.
+- ✅ A `kid` (Key ID) is included in every JWT header (SHA-256
+  fingerprint of the public key) to support future key rotation.
+- **Breaking change:** existing HS256 tokens and config
+  (`session_signing_key`, `email_verification_signing_key`) are
+  no longer supported. Deployers must generate an RSA key pair
+  and update their configuration.
 
 #### Future — Optional Revocation (Option E scope)
 

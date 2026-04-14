@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use unstable::Unstable;
 
 use self::api::Api;
-use self::auth::{Auth, JwtSigningSecret};
+use self::auth::Auth;
 use self::database::Database;
 use self::image_cache::ImageCache;
 use self::mail::Mail;
@@ -111,8 +111,8 @@ impl Settings {
             let _ = self.database.connect_url.set_password(Some("***"));
         }
         "***".clone_into(&mut self.mail.smtp.credentials.password);
-        self.auth.session_signing_key = JwtSigningSecret::new("***-redacted-session-signing-key!");
-        self.auth.email_verification_signing_key = JwtSigningSecret::new("***-redacted-emailverify-secret!");
+        self.auth.private_key_pem = Some("***-redacted-private-key-pem***".to_owned());
+        self.auth.private_key_path = Some("***-redacted***".to_owned());
     }
 
     /// Encodes the configuration to TOML.

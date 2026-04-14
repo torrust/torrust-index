@@ -49,8 +49,8 @@ pub struct Network {
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Auth {
-    pub session_signing_key: String,
-    pub email_verification_signing_key: String,
+    pub private_key_path: Option<String>,
+    pub public_key_path: Option<String>,
     pub password_constraints: PasswordConstraints,
 }
 
@@ -153,8 +153,8 @@ impl From<DomainNetwork> for Network {
 impl From<DomainAuth> for Auth {
     fn from(auth: DomainAuth) -> Self {
         Self {
-            session_signing_key: auth.session_signing_key.to_string(),
-            email_verification_signing_key: auth.email_verification_signing_key.to_string(),
+            private_key_path: auth.private_key_path,
+            public_key_path: auth.public_key_path,
             password_constraints: auth.password_constraints.into(),
         }
     }

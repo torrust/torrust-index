@@ -45,8 +45,8 @@
 //!
 //! ```toml
 //! [auth]
-//! session_signing_key = "your-session-signing-secret-here!"
-//! email_verification_signing_key = "your-email-verify-secret-here!!"
+//! private_key_path = "/path/to/private.pem"
+//! public_key_path = "/path/to/public.pem"
 //! ```
 //!
 //! Refer to the [`RegistrationForm`](crate::web::api::server::v1::contexts::user::forms::RegistrationForm)

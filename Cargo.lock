@@ -4281,6 +4281,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "sha-1",
+ "sha2",
  "sqlx",
  "tempfile",
  "tera",

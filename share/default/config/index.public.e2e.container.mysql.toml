@@ -17,8 +17,8 @@ token = "MyAccessToken"
 url = "udp://tracker:6969"
 
 [auth]
-session_signing_key = "MaxVerstappenWC2021-session-key!"
-email_verification_signing_key = "MaxVerstappenWC2021-emailverify!"
+private_key_path = "/var/lib/torrust/index/jwt/private.pem"
+public_key_path = "/var/lib/torrust/index/jwt/public.pem"
 
 [database]
 connect_url = "mysql://root:root_secret_password@mysql:3306/torrust_index_e2e_testing"

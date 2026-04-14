@@ -73,7 +73,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     // Build app dependencies
 
     let database = Arc::new(database::connect(&database_connect_url).await.expect("Database error."));
-    let json_web_token = Arc::new(JsonWebToken::new(configuration.clone()));
+    let json_web_token = Arc::new(JsonWebToken::new(configuration.clone()).await);
     let auth = Arc::new(Authentication::new(json_web_token.clone()));
 
     // Repositories

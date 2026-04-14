@@ -24,7 +24,6 @@ pub type Registration = v2::registration::Registration;
 pub type Email = v2::registration::Email;
 
 pub type Auth = v2::auth::Auth;
-pub type SecretKey = v2::auth::JwtSigningSecret;
 pub type PasswordConstraints = v2::auth::PasswordConstraints;
 
 pub type Database = v2::database::Database;
@@ -349,23 +348,10 @@ impl Configuration {
     /// Will return an error if a mandatory configuration option is only
     /// obtained by default value (code), meaning the user hasn't overridden it.
     fn check_mandatory_options(figment: &Figment) -> Result<(), Error> {
-        let mandatory_options = [
-            "auth.session_signing_key",
-            "logging.threshold",
-            "metadata.schema_version",
-            "tracker.token",
-        ];
+        let mandatory_options = ["logging.threshold", "metadata.schema_version", "tracker.token"];
 
         for mandatory_option in mandatory_options {
-            // Accept both the canonical key and the legacy aliases.
-            let found = figment.find_value(mandatory_option).is_ok()
-                || match mandatory_option {
-                    "auth.session_signing_key" => {
-                        figment.find_value("auth.jwt_signing_secret").is_ok()
-                            || figment.find_value("auth.user_claim_token_pepper").is_ok()
-                    }
-                    _ => false,
-                };
+            let found = figment.find_value(mandatory_option).is_ok();
 
             if !found {
                 return Err(Error::MissingMandatoryOption {

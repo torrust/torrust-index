@@ -132,8 +132,8 @@ impl Authentication {
     /// # Errors
     ///
     /// This function will return an error if the JWT is not good or expired.
-    pub async fn verify_jwt(&self, token: &str) -> Result<SessionClaims, AuthError> {
-        self.json_web_token.verify(token).await
+    pub fn verify_jwt(&self, token: &str) -> Result<SessionClaims, AuthError> {
+        self.json_web_token.verify(token)
     }
 
     /// Get logged-in user ID from bearer token
@@ -141,8 +141,8 @@ impl Authentication {
     /// # Errors
     ///
     /// This function will return an error if it can get claims from the request
-    pub async fn get_user_id_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<UserId, AuthError> {
-        let claims = self.get_claims_from_bearer_token(maybe_token).await?;
+    pub fn get_user_id_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<UserId, AuthError> {
+        let claims = self.get_claims_from_bearer_token(maybe_token)?;
         Ok(claims.sub)
     }
 
@@ -154,14 +154,8 @@ impl Authentication {
     ///
     /// - Return an `AuthError::TokenNotFound` if `HeaderValue` is `None`.
     /// - Pass through the `AuthError::TokenInvalid` if unable to verify the JWT.
-    async fn get_claims_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<SessionClaims, AuthError> {
-        match maybe_token {
-            Some(token) => match self.verify_jwt(&token.value()).await {
-                Ok(claims) => Ok(claims),
-                Err(e) => Err(e),
-            },
-            None => Err(AuthError::TokenNotFound),
-        }
+    fn get_claims_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<SessionClaims, AuthError> {
+        maybe_token.map_or(Err(AuthError::TokenNotFound), |token| self.verify_jwt(&token.value()))
     }
 }
 
@@ -188,15 +182,11 @@ pub fn parse_token(authorization: &HeaderValue) -> Result<String, AuthError> {
 /// # Errors
 ///
 /// It returns an error if we cannot get the user from the bearer token.
-pub async fn get_optional_logged_in_user(
+pub fn get_optional_logged_in_user(
     maybe_bearer_token: Option<BearerToken>,
-    app_data: Arc<AppData>,
+    app_data: &Arc<AppData>,
 ) -> Result<Option<UserId>, AuthError> {
-    match maybe_bearer_token {
-        Some(bearer_token) => match app_data.auth.get_user_id_from_bearer_token(Some(bearer_token)).await {
-            Ok(user_id) => Ok(Some(user_id)),
-            Err(error) => Err(error),
-        },
-        None => Ok(None),
-    }
+    maybe_bearer_token.map_or(Ok(None), |bearer_token| {
+        app_data.auth.get_user_id_from_bearer_token(Some(bearer_token)).map(Some)
+    })
 }

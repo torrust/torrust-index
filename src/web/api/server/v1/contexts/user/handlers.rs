@@ -100,7 +100,7 @@ pub async fn verify_token_handler(
     State(app_data): State<Arc<AppData>>,
     extract::Json(token): extract::Json<JsonWebToken>,
 ) -> Response {
-    match app_data.json_web_token.verify(&token.token).await {
+    match app_data.json_web_token.verify(&token.token) {
         Ok(_) => axum::Json(OkResponseData {
             data: "Token is valid.".to_string(),
         })

@@ -15,8 +15,8 @@ threshold = "info"
 token = "MyAccessToken"
 
 [auth]
-session_signing_key = "MaxVerstappenWC2021-session-key!"
-email_verification_signing_key = "MaxVerstappenWC2021-emailverify!"
+private_key_path = "/var/lib/torrust/index/jwt/private.pem"
+public_key_path = "/var/lib/torrust/index/jwt/public.pem"
 
 [database]
 connect_url = "sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc"

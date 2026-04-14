@@ -1,6 +1,7 @@
-use std::fmt;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 /// Default session-token lifetime: 2 weeks (1 209 600 s).
 const DEFAULT_SESSION_TOKEN_LIFETIME_SECS: u64 = 1_209_600;
@@ -8,29 +9,48 @@ const DEFAULT_SESSION_TOKEN_LIFETIME_SECS: u64 = 1_209_600;
 /// Default email-verification-token lifetime: ~10 years (315 569 260 s).
 const DEFAULT_EMAIL_VERIFICATION_TOKEN_LIFETIME_SECS: u64 = 315_569_260;
 
-/// Minimum allowed length for signing secrets (ADR-T-007 Phase 2).
-const MIN_SECRET_LENGTH: usize = 32;
+/// Default paths for the development RSA key pair shipped with the repo.
+const DEFAULT_PRIVATE_KEY_PATH: &str = "./share/default/jwt/private.pem";
+const DEFAULT_PUBLIC_KEY_PATH: &str = "./share/default/jwt/public.pem";
 
 /// Authentication options.
+///
+/// ## Phase 3 (ADR-T-007)
+///
+/// JWT signing has moved from HMAC-HS256 with shared secrets to
+/// RS256 (RSA + SHA-256) with a public/private key pair.
+///
+/// Configuration supports two mechanisms (in priority order):
+///
+/// 1. **Inline PEM** — `private_key_pem` / `public_key_pem`.
+///    Primarily for passing keys via environment variables
+///    (e.g., `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PEM`).
+/// 2. **File paths** — `private_key_path` / `public_key_path`.
+///    Point to PEM files on disk.
+///
+/// If neither is provided, the development key pair shipped at
+/// `share/default/jwt/` is used with a loud warning.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Auth {
-    /// The HMAC secret used to sign session JWT tokens.
+    /// Inline RSA private key in PEM format (overrides `private_key_path`).
     ///
-    /// Phase 2 (ADR-T-007): renamed from `jwt_signing_secret` to
-    /// `session_signing_key` to reflect per-purpose key separation.
-    #[serde(
-        default = "Auth::default_session_signing_key",
-        alias = "jwt_signing_secret",
-        alias = "user_claim_token_pepper"
-    )]
-    pub session_signing_key: JwtSigningSecret,
+    /// Use this when passing the key via environment variable.
+    #[serde(default)]
+    pub private_key_pem: Option<String>,
 
-    /// The HMAC secret used to sign email-verification JWT tokens.
+    /// Inline RSA public key in PEM format (overrides `public_key_path`).
     ///
-    /// If absent, falls back to `session_signing_key` for backward
-    /// compatibility, but deployers should provide a separate value.
-    #[serde(default = "Auth::default_email_verification_signing_key")]
-    pub email_verification_signing_key: JwtSigningSecret,
+    /// Use this when passing the key via environment variable.
+    #[serde(default)]
+    pub public_key_pem: Option<String>,
+
+    /// Path to the RSA private key PEM file for JWT signing.
+    #[serde(default = "Auth::default_private_key_path")]
+    pub private_key_path: Option<String>,
+
+    /// Path to the RSA public key PEM file for JWT verification.
+    #[serde(default = "Auth::default_public_key_path")]
+    pub public_key_path: Option<String>,
 
     /// Session-token lifetime in seconds (default: 2 weeks).
     #[serde(default = "Auth::default_session_token_lifetime_secs")]
@@ -48,8 +68,10 @@ pub struct Auth {
 impl Default for Auth {
     fn default() -> Self {
         Self {
-            session_signing_key: Self::default_session_signing_key(),
-            email_verification_signing_key: Self::default_email_verification_signing_key(),
+            private_key_pem: None,
+            public_key_pem: None,
+            private_key_path: Self::default_private_key_path(),
+            public_key_path: Self::default_public_key_path(),
             session_token_lifetime_secs: Self::default_session_token_lifetime_secs(),
             email_verification_token_lifetime_secs: Self::default_email_verification_token_lifetime_secs(),
             password_constraints: Self::default_password_constraints(),
@@ -58,20 +80,14 @@ impl Default for Auth {
 }
 
 impl Auth {
-    pub fn override_session_signing_key(&mut self, secret: &str) {
-        self.session_signing_key = JwtSigningSecret::new(secret);
+    #[allow(clippy::unnecessary_wraps)] // serde default must match the field type
+    fn default_private_key_path() -> Option<String> {
+        Some(DEFAULT_PRIVATE_KEY_PATH.to_owned())
     }
 
-    pub fn override_email_verification_signing_key(&mut self, secret: &str) {
-        self.email_verification_signing_key = JwtSigningSecret::new(secret);
-    }
-
-    fn default_session_signing_key() -> JwtSigningSecret {
-        JwtSigningSecret::new("MaxVerstappenWC2021-session-key!")
-    }
-
-    fn default_email_verification_signing_key() -> JwtSigningSecret {
-        JwtSigningSecret::new("MaxVerstappenWC2021-emailverify!")
+    #[allow(clippy::unnecessary_wraps)] // serde default must match the field type
+    fn default_public_key_path() -> Option<String> {
+        Some(DEFAULT_PUBLIC_KEY_PATH.to_owned())
     }
 
     const fn default_session_token_lifetime_secs() -> u64 {
@@ -85,43 +101,75 @@ impl Auth {
     fn default_password_constraints() -> PasswordConstraints {
         PasswordConstraints::default()
     }
-}
 
-/// The HMAC signing secret for JWT tokens.
-///
-/// Renamed from `ClaimTokenPepper` (see ADR-T-007) — the old name
-/// incorrectly suggested a password-hashing "pepper" rather than a
-/// signing key.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct JwtSigningSecret(String);
-
-impl JwtSigningSecret {
-    /// Creates a new signing secret.
+    /// Resolve the RSA private key PEM bytes.
+    ///
+    /// Resolution order:
+    /// 1. Inline PEM (`private_key_pem`)
+    /// 2. File path (`private_key_path`)
+    /// 3. Fallback to default dev key path (with warning)
     ///
     /// # Panics
     ///
-    /// Will panic if the key is empty or shorter than 32 bytes.
+    /// Panics if no valid private key PEM can be resolved.
     #[must_use]
-    pub fn new(key: &str) -> Self {
-        assert!(!key.is_empty(), "secret key cannot be empty");
-        assert!(
-            key.len() >= MIN_SECRET_LENGTH,
-            "secret key must be at least {MIN_SECRET_LENGTH} bytes, got {}",
-            key.len()
+    pub fn resolve_private_key_pem(&self) -> Vec<u8> {
+        if let Some(ref pem) = self.private_key_pem {
+            return pem.as_bytes().to_vec();
+        }
+
+        if let Some(ref path) = self.private_key_path {
+            if Path::new(path).exists() {
+                if path == DEFAULT_PRIVATE_KEY_PATH {
+                    warn!(
+                        "Using the DEVELOPMENT RSA private key at `{path}`. \
+                         This key is PUBLIC and must NOT be used in production! \
+                         Generate your own key pair: \
+                         `openssl genrsa -out private.pem 2048 && openssl rsa -in private.pem -pubout -out public.pem`"
+                    );
+                }
+                return std::fs::read(path).unwrap_or_else(|e| panic!("Failed to read RSA private key from `{path}`: {e}"));
+            }
+        }
+
+        panic!(
+            "No RSA private key configured. Set `auth.private_key_path` or `auth.private_key_pem` in the configuration, \
+             or generate a key pair: `openssl genrsa -out private.pem 2048`"
         );
-
-        Self(key.to_owned())
     }
 
+    /// Resolve the RSA public key PEM bytes.
+    ///
+    /// Resolution order:
+    /// 1. Inline PEM (`public_key_pem`)
+    /// 2. File path (`public_key_path`)
+    /// 3. Fallback to default dev key path (with warning)
+    ///
+    /// # Panics
+    ///
+    /// Panics if no valid public key PEM can be resolved.
     #[must_use]
-    pub fn as_bytes(&self) -> &[u8] {
-        self.0.as_bytes()
-    }
-}
+    pub fn resolve_public_key_pem(&self) -> Vec<u8> {
+        if let Some(ref pem) = self.public_key_pem {
+            return pem.as_bytes().to_vec();
+        }
 
-impl fmt::Display for JwtSigningSecret {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        if let Some(ref path) = self.public_key_path {
+            if Path::new(path).exists() {
+                if path == DEFAULT_PUBLIC_KEY_PATH {
+                    warn!(
+                        "Using the DEVELOPMENT RSA public key at `{path}`. \
+                         This key is PUBLIC and must NOT be used in production!"
+                    );
+                }
+                return std::fs::read(path).unwrap_or_else(|e| panic!("Failed to read RSA public key from `{path}`: {e}"));
+            }
+        }
+
+        panic!(
+            "No RSA public key configured. Set `auth.public_key_path` or `auth.public_key_pem` in the configuration, \
+             or generate a key pair: `openssl rsa -in private.pem -pubout -out public.pem`"
+        );
     }
 }
 

@@ -28,7 +28,7 @@ where
         let app_data = Arc::from_ref(state);
 
         #[allow(clippy::option_if_let_else)]
-        let result = match app_data.auth.get_user_id_from_bearer_token(maybe_bearer_token).await {
+        let result = match app_data.auth.get_user_id_from_bearer_token(maybe_bearer_token) {
             Ok(user_id) => Ok(Self(user_id)),
             Err(_) => Err(AuthError::LoggedInUserNotFound.into_response()),
         };
