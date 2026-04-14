@@ -28,7 +28,7 @@ where
 
         #[allow(clippy::option_if_let_else)]
         match header {
-            Some(header_value) => Ok(Self(Some(BearerToken(parse_token(header_value))))),
+            Some(header_value) => Ok(Self(parse_token(header_value).ok().map(BearerToken))),
             None => Ok(Self(None)),
         }
     }

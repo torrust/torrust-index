@@ -5,7 +5,6 @@ use std::sync::Arc;
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
 use async_trait::async_trait;
-use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 #[cfg(test)]
 use mockall::automock;
 use pbkdf2::password_hash::rand_core::OsRng;
@@ -17,7 +16,7 @@ use super::authorization::{self, ACTION};
 use crate::config::{Configuration, PasswordConstraints};
 use crate::databases::database::{Database, Error, UsersFilters, UsersSorting};
 use crate::errors::UserError;
-use crate::mailer::VerifyClaims;
+use crate::jwt::JsonWebToken;
 use crate::models::response::UserProfilesResponse;
 use crate::models::user::{UserCompact, UserId, UserProfile, Username};
 use crate::services::authentication::verify_password;
@@ -56,6 +55,7 @@ pub struct ListingSpecification {
 
 pub struct RegistrationService {
     configuration: Arc<Configuration>,
+    json_web_token: Arc<JsonWebToken>,
     mailer: Arc<mailer::Service>,
     user_repository: Arc<Box<dyn Repository>>,
     user_profile_repository: Arc<DbUserProfileRepository>,
@@ -65,12 +65,14 @@ impl RegistrationService {
     #[must_use]
     pub fn new(
         configuration: Arc<Configuration>,
+        json_web_token: Arc<JsonWebToken>,
         mailer: Arc<mailer::Service>,
         user_repository: Arc<Box<dyn Repository>>,
         user_profile_repository: Arc<DbUserProfileRepository>,
     ) -> Self {
         Self {
             configuration,
+            json_web_token,
             mailer,
             user_repository,
             user_profile_repository,
@@ -184,24 +186,9 @@ impl RegistrationService {
     /// This function will return a `UserError::DatabaseError` if unable to
     /// update the user's email verification status.
     pub async fn verify_email(&self, token: &str) -> Result<bool, UserError> {
-        let settings = self.configuration.settings.read().await;
-
-        let token_data = match decode::<VerifyClaims>(
-            token,
-            &DecodingKey::from_secret(settings.auth.user_claim_token_pepper.as_bytes()),
-            &Validation::new(Algorithm::HS256),
-        ) {
-            Ok(token_data) => {
-                if !token_data.claims.iss.eq("email-verification") {
-                    return Ok(false);
-                }
-
-                token_data.claims
-            }
-            Err(_) => return Ok(false),
+        let Ok(token_data) = self.json_web_token.verify_email_token(token).await else {
+            return Ok(false);
         };
-
-        drop(settings);
 
         let user_id = token_data.sub;
 

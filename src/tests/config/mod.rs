@@ -97,7 +97,7 @@ fn configuration_should_use_the_default_values_when_only_the_mandatory_options_a
                 token = "MyAccessToken"
 
                 [auth]
-                user_claim_token_pepper = "MaxVerstappenWC2021"
+                jwt_signing_secret = "MaxVerstappenWC2021"
             "#,
         )?;
 
@@ -129,7 +129,7 @@ fn configuration_should_use_the_default_values_when_only_the_mandatory_options_a
                 token = "MyAccessToken"
 
                 [auth]
-                user_claim_token_pepper = "MaxVerstappenWC2021"
+                jwt_signing_secret = "MaxVerstappenWC2021"
             "#
         .to_string();
 
@@ -170,13 +170,13 @@ async fn configuration_should_allow_to_override_the_tracker_api_token_provided_i
 
 #[tokio::test]
 #[allow(clippy::result_large_err)]
-async fn configuration_should_allow_to_override_the_authentication_user_claim_token_pepper_provided_in_the_toml_file() {
+async fn configuration_should_allow_to_override_the_authentication_jwt_signing_secret_provided_in_the_toml_file() {
     figment::Jail::expect_with(|jail| {
         jail.create_dir("templates")?;
         jail.create_file("templates/verify.html", "EMAIL TEMPLATE")?;
 
         jail.set_env(
-            "TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__USER_CLAIM_TOKEN_PEPPER",
+            "TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__JWT_SIGNING_SECRET",
             "OVERRIDDEN AUTH SECRET KEY",
         );
 
@@ -187,10 +187,7 @@ async fn configuration_should_allow_to_override_the_authentication_user_claim_to
 
         let settings = Configuration::load_settings(&info).expect("Could not load configuration from file");
 
-        assert_eq!(
-            settings.auth.user_claim_token_pepper,
-            SecretKey::new("OVERRIDDEN AUTH SECRET KEY")
-        );
+        assert_eq!(settings.auth.jwt_signing_secret, SecretKey::new("OVERRIDDEN AUTH SECRET KEY"));
 
         Ok(())
     });

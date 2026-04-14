@@ -49,8 +49,9 @@
 //!   }
 //! ```
 //!
-//! **NOTICE**: The token is valid for 2 weeks (`1_209_600` seconds). After that,
-//! you will have to renew the token.
+//! **NOTICE**: The token lifetime is configurable via
+//! `auth.session_token_lifetime_secs` (default: 2 weeks / `1_209_600` seconds).
+//! After expiry you will have to renew the token.
 //!
 //! **NOTICE**: The token is associated with the user role. If you change the
 //! user's role, you will have to log in again to get a new token with the new
@@ -84,8 +85,8 @@ use hyper::http::HeaderValue;
 
 use crate::common::AppData;
 use crate::errors::AuthError;
-use crate::models::user::{UserClaims, UserCompact, UserId};
-use crate::services::authentication::JsonWebToken;
+use crate::jwt::{JsonWebToken, UserClaims};
+use crate::models::user::{UserCompact, UserId};
 use crate::web::api::server::v1::extractors::bearer_token::BearerToken;
 
 pub struct Authentication {
@@ -99,7 +100,11 @@ impl Authentication {
     }
 
     /// Create Json Web Token
-    pub async fn sign_jwt(&self, user: UserCompact) -> String {
+    ///
+    /// # Errors
+    ///
+    /// Returns `AuthError::InternalServerError` if the token cannot be encoded.
+    pub async fn sign_jwt(&self, user: UserCompact) -> Result<String, AuthError> {
         self.json_web_token.sign(user).await
     }
 
@@ -143,17 +148,20 @@ impl Authentication {
 
 /// Parses the token from the `Authorization` header.
 ///
-/// # Panics
+/// # Errors
 ///
-/// This function will panic if the `Authorization` header is not a valid `String`.
-pub fn parse_token(authorization: &HeaderValue) -> String {
-    let split: Vec<&str> = authorization
-        .to_str()
-        .expect("variable `auth` contains data that is not visible ASCII chars.")
-        .split("Bearer")
-        .collect();
-    let token = split[1].trim();
-    token.to_string()
+/// Returns `AuthError::TokenInvalid` if the header value is not valid
+/// ASCII or does not contain a `Bearer <token>` pair.
+pub fn parse_token(authorization: &HeaderValue) -> Result<String, AuthError> {
+    let header_str = authorization.to_str().map_err(|_| AuthError::TokenInvalid)?;
+
+    let token = header_str.strip_prefix("Bearer").ok_or(AuthError::TokenInvalid)?.trim();
+
+    if token.is_empty() {
+        return Err(AuthError::TokenInvalid);
+    }
+
+    Ok(token.to_string())
 }
 
 /// If the user is logged in, returns the user's ID. Otherwise, returns `None`.

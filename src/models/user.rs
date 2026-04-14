@@ -67,13 +67,6 @@ pub struct UserListing {
     pub administrator: bool,
 }
 
-#[allow(clippy::module_name_repetitions)]
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct UserClaims {
-    pub user: UserCompact,
-    pub exp: u64, // epoch in seconds
-}
-
 pub(crate) const MAX_USERNAME_LENGTH: usize = 20;
 const USERNAME_VALIDATION_ERROR_MSG: &str = "Usernames must consist of 1-20 alphanumeric characters, dashes, or underscore";
 

@@ -17,7 +17,7 @@ token = "MyAccessToken"
 url = "udp://tracker:6969"
 
 [auth]
-user_claim_token_pepper = "MaxVerstappenWC2021"
+jwt_signing_secret = "MaxVerstappenWC2021"
 
 [database]
 connect_url = "sqlite:///var/lib/torrust/index/database/e2e_testing_sqlite3.db?mode=rwc"

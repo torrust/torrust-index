@@ -55,7 +55,7 @@ pub struct Network {
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Auth {
-    pub user_claim_token_pepper: String,
+    pub jwt_signing_secret: String,
     pub password_constraints: PasswordConstraints,
 }
 
@@ -179,7 +179,7 @@ impl From<DomainNetwork> for Network {
 impl From<DomainAuth> for Auth {
     fn from(auth: DomainAuth) -> Self {
         Self {
-            user_claim_token_pepper: auth.user_claim_token_pepper.to_string(),
+            jwt_signing_secret: auth.jwt_signing_secret.to_string(),
             password_constraints: auth.password_constraints.into(),
         }
     }

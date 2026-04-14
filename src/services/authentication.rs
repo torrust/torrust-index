@@ -2,14 +2,16 @@
 use std::sync::Arc;
 
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use pbkdf2::Pbkdf2;
 
 use super::user::DbUserProfileRepository;
 use crate::config::Configuration;
 use crate::databases::database::{Database, Error};
 use crate::errors::AuthError;
-use crate::models::user::{UserAuthentication, UserClaims, UserCompact, UserId};
+// Re-export so that existing `use crate::services::authentication::JsonWebToken`
+// paths keep compiling.
+pub use crate::jwt::JsonWebToken;
+use crate::models::user::{UserAuthentication, UserCompact, UserId};
 use crate::services::user::Repository;
 use crate::utils::clock;
 
@@ -91,7 +93,7 @@ impl Service {
             })?;
 
         // Sign JWT with compact user details as payload
-        let token = self.json_web_token.sign(user_compact.clone()).await;
+        let token = self.json_web_token.sign(user_compact.clone()).await?;
 
         Ok((token, user_compact))
     }
@@ -121,64 +123,11 @@ impl Service {
 
         // Renew token if it is valid for less than one week
         let token = match claims.exp - clock::now() {
-            x if x < ONE_WEEK_IN_SECONDS => self.json_web_token.sign(user_compact.clone()).await,
+            x if x < ONE_WEEK_IN_SECONDS => self.json_web_token.sign(user_compact.clone()).await?,
             _ => token.to_string(),
         };
 
         Ok((token, user_compact))
-    }
-}
-
-pub struct JsonWebToken {
-    cfg: Arc<Configuration>,
-}
-
-impl JsonWebToken {
-    pub const fn new(cfg: Arc<Configuration>) -> Self {
-        Self { cfg }
-    }
-
-    /// Create Json Web Token.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the default encoding algorithm does not ç
-    /// match the encoding key.
-    pub async fn sign(&self, user: UserCompact) -> String {
-        let key = self.cfg.settings.read().await.auth.user_claim_token_pepper.clone();
-
-        // Create JWT that expires in two weeks
-        let key = key.as_bytes();
-
-        // todo: create config option for setting the token validity in seconds.
-        let exp_date = clock::now() + 1_209_600; // two weeks from now
-
-        let claims = UserClaims { user, exp: exp_date };
-
-        encode(&Header::default(), &claims, &EncodingKey::from_secret(key)).expect("argument `Header` should match `EncodingKey`")
-    }
-
-    /// Verify Json Web Token.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the JWT is not good or expired.
-    pub async fn verify(&self, token: &str) -> Result<UserClaims, AuthError> {
-        let settings = self.cfg.settings.read().await;
-
-        match decode::<UserClaims>(
-            token,
-            &DecodingKey::from_secret(settings.auth.user_claim_token_pepper.as_bytes()),
-            &Validation::new(Algorithm::HS256),
-        ) {
-            Ok(token_data) => {
-                if token_data.claims.exp < clock::now() {
-                    return Err(AuthError::TokenExpired);
-                }
-                Ok(token_data.claims)
-            }
-            Err(_) => Err(AuthError::TokenInvalid),
-        }
     }
 }
 

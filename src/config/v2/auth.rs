@@ -2,14 +2,28 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+/// Default session-token lifetime: 2 weeks (1 209 600 s).
+const DEFAULT_SESSION_TOKEN_LIFETIME_SECS: u64 = 1_209_600;
+
+/// Default email-verification-token lifetime: ~10 years (315 569 260 s).
+const DEFAULT_EMAIL_VERIFICATION_TOKEN_LIFETIME_SECS: u64 = 315_569_260;
+
 /// Authentication options.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Auth {
-    /// The secret key used to sign JWT tokens.
-    #[serde(default = "Auth::default_user_claim_token_pepper")]
-    pub user_claim_token_pepper: ClaimTokenPepper,
+    /// The HMAC secret used to sign JWT tokens.
+    #[serde(default = "Auth::default_jwt_signing_secret")]
+    pub jwt_signing_secret: JwtSigningSecret,
 
-    /// The password constraints
+    /// Session-token lifetime in seconds (default: 2 weeks).
+    #[serde(default = "Auth::default_session_token_lifetime_secs")]
+    pub session_token_lifetime_secs: u64,
+
+    /// Email-verification-token lifetime in seconds (default: ~10 years).
+    #[serde(default = "Auth::default_email_verification_token_lifetime_secs")]
+    pub email_verification_token_lifetime_secs: u64,
+
+    /// The password constraints.
     #[serde(default = "Auth::default_password_constraints")]
     pub password_constraints: PasswordConstraints,
 }
@@ -17,19 +31,29 @@ pub struct Auth {
 impl Default for Auth {
     fn default() -> Self {
         Self {
+            jwt_signing_secret: Self::default_jwt_signing_secret(),
+            session_token_lifetime_secs: Self::default_session_token_lifetime_secs(),
+            email_verification_token_lifetime_secs: Self::default_email_verification_token_lifetime_secs(),
             password_constraints: Self::default_password_constraints(),
-            user_claim_token_pepper: Self::default_user_claim_token_pepper(),
         }
     }
 }
 
 impl Auth {
-    pub fn override_user_claim_token_pepper(&mut self, user_claim_token_pepper: &str) {
-        self.user_claim_token_pepper = ClaimTokenPepper::new(user_claim_token_pepper);
+    pub fn override_jwt_signing_secret(&mut self, secret: &str) {
+        self.jwt_signing_secret = JwtSigningSecret::new(secret);
     }
 
-    fn default_user_claim_token_pepper() -> ClaimTokenPepper {
-        ClaimTokenPepper::new("MaxVerstappenWC2021")
+    fn default_jwt_signing_secret() -> JwtSigningSecret {
+        JwtSigningSecret::new("MaxVerstappenWC2021")
+    }
+
+    const fn default_session_token_lifetime_secs() -> u64 {
+        DEFAULT_SESSION_TOKEN_LIFETIME_SECS
+    }
+
+    const fn default_email_verification_token_lifetime_secs() -> u64 {
+        DEFAULT_EMAIL_VERIFICATION_TOKEN_LIFETIME_SECS
     }
 
     fn default_password_constraints() -> PasswordConstraints {
@@ -37,13 +61,18 @@ impl Auth {
     }
 }
 
+/// The HMAC signing secret for JWT tokens.
+///
+/// Renamed from `ClaimTokenPepper` (see ADR-T-007) — the old name
+/// incorrectly suggested a password-hashing "pepper" rather than a
+/// signing key.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ClaimTokenPepper(String);
+pub struct JwtSigningSecret(String);
 
-impl ClaimTokenPepper {
+impl JwtSigningSecret {
     /// # Panics
     ///
-    /// Will panic if the key if empty.
+    /// Will panic if the key is empty.
     #[must_use]
     pub fn new(key: &str) -> Self {
         assert!(!key.is_empty(), "secret key cannot be empty");
@@ -57,7 +86,7 @@ impl ClaimTokenPepper {
     }
 }
 
-impl fmt::Display for ClaimTokenPepper {
+impl fmt::Display for JwtSigningSecret {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }

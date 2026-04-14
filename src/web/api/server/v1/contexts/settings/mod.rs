@@ -54,7 +54,9 @@
 //!       "tsl": null
 //!     },
 //!     "auth": {
-//!       "user_claim_token_pepper": "***",
+//!       "jwt_signing_secret": "***",
+//!       "session_token_lifetime_secs": 1209600,
+//!       "email_verification_token_lifetime_secs": 315569260,
 //!       "password_constraints": {
 //!         "max_password_length": 64,
 //!         "min_password_length": 6

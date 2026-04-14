@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use unstable::Unstable;
 
 use self::api::Api;
-use self::auth::{Auth, ClaimTokenPepper};
+use self::auth::{Auth, JwtSigningSecret};
 use self::database::Database;
 use self::image_cache::ImageCache;
 use self::mail::Mail;
@@ -111,7 +111,7 @@ impl Settings {
             let _ = self.database.connect_url.set_password(Some("***"));
         }
         "***".clone_into(&mut self.mail.smtp.credentials.password);
-        self.auth.user_claim_token_pepper = ClaimTokenPepper::new("***");
+        self.auth.jwt_signing_secret = JwtSigningSecret::new("***");
     }
 
     /// Encodes the configuration to TOML.

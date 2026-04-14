@@ -107,7 +107,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let tracker_service = Arc::new(tracker::service::Service::new(configuration.clone(), database.clone()).await);
     let tracker_statistics_importer =
         Arc::new(StatisticsImporter::new(configuration.clone(), tracker_service.clone(), database.clone()).await);
-    let mailer_service = Arc::new(mailer::Service::new(configuration.clone()).await);
+    let mailer_service = Arc::new(mailer::Service::new(configuration.clone(), json_web_token.clone()).await);
     let image_cache_service: Arc<ImageCacheService> = Arc::new(ImageCacheService::new(configuration.clone()).await);
     let category_service = Arc::new(category::Service::new(
         category_repository.clone(),
@@ -136,6 +136,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     ));
     let registration_service = Arc::new(user::RegistrationService::new(
         configuration.clone(),
+        json_web_token.clone(),
         mailer_service.clone(),
         user_repository.clone(),
         user_profile_repository.clone(),

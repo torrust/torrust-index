@@ -15,7 +15,7 @@ threshold = "info"
 token = "MyAccessToken"
 
 [auth]
-user_claim_token_pepper = "MaxVerstappenWC2021"
+jwt_signing_secret = "MaxVerstappenWC2021"
 
 [database]
 connect_url = "sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc"

@@ -45,7 +45,7 @@
 //!
 //! ```toml
 //! [auth]
-//! user_claim_token_pepper = "MaxVerstappenWC2021"
+//! jwt_signing_secret = "MaxVerstappenWC2021"
 //! ```
 //!
 //! Refer to the [`RegistrationForm`](crate::web::api::server::v1::contexts::user::forms::RegistrationForm)
