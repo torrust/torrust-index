@@ -3,17 +3,24 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use bytes::Bytes;
+use thiserror::Error;
 use tokio::sync::RwLock;
 
 use crate::cache::BytesCache;
 use crate::config::Configuration;
 use crate::models::user::UserId;
 
+#[derive(Debug, Error)]
 pub enum Error {
+    #[error("URL is unreachable")]
     UrlIsUnreachable,
+    #[error("URL is not an image")]
     UrlIsNotAnImage,
+    #[error("image is too big")]
     ImageTooBig,
+    #[error("user quota met")]
     UserQuotaMet,
+    #[error("unauthenticated")]
     Unauthenticated,
 }
 

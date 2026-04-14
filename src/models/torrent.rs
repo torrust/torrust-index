@@ -1,5 +1,5 @@
-use derive_more::{Display, Error};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use super::category::CategoryId;
 use super::torrent_tag::TagId;
@@ -30,12 +30,12 @@ pub struct TorrentListing {
     pub encoding: Option<String>,
 }
 
-#[derive(Debug, Display, PartialEq, Eq, Error)]
+#[derive(Debug, PartialEq, Eq, Error)]
 pub enum MetadataError {
-    #[display("Missing mandatory torrent title.")]
+    #[error("Missing mandatory torrent title.")]
     MissingTorrentTitle,
 
-    #[display("Torrent title is too short.")]
+    #[error("Torrent title is too short.")]
     InvalidTorrentTitleLength,
 }
 

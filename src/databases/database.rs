@@ -1,10 +1,10 @@
-use std::fmt;
 use std::str::FromStr;
 
 use async_trait::async_trait;
 use bittorrent_primitives::info_hash::InfoHash;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use url::Url;
 
 use crate::databases::mysql::Mysql;
@@ -100,16 +100,9 @@ impl FromStr for UsersSorting {
 }
 
 // Custom error type for parsing failures
-#[derive(Debug)]
+#[derive(Debug, Error)]
+#[error("Invalid sorting option")]
 pub struct UsersSortingParseError;
-
-impl fmt::Display for UsersSortingParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Invalid sorting option")
-    }
-}
-
-impl std::error::Error for UsersSortingParseError {}
 
 /// Sorting options for users.
 #[derive(Clone, Copy, Debug, Deserialize)]
@@ -133,32 +126,38 @@ impl FromStr for UsersFilters {
 }
 
 // Custom error type for parsing failures
-#[derive(Debug)]
+#[derive(Debug, Error)]
+#[error("Invalid filter option")]
 pub struct UsersFiltersParseError;
 
-impl fmt::Display for UsersFiltersParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Invalid filter option")
-    }
-}
-
-impl std::error::Error for UsersFiltersParseError {}
-
 /// Database errors.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
+    #[error("database error")]
     Error,
+    #[error("{0}")]
     ErrorWithText(String),
-    UnrecognizedDatabaseDriver, // when the db path does not start with sqlite or mysql
+    #[error("unrecognized database driver")]
+    UnrecognizedDatabaseDriver,
+    #[error("username already taken")]
     UsernameTaken,
+    #[error("email already taken")]
     EmailTaken,
+    #[error("user not found")]
     UserNotFound,
+    #[error("category not found")]
     CategoryNotFound,
+    #[error("tag already exists")]
     TagAlreadyExists,
+    #[error("tag not found")]
     TagNotFound,
+    #[error("torrent not found")]
     TorrentNotFound,
-    TorrentAlreadyExists, // when uploading an already uploaded info_hash
+    #[error("torrent already exists")]
+    TorrentAlreadyExists,
+    #[error("torrent title already exists")]
     TorrentTitleAlreadyExists,
+    #[error("torrent info hash not found")]
     TorrentInfoHashNotFound,
 }
 

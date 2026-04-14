@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use derive_more::{Display, Error};
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tracing::{debug, error};
 use url::Url;
 
@@ -12,34 +12,34 @@ use crate::databases::database::Database;
 use crate::models::tracker_key::TrackerKey;
 use crate::models::user::UserId;
 
-#[derive(Debug, Display, PartialEq, Eq, Error)]
+#[derive(Debug, PartialEq, Eq, Error)]
 #[allow(dead_code)]
 pub enum TrackerAPIError {
-    #[display("Error with tracker request: {error}.")]
+    #[error("Error with tracker request: {error}.")]
     TrackerOffline { error: String },
 
-    #[display("Invalid token for tracker API. Check the tracker token in settings.")]
+    #[error("Invalid token for tracker API. Check the tracker token in settings.")]
     InvalidToken,
 
-    #[display("Tracker returned an internal server error.")]
+    #[error("Tracker returned an internal server error.")]
     InternalServerError,
 
-    #[display("Tracker returned a not found error.")]
+    #[error("Tracker returned a not found error.")]
     NotFound,
 
-    #[display("Tracker returned an unexpected response status.")]
+    #[error("Tracker returned an unexpected response status.")]
     UnexpectedResponseStatus,
 
-    #[display("Could not save the newly generated user key into the database.")]
+    #[error("Could not save the newly generated user key into the database.")]
     CannotSaveUserKey,
 
-    #[display("Torrent not found.")]
+    #[error("Torrent not found.")]
     TorrentNotFound,
 
-    #[display("Expected body in tracker response, received empty body.")]
+    #[error("Expected body in tracker response, received empty body.")]
     MissingResponseBody,
 
-    #[display("Expected body in tracker response, received empty body.")]
+    #[error("Expected body in tracker response, received empty body.")]
     FailedToParseTrackerResponse { body: String },
 }
 

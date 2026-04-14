@@ -131,7 +131,6 @@ use std::str::FromStr;
 use std::thread::sleep;
 use std::time::Duration;
 
-use anyhow::Context;
 use clap::Parser;
 use reqwest::Url;
 use text_colorizer::Colorize;
@@ -171,12 +170,12 @@ struct Args {
 /// # Errors
 ///
 /// Will not return any errors for the time being.
-pub async fn run() -> anyhow::Result<()> {
+pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     logging::setup(LevelFilter::INFO);
 
     let args = Args::parse();
 
-    let api_url = Url::from_str(&args.api_base_url).context("failed to parse API base URL")?;
+    let api_url = Url::from_str(&args.api_base_url)?;
 
     let api_user = login_index_api(&api_url, &args.user, &args.password).await;
 
@@ -191,7 +190,7 @@ pub async fn run() -> anyhow::Result<()> {
             Ok(uploaded_torrent) => {
                 debug!(target:"seeder", "Uploaded torrent {uploaded_torrent:?}");
 
-                let json = serde_json::to_string(&uploaded_torrent).context("failed to serialize upload response into JSON")?;
+                let json = serde_json::to_string(&uploaded_torrent)?;
 
                 info!(target:"seeder", "Uploaded torrent: {}", json.yellow());
             }

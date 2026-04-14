@@ -1,8 +1,9 @@
 use std::borrow::Cow;
 use std::error;
 
-use derive_more::{Display, Error};
 use hyper::StatusCode;
+use thiserror::Error;
+use tracing::error;
 
 use crate::databases::database;
 use crate::models::torrent::MetadataError;
@@ -11,182 +12,182 @@ use crate::utils::parse_torrent::DecodeTorrentFileError;
 
 pub type ServiceResult<V> = Result<V, ServiceError>;
 
-#[derive(Debug, Display, PartialEq, Eq, Error)]
+#[derive(Debug, PartialEq, Eq, Error)]
 #[allow(dead_code)]
 pub enum ServiceError {
-    #[display("internal server error")]
+    #[error("internal server error")]
     InternalServerError,
 
-    #[display("This server is is closed for registration. Contact admin if this is unexpected")]
+    #[error("This server is is closed for registration. Contact admin if this is unexpected")]
     ClosedForRegistration,
 
-    #[display("Email is required")] //405j
+    #[error("Email is required")] //405j
     EmailMissing,
-    #[display("Please enter a valid email address")] //405j
+    #[error("Please enter a valid email address")] //405j
     EmailInvalid,
 
-    #[display("The value you entered for URL is not a URL")] //405j
+    #[error("The value you entered for URL is not a URL")] //405j
     NotAUrl,
 
-    #[display("Invalid username/email or password")]
+    #[error("Invalid username/email or password")]
     WrongPasswordOrUsername,
-    #[display("Invalid password")]
+    #[error("Invalid password")]
     InvalidPassword,
-    #[display("Username not found")]
+    #[error("Username not found")]
     UsernameNotFound,
-    #[display("User not found")]
+    #[error("User not found")]
     UserNotFound,
 
-    #[display("Account not found")]
+    #[error("Account not found")]
     AccountNotFound,
 
     /// when the value passed contains profanity
-    #[display("Can't allow profanity in usernames")]
+    #[error("Can't allow profanity in usernames")]
     ProfanityError,
     /// when the value passed contains blacklisted words
     /// see [blacklist](https://github.com/shuttlecraft/The-Big-Username-Blacklist)
-    #[display("Username contains blacklisted words")]
+    #[error("Username contains blacklisted words")]
     BlacklistError,
     /// when the value passed contains characters not present
     /// in [UsernameCaseMapped](https://tools.ietf.org/html/rfc8265#page-7)
     /// profile
-    #[display("username_case_mapped violation")]
+    #[error("username_case_mapped violation")]
     UsernameCaseMappedError,
 
-    #[display("Password too short")]
+    #[error("Password too short")]
     PasswordTooShort,
-    #[display("Password too long")]
+    #[error("Password too long")]
     PasswordTooLong,
-    #[display("Passwords don't match")]
+    #[error("Passwords don't match")]
     PasswordsDontMatch,
 
     /// when the a username is already taken
-    #[display("Username not available")]
+    #[error("Username not available")]
     UsernameTaken,
 
-    #[display("Invalid username. Usernames must consist of 1-20 alphanumeric characters, dashes, or underscore")]
+    #[error("Invalid username. Usernames must consist of 1-20 alphanumeric characters, dashes, or underscore")]
     UsernameInvalid,
 
     /// email is already taken
-    #[display("Email not available")]
+    #[error("Email not available")]
     EmailTaken,
 
-    #[display("Please verify your email before logging in")]
+    #[error("Please verify your email before logging in")]
     EmailNotVerified,
 
     /// when the a token name is already taken
     /// token not found
-    #[display("Token not found. Please sign in.")]
+    #[error("Token not found. Please sign in.")]
     TokenNotFound,
 
     /// token expired
-    #[display("Token expired. Please sign in again.")]
+    #[error("Token expired. Please sign in again.")]
     TokenExpired,
 
-    #[display("Token invalid.")]
     /// token invalid
+    #[error("Token invalid.")]
     TokenInvalid,
 
-    #[display("Uploaded torrent is not valid.")]
+    #[error("Uploaded torrent is not valid.")]
     InvalidTorrentFile,
 
-    #[display("Uploaded torrent has an invalid pieces key.")]
+    #[error("Uploaded torrent has an invalid pieces key.")]
     InvalidTorrentPiecesLength,
 
-    #[display("Only .torrent files can be uploaded.")]
+    #[error("Only .torrent files can be uploaded.")]
     InvalidFileType,
 
-    #[display("Torrent title is too short.")]
+    #[error("Torrent title is too short.")]
     InvalidTorrentTitleLength,
 
-    #[display("Some mandatory metadata fields are missing.")]
+    #[error("Some mandatory metadata fields are missing.")]
     MissingMandatoryMetadataFields,
 
-    #[display("Selected category does not exist.")]
+    #[error("Selected category does not exist.")]
     InvalidCategory,
 
-    #[display("Selected tag does not exist.")]
+    #[error("Selected tag does not exist.")]
     InvalidTag,
 
-    #[display("Unauthorized action.")]
+    #[error("Unauthorized action.")]
     UnauthorizedAction,
 
-    #[display("Unauthorized actions for guest users. Try logging in to check if you have permission to perform the action")]
+    #[error("Unauthorized actions for guest users. Try logging in to check if you have permission to perform the action")]
     UnauthorizedActionForGuests,
 
-    #[display("This torrent already exists in our database.")]
+    #[error("This torrent already exists in our database.")]
     InfoHashAlreadyExists,
 
-    #[display("A torrent with the same canonical infohash already exists in our database.")]
+    #[error("A torrent with the same canonical infohash already exists in our database.")]
     CanonicalInfoHashAlreadyExists,
 
-    #[display("A torrent with the same original infohash already exists in our database.")]
+    #[error("A torrent with the same original infohash already exists in our database.")]
     OriginalInfoHashAlreadyExists,
 
-    #[display("This torrent title has already been used.")]
+    #[error("This torrent title has already been used.")]
     TorrentTitleAlreadyExists,
 
-    #[display("Could not whitelist torrent.")]
+    #[error("Could not whitelist torrent.")]
     WhitelistingError,
 
-    #[display("Failed to send verification email.")]
+    #[error("Failed to send verification email.")]
     FailedToSendVerificationEmail,
 
-    #[display("Category already exists.")]
+    #[error("Category already exists.")]
     CategoryAlreadyExists,
 
-    #[display("Category name cannot be empty.")]
+    #[error("Category name cannot be empty.")]
     CategoryNameEmpty,
 
-    #[display("Tag already exists.")]
+    #[error("Tag already exists.")]
     TagAlreadyExists,
 
-    #[display("Tag name cannot be empty.")]
+    #[error("Tag name cannot be empty.")]
     TagNameEmpty,
 
-    #[display("Torrent not found.")]
+    #[error("Torrent not found.")]
     TorrentNotFound,
 
-    #[display("Category not found.")]
+    #[error("Category not found.")]
     CategoryNotFound,
 
-    #[display("Tag not found.")]
+    #[error("Tag not found.")]
     TagNotFound,
 
-    #[display("Database error.")]
+    #[error("Database error.")]
     DatabaseError,
 
-    #[display("Authentication error, please sign in")]
+    #[error("Authentication error, please sign in")]
     LoggedInUserNotFound,
 
     // Begin tracker errors
-    #[display("Sorry, we have an error with our tracker connection.")]
+    #[error("Sorry, we have an error with our tracker connection.")]
     TrackerOffline,
 
-    #[display("Tracker response error. The operation could not be performed.")]
+    #[error("Tracker response error. The operation could not be performed.")]
     TrackerResponseError,
 
-    #[display("Tracker unknown response. Unexpected response from tracker. For example, if it can't be parsed.")]
+    #[error("Tracker unknown response. Unexpected response from tracker. For example, if it can't be parsed.")]
     TrackerUnknownResponse,
 
-    #[display("Torrent not found in tracker.")]
+    #[error("Torrent not found in tracker.")]
     TorrentNotFoundInTracker,
 
-    #[display("Invalid tracker API token.")]
+    #[error("Invalid tracker API token.")]
     InvalidTrackerToken,
     // End tracker errors
-    #[display("Invalid user listing fields in the URL params.")]
+    #[error("Invalid user listing fields in the URL params.")]
     InvalidUserListing,
 }
 
 impl From<sqlx::Error> for ServiceError {
     fn from(e: sqlx::Error) -> Self {
-        eprintln!("{e:?}");
+        error!(error = %e, "sqlx error");
 
         if let Some(err) = e.as_database_error() {
             return if err.code() == Some(Cow::from("2067")) {
                 if err.message().contains("torrust_torrents.info_hash") {
-                    println!("info_hash already exists {}", err.message());
+                    error!("info_hash already exists: {}", err.message());
                     Self::InfoHashAlreadyExists
                 } else {
                     Self::InternalServerError
@@ -208,35 +209,35 @@ impl From<database::Error> for ServiceError {
 
 impl From<argon2::password_hash::Error> for ServiceError {
     fn from(e: argon2::password_hash::Error) -> Self {
-        eprintln!("{e}");
+        error!(error = %e, "password hashing error");
         Self::InternalServerError
     }
 }
 
 impl From<std::io::Error> for ServiceError {
     fn from(e: std::io::Error) -> Self {
-        eprintln!("{e}");
+        error!(error = %e, "I/O error");
         Self::InternalServerError
     }
 }
 
 impl From<Box<dyn error::Error>> for ServiceError {
     fn from(e: Box<dyn error::Error>) -> Self {
-        eprintln!("{e}");
+        error!(error = %e, "boxed error");
         Self::InternalServerError
     }
 }
 
 impl From<serde_json::Error> for ServiceError {
     fn from(e: serde_json::Error) -> Self {
-        eprintln!("{e}");
+        error!(error = %e, "JSON error");
         Self::InternalServerError
     }
 }
 
 impl From<MetadataError> for ServiceError {
     fn from(e: MetadataError) -> Self {
-        eprintln!("{e}");
+        error!(error = %e, "metadata error");
         match e {
             MetadataError::MissingTorrentTitle => Self::MissingMandatoryMetadataFields,
             MetadataError::InvalidTorrentTitleLength => Self::InvalidTorrentTitleLength,
@@ -246,7 +247,7 @@ impl From<MetadataError> for ServiceError {
 
 impl From<DecodeTorrentFileError> for ServiceError {
     fn from(e: DecodeTorrentFileError) -> Self {
-        eprintln!("{e}");
+        error!(error = %e, "torrent file decode error");
         match e {
             DecodeTorrentFileError::InvalidTorrentPiecesLength => Self::InvalidTorrentTitleLength,
             DecodeTorrentFileError::CannotBencodeInfoDict
@@ -258,7 +259,7 @@ impl From<DecodeTorrentFileError> for ServiceError {
 
 impl From<TrackerAPIError> for ServiceError {
     fn from(e: TrackerAPIError) -> Self {
-        eprintln!("{e}");
+        error!(error = %e, "tracker API error");
         match e {
             TrackerAPIError::TrackerOffline { error: _ } => Self::TrackerOffline,
             TrackerAPIError::InternalServerError | TrackerAPIError::NotFound => Self::TrackerResponseError,

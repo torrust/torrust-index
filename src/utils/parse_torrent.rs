@@ -1,26 +1,26 @@
 use std::error;
 
 use bittorrent_primitives::info_hash::InfoHash;
-use derive_more::{Display, Error};
 use serde::{Deserialize, Serialize};
 use serde_bencode::value::Value;
 use serde_bencode::{Error as SerdeError, de};
 use sha1::{Digest, Sha1};
+use thiserror::Error;
 
 use crate::models::torrent_file::Torrent;
 
-#[derive(Debug, Display, PartialEq, Eq, Error)]
+#[derive(Debug, PartialEq, Eq, Error)]
 pub enum DecodeTorrentFileError {
-    #[display("Torrent data could not be decoded from the bencoded format.")]
+    #[error("Torrent data could not be decoded from the bencoded format.")]
     InvalidBencodeData,
 
-    #[display("Torrent info dictionary key could not be decoded from the bencoded format.")]
+    #[error("Torrent info dictionary key could not be decoded from the bencoded format.")]
     InvalidInfoDictionary,
 
-    #[display("Torrent has an invalid pieces key length. It should be a multiple of 20.")]
+    #[error("Torrent has an invalid pieces key length. It should be a multiple of 20.")]
     InvalidTorrentPiecesLength,
 
-    #[display("Cannot bencode the parsed `info` dictionary again to generate the info-hash.")]
+    #[error("Cannot bencode the parsed `info` dictionary again to generate the info-hash.")]
     CannotBencodeInfoDict,
 }
 

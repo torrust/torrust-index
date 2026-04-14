@@ -24,8 +24,8 @@
 use std::env;
 use std::sync::Arc;
 
-use derive_more::{Display, Error};
 use text_colorizer::Colorize;
+use thiserror::Error;
 
 use crate::bootstrap::config::initialize_configuration;
 use crate::bootstrap::logging;
@@ -35,10 +35,10 @@ use crate::tracker::statistics_importer::StatisticsImporter;
 
 const NUMBER_OF_ARGUMENTS: usize = 0;
 
-#[derive(Debug, Display, PartialEq, Eq, Error)]
+#[derive(Debug, PartialEq, Eq, Error)]
 #[allow(dead_code)]
 pub enum ImportError {
-    #[display("internal server error")]
+    #[error("internal server error")]
     WrongNumberOfArgumentsError,
 }
 

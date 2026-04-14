@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 #[allow(clippy::module_name_repetitions)]
 pub type UserId = i64;
@@ -76,20 +77,11 @@ pub struct UserClaims {
 pub(crate) const MAX_USERNAME_LENGTH: usize = 20;
 const USERNAME_VALIDATION_ERROR_MSG: &str = "Usernames must consist of 1-20 alphanumeric characters, dashes, or underscore";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Error)]
+#[error("UsernameParseError: {message}")]
 pub struct UsernameParseError {
     message: String,
 }
-
-// Implement std::fmt::Display for UsernameParseError
-impl fmt::Display for UsernameParseError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "UsernameParseError: {}", self.message)
-    }
-}
-
-// Implement std::error::Error for UsernameParseError
-impl std::error::Error for UsernameParseError {}
 
 pub struct Username(String);
 

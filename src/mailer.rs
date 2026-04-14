@@ -9,6 +9,7 @@ use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 use serde::{Deserialize, Serialize};
 use serde_json::value::{Value, to_value};
 use tera::{Context, Tera, try_get_value};
+use tracing::error;
 
 use crate::config::Configuration;
 use crate::errors::ServiceError;
@@ -28,7 +29,7 @@ pub static TEMPLATES: LazyLock<Tera> = LazyLock::new(|| {
         Ok(contents) => contents,
         Err(err) if err.kind() == ErrorKind::NotFound => VERIFY_EMAIL_DEFAULT.to_string(),
         Err(err) => {
-            eprintln!("Failed to read templates/verify.html: {err}");
+            error!(error = %err, "Failed to read templates/verify.html");
             ::std::process::exit(1);
         }
     };
@@ -127,7 +128,7 @@ impl Service {
         match self.mailer.send(mail).await {
             Ok(_res) => Ok(()),
             Err(e) => {
-                eprintln!("Failed to send email: {e}");
+                error!(error = %e, "Failed to send email");
                 Err(ServiceError::FailedToSendVerificationEmail)
             }
         }

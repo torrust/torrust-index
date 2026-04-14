@@ -1,38 +1,38 @@
 use axum::response::{IntoResponse, Response};
-use derive_more::{Display, Error};
 use hyper::StatusCode;
+use thiserror::Error;
 
 use crate::web::api::server::v1::responses::{ErrorResponseData, json_error_response};
 
-#[derive(Debug, Display, PartialEq, Eq, Error)]
+#[derive(Debug, PartialEq, Eq, Error)]
 pub enum Request {
-    #[display("torrent title bytes are nota valid UTF8 string.")]
+    #[error("torrent title bytes are nota valid UTF8 string.")]
     TitleIsNotValidUtf8,
 
-    #[display("torrent description bytes are nota valid UTF8 string.")]
+    #[error("torrent description bytes are nota valid UTF8 string.")]
     DescriptionIsNotValidUtf8,
 
-    #[display("torrent category bytes are nota valid UTF8 string.")]
+    #[error("torrent category bytes are nota valid UTF8 string.")]
     CategoryIsNotValidUtf8,
 
-    #[display("torrent tags arrays bytes are nota valid UTF8 string array.")]
+    #[error("torrent tags arrays bytes are nota valid UTF8 string array.")]
     TagsArrayIsNotValidUtf8,
 
-    #[display("torrent tags string is not a valid JSON.")]
+    #[error("torrent tags string is not a valid JSON.")]
     TagsArrayIsNotValidJson,
 
-    #[display(
+    #[error(
         "upload torrent request header `content-type` should be preferably `application/x-bittorrent` or `application/octet-stream`."
     )]
     InvalidFileType,
 
-    #[display("cannot write uploaded torrent bytes (binary file) into memory.")]
+    #[error("cannot write uploaded torrent bytes (binary file) into memory.")]
     CannotWriteChunkFromUploadedBinary,
 
-    #[display("cannot read a chunk of bytes from the uploaded torrent file. Review the request body size limit.")]
+    #[error("cannot read a chunk of bytes from the uploaded torrent file. Review the request body size limit.")]
     CannotReadChunkFromUploadedBinary,
 
-    #[display("provided path param for Info-hash is not valid.")]
+    #[error("provided path param for Info-hash is not valid.")]
     InvalidInfoHashParam,
 }
 
