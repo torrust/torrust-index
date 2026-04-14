@@ -1,6 +1,6 @@
 # ADR-T-007: Refactor the JWT System
 
-**Status:** Phase 1 implemented
+**Status:** Phase 2 implemented
 **Date:** 2026-04-14
 
 ## Context
@@ -362,9 +362,9 @@ phased rollout that subsumes Options A and B.
   `session_token_lifetime_secs`,
   `email_verification_token_lifetime_secs`.
 
-#### Phase 2 — Claim Redesign + Per-Purpose Keys (Option B scope)
+#### Phase 2 — Claim Redesign + Per-Purpose Keys (Option B scope) ✅ Implemented
 
-- Redesign `UserClaims` → `SessionClaims`:
+- ✅ Redesign `UserClaims` → `SessionClaims`:
   ```rust
   struct SessionClaims {
       sub: UserId,      // subject = user ID
@@ -376,14 +376,15 @@ phased rollout that subsumes Options A and B.
       username: String, // convenience, non-authoritative
   }
   ```
-- Redesign `VerifyClaims` with `aud: "email-verification"`.
-- Split config into two independent keys:
+- ✅ Redesign `VerifyClaims` with `aud: "email-verification"`.
+- ✅ Split config into two independent keys:
   `auth.session_signing_key` and
   `auth.email_verification_signing_key`.
-- Re-validate the user's role from the database on every
-  authenticated request (with a short-lived cache) so the token
-  role is advisory only.
-- Enforce a minimum secret length at config validation time.
+- ✅ Re-validate the user's role from the database on every
+  authenticated request (the authorization service already does
+  this via `get_role`) so the token role is advisory only.
+- ✅ Enforce a minimum secret length (32 bytes) at config
+  validation time.
 - **Breaking change:** existing HS256 tokens are invalidated;
   users must re-login.
 

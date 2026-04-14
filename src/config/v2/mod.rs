@@ -111,7 +111,8 @@ impl Settings {
             let _ = self.database.connect_url.set_password(Some("***"));
         }
         "***".clone_into(&mut self.mail.smtp.credentials.password);
-        self.auth.jwt_signing_secret = JwtSigningSecret::new("***");
+        self.auth.session_signing_key = JwtSigningSecret::new("***-redacted-session-signing-key!");
+        self.auth.email_verification_signing_key = JwtSigningSecret::new("***-redacted-emailverify-secret!");
     }
 
     /// Encodes the configuration to TOML.

@@ -114,7 +114,7 @@ impl Service {
 
         let user_compact = self
             .user_repository
-            .get_compact(&claims.user.user_id)
+            .get_compact(&claims.sub)
             .await
             .map_err(|err| match err {
                 Error::UserNotFound => AuthError::UserNotFound,

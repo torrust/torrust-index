@@ -19,7 +19,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
+//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiJ9.-EfY9CrZz2OLfjiVQzkhxSjV7tWTFivP2yMuzZkbEak" \
 //!   --request GET \
 //!   "http://127.0.0.1:3001/v1/settings"
 //! ```
@@ -54,7 +54,8 @@
 //!       "tsl": null
 //!     },
 //!     "auth": {
-//!       "jwt_signing_secret": "***",
+//!       "session_signing_key": "***",
+//!       "email_verification_signing_key": "***",
 //!       "session_token_lifetime_secs": 1209600,
 //!       "email_verification_token_lifetime_secs": 315569260,
 //!       "password_constraints": {

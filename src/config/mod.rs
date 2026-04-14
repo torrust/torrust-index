@@ -350,17 +350,20 @@ impl Configuration {
     /// obtained by default value (code), meaning the user hasn't overridden it.
     fn check_mandatory_options(figment: &Figment) -> Result<(), Error> {
         let mandatory_options = [
-            "auth.jwt_signing_secret",
+            "auth.session_signing_key",
             "logging.threshold",
             "metadata.schema_version",
             "tracker.token",
         ];
 
         for mandatory_option in mandatory_options {
-            // Accept both the canonical key and the legacy alias.
+            // Accept both the canonical key and the legacy aliases.
             let found = figment.find_value(mandatory_option).is_ok()
                 || match mandatory_option {
-                    "auth.jwt_signing_secret" => figment.find_value("auth.user_claim_token_pepper").is_ok(),
+                    "auth.session_signing_key" => {
+                        figment.find_value("auth.jwt_signing_secret").is_ok()
+                            || figment.find_value("auth.user_claim_token_pepper").is_ok()
+                    }
                     _ => false,
                 };
 

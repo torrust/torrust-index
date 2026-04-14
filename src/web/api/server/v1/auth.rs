@@ -42,20 +42,39 @@
 //! ```json
 //! {
 //!     "data":{
-//!       "token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI",
+//!       "token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiJ9.-EfY9CrZz2OLfjiVQzkhxSjV7tWTFivP2yMuzZkbEak",
 //!       "username":"indexadmin",
 //!       "admin":true
 //!     }
 //!   }
 //! ```
 //!
+//! The JWT payload contains RFC 7519 registered claims:
+//!
+//! ```json
+//! {
+//!   "sub": 1,
+//!   "iss": "torrust-index",
+//!   "aud": "session",
+//!   "iat": 1686215788,
+//!   "exp": 1687425388,
+//!   "role": "admin",
+//!   "username": "indexadmin"
+//! }
+//! ```
+//!
+//! The `role` and `username` fields are **advisory only** — the
+//! authoritative role is always re-checked from the database on each
+//! authenticated request (see ADR-T-007 Phase 2).
+//!
 //! **NOTICE**: The token lifetime is configurable via
 //! `auth.session_token_lifetime_secs` (default: 2 weeks / `1_209_600` seconds).
 //! After expiry you will have to renew the token.
 //!
-//! **NOTICE**: The token is associated with the user role. If you change the
-//! user's role, you will have to log in again to get a new token with the new
-//! role.
+//! **NOTICE**: The token `role` is advisory. If the user's role changes in
+//! the database, the new role takes effect immediately on the next request.
+//! However, you may still want to log in again to get a token that reflects
+//! the current role.
 //!
 //! ## Using the token
 //!
@@ -66,7 +85,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
+//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiJ9.-EfY9CrZz2OLfjiVQzkhxSjV7tWTFivP2yMuzZkbEak" \
 //!   --request POST \
 //!   --data '{"name":"new category","icon":null}' \
 //!   http://127.0.0.1:3001/v1/category
@@ -85,7 +104,7 @@ use hyper::http::HeaderValue;
 
 use crate::common::AppData;
 use crate::errors::AuthError;
-use crate::jwt::{JsonWebToken, UserClaims};
+use crate::jwt::{JsonWebToken, SessionClaims};
 use crate::models::user::{UserCompact, UserId};
 use crate::web::api::server::v1::extractors::bearer_token::BearerToken;
 
@@ -113,7 +132,7 @@ impl Authentication {
     /// # Errors
     ///
     /// This function will return an error if the JWT is not good or expired.
-    pub async fn verify_jwt(&self, token: &str) -> Result<UserClaims, AuthError> {
+    pub async fn verify_jwt(&self, token: &str) -> Result<SessionClaims, AuthError> {
         self.json_web_token.verify(token).await
     }
 
@@ -124,7 +143,7 @@ impl Authentication {
     /// This function will return an error if it can get claims from the request
     pub async fn get_user_id_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<UserId, AuthError> {
         let claims = self.get_claims_from_bearer_token(maybe_token).await?;
-        Ok(claims.user.user_id)
+        Ok(claims.sub)
     }
 
     /// Get Claims from bearer token
@@ -135,7 +154,7 @@ impl Authentication {
     ///
     /// - Return an `AuthError::TokenNotFound` if `HeaderValue` is `None`.
     /// - Pass through the `AuthError::TokenInvalid` if unable to verify the JWT.
-    async fn get_claims_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<UserClaims, AuthError> {
+    async fn get_claims_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<SessionClaims, AuthError> {
         match maybe_token {
             Some(token) => match self.verify_jwt(&token.value()).await {
                 Ok(claims) => Ok(claims),

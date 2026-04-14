@@ -114,7 +114,8 @@ impl TestEnv {
 
                 "***".clone_into(&mut settings.mail.smtp.credentials.password);
 
-                "***".clone_into(&mut settings.auth.jwt_signing_secret);
+                "***-redacted-session-signing-key!".clone_into(&mut settings.auth.session_signing_key);
+                "***-redacted-emailverify-secret!".clone_into(&mut settings.auth.email_verification_signing_key);
 
                 Some(settings)
             }

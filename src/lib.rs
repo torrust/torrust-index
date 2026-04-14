@@ -189,7 +189,8 @@
 //! bind_address = "0.0.0.0:3001"
 //!
 //! [auth]
-//! jwt_signing_secret = "MaxVerstappenWC2021"
+//! session_signing_key = "MaxVerstappenWC2021-session-key!"
+//! email_verification_signing_key = "MaxVerstappenWC2021-emailverify!"
 //!
 //! [auth.password_constraints]
 //! min_password_length = 6
