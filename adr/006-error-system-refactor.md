@@ -1,6 +1,6 @@
 # ADR-T-006: Refactor the Error System
 
-**Status:** Accepted
+**Status:** Implemented (Phases 0–3 complete)
 **Date:** 2026-04-14
 **Relates to:** [ADR-T-004](004-remove-located-error.md)
 (removal of `located-error` package — prerequisite cleanup)
@@ -361,35 +361,38 @@ implementation.
 
 ### Migration Strategy
 
-1. **Phase 0 — Prerequisite cleanup (can be done first):**
-   - Complete ADR-T-004 (remove `located-error`).
-   - Replace all `eprintln!()` in `From` impls with `tracing::error!()`.
-   - Add `Error` trait to cache error types.
-   - Remove unused `anyhow` dependency.
-   - Standardise on `thiserror` for all error derives.
+1. **Phase 0 — Prerequisite cleanup:** ✅ Done
+   - Complete ADR-T-004 (remove `located-error`). ✅
+   - Replace all `eprintln!()` in `From` impls with `tracing::error!()`. ✅
+   - Add `Error` trait to cache error types. ✅
+   - Remove unused `anyhow` dependency. ✅
+   - Standardise on `thiserror` for all error derives. ✅
 
-2. **Phase 1 — Extract domain errors one at a time:**
-   - Start with the most isolated domain (e.g. `CategoryTagError`).
-   - Create the domain enum with `#[source]` chains.
-   - Update the service functions in that domain to return the new type.
-   - Add `From<DomainError> for ApiError` (or implement
-     `IntoResponse` directly on the domain error).
-   - Update handlers to use the new error type.
-   - Remove the migrated variants from `ServiceError`.
-   - Repeat for each domain.
+2. **Phase 1 — Extract domain errors:** ✅ Done
+   - Extracted `AuthError` (13 variants: JWT, password, authorization).
+   - Extracted `UserError` (21 variants: registration, profile, banning).
+   - Extracted `TorrentError` (~24 variants: upload, listing, tracker).
+   - Retained `CategoryTagError` (already extracted prior to this ADR).
+   - Each domain error has a co-located `status_code()` method and
+     typed `From` impls for lower-level errors (`database::Error`,
+     `argon2`, `sqlx`, `TrackerAPIError`, `MetadataError`, etc.).
+   - All service functions updated to return domain-specific types.
+   - All handlers and extractors updated.
 
-3. **Phase 2 — Introduce `ApiError` wrapper:**
-   - Once all domains are extracted, replace `ServiceError` with a
-     thin `ApiError` enum that wraps the domain errors.
-   - `ApiError` implements `IntoResponse` by delegating to domain
-     error status codes and messages.
+3. **Phase 2 — Introduce `ApiError` wrapper:** ✅ Done
+   - `ApiError` wraps `AuthError`, `UserError`, `TorrentError`, and
+     `CategoryTagError` via `#[from]`.
+   - `ApiError` implements `IntoResponse` by delegating to the
+     wrapped domain error's `status_code()` and `Display` message.
+   - Handlers that span multiple domains can use `ApiError` as
+     their error type.
 
-4. **Phase 3 — Cleanup:**
-   - Remove `src/errors.rs` `ServiceError` and all its `From` impls.
-   - Remove `http_status_code_for_service_error` and
+4. **Phase 3 — Cleanup:** ✅ Done
+   - Removed `ServiceError` (41 variants) and `ServiceResult`.
+   - Removed `http_status_code_for_service_error` and
      `map_database_error_to_service_error`.
-   - Refine `database::Error` with specific variants and
-     `#[source]`.
+   - Removed `IntoResponse for database::Error`.
+   - All doc comments updated to reference domain error types.
 
 ### Handling Cross-Domain Errors in Handlers
 
@@ -408,18 +411,21 @@ errors via `#[source]` when needed.
 
 ## Consequences
 
-- **`ServiceError` will be removed.** All code referencing it must
-  migrate to domain-specific error types or `ApiError`.
-- **Test assertions** that compare error variants by equality can
-  continue to work on the smaller domain enums (which will derive
-  `PartialEq` where feasible). Variants carrying non-`Eq` source
-  errors will need pattern-matching assertions instead.
-- **HTTP response format** (`{"error": "<string>"}`) will remain
-  stable. The `ApiError` wrapper will produce the same JSON shape.
+- **`ServiceError` has been removed.** All code now uses
+  domain-specific error types (`AuthError`, `UserError`,
+  `TorrentError`, `CategoryTagError`) or `ApiError`.
+- **Test assertions** work on the smaller domain enums — all four
+  derive `PartialEq` + `Eq`.
+- **HTTP response format** (`{"error": "<string>"}`) remains
+  stable. `ApiError` and the domain error `IntoResponse` impls
+  produce the same JSON shape as the old `ServiceError` mapping.
 - **ADR-T-004 migration** (remove `located-error`, adopt `tracing`)
-  should be completed first or concurrently (Phase 0).
-- **Logging** will converge on `tracing` exclusively; all
-  `eprintln!` calls will be removed in Phase 0.
-- **The refactor is large but incremental.** Each domain can be
-  extracted in a separate PR, keeping individual diffs reviewable
-  and the main branch functional throughout the migration.
+  was completed as a prerequisite (Phase 0).
+- **Logging** uses `tracing` exclusively in error `From` impls;
+  no `eprintln!` calls remain in error conversion code.
+- **Cross-cutting variants** (`UnauthorizedAction`,
+  `UnauthorizedActionForGuests`, `DatabaseError`,
+  `InternalServerError`) are currently duplicated across domain
+  enums with a `// see ADR-T-006` comment. A future refinement
+  could extract a shared `InfraError` type to reduce this
+  duplication.

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
 use super::user::Repository;
-use crate::errors::ServiceError;
+use crate::errors::AuthError;
 use crate::models::user::{UserCompact, UserId};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Hash)]
@@ -75,22 +75,20 @@ impl Service {
     ///
     /// Will return an error if:
     /// - The user is not authorized to perform the action.
-    pub async fn authorize(&self, action: ACTION, maybe_user_id: Option<UserId>) -> std::result::Result<(), ServiceError> {
+    pub async fn authorize(&self, action: ACTION, maybe_user_id: Option<UserId>) -> std::result::Result<(), AuthError> {
         let role = self.get_role(maybe_user_id).await;
 
         let enforcer = self.casbin_enforcer.enforcer.read().await;
 
-        let authorize = enforcer
-            .enforce((&role, action))
-            .map_err(|_| ServiceError::UnauthorizedAction)?;
+        let authorize = enforcer.enforce((&role, action)).map_err(|_| AuthError::UnauthorizedAction)?;
         drop(enforcer);
 
         if authorize {
             Ok(())
         } else if role == UserRole::Guest {
-            Err(ServiceError::UnauthorizedActionForGuests)
+            Err(AuthError::UnauthorizedActionForGuests)
         } else {
-            Err(ServiceError::UnauthorizedAction)
+            Err(AuthError::UnauthorizedAction)
         }
     }
 
@@ -99,8 +97,11 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    async fn get_user(&self, user_id: UserId) -> std::result::Result<UserCompact, ServiceError> {
-        self.user_repository.get_compact(&user_id).await
+    async fn get_user(&self, user_id: UserId) -> std::result::Result<UserCompact, AuthError> {
+        self.user_repository
+            .get_compact(&user_id)
+            .await
+            .map_err(|_| AuthError::UserNotFound)
     }
 
     /// It returns the role of the user.

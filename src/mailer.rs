@@ -12,7 +12,7 @@ use tera::{Context, Tera, try_get_value};
 use tracing::error;
 
 use crate::config::Configuration;
-use crate::errors::ServiceError;
+use crate::errors::UserError;
 use crate::utils::clock;
 use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 
@@ -113,13 +113,7 @@ impl Service {
     /// # Panics
     ///
     /// This function will panic if the multipart builder had an error.
-    pub async fn send_verification_mail(
-        &self,
-        to: &str,
-        username: &str,
-        user_id: i64,
-        base_url: &str,
-    ) -> Result<(), ServiceError> {
+    pub async fn send_verification_mail(&self, to: &str, username: &str, user_id: i64, base_url: &str) -> Result<(), UserError> {
         let builder = self.get_builder(to).await;
         let verification_url = self.get_verification_url(user_id, base_url).await;
 
@@ -129,7 +123,7 @@ impl Service {
             Ok(_res) => Ok(()),
             Err(e) => {
                 error!(error = %e, "Failed to send email");
-                Err(ServiceError::FailedToSendVerificationEmail)
+                Err(UserError::FailedToSendVerificationEmail)
             }
         }
     }
@@ -169,10 +163,10 @@ impl Service {
     }
 }
 
-pub(crate) fn build_letter(verification_url: &str, username: &str, builder: MessageBuilder) -> Result<Message, ServiceError> {
+pub(crate) fn build_letter(verification_url: &str, username: &str, builder: MessageBuilder) -> Result<Message, UserError> {
     let (plain_body, html_body) = build_content(verification_url, username).map_err(|e| {
         tracing::error!("{e}");
-        ServiceError::InternalServerError
+        UserError::InternalServerError
     })?;
 
     Ok(builder

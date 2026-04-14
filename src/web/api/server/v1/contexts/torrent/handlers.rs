@@ -16,7 +16,7 @@ use super::errors;
 use super::forms::UpdateTorrentInfoForm;
 use super::responses::{new_torrent_response, torrent_file_response};
 use crate::common::AppData;
-use crate::errors::ServiceError;
+use crate::errors::TorrentError;
 use crate::models::torrent_tag::TagId;
 use crate::services::torrent::{AddTorrentRequest, ListingRequest};
 use crate::services::torrent_file::generate_random_torrent;
@@ -89,7 +89,7 @@ pub async fn download_torrent_handler(
         };
 
         let Ok(bytes) = parse_torrent::encode_torrent(&torrent) else {
-            return ServiceError::InternalServerError.into_response();
+            return TorrentError::InternalServerError.into_response();
         };
 
         torrent_file_response(
@@ -294,7 +294,7 @@ pub async fn create_random_torrent_handler(State(_app_data): State<Arc<AppData>>
     let torrent = generate_random_torrent(uuid);
 
     let Ok(bytes) = parse_torrent::encode_torrent(&torrent) else {
-        return ServiceError::InternalServerError.into_response();
+        return TorrentError::InternalServerError.into_response();
     };
 
     torrent_file_response(

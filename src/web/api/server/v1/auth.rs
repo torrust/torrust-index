@@ -83,7 +83,7 @@ use std::sync::Arc;
 use hyper::http::HeaderValue;
 
 use crate::common::AppData;
-use crate::errors::ServiceError;
+use crate::errors::AuthError;
 use crate::models::user::{UserClaims, UserCompact, UserId};
 use crate::services::authentication::JsonWebToken;
 use crate::web::api::server::v1::extractors::bearer_token::BearerToken;
@@ -108,7 +108,7 @@ impl Authentication {
     /// # Errors
     ///
     /// This function will return an error if the JWT is not good or expired.
-    pub async fn verify_jwt(&self, token: &str) -> Result<UserClaims, ServiceError> {
+    pub async fn verify_jwt(&self, token: &str) -> Result<UserClaims, AuthError> {
         self.json_web_token.verify(token).await
     }
 
@@ -117,7 +117,7 @@ impl Authentication {
     /// # Errors
     ///
     /// This function will return an error if it can get claims from the request
-    pub async fn get_user_id_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<UserId, ServiceError> {
+    pub async fn get_user_id_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<UserId, AuthError> {
         let claims = self.get_claims_from_bearer_token(maybe_token).await?;
         Ok(claims.user.user_id)
     }
@@ -128,15 +128,15 @@ impl Authentication {
     ///
     /// This function will:
     ///
-    /// - Return an `ServiceError::TokenNotFound` if `HeaderValue` is `None`.
-    /// - Pass through the `ServiceError::TokenInvalid` if unable to verify the JWT.
-    async fn get_claims_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<UserClaims, ServiceError> {
+    /// - Return an `AuthError::TokenNotFound` if `HeaderValue` is `None`.
+    /// - Pass through the `AuthError::TokenInvalid` if unable to verify the JWT.
+    async fn get_claims_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<UserClaims, AuthError> {
         match maybe_token {
             Some(token) => match self.verify_jwt(&token.value()).await {
                 Ok(claims) => Ok(claims),
                 Err(e) => Err(e),
             },
-            None => Err(ServiceError::TokenNotFound),
+            None => Err(AuthError::TokenNotFound),
         }
     }
 }
@@ -164,7 +164,7 @@ pub fn parse_token(authorization: &HeaderValue) -> String {
 pub async fn get_optional_logged_in_user(
     maybe_bearer_token: Option<BearerToken>,
     app_data: Arc<AppData>,
-) -> Result<Option<UserId>, ServiceError> {
+) -> Result<Option<UserId>, AuthError> {
     match maybe_bearer_token {
         Some(bearer_token) => match app_data.auth.get_user_id_from_bearer_token(Some(bearer_token)).await {
             Ok(user_id) => Ok(Some(user_id)),

@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use super::authorization::{self, ACTION};
-use crate::errors::ServiceError;
+use crate::errors::AuthError;
 use crate::models::user::UserId;
 
 pub struct Service {
@@ -24,7 +24,7 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is an error authorizing the action.
-    pub async fn get_about_page(&self, maybe_user_id: Option<UserId>) -> Result<String, ServiceError> {
+    pub async fn get_about_page(&self, maybe_user_id: Option<UserId>) -> Result<String, AuthError> {
         self.authorization_service
             .authorize(ACTION::GetAboutPage, maybe_user_id)
             .await?;
@@ -58,7 +58,7 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is an error authorizing the action.
-    pub async fn get_license_page(&self, maybe_user_id: Option<UserId>) -> Result<String, ServiceError> {
+    pub async fn get_license_page(&self, maybe_user_id: Option<UserId>) -> Result<String, AuthError> {
         self.authorization_service
             .authorize(ACTION::GetLicensePage, maybe_user_id)
             .await?;

@@ -8,7 +8,7 @@ use url::Url;
 
 use super::authorization::{self, ACTION};
 use crate::config::{self, Configuration, Settings};
-use crate::errors::ServiceError;
+use crate::errors::AuthError;
 use crate::models::user::UserId;
 
 pub struct Service {
@@ -30,7 +30,7 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if the user does not have the required permissions.
-    pub async fn get_all(&self, maybe_user_id: Option<UserId>) -> Result<Settings, ServiceError> {
+    pub async fn get_all(&self, maybe_user_id: Option<UserId>) -> Result<Settings, AuthError> {
         self.authorization_service
             .authorize(ACTION::GetSettings, maybe_user_id)
             .await?;
@@ -45,7 +45,7 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if the user does not have the required permissions.
-    pub async fn get_all_masking_secrets(&self, maybe_user_id: Option<UserId>) -> Result<Settings, ServiceError> {
+    pub async fn get_all_masking_secrets(&self, maybe_user_id: Option<UserId>) -> Result<Settings, AuthError> {
         self.authorization_service
             .authorize(ACTION::GetSettingsSecret, maybe_user_id)
             .await?;
@@ -62,7 +62,7 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if the user does not have the required permissions.
-    pub async fn get_public(&self, maybe_user_id: Option<UserId>) -> Result<ConfigurationPublic, ServiceError> {
+    pub async fn get_public(&self, maybe_user_id: Option<UserId>) -> Result<ConfigurationPublic, AuthError> {
         self.authorization_service
             .authorize(ACTION::GetPublicSettings, maybe_user_id)
             .await?;
@@ -76,7 +76,7 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if the user does not have the required permissions.
-    pub async fn get_site_name(&self, maybe_user_id: Option<UserId>) -> Result<String, ServiceError> {
+    pub async fn get_site_name(&self, maybe_user_id: Option<UserId>) -> Result<String, AuthError> {
         self.authorization_service
             .authorize(ACTION::GetSiteName, maybe_user_id)
             .await?;

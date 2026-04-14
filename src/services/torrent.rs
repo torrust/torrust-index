@@ -11,7 +11,7 @@ use super::authorization::{self, ACTION};
 use super::category::DbCategoryRepository;
 use crate::config::Configuration;
 use crate::databases::database::{Database, Error, Sorting};
-use crate::errors::ServiceError;
+use crate::errors::TorrentError;
 use crate::models::category::CategoryId;
 use crate::models::response::{DeletedTorrentResponse, TorrentResponse, TorrentsResponse};
 use crate::models::torrent::{Metadata, TorrentId, TorrentListing};
@@ -134,9 +134,9 @@ impl Index {
         &self,
         add_torrent_req: AddTorrentRequest,
         maybe_user_id: Option<UserId>,
-    ) -> Result<AddTorrentResponse, ServiceError> {
+    ) -> Result<AddTorrentResponse, TorrentError> {
         let Some(user_id) = maybe_user_id else {
-            return Err(ServiceError::UnauthorizedActionForGuests);
+            return Err(TorrentError::UnauthorizedActionForGuests);
         };
 
         self.authorization_service
@@ -188,16 +188,16 @@ impl Index {
         })
     }
 
-    async fn validate_and_build_metadata(&self, add_torrent_req: &AddTorrentRequest) -> Result<Metadata, ServiceError> {
+    async fn validate_and_build_metadata(&self, add_torrent_req: &AddTorrentRequest) -> Result<Metadata, TorrentError> {
         if add_torrent_req.category_name.is_empty() {
-            return Err(ServiceError::MissingMandatoryMetadataFields);
+            return Err(TorrentError::MissingMandatoryMetadataFields);
         }
 
         let category = self
             .category_repository
             .get_by_name(&add_torrent_req.category_name)
             .await
-            .map_err(|_| ServiceError::InvalidCategory)?;
+            .map_err(|_| TorrentError::InvalidCategory)?;
 
         let metadata = Metadata::new(
             &add_torrent_req.title,
@@ -213,7 +213,7 @@ impl Index {
         &self,
         original_info_hash: &InfoHash,
         canonical_info_hash: &InfoHash,
-    ) -> Result<(), ServiceError> {
+    ) -> Result<(), TorrentError> {
         let original_info_hashes = self
             .torrent_info_hash_repository
             .get_canonical_info_hash_group(canonical_info_hash)
@@ -229,7 +229,7 @@ impl Index {
                 // The exact original infohash was already uploaded
                 debug!("Original infohash found: {:?}", original_info_hash.to_hex_string());
 
-                return Err(ServiceError::OriginalInfoHashAlreadyExists);
+                return Err(TorrentError::OriginalInfoHashAlreadyExists);
             }
 
             // A new original infohash is being uploaded with a canonical infohash that already exists.
@@ -239,7 +239,7 @@ impl Index {
             self.torrent_info_hash_repository
                 .add_info_hash_to_canonical_info_hash_group(original_info_hash, canonical_info_hash)
                 .await?;
-            return Err(ServiceError::CanonicalInfoHashAlreadyExists);
+            return Err(TorrentError::CanonicalInfoHashAlreadyExists);
         }
 
         // No other torrent with the same canonical infohash has been uploaded before
@@ -266,7 +266,7 @@ impl Index {
     ///
     /// This function will return an error if unable to get the torrent from the
     /// database.
-    pub async fn get_torrent(&self, info_hash: &InfoHash, maybe_user_id: Option<UserId>) -> Result<Torrent, ServiceError> {
+    pub async fn get_torrent(&self, info_hash: &InfoHash, maybe_user_id: Option<UserId>) -> Result<Torrent, TorrentError> {
         self.authorization_service
             .authorize(ACTION::GetTorrent, maybe_user_id)
             .await?;
@@ -305,7 +305,7 @@ impl Index {
         &self,
         info_hash: &InfoHash,
         maybe_user_id: Option<UserId>,
-    ) -> Result<DeletedTorrentResponse, ServiceError> {
+    ) -> Result<DeletedTorrentResponse, TorrentError> {
         self.authorization_service
             .authorize(ACTION::DeleteTorrent, maybe_user_id)
             .await?;
@@ -342,7 +342,7 @@ impl Index {
         &self,
         info_hash: &InfoHash,
         maybe_user_id: Option<UserId>,
-    ) -> Result<TorrentResponse, ServiceError> {
+    ) -> Result<TorrentResponse, TorrentError> {
         self.authorization_service
             .authorize(ACTION::GetTorrentInfo, maybe_user_id)
             .await?;
@@ -360,12 +360,12 @@ impl Index {
     ///
     /// # Errors
     ///
-    /// Returns a `ServiceError::DatabaseError` if the database query fails.
+    /// Returns a `TorrentError::DatabaseError` if the database query fails.
     pub async fn generate_torrent_info_listing(
         &self,
         request: &ListingRequest,
         maybe_user_id: Option<UserId>,
-    ) -> Result<TorrentsResponse, ServiceError> {
+    ) -> Result<TorrentsResponse, TorrentError> {
         self.authorization_service
             .authorize(ACTION::GenerateTorrentInfoListing, maybe_user_id)
             .await?;
@@ -433,7 +433,7 @@ impl Index {
         category_id: &Option<CategoryId>,
         tags: &Option<Vec<TagId>>,
         user_id: &UserId,
-    ) -> Result<TorrentResponse, ServiceError> {
+    ) -> Result<TorrentResponse, TorrentError> {
         let updater = self.user_repository.get_compact(user_id).await?;
 
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
@@ -441,7 +441,7 @@ impl Index {
         // Check if user is owner or administrator
         // todo: move this to an authorization service.
         if !(torrent_listing.uploader == updater.username || updater.administrator) {
-            return Err(ServiceError::UnauthorizedAction);
+            return Err(TorrentError::UnauthorizedAction);
         }
 
         self.torrent_info_repository
@@ -472,7 +472,7 @@ impl Index {
         &self,
         torrent_listing: TorrentListing,
         info_hash: &InfoHash,
-    ) -> Result<TorrentResponse, ServiceError> {
+    ) -> Result<TorrentResponse, TorrentError> {
         let category = match torrent_listing.category_id {
             Some(category_id) => Some(self.category_repository.get_by_id(&category_id).await?),
             None => None,
@@ -495,7 +495,7 @@ impl Index {
         torrent_listing: TorrentListing,
         info_hash: &InfoHash,
         maybe_user_id: Option<UserId>,
-    ) -> Result<TorrentResponse, ServiceError> {
+    ) -> Result<TorrentResponse, TorrentError> {
         let torrent_id: i64 = torrent_listing.torrent_id;
 
         let mut torrent_response = self.build_short_torrent_response(torrent_listing, info_hash).await?;
@@ -579,7 +579,7 @@ impl Index {
         &self,
         info_hash: &InfoHash,
         maybe_user_id: Option<UserId>,
-    ) -> Result<Option<InfoHash>, ServiceError> {
+    ) -> Result<Option<InfoHash>, TorrentError> {
         self.authorization_service
             .authorize(ACTION::GetCanonicalInfoHash, maybe_user_id)
             .await?;
@@ -587,7 +587,7 @@ impl Index {
         self.torrent_info_hash_repository
             .find_canonical_info_hash_for(info_hash)
             .await
-            .map_err(|_| ServiceError::DatabaseError)
+            .map_err(|_| TorrentError::DatabaseError)
     }
 }
 
