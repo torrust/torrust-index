@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::databases::database;
-use crate::errors::{ServiceError, http_status_code_for_service_error, map_database_error_to_service_error};
+use crate::errors::{CategoryTagError, ServiceError, http_status_code_for_service_error, map_database_error_to_service_error};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct OkResponseData<T> {
@@ -23,6 +23,12 @@ impl IntoResponse for ServiceError {
             http_status_code_for_service_error(&self),
             &ErrorResponseData { error: self.to_string() },
         )
+    }
+}
+
+impl IntoResponse for CategoryTagError {
+    fn into_response(self) -> Response {
+        json_error_response(self.status_code(), &ErrorResponseData { error: self.to_string() })
     }
 }
 

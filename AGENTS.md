@@ -9,9 +9,9 @@ Be mindful to at least do a quick spot-test with `--no-default-features`,
 and to try building the docs and running the doc-tests.
 
 When testing, also run the tests in `--release` mode to check that this
-works. Run the tests in debug mode with `CARGO_PROFILE_DEV_OPT_LEVEL=3`;
-otherwise it is just too slow. You can turn off the optimisation if a bug
-is found and you need backtracing.
+works. The dev profile already sets `opt-level = 3` in `Cargo.toml`,
+so debug builds are fast by default. If you need full backtraces for
+debugging, temporarily override with `CARGO_PROFILE_DEV_OPT_LEVEL=0`.
 
 When working inside a package, prefer running only the `--package` tests,
 as the whole-project tests are slow to run. (Occasionally run the whole

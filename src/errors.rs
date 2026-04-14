@@ -12,6 +12,85 @@ use crate::utils::parse_torrent::DecodeTorrentFileError;
 
 pub type ServiceResult<V> = Result<V, ServiceError>;
 
+/// Domain error for category and tag operations.
+///
+/// Covers all failure modes from the category and tag services.
+/// Status-code mapping is co-located via [`CategoryTagError::status_code`].
+///
+/// The `UnauthorizedAction`, `UnauthorizedActionForGuests`, and
+/// `DatabaseError` variants are cross-cutting placeholders that will
+/// be replaced by dedicated `AuthError` / `InfraError` enums in a
+/// later phase (see ADR-T-006 Phase 1).
+#[derive(Debug, PartialEq, Eq, Error)]
+pub enum CategoryTagError {
+    #[error("Selected category does not exist.")]
+    InvalidCategory,
+
+    #[error("Category already exists.")]
+    CategoryAlreadyExists,
+
+    #[error("Category name cannot be empty.")]
+    CategoryNameEmpty,
+
+    #[error("Category not found.")]
+    CategoryNotFound,
+
+    #[error("Selected tag does not exist.")]
+    InvalidTag,
+
+    #[error("Tag already exists.")]
+    TagAlreadyExists,
+
+    #[error("Tag name cannot be empty.")]
+    TagNameEmpty,
+
+    #[error("Tag not found.")]
+    TagNotFound,
+
+    // -- Cross-cutting (temporary, see ADR-T-006) --
+    #[error("Unauthorized action.")]
+    UnauthorizedAction,
+
+    #[error("Unauthorized actions for guest users. Try logging in to check if you have permission to perform the action")]
+    UnauthorizedActionForGuests,
+
+    #[error("Database error.")]
+    DatabaseError,
+}
+
+impl CategoryTagError {
+    /// HTTP status code for this error variant.
+    #[must_use]
+    pub const fn status_code(&self) -> StatusCode {
+        match self {
+            Self::InvalidCategory
+            | Self::CategoryAlreadyExists
+            | Self::CategoryNameEmpty
+            | Self::InvalidTag
+            | Self::TagAlreadyExists
+            | Self::TagNameEmpty => StatusCode::BAD_REQUEST,
+            Self::CategoryNotFound | Self::TagNotFound => StatusCode::NOT_FOUND,
+            Self::UnauthorizedAction => StatusCode::FORBIDDEN,
+            Self::UnauthorizedActionForGuests => StatusCode::UNAUTHORIZED,
+            Self::DatabaseError => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
+/// Transitional conversion: the authorization service still returns
+/// [`ServiceError`]; this maps the auth-related variants into
+/// [`CategoryTagError`].  Will be removed once `AuthError` is
+/// extracted (ADR-T-006 Phase 1, auth domain).
+impl From<ServiceError> for CategoryTagError {
+    fn from(e: ServiceError) -> Self {
+        match e {
+            ServiceError::UnauthorizedAction => Self::UnauthorizedAction,
+            ServiceError::UnauthorizedActionForGuests => Self::UnauthorizedActionForGuests,
+            _ => Self::DatabaseError,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Error)]
 #[allow(dead_code)]
 pub enum ServiceError {
@@ -133,26 +212,8 @@ pub enum ServiceError {
     #[error("Failed to send verification email.")]
     FailedToSendVerificationEmail,
 
-    #[error("Category already exists.")]
-    CategoryAlreadyExists,
-
-    #[error("Category name cannot be empty.")]
-    CategoryNameEmpty,
-
-    #[error("Tag already exists.")]
-    TagAlreadyExists,
-
-    #[error("Tag name cannot be empty.")]
-    TagNameEmpty,
-
     #[error("Torrent not found.")]
     TorrentNotFound,
-
-    #[error("Category not found.")]
-    CategoryNotFound,
-
-    #[error("Tag not found.")]
-    TagNotFound,
 
     #[error("Database error.")]
     DatabaseError,
@@ -313,17 +374,11 @@ pub const fn http_status_code_for_service_error(error: &ServiceError) -> StatusC
         ServiceError::OriginalInfoHashAlreadyExists => StatusCode::CONFLICT,
         ServiceError::TorrentTitleAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::TrackerOffline => StatusCode::SERVICE_UNAVAILABLE,
-        ServiceError::CategoryNameEmpty => StatusCode::BAD_REQUEST,
-        ServiceError::CategoryAlreadyExists => StatusCode::BAD_REQUEST,
-        ServiceError::TagNameEmpty => StatusCode::BAD_REQUEST,
-        ServiceError::TagAlreadyExists => StatusCode::BAD_REQUEST,
         ServiceError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::EmailMissing => StatusCode::NOT_FOUND,
         ServiceError::FailedToSendVerificationEmail => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::WhitelistingError => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::DatabaseError => StatusCode::INTERNAL_SERVER_ERROR,
-        ServiceError::CategoryNotFound => StatusCode::NOT_FOUND,
-        ServiceError::TagNotFound => StatusCode::NOT_FOUND,
         ServiceError::TrackerResponseError => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::TrackerUnknownResponse => StatusCode::INTERNAL_SERVER_ERROR,
         ServiceError::TorrentNotFoundInTracker => StatusCode::NOT_FOUND,
@@ -343,7 +398,7 @@ pub const fn map_database_error_to_service_error(error: &database::Error) -> Ser
         database::Error::EmailTaken => ServiceError::EmailTaken,
         database::Error::UserNotFound => ServiceError::UserNotFound,
         database::Error::CategoryNotFound => ServiceError::InvalidCategory,
-        database::Error::TagAlreadyExists => ServiceError::TagAlreadyExists,
+        database::Error::TagAlreadyExists => ServiceError::InternalServerError,
         database::Error::TagNotFound => ServiceError::InvalidTag,
         database::Error::TorrentNotFound => ServiceError::TorrentNotFound,
         database::Error::TorrentAlreadyExists => ServiceError::InfoHashAlreadyExists,
