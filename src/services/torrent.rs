@@ -7,7 +7,7 @@ use serde_derive::{Deserialize, Serialize};
 use tracing::debug;
 use url::Url;
 
-use super::authorization::{self, ACTION};
+use super::authorization::{self, Action};
 use super::category::DbCategoryRepository;
 use crate::config::Configuration;
 use crate::databases::database::{Database, Error, Sorting};
@@ -140,7 +140,7 @@ impl Index {
         };
 
         self.authorization_service
-            .authorize(ACTION::AddTorrent, maybe_user_id)
+            .authorize(Action::AddTorrent, maybe_user_id)
             .await?;
 
         let metadata = self.validate_and_build_metadata(&add_torrent_req).await?;
@@ -268,7 +268,7 @@ impl Index {
     /// database.
     pub async fn get_torrent(&self, info_hash: &InfoHash, maybe_user_id: Option<UserId>) -> Result<Torrent, TorrentError> {
         self.authorization_service
-            .authorize(ACTION::GetTorrent, maybe_user_id)
+            .authorize(Action::GetTorrent, maybe_user_id)
             .await?;
 
         let mut torrent = self.torrent_repository.get_by_info_hash(info_hash).await?;
@@ -307,7 +307,7 @@ impl Index {
         maybe_user_id: Option<UserId>,
     ) -> Result<DeletedTorrentResponse, TorrentError> {
         self.authorization_service
-            .authorize(ACTION::DeleteTorrent, maybe_user_id)
+            .authorize(Action::DeleteTorrent, maybe_user_id)
             .await?;
 
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
@@ -344,7 +344,7 @@ impl Index {
         maybe_user_id: Option<UserId>,
     ) -> Result<TorrentResponse, TorrentError> {
         self.authorization_service
-            .authorize(ACTION::GetTorrentInfo, maybe_user_id)
+            .authorize(Action::GetTorrentInfo, maybe_user_id)
             .await?;
 
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
@@ -367,7 +367,7 @@ impl Index {
         maybe_user_id: Option<UserId>,
     ) -> Result<TorrentsResponse, TorrentError> {
         self.authorization_service
-            .authorize(ACTION::GenerateTorrentInfoListing, maybe_user_id)
+            .authorize(Action::GenerateTorrentInfoListing, maybe_user_id)
             .await?;
 
         let torrent_listing_specification = self.listing_specification_from_user_request(request).await;
@@ -438,9 +438,9 @@ impl Index {
 
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
 
-        // Check if user is owner or administrator
+        // Check if user is owner or admin
         // todo: move this to an authorization service.
-        if !(torrent_listing.uploader == updater.username || updater.administrator) {
+        if !(torrent_listing.uploader == updater.username || updater.is_admin()) {
             return Err(TorrentError::UnauthorizedAction);
         }
 
@@ -581,7 +581,7 @@ impl Index {
         maybe_user_id: Option<UserId>,
     ) -> Result<Option<InfoHash>, TorrentError> {
         self.authorization_service
-            .authorize(ACTION::GetCanonicalInfoHash, maybe_user_id)
+            .authorize(Action::GetCanonicalInfoHash, maybe_user_id)
             .await?;
 
         self.torrent_info_hash_repository

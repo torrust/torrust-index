@@ -213,7 +213,7 @@ impl JsonWebToken {
             aud: "session".to_owned(),
             iat: now,
             exp: exp_date,
-            role: if user.administrator {
+            role: if user.is_admin() {
                 "admin".to_owned()
             } else {
                 "user".to_owned()

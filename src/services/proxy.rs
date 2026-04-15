@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 
-use super::authorization::{self, ACTION};
+use super::authorization::{self, Action};
 use crate::cache::image::manager::{Error, ImageCacheService};
 use crate::models::user::UserId;
 
@@ -44,7 +44,7 @@ impl Service {
         };
 
         self.authorization_service
-            .authorize(ACTION::GetImageByUrl, maybe_user_id)
+            .authorize(Action::GetImageByUrl, maybe_user_id)
             .await
             .map_err(|_| Error::Unauthenticated)?;
 

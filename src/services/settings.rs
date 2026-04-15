@@ -6,7 +6,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use super::authorization::{self, ACTION};
+use super::authorization::{self, Action};
 use crate::config::{self, Configuration, Settings};
 use crate::errors::AuthError;
 use crate::models::user::UserId;
@@ -32,7 +32,7 @@ impl Service {
     /// It returns an error if the user does not have the required permissions.
     pub async fn get_all(&self, maybe_user_id: Option<UserId>) -> Result<Settings, AuthError> {
         self.authorization_service
-            .authorize(ACTION::GetSettings, maybe_user_id)
+            .authorize(Action::GetSettings, maybe_user_id)
             .await?;
 
         let torrust_index_configuration = self.configuration.get_all().await;
@@ -47,7 +47,7 @@ impl Service {
     /// It returns an error if the user does not have the required permissions.
     pub async fn get_all_masking_secrets(&self, maybe_user_id: Option<UserId>) -> Result<Settings, AuthError> {
         self.authorization_service
-            .authorize(ACTION::GetSettingsSecret, maybe_user_id)
+            .authorize(Action::GetSettingsSecret, maybe_user_id)
             .await?;
 
         let mut torrust_index_configuration = self.configuration.get_all().await;
@@ -64,7 +64,7 @@ impl Service {
     /// It returns an error if the user does not have the required permissions.
     pub async fn get_public(&self, maybe_user_id: Option<UserId>) -> Result<ConfigurationPublic, AuthError> {
         self.authorization_service
-            .authorize(ACTION::GetPublicSettings, maybe_user_id)
+            .authorize(Action::GetPublicSettings, maybe_user_id)
             .await?;
 
         let settings_lock = self.configuration.get_all().await;
@@ -78,7 +78,7 @@ impl Service {
     /// It returns an error if the user does not have the required permissions.
     pub async fn get_site_name(&self, maybe_user_id: Option<UserId>) -> Result<String, AuthError> {
         self.authorization_service
-            .authorize(ACTION::GetSiteName, maybe_user_id)
+            .authorize(Action::GetSiteName, maybe_user_id)
             .await?;
 
         Ok(self.configuration.get_site_name().await)

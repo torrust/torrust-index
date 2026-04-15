@@ -32,6 +32,7 @@ pub struct TokenResponse {
     pub token: String,
     pub username: String,
     pub admin: bool,
+    pub role: String,
 }
 
 #[allow(clippy::module_name_repetitions)]

@@ -13,7 +13,7 @@ pub struct User {
     pub user_id: UserId,
     pub date_registered: Option<String>,
     pub date_imported: Option<String>,
-    pub administrator: bool,
+    pub role: String,
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -39,7 +39,18 @@ pub struct UserProfile {
 pub struct UserCompact {
     pub user_id: UserId,
     pub username: String,
-    pub administrator: bool,
+    pub role: String,
+}
+
+impl UserCompact {
+    /// Whether this user has the admin role.
+    ///
+    /// Convenience for backward-compatible API responses during the
+    /// deprecation period (ADR-T-008 Phase 1).
+    #[must_use]
+    pub fn is_admin(&self) -> bool {
+        self.role == "admin"
+    }
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -48,7 +59,7 @@ pub struct UserFull {
     pub user_id: UserId,
     pub date_registered: Option<String>,
     pub date_imported: Option<String>,
-    pub administrator: bool,
+    pub role: String,
     pub username: String,
     pub email: String,
     pub email_verified: bool,
@@ -64,7 +75,7 @@ pub struct UserListing {
     pub email: String,
     pub email_verified: bool,
     pub date_registered: String,
-    pub administrator: bool,
+    pub role: String,
 }
 
 pub(crate) const MAX_USERNAME_LENGTH: usize = 20;

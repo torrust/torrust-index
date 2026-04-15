@@ -1,7 +1,7 @@
 //! Tag service.
 use std::sync::Arc;
 
-use super::authorization::{self, ACTION};
+use super::authorization::{self, Action};
 use crate::databases::database::{Database, Error as DatabaseError, Error};
 use crate::errors::CategoryTagError;
 use crate::models::torrent_tag::{TagId, TorrentTag};
@@ -30,7 +30,7 @@ impl Service {
     /// * The user does not have the required permissions.
     /// * There is a database error.
     pub async fn add_tag(&self, tag_name: &str, maybe_user_id: Option<UserId>) -> Result<TagId, CategoryTagError> {
-        self.authorization_service.authorize(ACTION::AddTag, maybe_user_id).await?;
+        self.authorization_service.authorize(Action::AddTag, maybe_user_id).await?;
 
         let trimmed_name = tag_name.trim();
 
@@ -56,7 +56,7 @@ impl Service {
     /// * The user does not have the required permissions.
     /// * There is a database error.
     pub async fn delete_tag(&self, tag_id: &TagId, maybe_user_id: Option<UserId>) -> Result<(), CategoryTagError> {
-        self.authorization_service.authorize(ACTION::DeleteTag, maybe_user_id).await?;
+        self.authorization_service.authorize(Action::DeleteTag, maybe_user_id).await?;
 
         match self.tag_repository.delete(tag_id).await {
             Ok(()) => Ok(()),
@@ -76,7 +76,7 @@ impl Service {
     /// * The user does not have the required permissions.
     /// * There is a database error retrieving the tags.
     pub async fn get_tags(&self, maybe_user_id: Option<UserId>) -> Result<Vec<TorrentTag>, CategoryTagError> {
-        self.authorization_service.authorize(ACTION::GetTags, maybe_user_id).await?;
+        self.authorization_service.authorize(Action::GetTags, maybe_user_id).await?;
 
         self.tag_repository
             .get_all()

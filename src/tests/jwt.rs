@@ -44,7 +44,11 @@ fn test_user(admin: bool) -> UserCompact {
     UserCompact {
         user_id: 42,
         username: "testuser".to_string(),
-        administrator: admin,
+        role: if admin {
+            "admin".to_string()
+        } else {
+            "registered".to_string()
+        },
     }
 }
 

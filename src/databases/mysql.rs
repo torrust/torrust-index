@@ -243,7 +243,7 @@ impl Database for Mysql {
         tp.email,
         tp.email_verified,
         tu.date_registered,
-        tu.administrator
+        tu.role
         FROM torrust_user_profiles tp 
         INNER JOIN torrust_users tu
         ON tp.user_id = tu.user_id 
@@ -281,7 +281,7 @@ impl Database for Mysql {
     }
 
     async fn get_user_compact_from_id(&self, user_id: i64) -> Result<UserCompact, database::Error> {
-        query_as::<_, UserCompact>("SELECT tu.user_id, tp.username, tu.administrator FROM torrust_users tu INNER JOIN torrust_user_profiles tp ON tu.user_id = tp.user_id WHERE tu.user_id = ?")
+        query_as::<_, UserCompact>("SELECT tu.user_id, tp.username, tu.role FROM torrust_users tu INNER JOIN torrust_user_profiles tp ON tu.user_id = tp.user_id WHERE tu.user_id = ?")
             .bind(user_id)
             .fetch_one(&self.pool)
             .await
@@ -389,7 +389,7 @@ impl Database for Mysql {
     }
 
     async fn grant_admin_role(&self, user_id: i64) -> Result<(), database::Error> {
-        query("UPDATE torrust_users SET administrator = TRUE WHERE user_id = ?")
+        query("UPDATE torrust_users SET role = 'admin' WHERE user_id = ?")
             .bind(user_id)
             .execute(&self.pool)
             .await

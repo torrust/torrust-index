@@ -9,10 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- ADR-T-008: Document rationale for roles and permissions refactor.
 - ADR-T-006: Document rationale for error system refactor.
 - 188 crate-level tests for the domain error system (`src/tests/errors/`):
   status-code mapping, display messages, `From` impl coverage, and
   `ApiError` delegation (ADR-T-006 §1–§4).
+- Native `PermissionMatrix` replacing Casbin: compile-time checked `Role` and
+  `Action` enums with an exhaustive default-deny policy table (ADR-T-008).
+- `Permissions` trait abstraction consumed by `authorization::Service`.
+- `role: TEXT` column on `torrust_users` (migration for SQLite and MySQL);
+  existing `administrator = true` rows migrated to `role = 'admin'`, others
+  to `role = 'registered'`.
+- `role: String` field on `TokenResponse`, `UserCompact`, `UserProfile`, and
+  `UserFull` API response models.
 - ADR-T-007: Document rationale for JWT system refactor.
 - Centralised JWT module (`src/jwt.rs`) consolidating all `jsonwebtoken` usage:
   key loading, signing, verification, and algorithm configuration.
@@ -52,6 +61,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **BREAKING:** Raise MSRV from 1.85 to 1.88.
+- **BREAKING:** `administrator: bool` replaced by `role: String` in API
+  responses (`TokenResponse`, `UserCompact`, etc.). The `admin` boolean field
+  is removed (ADR-T-008).
+- **BREAKING:** `ACTION` enum renamed to `Action`; variants unchanged.
+- Authorization service (`authorization::Service`) now delegates to a
+  `PermissionMatrix` instead of a Casbin enforcer.
 - **BREAKING:** JWT signing algorithm changed from HMAC-HS256 to RS256
   (RSA + SHA-256). Existing HS256 tokens are invalidated; users must re-login.
 - **BREAKING:** JWT claims redesigned from `UserClaims { user, exp }` to
@@ -84,6 +99,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- `casbin` crate dependency and all Casbin-related code
+  (`CasbinConfiguration`, `CasbinEnforcer`, the `ACTION` enum in
+  SCREAMING_CASE) — replaced by the native `PermissionMatrix` (ADR-T-008).
+- `unstable.auth.casbin` configuration section (`Unstable`, `Auth`, `Casbin`
+  config structs in `src/config/v2/unstable.rs`).
+- `admin: bool` field from `TokenResponse` (replaced by `role: String`).
 - `bearer_token::Extract` wrapper struct (replaced by `BearerToken` directly).
 - `get_optional_logged_in_user` free function (logic moved into extractors).
 - `get_claims_from_bearer_token` private method on `Authentication` (inlined).

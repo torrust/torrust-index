@@ -8,13 +8,11 @@ pub mod net;
 pub mod registration;
 pub mod tracker;
 pub mod tracker_statistics_importer;
-pub mod unstable;
 pub mod website;
 
 use logging::Logging;
 use registration::Registration;
 use serde::{Deserialize, Serialize};
-use unstable::Unstable;
 
 use self::api::Api;
 use self::auth::Auth;
@@ -78,10 +76,6 @@ pub struct Settings {
     /// The tracker statistics importer job configuration.
     #[serde(default = "Settings::default_tracker_statistics_importer")]
     pub tracker_statistics_importer: TrackerStatisticsImporter,
-
-    /// The unstable configuration.
-    #[serde(default = "Settings::default_unstable")]
-    pub unstable: Option<Unstable>,
 }
 
 impl Default for Settings {
@@ -99,7 +93,6 @@ impl Default for Settings {
             api: Self::default_api(),
             registration: Self::default_registration(),
             tracker_statistics_importer: Self::default_tracker_statistics_importer(),
-            unstable: Self::default_unstable(),
         }
     }
 }
@@ -191,10 +184,6 @@ impl Settings {
 
     fn default_tracker_statistics_importer() -> TrackerStatisticsImporter {
         TrackerStatisticsImporter::default()
-    }
-
-    const fn default_unstable() -> Option<Unstable> {
-        None
     }
 }
 

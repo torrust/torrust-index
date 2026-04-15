@@ -13,7 +13,7 @@ use serde_derive::Deserialize;
 use tracing::{debug, info};
 
 use super::authentication::DbUserAuthenticationRepository;
-use super::authorization::{self, ACTION};
+use super::authorization::{self, Action};
 use crate::config::{Configuration, PasswordConstraints};
 use crate::databases::database::{Database, Error, UsersFilters, UsersSorting};
 use crate::errors::UserError;
@@ -162,7 +162,7 @@ impl RegistrationService {
             )
             .await?;
 
-        // If this is the first created account, give administrator rights
+        // If this is the first created account, grant the admin role.
         if user_id == 1 {
             drop(self.user_repository.grant_admin_role(&user_id).await);
         }
@@ -252,7 +252,7 @@ impl ProfileService {
         };
 
         self.authorization_service
-            .authorize(ACTION::ChangePassword, maybe_user_id)
+            .authorize(Action::ChangePassword, maybe_user_id)
             .await?;
 
         info!("changing user password for user ID: {}", user_id);
@@ -323,7 +323,7 @@ impl BanService {
             return Err(UserError::UnauthorizedActionForGuests);
         };
 
-        self.authorization_service.authorize(ACTION::BanUser, maybe_user_id).await?;
+        self.authorization_service.authorize(Action::BanUser, maybe_user_id).await?;
 
         debug!("user with ID {} banning username: {username_to_be_banned}", user_id);
 
@@ -370,7 +370,7 @@ impl ListingService {
         request: &ListingRequest,
     ) -> Result<ListingSpecification, UserError> {
         self.authorization_service
-            .authorize(ACTION::GenerateUserProfileSpecification, maybe_user_id)
+            .authorize(Action::GenerateUserProfileSpecification, maybe_user_id)
             .await?;
 
         let settings = self.configuration.settings.read().await;

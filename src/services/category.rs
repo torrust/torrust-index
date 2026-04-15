@@ -1,7 +1,7 @@
 //! Category service.
 use std::sync::Arc;
 
-use super::authorization::{self, ACTION};
+use super::authorization::{self, Action};
 use crate::databases::database::{Category, Database, Error as DatabaseError};
 use crate::errors::CategoryTagError;
 use crate::models::category::CategoryId;
@@ -33,7 +33,7 @@ impl Service {
     /// * There is a database error.
     pub async fn add_category(&self, category_name: &str, maybe_user_id: Option<UserId>) -> Result<i64, CategoryTagError> {
         self.authorization_service
-            .authorize(ACTION::AddCategory, maybe_user_id)
+            .authorize(Action::AddCategory, maybe_user_id)
             .await?;
 
         let trimmed_name = category_name.trim();
@@ -68,7 +68,7 @@ impl Service {
     /// * There is a database error.
     pub async fn delete_category(&self, category_name: &str, maybe_user_id: Option<UserId>) -> Result<(), CategoryTagError> {
         self.authorization_service
-            .authorize(ACTION::DeleteCategory, maybe_user_id)
+            .authorize(Action::DeleteCategory, maybe_user_id)
             .await?;
 
         match self.category_repository.delete(category_name).await {
@@ -90,7 +90,7 @@ impl Service {
     /// * There is a database error retrieving the categories.
     pub async fn get_categories(&self, maybe_user_id: Option<UserId>) -> Result<Vec<Category>, CategoryTagError> {
         self.authorization_service
-            .authorize(ACTION::GetCategories, maybe_user_id)
+            .authorize(Action::GetCategories, maybe_user_id)
             .await?;
 
         self.category_repository

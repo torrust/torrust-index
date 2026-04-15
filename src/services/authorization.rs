@@ -1,37 +1,89 @@
 //! Authorization service.
+//!
+//! Implements ADR-T-008 Phase 1: native Rust permission system.
+//!
+//! # Architecture
+//!
+//! - [`Role`] — the user's privilege level (`Guest`, `Registered`, `Admin`).
+//! - [`Action`] — an operation the user wants to perform.
+//! - [`PermissionMatrix`] — the default-deny policy table.
+//! - [`Permissions`] trait — abstraction consumed by [`Service`].
+//! - [`Service`] — resolves the caller's role from the database and
+//!   delegates to the [`Permissions`] implementation.
+
+use std::collections::HashSet;
 use std::fmt;
+use std::str::FromStr;
 use std::sync::Arc;
 
-use casbin::{CoreApi, DefaultModel, Enforcer, MgmtApi};
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
-use tracing::error;
 
 use super::user::Repository;
 use crate::errors::AuthError;
-use crate::models::user::{UserCompact, UserId};
+use crate::models::user::UserId;
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Hash)]
+// ── Role ─────────────────────────────────────────────────────────────
+
+/// User privilege level.
+///
+/// Stored as a lowercase string in the `torrust_users.role` column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-enum UserRole {
-    Admin,
-    Registered,
+pub enum Role {
     Guest,
+    Registered,
+    Admin,
 }
 
-impl fmt::Display for UserRole {
+impl Role {
+    /// All variants (compile-time safe — see tests).
+    pub const ALL: &[Self] = &[Self::Guest, Self::Registered, Self::Admin];
+}
+
+impl fmt::Display for Role {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let role_str = match self {
-            Self::Admin => "admin",
-            Self::Registered => "registered",
+        let s = match self {
             Self::Guest => "guest",
+            Self::Registered => "registered",
+            Self::Admin => "admin",
         };
-        write!(f, "{role_str}")
+        write!(f, "{s}")
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
-pub enum ACTION {
+impl FromStr for Role {
+    type Err = RoleParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "guest" => Ok(Self::Guest),
+            "registered" => Ok(Self::Registered),
+            "admin" => Ok(Self::Admin),
+            _ => Err(RoleParseError(s.to_owned())),
+        }
+    }
+}
+
+/// Error returned when a string cannot be parsed into a [`Role`].
+#[derive(Debug, Clone)]
+pub struct RoleParseError(pub String);
+
+impl fmt::Display for RoleParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown role: {:?}", self.0)
+    }
+}
+
+impl std::error::Error for RoleParseError {}
+
+// ── Action ───────────────────────────────────────────────────────────
+
+/// An operation that may be authorized.
+///
+/// Adding a variant without updating `PermissionMatrix::default_grant`
+/// is a compile error (the exhaustive `match` has no wildcard).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Action {
     GetAboutPage,
     GetLicensePage,
     AddCategory,
@@ -56,228 +108,201 @@ pub enum ACTION {
     GenerateUserProfileSpecification,
 }
 
+impl Action {
+    /// Every variant in declaration order.
+    pub const ALL: &[Self] = &[
+        Self::GetAboutPage,
+        Self::GetLicensePage,
+        Self::AddCategory,
+        Self::DeleteCategory,
+        Self::GetCategories,
+        Self::GetImageByUrl,
+        Self::GetSettings,
+        Self::GetSettingsSecret,
+        Self::GetPublicSettings,
+        Self::GetSiteName,
+        Self::AddTag,
+        Self::DeleteTag,
+        Self::GetTags,
+        Self::AddTorrent,
+        Self::GetTorrent,
+        Self::DeleteTorrent,
+        Self::GetTorrentInfo,
+        Self::GenerateTorrentInfoListing,
+        Self::GetCanonicalInfoHash,
+        Self::ChangePassword,
+        Self::BanUser,
+        Self::GenerateUserProfileSpecification,
+    ];
+}
+
+impl fmt::Display for Action {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
+}
+
+// ── Permissions trait ────────────────────────────────────────────────
+
+/// Abstraction over any permission-checking backend.
+pub trait Permissions: Send + Sync {
+    /// Returns `true` if `role` is allowed to perform `action`.
+    fn can(&self, role: &Role, action: Action) -> bool;
+}
+
+// ── PermissionMatrix ─────────────────────────────────────────────────
+
+/// A set-based permission matrix: `(Role, Action)` pairs that are allowed.
+///
+/// Default-deny: any pair not in the set is denied.
+pub struct PermissionMatrix {
+    allowed: HashSet<(Role, Action)>,
+}
+
+impl PermissionMatrix {
+    /// Build the default permission matrix.
+    ///
+    /// Iterates every `(Role, Action)` pair and delegates to
+    /// `default_grant`, which uses exhaustive matches (no
+    /// wildcards for `Registered` and `Guest`) — adding a new `Action`
+    /// variant without deciding its permission is a compile error.
+    #[must_use]
+    pub fn default_matrix() -> Self {
+        let mut allowed = HashSet::new();
+
+        for &role in Role::ALL {
+            for &action in Action::ALL {
+                if Self::default_grant(role, action) {
+                    allowed.insert((role, action));
+                }
+            }
+        }
+
+        Self { allowed }
+    }
+
+    /// Default grant decision for a single `(role, action)` pair.
+    ///
+    /// # Compile-time guarantees
+    ///
+    /// - Adding a `Role` variant → the top-level `match role` becomes
+    ///   non-exhaustive → compile error.
+    /// - Adding an `Action` variant → the `match action` arms for
+    ///   `Registered` and `Guest` become non-exhaustive → compile error.
+    /// - `Admin` intentionally grants all actions by default.
+    const fn default_grant(role: Role, action: Action) -> bool {
+        match role {
+            // Admin is granted every action.
+            Role::Admin => true,
+
+            Role::Registered => match action {
+                Action::GetAboutPage
+                | Action::GetLicensePage
+                | Action::GetCategories
+                | Action::GetImageByUrl
+                | Action::GetPublicSettings
+                | Action::GetSiteName
+                | Action::GetTags
+                | Action::AddTorrent
+                | Action::GetTorrent
+                | Action::GetTorrentInfo
+                | Action::GenerateTorrentInfoListing
+                | Action::GetCanonicalInfoHash
+                | Action::ChangePassword => true,
+
+                Action::AddCategory
+                | Action::DeleteCategory
+                | Action::GetSettings
+                | Action::GetSettingsSecret
+                | Action::AddTag
+                | Action::DeleteTag
+                | Action::DeleteTorrent
+                | Action::BanUser
+                | Action::GenerateUserProfileSpecification => false,
+            },
+
+            Role::Guest => match action {
+                Action::GetAboutPage
+                | Action::GetLicensePage
+                | Action::GetCategories
+                | Action::GetPublicSettings
+                | Action::GetSiteName
+                | Action::GetTags
+                | Action::GetTorrent
+                | Action::GetTorrentInfo
+                | Action::GenerateTorrentInfoListing
+                | Action::GetCanonicalInfoHash => true,
+
+                Action::AddCategory
+                | Action::DeleteCategory
+                | Action::GetImageByUrl
+                | Action::GetSettings
+                | Action::GetSettingsSecret
+                | Action::AddTag
+                | Action::DeleteTag
+                | Action::AddTorrent
+                | Action::DeleteTorrent
+                | Action::ChangePassword
+                | Action::BanUser
+                | Action::GenerateUserProfileSpecification => false,
+            },
+        }
+    }
+}
+
+impl Permissions for PermissionMatrix {
+    fn can(&self, role: &Role, action: Action) -> bool {
+        self.allowed.contains(&(*role, action))
+    }
+}
+
+// ── Service ──────────────────────────────────────────────────────────
+
 pub struct Service {
     user_repository: Arc<Box<dyn Repository>>,
-    casbin_enforcer: Arc<CasbinEnforcer>,
+    permissions: Arc<dyn Permissions>,
 }
 
 impl Service {
     #[must_use]
-    pub fn new(user_repository: Arc<Box<dyn Repository>>, casbin_enforcer: Arc<CasbinEnforcer>) -> Self {
+    pub fn new(user_repository: Arc<Box<dyn Repository>>, permissions: Arc<dyn Permissions>) -> Self {
         Self {
             user_repository,
-            casbin_enforcer,
+            permissions,
         }
     }
 
-    ///Allows or denies an user to perform an action based on the user's privileges
+    /// Allows or denies a user to perform an action based on their role.
     ///
     /// # Errors
     ///
-    /// Will return an error if:
-    /// - The user is not authorized to perform the action.
-    pub async fn authorize(&self, action: ACTION, maybe_user_id: Option<UserId>) -> std::result::Result<(), AuthError> {
+    /// Returns an error if the user is not authorized:
+    /// - `AuthError::UnauthorizedActionForGuests` for guest users.
+    /// - `AuthError::UnauthorizedAction` for authenticated users.
+    pub async fn authorize(&self, action: Action, maybe_user_id: Option<UserId>) -> Result<(), AuthError> {
         let role = self.get_role(maybe_user_id).await;
 
-        let enforcer = self.casbin_enforcer.enforcer.read().await;
-
-        let authorize = enforcer.enforce((&role, action)).map_err(|e| {
-            error!(error = %e, "casbin enforcer error");
-            AuthError::InternalServerError
-        })?;
-        drop(enforcer);
-
-        if authorize {
+        if self.permissions.can(&role, action) {
             Ok(())
-        } else if role == UserRole::Guest {
+        } else if role == Role::Guest {
             Err(AuthError::UnauthorizedActionForGuests)
         } else {
             Err(AuthError::UnauthorizedAction)
         }
     }
 
-    /// It returns the compact user.
+    /// Resolve the role for a (possibly absent) user ID.
     ///
-    /// # Errors
-    ///
-    /// It returns an error if there is a database error.
-    async fn get_user(&self, user_id: UserId) -> std::result::Result<UserCompact, AuthError> {
-        self.user_repository.get_compact(&user_id).await.map_err(AuthError::from)
-    }
-
-    /// It returns the role of the user.
-    /// If the user found in the request does not exist in the database or there is no user id, a guest role is returned
-    async fn get_role(&self, maybe_user_id: Option<UserId>) -> UserRole {
+    /// - `None` → `Guest`
+    /// - `Some(id)` not found in DB → `Guest`
+    /// - `Some(id)` found → role from the `role` column
+    async fn get_role(&self, maybe_user_id: Option<UserId>) -> Role {
         match maybe_user_id {
-            Some(user_id) => {
-                // Checks if the user found in the request exists in the database
-                let user_guard = self.get_user(user_id).await;
-
-                match user_guard {
-                    Ok(user_data) => {
-                        if user_data.administrator {
-                            UserRole::Admin
-                        } else {
-                            UserRole::Registered
-                        }
-                    }
-                    Err(_) => UserRole::Guest,
-                }
-            }
-            None => UserRole::Guest,
-        }
-    }
-}
-
-pub struct CasbinEnforcer {
-    enforcer: Arc<RwLock<Enforcer>>,
-}
-
-impl CasbinEnforcer {
-    /// # Panics
-    ///
-    /// Will panic if:
-    ///
-    /// - The enforcer can't be created.
-    /// - The policies can't be loaded.
-    pub async fn with_default_configuration() -> Self {
-        let casbin_configuration = CasbinConfiguration::default();
-
-        let mut enforcer = Enforcer::new(casbin_configuration.default_model().await, ())
-            .await
-            .expect("Error creating the enforcer");
-
-        enforcer
-            .add_policies(casbin_configuration.policy_lines())
-            .await
-            .expect("Error loading the policy");
-
-        let enforcer = Arc::new(RwLock::new(enforcer));
-
-        Self { enforcer }
-    }
-
-    /// # Panics
-    ///
-    /// Will panic if:
-    ///
-    /// - The enforcer can't be created.
-    /// - The policies can't be loaded.
-    pub async fn with_configuration(casbin_configuration: CasbinConfiguration) -> Self {
-        let mut enforcer = Enforcer::new(casbin_configuration.default_model().await, ())
-            .await
-            .expect("Error creating the enforcer");
-
-        enforcer
-            .add_policies(casbin_configuration.policy_lines())
-            .await
-            .expect("Error loading the policy");
-
-        let enforcer = Arc::new(RwLock::new(enforcer));
-
-        Self { enforcer }
-    }
-}
-
-#[allow(dead_code)]
-pub struct CasbinConfiguration {
-    model: String,
-    policy: String,
-}
-
-impl CasbinConfiguration {
-    #[must_use]
-    pub fn new(model: &str, policy: &str) -> Self {
-        Self {
-            model: model.to_owned(),
-            policy: policy.to_owned(),
-        }
-    }
-
-    /// # Panics
-    ///
-    /// It panics if the model cannot be loaded.
-    async fn default_model(&self) -> DefaultModel {
-        DefaultModel::from_str(&self.model).await.expect("Error loading the model")
-    }
-
-    /// Converts the policy from a string type to a vector.
-    fn policy_lines(&self) -> Vec<Vec<String>> {
-        self.policy
-            .lines()
-            .filter(|line| !line.trim().is_empty())
-            .map(|line| line.split(',').map(|s| s.trim().to_owned()).collect::<Vec<String>>())
-            .collect()
-    }
-}
-
-impl Default for CasbinConfiguration {
-    fn default() -> Self {
-        Self {
-            model: String::from(
-                "
-                [request_definition]
-                r = role, action
-                
-                [policy_definition]
-                p = role, action
-                
-                [policy_effect]
-                e = some(where (p.eft == allow))
-                
-                [matchers]
-                m = r.role == p.role && r.action == p.action
-            ",
-            ),
-            policy: String::from(
-                "
-                admin, GetAboutPage
-                admin, GetLicensePage
-                admin, AddCategory
-                admin, DeleteCategory
-                admin, GetCategories
-                admin, GetImageByUrl
-                admin, GetSettings
-                admin, GetSettingsSecret
-                admin, GetPublicSettings
-                admin, GetSiteName
-                admin, AddTag
-                admin, DeleteTag
-                admin, GetTags
-                admin, AddTorrent
-                admin, GetTorrent
-                admin, DeleteTorrent
-                admin, GetTorrentInfo
-                admin, GenerateTorrentInfoListing
-                admin, GetCanonicalInfoHash
-                admin, ChangePassword
-                admin, BanUser
-                admin, GenerateUserProfileSpecification
-                registered, GetAboutPage
-                registered, GetLicensePage
-                registered, GetCategories
-                registered, GetImageByUrl
-                registered, GetPublicSettings
-                registered, GetSiteName
-                registered, GetTags
-                registered, AddTorrent
-                registered, GetTorrent
-                registered, GetTorrentInfo
-                registered, GenerateTorrentInfoListing
-                registered, GetCanonicalInfoHash
-                registered, ChangePassword
-                guest, GetAboutPage
-                guest, GetLicensePage
-                guest, GetCategories
-                guest, GetPublicSettings
-                guest, GetSiteName
-                guest, GetTags
-                guest, GetTorrent
-                guest, GetTorrentInfo
-                guest, GenerateTorrentInfoListing
-                guest, GetCanonicalInfoHash
-                ",
-            ),
+            Some(user_id) => match self.user_repository.get_compact(&user_id).await {
+                Ok(user) => Role::from_str(&user.role).unwrap_or(Role::Registered),
+                Err(_) => Role::Guest,
+            },
+            None => Role::Guest,
         }
     }
 }
