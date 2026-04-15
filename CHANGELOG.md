@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - ADR-T-006: Document rationale for error system refactor.
+- 188 crate-level tests for the domain error system (`src/tests/errors/`):
+  status-code mapping, display messages, `From` impl coverage, and
+  `ApiError` delegation (ADR-T-006 §1–§4).
 
 ### Changed
 

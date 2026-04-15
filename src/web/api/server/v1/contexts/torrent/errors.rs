@@ -6,16 +6,16 @@ use crate::web::api::server::v1::responses::{ErrorResponseData, json_error_respo
 
 #[derive(Debug, PartialEq, Eq, Error)]
 pub enum Request {
-    #[error("torrent title bytes are nota valid UTF8 string.")]
+    #[error("torrent title bytes are not a valid UTF8 string.")]
     TitleIsNotValidUtf8,
 
-    #[error("torrent description bytes are nota valid UTF8 string.")]
+    #[error("torrent description bytes are not a valid UTF8 string.")]
     DescriptionIsNotValidUtf8,
 
-    #[error("torrent category bytes are nota valid UTF8 string.")]
+    #[error("torrent category bytes are not a valid UTF8 string.")]
     CategoryIsNotValidUtf8,
 
-    #[error("torrent tags arrays bytes are nota valid UTF8 string array.")]
+    #[error("torrent tags arrays bytes are not a valid UTF8 string array.")]
     TagsArrayIsNotValidUtf8,
 
     #[error("torrent tags string is not a valid JSON.")]

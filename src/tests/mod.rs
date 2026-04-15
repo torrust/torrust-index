@@ -1,6 +1,7 @@
 mod bootstrap;
 mod cache;
 mod config;
+mod errors;
 mod mailer;
 mod models;
 mod services;

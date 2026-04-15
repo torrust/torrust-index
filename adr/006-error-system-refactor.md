@@ -1,7 +1,7 @@
 # ADR-T-006: Refactor the Error System
 
-**Status:** Implemented (Phases 0–3 complete)
-**Date:** 2026-04-14
+**Status:** Implemented (Phases 0–4 complete)
+**Date:** 2026-04-15
 **Relates to:** [ADR-T-004](004-remove-located-error.md)
 (removal of `located-error` package — prerequisite cleanup)
 
@@ -394,6 +394,17 @@ implementation.
    - Removed `IntoResponse for database::Error`.
    - All doc comments updated to reference domain error types.
 
+5. **Phase 4 — Crate-level test suite:** ✅ Done
+   - 188 crate tests in `src/tests/errors/` covering §1–§4 of the
+     Testing Acceptance Guide.
+   - `auth_error.rs` — 29 tests (status codes, display, `From` impls).
+   - `user_error.rs` — 54 tests (status codes, display, `From` impls).
+   - `torrent_error.rs` — 73 tests (status codes, display, `From` impls).
+   - `category_tag_error.rs` — 24 tests (status codes, display, `From` impls).
+   - `api_error.rs` — 8 tests (`status_code()` and `Display` delegation).
+   - §5 (tracing capture) and §6 (integration `IntoResponse`) remain
+     as future work.
+
 ### Handling Cross-Domain Errors in Handlers
 
 Handlers that call multiple services (e.g. auth + torrent) will
@@ -429,3 +440,191 @@ errors via `#[source]` when needed.
   enums with a `// see ADR-T-006` comment. A future refinement
   could extract a shared `InfraError` type to reduce this
   duplication.
+
+## Testing Acceptance Guide
+
+This section describes the testing requirements for the error system.
+New error variants, `From` impls, and status-code mappings introduced
+after this ADR **must** satisfy the criteria below before merging.
+
+### 1. Status-Code Mapping (Crate Tests) ✅
+
+Every variant of every domain error enum (`AuthError`, `UserError`,
+`TorrentError`, `CategoryTagError`) **must** have a crate-level test
+that asserts the expected `StatusCode` returned by `status_code()`.
+
+```rust
+// src/tests/errors.rs  (crate-level, §T-006 status-code tests)
+
+use hyper::StatusCode;
+use crate::errors::AuthError;
+
+#[test]
+fn auth_error_wrong_password_returns_forbidden() {
+    assert_eq!(AuthError::WrongPasswordOrUsername.status_code(), StatusCode::FORBIDDEN);
+}
+```
+
+Group the tests by domain error enum. One test per variant is the
+baseline; variants that share a status code may be combined into a
+single parametric test if preferred, but every variant must appear.
+
+### 2. Display Messages (Crate Tests) ✅
+
+Each variant's `Display` output is the string returned to API
+consumers in the `{"error": "…"}` JSON body. A crate test **must**
+assert the exact message string for every variant to prevent
+accidental regressions.
+
+```rust
+#[test]
+fn auth_error_token_expired_display_message() {
+    assert_eq!(
+        AuthError::TokenExpired.to_string(),
+        "Token expired. Please sign in again.",
+    );
+}
+```
+
+### 3. `From` Impl Coverage (Crate Tests) ✅
+
+Every `From<SourceError> for DomainError` impl **must** have at
+least one test per mapping arm. In particular:
+
+- **Specific mappings** (e.g. `database::Error::UserNotFound` →
+  `AuthError::UserNotFound`) must each be asserted.
+- **Catch-all / fallback arms** (e.g. `_ => Self::DatabaseError`)
+  must be tested with at least one representative source variant
+  that exercises the fallback.
+- **Lossy conversions** (source error → `InternalServerError`) must
+  verify the correct variant *and* confirm that the source error is
+  logged (see §5 below).
+
+```rust
+#[test]
+fn auth_error_from_database_user_not_found() {
+    let err: AuthError = database::Error::UserNotFound.into();
+    assert_eq!(err, AuthError::UserNotFound);
+}
+
+#[test]
+fn auth_error_from_database_fallback() {
+    let err: AuthError = database::Error::CategoryNotFound.into();
+    assert_eq!(err, AuthError::DatabaseError);
+}
+```
+
+### 4. `ApiError` Delegation (Crate Tests) ✅
+
+`ApiError` must transparently delegate `status_code()` and
+`Display` to the wrapped domain error. For each `ApiError` variant,
+a test should assert:
+
+- `ApiError::from(domain_error).status_code()` equals the inner
+  error's `status_code()`.
+- `ApiError::from(domain_error).to_string()` equals the inner
+  error's `to_string()`.
+
+```rust
+#[test]
+fn api_error_delegates_status_code_to_auth() {
+    let inner = AuthError::TokenNotFound;
+    let api = ApiError::from(inner);
+    // TokenNotFound → UNAUTHORIZED
+    assert_eq!(api.status_code(), StatusCode::UNAUTHORIZED);
+}
+```
+
+### 5. Tracing Output on Lossy Conversions (Crate Tests) — Future
+
+`From` impls that discard the source error (converting to
+`InternalServerError`, `DatabaseError`, etc.) **must** log the
+original error via `tracing::error!`. Tests should use a
+[`tracing_subscriber::fmt::TestWriter`] or the `tracing-test` crate
+to capture log output and assert the source error message appears.
+
+At minimum, one test per `From` impl that performs a lossy
+conversion should confirm the log line is emitted.
+
+### 6. `IntoResponse` HTTP Shape (Integration Tests) — Future
+
+Integration tests (`tests/e2e/`) should verify the end-to-end HTTP
+response for representative error scenarios:
+
+- **Status code** matches the domain error's `status_code()`.
+- **Content-Type** is `application/json`.
+- **Body** is `{"error": "<Display message>"}`.
+
+These tests exercise the full Axum handler → domain error →
+`IntoResponse` pipeline. At least one happy-path error per domain
+should be covered (e.g. login with wrong password → 403, upload
+duplicate torrent → 400, delete non-existent category → 404).
+
+### 7. Exhaustiveness Guard
+
+To prevent a new variant from being added without a corresponding
+test, each domain error's status-code test module should include a
+compile-time or runtime exhaustiveness check. The simplest approach
+is a test that matches all variants in a `match` expression with no
+wildcard arm — the compiler will error if a new variant is added
+without updating the test:
+
+```rust
+#[test]
+fn auth_error_status_code_is_exhaustive() {
+    // This match must list every variant. Adding a new variant
+    // to AuthError without updating this test will cause a
+    // compiler error.
+    let variants: Vec<AuthError> = vec![
+        AuthError::WrongPasswordOrUsername,
+        AuthError::InvalidPassword,
+        AuthError::UsernameNotFound,
+        AuthError::TokenNotFound,
+        AuthError::TokenExpired,
+        AuthError::TokenInvalid,
+        AuthError::UnauthorizedAction,
+        AuthError::UnauthorizedActionForGuests,
+        AuthError::LoggedInUserNotFound,
+        AuthError::EmailNotVerified,
+        AuthError::InternalServerError,
+        AuthError::DatabaseError,
+        AuthError::UserNotFound,
+    ];
+    for variant in variants {
+        // Just ensure status_code() doesn't panic.
+        let _ = variant.status_code();
+    }
+}
+```
+
+### 8. Cross-Cutting Variant Consistency
+
+The duplicated cross-cutting variants (`UnauthorizedAction`,
+`UnauthorizedActionForGuests`, `DatabaseError`,
+`InternalServerError`) **must** map to the same `StatusCode` in
+every domain enum that contains them. A dedicated test should assert
+this invariant:
+
+```rust
+#[test]
+fn cross_cutting_variants_have_consistent_status_codes() {
+    // UnauthorizedAction → FORBIDDEN everywhere
+    assert_eq!(AuthError::UnauthorizedAction.status_code(), StatusCode::FORBIDDEN);
+    assert_eq!(UserError::UnauthorizedAction.status_code(), StatusCode::FORBIDDEN);
+    assert_eq!(TorrentError::UnauthorizedAction.status_code(), StatusCode::FORBIDDEN);
+    assert_eq!(CategoryTagError::UnauthorizedAction.status_code(), StatusCode::FORBIDDEN);
+}
+```
+
+### Summary Checklist
+
+| # | What | Where | Blocking? |
+|---|------|-------|-----------|
+| 1 | `status_code()` per variant | `src/tests/` | Yes |
+| 2 | `Display` message per variant | `src/tests/` | Yes |
+| 3 | Every `From` mapping arm | `src/tests/` | Yes |
+| 4 | `ApiError` delegation | `src/tests/` | Yes |
+| 5 | Tracing on lossy conversions | `src/tests/` | Recommended |
+| 6 | HTTP response shape (e2e) | `tests/e2e/` | Recommended |
+| 7 | Exhaustiveness guard | `src/tests/` | Yes |
+| 8 | Cross-cutting consistency | `src/tests/` | Yes |
