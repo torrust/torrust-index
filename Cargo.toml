@@ -80,6 +80,7 @@ pbkdf2 = { version = "0", features = ["simple"] }
 pin-project-lite = "0"
 rand = "0.10"
 regex = "1"
+rsa = { version = "0.9", default-features = false, features = ["std", "pem"] }
 reqwest = { version = "0", features = ["json", "multipart", "query"] }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_bencode = "0"

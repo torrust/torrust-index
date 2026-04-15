@@ -1,6 +1,6 @@
 # ADR-T-007: Refactor the JWT System
 
-**Status:** Phase 4 implemented
+**Status:** Implemented
 **Date:** 2026-04-14
 
 ## Context
@@ -397,8 +397,10 @@ phased rollout that subsumes Options A and B.
   - `auth.public_key_path` for verification.
   - Alternatively, inline PEM via environment variable
     (`auth.private_key_pem`, `auth.public_key_pem`).
-- ✅ Development key pair shipped at `share/default/jwt/` with loud
-  startup warning when the default dev keys are used.
+- ~~Development key pair shipped at `share/default/jwt/` with loud
+  startup warning when the default dev keys are used.~~
+  *(Implemented, then superseded by Phase 5 — ephemeral
+  auto-generated keys replace the shipped dev keys.)*
 - ✅ Use `EncodingKey::from_rsa_pem` / `DecodingKey::from_rsa_pem`.
 - ✅ Only the signing service loads the private key; the
   verification path uses the public key.
@@ -427,12 +429,249 @@ phased rollout that subsumes Options A and B.
 - **Breaking change:** existing tokens without a `gen` claim will
   fail deserialization and be rejected (users re-login once).
 
+#### Phase 5 — Ephemeral Auto-Generated Keys (default) ✅ Implemented
+
+##### Behaviour
+
+- Remove the shipped development key pair from `share/default/jwt/`.
+- On startup, if no key paths or PEM values are configured,
+  **auto-generate an RSA-2048 key pair in memory** via the `rsa`
+  crate's `RsaPrivateKey::new(&mut OsRng, 2048)`.
+- The generated keys are held only in process memory and are
+  **never written to disk**. On shutdown (or crash) the keys are
+  lost; all outstanding tokens become unverifiable and users must
+  re-login.
+- Log a clear informational message at startup:
+  `"Using ephemeral auto-generated RSA key pair. Sessions will
+  not survive server restarts. To persist sessions, configure
+  auth.private_key_path / auth.public_key_path."`
+- No development-mode keys exist in the repository. There is no
+  distinction between "dev" and "prod" key material — only
+  between ephemeral (default) and host-supplied (persistent).
+- For **persistent sessions across restarts**, the deployer
+  generates their own RSA key pair and configures the paths or
+  environment variables as described in Phase 3.
+- **No breaking change for existing Phase 3 deployers** who
+  already supply their own key pair — their configuration
+  continues to work as before. Only the *default* behaviour
+  changes (from shipped dev keys to ephemeral keys).
+
+##### New dependencies
+
+The `rsa` crate (already a transitive dependency via
+`jsonwebtoken`'s `rust_crypto` feature) must be added as a
+**direct** dependency in `Cargo.toml` along with `rand` (for
+`OsRng`). PEM export requires the `pkcs8` + `pem` features on
+`rsa` (for `EncodePrivateKey::to_pkcs8_pem`) and `spki` (for
+`EncodePublicKey::to_public_key_pem`).
+
+##### Key generation details
+
+`RsaPrivateKey::new()` is CPU-intensive (~100-300 ms for 2048
+bits). Because `JsonWebToken::new()` is `async`, the generation
+must be wrapped in `tokio::task::spawn_blocking` to avoid stalling
+the async executor.
+
+After generation, the private and public keys are exported to
+in-memory PEM byte vectors via:
+```rust
+use rsa::pkcs8::EncodePrivateKey;
+use rsa::pkcs8::LineEnding;
+use spki::EncodePublicKey;
+
+let private_pem = private_key
+    .to_pkcs8_pem(LineEnding::LF)
+    .expect("PEM export");
+let public_pem = private_key
+    .to_public_key()
+    .to_public_key_pem(LineEnding::LF)
+    .expect("PEM export");
+```
+These PEM bytes are then passed to `EncodingKey::from_rsa_pem` /
+`DecodingKey::from_rsa_pem` exactly as the host-supplied path does
+today.
+
+##### Interface changes
+
+- **`Auth::resolve_private_key_pem()` / `resolve_public_key_pem()`**
+  currently **panic** when no key is found. These methods must
+  change their return type to `Option<Vec<u8>>` so the caller
+  (`JsonWebToken::new`) can distinguish "no key configured" from
+  "key configured but invalid".
+- **`Auth::default()`** must set `private_key_path` and
+  `public_key_path` to `None` (not the former
+  `./share/default/jwt/…` paths). The `DEFAULT_PRIVATE_KEY_PATH`
+  and `DEFAULT_PUBLIC_KEY_PATH` constants are removed.
+- **`JsonWebToken::new()`** gains a new branch: when both
+  `resolve_*` methods return `None`, it generates an ephemeral
+  key pair (via `spawn_blocking`) and logs the informational
+  message.
+
+##### Files affected by dev-key removal
+
+Removing `share/default/jwt/` and the default-path constants
+touches the following files (non-exhaustive):
+
+| File | Change |
+|---|---|
+| `share/default/jwt/private.pem`, `public.pem` | Delete |
+| `src/config/v2/auth.rs` | Remove `DEFAULT_*_KEY_PATH` constants; change defaults to `None`; return `Option` from `resolve_*` |
+| `src/jwt.rs` | Add ephemeral-generation branch in `JsonWebToken::new()` |
+| `src/lib.rs` | Update doc-comment example config (remove key paths from default) |
+| `src/tests/jwt.rs` | `jwt_service()` helper uses ephemeral path (no path overrides) |
+| `tests/fixtures/default_configuration.toml` | Remove `private_key_path` / `public_key_path` lines |
+| `.env.local` | Remove `AUTH__PRIVATE_KEY_PATH` / `AUTH__PUBLIC_KEY_PATH` overrides |
+| `share/default/config/index.development.sqlite3.toml` | Remove key-path lines |
+| `contrib/dev-tools/container/e2e/sqlite/install.sh` | Remove `cp …/jwt/*.pem` line |
+| `contrib/dev-tools/container/e2e/mysql/install.sh` | Remove `cp …/jwt/*.pem` line |
+| `compose.yaml` | Remove or comment out `AUTH__PRIVATE_KEY_PATH` / `AUTH__PUBLIC_KEY_PATH` env vars |
+| `src/web/api/server/v1/contexts/user/mod.rs` | Update module-level doc example |
+
+#### Phase 6 — `generate-auth-keypair` CLI + Container Auto-Generation
+
+##### Motivation
+
+Phases 3 and 5 require deployers who want **persistent sessions**
+to generate an RSA key pair externally (e.g., via `openssl`).
+This creates an operational dependency on a tool that may not be
+present in minimal container images (the runtime image is
+distroless). Rather than adding `openssl` to the container, the
+key generation capability is built into the project itself — the
+`rsa` crate is already a direct dependency.
+
+The goal is zero-friction persistent sessions in the container:
+on first boot, if no keys exist on the `/etc/torrust/index`
+volume, the entry script generates them automatically. Subsequent
+restarts reuse the same keys, so sessions survive. Hosts who want
+their own keys either pre-populate the volume before the first
+start, or overwrite the generated keys and restart.
+
+##### CLI binary — `torrust-generate-auth-keypair`
+
+A new binary `torrust-generate-auth-keypair`
+(`src/bin/generate_auth_keypair.rs`) generates an RSA-2048 key
+pair and writes both PEM blocks to **stdout**. Design constraints:
+
+- **Stdout must be piped.** The tool refuses to run if stdout is
+  a terminal (`std::io::stdout().is_terminal()`), printing a
+  usage hint to stderr and exiting with code 1. This prevents
+  accidental display of key material on screen.
+- **Private key on stdout first, then the public key**, each in
+  standard PEM (Base64-encoded PKCS#8 / SPKI) format. The two
+  blocks are self-delimiting via their `-----BEGIN …-----` /
+  `-----END …-----` markers.
+- **Diagnostic message on stderr** confirming the key was
+  generated (type, bit size).
+- Uses `clap` (already a dependency) for `--help` and future
+  extensibility (e.g., `--bits`, `--out-dir`).
+- Reuses the same `rsa` + `pkcs8` code path as the ephemeral
+  generator in `src/jwt.rs`.
+
+##### Container integration
+
+The container entry script (`share/container/entry_script_sh`)
+auto-generates persistent keys on first boot:
+
+```sh
+# Generate auth keys if not already present on the volume.
+private_key="/etc/torrust/index/private.pem"
+public_key="/etc/torrust/index/public.pem"
+
+if [ ! -f "$private_key" ] || [ ! -f "$public_key" ]; then
+    torrust-generate-auth-keypair > /tmp/auth_keys.pem 2>/dev/null
+    sed -n '/BEGIN PRIVATE/,/END PRIVATE/p' /tmp/auth_keys.pem > "$private_key"
+    sed -n '/BEGIN PUBLIC/,/END PUBLIC/p'   /tmp/auth_keys.pem > "$public_key"
+    rm -f /tmp/auth_keys.pem
+    chown torrust:torrust "$private_key" "$public_key"
+    chmod 0400 "$private_key"
+    chmod 0440 "$public_key"
+fi
+```
+
+Because `/etc/torrust/index` is a declared `VOLUME`, the
+generated keys persist across container restarts and image
+upgrades. Sessions survive as long as the volume is retained.
+
+All container configuration files (`share/default/config/`) set:
+```toml
+[auth]
+private_key_path = "/etc/torrust/index/private.pem"
+public_key_path  = "/etc/torrust/index/public.pem"
+```
+
+##### Containerfile changes
+
+The `torrust-generate-auth-keypair` binary is copied into `/usr/bin/` in
+both the debug and release runtime images alongside
+`torrust-index` and `health_check`:
+
+```dockerfile
+# Extract and Test (debug)
+RUN mkdir -p /app/bin/; \
+  cp -l /test/src/target/debug/torrust-index /app/bin/torrust-index; \
+  cp -l /test/src/target/debug/torrust-generate-auth-keypair /app/bin/torrust-generate-auth-keypair
+
+# Extract and Test (release)
+RUN mkdir -p /app/bin/; \
+  cp -l /test/src/target/release/torrust-index /app/bin/torrust-index; \
+  cp -l /test/src/target/release/health_check /app/bin/health_check; \
+  cp -l /test/src/target/release/torrust-generate-auth-keypair /app/bin/torrust-generate-auth-keypair
+```
+
+##### Host-supplied keys (custom key workflow)
+
+Hosts who want to use their own RSA key pair have two options:
+
+1. **Pre-supply before first boot.** Mount or copy key files into
+   the `/etc/torrust/index` volume before starting the container.
+   The entry script's existence check (`[ ! -f … ]`) will skip
+   generation and the server will use the host's keys directly.
+
+2. **Overwrite after first boot.** Let the container auto-generate
+   keys on first boot since it "just works". Later, replace the
+   generated PEM files on the volume with the host's own keys and
+   restart the container. The server picks up the new keys; any
+   tokens signed with the old keys are invalidated (users
+   re-login once).
+
+##### Usage outside containers
+
+```sh
+# Generate and split into two files:
+cargo run --bin torrust-generate-auth-keypair \
+  | tee >(sed -n '/BEGIN PRIVATE/,/END PRIVATE/p' > private.pem) \
+        >(sed -n '/BEGIN PUBLIC/,/END PUBLIC/p'   > public.pem) \
+        > /dev/null
+```
+
+##### Files affected
+
+| File | Change |
+|---|---|
+| `src/bin/torrust-generate-auth-keypair.rs` | New binary |
+| `Cargo.toml` | No change — auto-discovered by Cargo |
+| `Containerfile` | Copy `torrust-generate-auth-keypair` into `/app/bin/` in both debug and release stages |
+| `share/container/entry_script_sh` | Add key-generation block before `exec su-exec` |
+| `share/default/config/index.container.sqlite3.toml` | Add `private_key_path` / `public_key_path` to `[auth]` |
+| `share/default/config/index.container.mysql.toml` | Add `private_key_path` / `public_key_path` to `[auth]` |
+| `share/default/config/index.public.e2e.container.sqlite3.toml` | Add `private_key_path` / `public_key_path` to `[auth]` |
+| `share/default/config/index.public.e2e.container.mysql.toml` | Add `private_key_path` / `public_key_path` to `[auth]` |
+| `share/default/config/index.private.e2e.container.sqlite3.toml` | Add `private_key_path` / `public_key_path` to `[auth]` |
+
+##### No breaking changes
+
+This phase adds a new binary and updates the container entry
+script. Bare-metal deployments without key paths configured
+continue to use Phase 5's ephemeral in-memory keys. Container
+deployments gain automatic persistent keys with no manual setup.
+
 ### Configuration Migration
 
 Deployers upgrading across Phase 2 / Phase 3 must:
 
-1. Generate an RSA key pair (e.g.,
-   `openssl genrsa -out private.pem 2048` and
+1. Generate an RSA key pair — either via
+   `cargo run --bin torrust-generate-auth-keypair | …` (see Phase 6) or
+   externally (`openssl genrsa -out private.pem 2048` and
    `openssl rsa -in private.pem -pubout -out public.pem`).
 2. Update the config to reference the key paths (or set env vars).
 3. Accept that existing sessions will be invalidated (users
@@ -440,14 +679,40 @@ Deployers upgrading across Phase 2 / Phase 3 must:
 
 A migration guide will accompany the release that ships Phase 3.
 
+With Phase 5, steps 1–2 become **optional** for bare-metal
+deployments. Without explicit key configuration the server
+auto-generates ephemeral keys and functions immediately —
+sessions simply do not survive restarts.
+
+With Phase 6, **container deployments handle key generation
+automatically.** The entry script generates keys to the
+`/etc/torrust/index` volume on first boot; the container configs
+already point to the generated paths. No manual key generation or
+config editing is required. Sessions persist across restarts as
+long as the volume is retained.
+
+Note: the **serialized default config** changes in Phase 5 — the
+bare-metal `[auth]` section will no longer contain
+`private_key_path` / `public_key_path` entries. Container configs
+*do* include these paths (pointing to `/etc/torrust/index/`).
+Deployers who generate their config from defaults should be aware
+of this difference. Existing configs that explicitly set these
+fields are unaffected.
+
 ## Consequences
 
 - Existing user sessions **will be invalidated** when Phase 2
   ships (claim format change) and again if key material changes
   in Phase 3. Users must re-login.
-- Deployers must generate and manage an RSA key pair (Phase 3).
-  A development-mode auto-generated key reduces friction for
-  local setups.
+- **Container deployments** auto-generate persistent keys on
+  first boot (Phase 6). Sessions survive restarts with no manual
+  setup. Hosts who want their own keys pre-populate the volume or
+  overwrite the generated keys and restart.
+- **Bare-metal deployments** without key paths configured use
+  ephemeral in-memory keys (Phase 5) — sessions do not survive
+  restarts. Deployers who want persistent sessions generate a key
+  pair via `torrust-generate-auth-keypair` (Phase 6) or `openssl` and
+  configure the paths.
 - Token revocation via a `token_generation` counter is included
   (Phase 4 / Option E). Password changes, role changes, and bans
   increment the counter and invalidate outstanding tokens.
@@ -455,6 +720,89 @@ A migration guide will accompany the release that ships Phase 3.
   (e.g., migrating to EdDSA) a localised, single-module change.
 - External services can verify tokens using only the public key,
   enabling zero-trust verification without secret sharing.
+
+## Testing Strategy
+
+The repository **does not ship any pre-generated RSA key material**.
+Tests exercise three key-provisioning modes:
+
+### Crate-level tests (`src/tests/jwt.rs`)
+
+The existing `jwt_service()` helper constructs a `JsonWebToken`
+with **no key paths configured**, exercising the ephemeral
+in-memory generation code path (Phase 5). All round-trip, claim,
+and error-path tests work unchanged — they only need a valid
+`JsonWebToken` instance, regardless of how the keys were
+provisioned.
+
+### Isolated e2e tests (bare-metal path)
+
+Isolated e2e tests (the default `cargo test` mode) start an
+in-process server with a `TempDir`-based ephemeral configuration.
+No key paths are configured, so the server auto-generates keys in
+memory. Authentication works for the lifetime of the test process.
+No special setup is required.
+
+### Container e2e tests (persistent-key path)
+
+Container e2e tests (`compose.yaml`) exercise the production-like
+flow where `torrust-generate-auth-keypair` runs in the entry script:
+
+1. The entry script detects no keys on the `/etc/torrust/index`
+   volume and runs `torrust-generate-auth-keypair` to create them.
+2. The container configs point `auth.private_key_path` and
+   `auth.public_key_path` at the generated files.
+3. The server starts with host-supplied (volume-persisted) keys.
+4. E2e tests run the full auth round-trip: register, login,
+   authenticated requests.
+
+Because the keys live on a volume, restarting the container
+reuses the same key pair — proving session persistence across
+restarts (the production contract).
+
+### Host-supplied-key e2e test
+
+A dedicated e2e test verifies that externally generated keys are
+accepted. The test has an external dependency on **`openssl`**
+(must be on `$PATH`).
+
+**Test outline (`tests/e2e/web/api/v1/contexts/user/`)**:
+
+1. **Generate a fresh RSA key pair via `openssl`** into a
+   temporary directory (`tempfile::TempDir`):
+   ```sh
+   openssl genrsa -out "$tmpdir/private.pem" 2048
+   openssl rsa -in "$tmpdir/private.pem" -pubout -out "$tmpdir/public.pem"
+   ```
+   Executed with `std::process::Command`. The test is
+   `#[ignore]`-gated (or behind a feature flag / env var) so CI
+   runners without `openssl` can skip it gracefully.
+
+2. **Start a test environment** with config overrides pointing
+   `auth.private_key_path` and `auth.public_key_path` at the
+   generated files.
+
+3. **Perform a full auth round-trip:**
+   - Register a user.
+   - Log in and receive a session JWT.
+   - Call an authenticated endpoint using the token.
+   - Verify the response succeeds (the host-supplied key pair is
+     used for signing and verification).
+
+4. **Restart the server** (same key pair, same temp dir) and
+   confirm the previously issued JWT is **still valid** — proving
+   session persistence across restarts.
+
+5. **Cleanup** — the `TempDir` drops automatically, removing the
+   generated keys.
+
+This test proves:
+- The repository contains no key material and the server boots
+  without shipped keys.
+- `openssl`-generated keys are accepted by
+  `EncodingKey::from_rsa_pem` / `DecodingKey::from_rsa_pem`.
+- Sessions persist across restarts when the deployer supplies
+  their own keys.
 
 ## Remaining Issues
 

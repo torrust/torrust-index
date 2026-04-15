@@ -17,8 +17,6 @@ threshold = "info"
 token = "MyAccessToken"
 
 [auth]
-private_key_path = "./share/default/jwt/private.pem"
-public_key_path = "./share/default/jwt/public.pem"
 
 # Uncomment if you want to enable TSL for development
 #[net.tsl]

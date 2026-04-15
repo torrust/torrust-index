@@ -54,10 +54,10 @@
 //!       "tsl": null
 //!     },
 //!     "auth": {
-//!       "private_key_pem": "***-redacted-private-key-pem***",
+//!       "private_key_pem": null,
 //!       "public_key_pem": null,
-//!       "private_key_path": "***-redacted***",
-//!       "public_key_path": "./share/default/jwt/public.pem",
+//!       "private_key_path": null,
+//!       "public_key_path": null,
 //!       "session_token_lifetime_secs": 1209600,
 //!       "email_verification_token_lifetime_secs": 315569260,
 //!       "password_constraints": {

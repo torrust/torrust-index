@@ -1,17 +1,12 @@
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use tracing::warn;
 
 /// Default session-token lifetime: 2 weeks (1 209 600 s).
 const DEFAULT_SESSION_TOKEN_LIFETIME_SECS: u64 = 1_209_600;
 
 /// Default email-verification-token lifetime: ~10 years (315 569 260 s).
 const DEFAULT_EMAIL_VERIFICATION_TOKEN_LIFETIME_SECS: u64 = 315_569_260;
-
-/// Default paths for the development RSA key pair shipped with the repo.
-const DEFAULT_PRIVATE_KEY_PATH: &str = "./share/default/jwt/private.pem";
-const DEFAULT_PUBLIC_KEY_PATH: &str = "./share/default/jwt/public.pem";
 
 /// Authentication options.
 ///
@@ -31,8 +26,10 @@ const DEFAULT_PUBLIC_KEY_PATH: &str = "./share/default/jwt/public.pem";
 /// 2. **File paths** — `private_key_path` / `public_key_path`.
 ///    Point to PEM files on disk.
 ///
-/// If neither is provided, the development key pair shipped at
-/// `share/default/jwt/` is used with a loud warning.
+/// If neither is provided, an ephemeral RSA-2048 key pair is
+/// auto-generated in memory at startup. Sessions will not survive
+/// server restarts. To persist sessions, generate your own key pair
+/// and configure the paths or environment variables.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Auth {
     /// Inline RSA private key in PEM format (overrides `private_key_path`).
@@ -73,8 +70,8 @@ impl Default for Auth {
         Self {
             private_key_pem: None,
             public_key_pem: None,
-            private_key_path: Self::default_private_key_path(),
-            public_key_path: Self::default_public_key_path(),
+            private_key_path: None,
+            public_key_path: None,
             session_token_lifetime_secs: Self::default_session_token_lifetime_secs(),
             email_verification_token_lifetime_secs: Self::default_email_verification_token_lifetime_secs(),
             password_constraints: Self::default_password_constraints(),
@@ -83,14 +80,12 @@ impl Default for Auth {
 }
 
 impl Auth {
-    #[allow(clippy::unnecessary_wraps)] // serde default must match the field type
-    fn default_private_key_path() -> Option<String> {
-        Some(DEFAULT_PRIVATE_KEY_PATH.to_owned())
+    const fn default_private_key_path() -> Option<String> {
+        None
     }
 
-    #[allow(clippy::unnecessary_wraps)] // serde default must match the field type
-    fn default_public_key_path() -> Option<String> {
-        Some(DEFAULT_PUBLIC_KEY_PATH.to_owned())
+    const fn default_public_key_path() -> Option<String> {
+        None
     }
 
     const fn default_session_token_lifetime_secs() -> u64 {
@@ -105,74 +100,60 @@ impl Auth {
         PasswordConstraints::default()
     }
 
-    /// Resolve the RSA private key PEM bytes.
+    /// Resolve the RSA private key PEM bytes, if configured.
     ///
     /// Resolution order:
     /// 1. Inline PEM (`private_key_pem`)
     /// 2. File path (`private_key_path`)
-    /// 3. Fallback to default dev key path (with warning)
+    ///
+    /// Returns `None` if no key is configured or the configured path
+    /// does not exist. The caller (`JsonWebToken::new`) uses this to
+    /// decide whether to auto-generate an ephemeral key pair.
     ///
     /// # Panics
     ///
-    /// Panics if no valid private key PEM can be resolved.
+    /// Panics if a configured path exists but cannot be read.
     #[must_use]
-    pub fn resolve_private_key_pem(&self) -> Vec<u8> {
+    pub fn resolve_private_key_pem(&self) -> Option<Vec<u8>> {
         if let Some(ref pem) = self.private_key_pem {
-            return pem.as_bytes().to_vec();
+            return Some(pem.as_bytes().to_vec());
         }
 
         if let Some(ref path) = self.private_key_path {
             if Path::new(path).exists() {
-                if path == DEFAULT_PRIVATE_KEY_PATH {
-                    warn!(
-                        "Using the DEVELOPMENT RSA private key at `{path}`. \
-                         This key is PUBLIC and must NOT be used in production! \
-                         Generate your own key pair: \
-                         `openssl genrsa -out private.pem 2048 && openssl rsa -in private.pem -pubout -out public.pem`"
-                    );
-                }
-                return std::fs::read(path).unwrap_or_else(|e| panic!("Failed to read RSA private key from `{path}`: {e}"));
+                return Some(std::fs::read(path).unwrap_or_else(|e| panic!("Failed to read RSA private key from `{path}`: {e}")));
             }
         }
 
-        panic!(
-            "No RSA private key configured. Set `auth.private_key_path` or `auth.private_key_pem` in the configuration, \
-             or generate a key pair: `openssl genrsa -out private.pem 2048`"
-        );
+        None
     }
 
-    /// Resolve the RSA public key PEM bytes.
+    /// Resolve the RSA public key PEM bytes, if configured.
     ///
     /// Resolution order:
     /// 1. Inline PEM (`public_key_pem`)
     /// 2. File path (`public_key_path`)
-    /// 3. Fallback to default dev key path (with warning)
+    ///
+    /// Returns `None` if no key is configured or the configured path
+    /// does not exist. The caller (`JsonWebToken::new`) uses this to
+    /// decide whether to auto-generate an ephemeral key pair.
     ///
     /// # Panics
     ///
-    /// Panics if no valid public key PEM can be resolved.
+    /// Panics if a configured path exists but cannot be read.
     #[must_use]
-    pub fn resolve_public_key_pem(&self) -> Vec<u8> {
+    pub fn resolve_public_key_pem(&self) -> Option<Vec<u8>> {
         if let Some(ref pem) = self.public_key_pem {
-            return pem.as_bytes().to_vec();
+            return Some(pem.as_bytes().to_vec());
         }
 
         if let Some(ref path) = self.public_key_path {
             if Path::new(path).exists() {
-                if path == DEFAULT_PUBLIC_KEY_PATH {
-                    warn!(
-                        "Using the DEVELOPMENT RSA public key at `{path}`. \
-                         This key is PUBLIC and must NOT be used in production!"
-                    );
-                }
-                return std::fs::read(path).unwrap_or_else(|e| panic!("Failed to read RSA public key from `{path}`: {e}"));
+                return Some(std::fs::read(path).unwrap_or_else(|e| panic!("Failed to read RSA public key from `{path}`: {e}")));
             }
         }
 
-        panic!(
-            "No RSA public key configured. Set `auth.public_key_path` or `auth.public_key_pem` in the configuration, \
-             or generate a key pair: `openssl rsa -in private.pem -pubout -out public.pem`"
-        );
+        None
     }
 }
 

@@ -5,7 +5,7 @@
 //!
 //! See ADR-T-007 for the rationale behind centralising JWT handling.
 //!
-//! # Architecture (ADR-T-007 Phases 1–4)
+//! # Architecture (ADR-T-007 Phases 1–5)
 //!
 //! **Phase 1 — Structural cleanup.** Consolidated all `jsonwebtoken`
 //! usage into this single module with `Result`-based error propagation.
@@ -26,12 +26,21 @@
 //! (token generation) counter. Password changes, role changes, and
 //! bans increment the counter in the database; tokens carrying an
 //! older `gen` are rejected at verification time.
+//!
+//! **Phase 5 — Ephemeral auto-generated keys.** When no key paths or
+//! inline PEM values are configured, an RSA-2048 key pair is
+//! auto-generated in memory at startup. The keys are never written to
+//! disk; sessions do not survive server restarts. Deployers who want
+//! persistent sessions supply their own key pair via config.
 
 use std::sync::Arc;
 
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use rsa::RsaPrivateKey;
+use rsa::pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tracing::info;
 
 use crate::config::Configuration;
 use crate::errors::AuthError;
@@ -112,17 +121,49 @@ pub struct JsonWebToken {
 }
 
 impl JsonWebToken {
-    /// Create a new `JsonWebToken` service, resolving the RSA key pair
-    /// from the configuration.
+    /// Create a new `JsonWebToken` service.
+    ///
+    /// Key resolution:
+    /// 1. Inline PEM or file path from configuration → host-supplied keys.
+    /// 2. Neither configured → auto-generate an ephemeral RSA-2048 key
+    ///    pair in memory (keys are never written to disk).
     ///
     /// # Panics
     ///
-    /// Panics if the RSA key PEM cannot be resolved or is invalid.
+    /// Panics if a configured key path exists but contains invalid PEM.
     pub async fn new(cfg: Arc<Configuration>) -> Self {
         let settings = cfg.settings.read().await;
-        let private_pem = settings.auth.resolve_private_key_pem();
-        let public_pem = settings.auth.resolve_public_key_pem();
+        let private_pem_opt = settings.auth.resolve_private_key_pem();
+        let public_pem_opt = settings.auth.resolve_public_key_pem();
         drop(settings);
+
+        let (private_pem, public_pem) = match (private_pem_opt, public_pem_opt) {
+            (Some(priv_pem), Some(pub_pem)) => (priv_pem, pub_pem),
+            (None, None) => {
+                info!(
+                    "Using ephemeral auto-generated RSA key pair. \
+                     Sessions will not survive server restarts. \
+                     To persist sessions, configure auth.private_key_path / auth.public_key_path."
+                );
+                generate_ephemeral_key_pair().await
+            }
+            (Some(_), None) => {
+                panic!(
+                    "RSA private key is configured but public key is missing. \
+                     Set both auth.private_key_path / auth.private_key_pem and \
+                     auth.public_key_path / auth.public_key_pem, or remove both \
+                     to use ephemeral auto-generated keys."
+                );
+            }
+            (None, Some(_)) => {
+                panic!(
+                    "RSA public key is configured but private key is missing. \
+                     Set both auth.private_key_path / auth.private_key_pem and \
+                     auth.public_key_path / auth.public_key_pem, or remove both \
+                     to use ephemeral auto-generated keys."
+                );
+            }
+        };
 
         let encoding_key = EncodingKey::from_rsa_pem(&private_pem)
             .expect("Invalid RSA private key PEM — check auth.private_key_path or auth.private_key_pem");
@@ -253,4 +294,35 @@ impl JsonWebToken {
 fn compute_kid(public_key_pem: &[u8]) -> String {
     let hash = Sha256::digest(public_key_pem);
     hex::encode(&hash[..8])
+}
+
+/// Generate an ephemeral RSA-2048 key pair in memory.
+///
+/// The generation is CPU-intensive (~100-300 ms) and is offloaded to
+/// a blocking thread via `tokio::task::spawn_blocking`.
+///
+/// Returns `(private_pem_bytes, public_pem_bytes)`.
+///
+/// # Panics
+///
+/// Panics if RSA key generation or PEM export fails (indicates a bug
+/// in the `rsa` crate or a system RNG failure).
+async fn generate_ephemeral_key_pair() -> (Vec<u8>, Vec<u8>) {
+    tokio::task::spawn_blocking(|| {
+        let mut rng = rsa::rand_core::OsRng;
+        let private_key = RsaPrivateKey::new(&mut rng, 2048).expect("RSA-2048 key generation failed");
+
+        let private_pem = private_key
+            .to_pkcs8_pem(LineEnding::LF)
+            .expect("RSA private key PEM export failed");
+
+        let public_pem = private_key
+            .to_public_key()
+            .to_public_key_pem(LineEnding::LF)
+            .expect("RSA public key PEM export failed");
+
+        (private_pem.as_bytes().to_vec(), public_pem.into_bytes())
+    })
+    .await
+    .expect("ephemeral key generation task panicked")
 }

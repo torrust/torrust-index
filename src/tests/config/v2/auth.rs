@@ -4,7 +4,8 @@
 //!
 //! - `resolve_private_key_pem_from_inline` — inline PEM takes priority.
 //! - `resolve_public_key_pem_from_inline` — inline PEM takes priority.
-//! - `resolve_private_key_pem_panics_when_no_key` — panics if no key is available.
+//! - `resolve_private_key_pem_returns_none_when_no_key` — returns `None` if
+//!   no key is configured (ephemeral generation is handled by `JsonWebToken`).
 
 use crate::config::v2::auth::Auth;
 
@@ -15,7 +16,7 @@ fn resolve_private_key_pem_from_inline() {
         private_key_path: None,
         ..Auth::default()
     };
-    let pem = auth.resolve_private_key_pem();
+    let pem = auth.resolve_private_key_pem().expect("should resolve inline PEM");
     assert!(pem.starts_with(b"-----BEGIN PRIVATE KEY-----"));
 }
 
@@ -26,17 +27,16 @@ fn resolve_public_key_pem_from_inline() {
         public_key_path: None,
         ..Auth::default()
     };
-    let pem = auth.resolve_public_key_pem();
+    let pem = auth.resolve_public_key_pem().expect("should resolve inline PEM");
     assert!(pem.starts_with(b"-----BEGIN PUBLIC KEY-----"));
 }
 
 #[test]
-#[should_panic(expected = "No RSA private key configured")]
-fn resolve_private_key_pem_panics_when_no_key() {
+fn resolve_private_key_pem_returns_none_when_no_key() {
     let auth = Auth {
         private_key_pem: None,
         private_key_path: None,
         ..Auth::default()
     };
-    drop(auth.resolve_private_key_pem());
+    assert!(auth.resolve_private_key_pem().is_none());
 }

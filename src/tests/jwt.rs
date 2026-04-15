@@ -33,23 +33,10 @@ use crate::errors::AuthError;
 use crate::jwt::JsonWebToken;
 use crate::models::user::UserCompact;
 
-/// Build a `JsonWebToken` service backed by the development RSA key
-/// pair shipped at `share/default/jwt/`.
-///
-/// Uses absolute paths derived from `CARGO_MANIFEST_DIR` so the tests
-/// are immune to working-directory changes from parallel tests.
+/// Build a `JsonWebToken` service using ephemeral auto-generated keys
+/// (the default when no key paths are configured).
 async fn jwt_service() -> JsonWebToken {
     let cfg = Arc::new(Configuration::default());
-
-    // Override the key paths with absolute paths so that tests do not
-    // depend on the current working directory.
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
-    {
-        let mut settings = cfg.settings.write().await;
-        settings.auth.private_key_path = Some(format!("{manifest_dir}/share/default/jwt/private.pem"));
-        settings.auth.public_key_path = Some(format!("{manifest_dir}/share/default/jwt/public.pem"));
-    }
-
     JsonWebToken::new(cfg).await
 }
 

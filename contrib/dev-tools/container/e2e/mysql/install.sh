@@ -16,10 +16,6 @@ MYSQL_DATABASE=$TORRUST_INDEX_DATABASE
 echo "Creating MySQL database '$MYSQL_DATABASE' for for E2E testing ..."
 MYSQL_PWD=$MYSQL_PASSWORD mysql -h $MYSQL_HOST -u $MYSQL_USER -e "CREATE DATABASE IF NOT EXISTS $MYSQL_DATABASE;"
 
-# Copy JWT PEM keys into the volume-mounted path
-mkdir -p ./storage/index/lib/jwt
-cp ./share/default/jwt/private.pem ./share/default/jwt/public.pem ./storage/index/lib/jwt/
-
 ## Tracker
 
 # Generate the Tracker sqlite database directory and file if it does not exist

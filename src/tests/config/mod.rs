@@ -97,8 +97,6 @@ fn configuration_should_use_the_default_values_when_only_the_mandatory_options_a
                 token = "MyAccessToken"
 
                 [auth]
-                private_key_path = "./share/default/jwt/private.pem"
-                public_key_path = "./share/default/jwt/public.pem"
             "#,
         )?;
 
@@ -130,8 +128,6 @@ fn configuration_should_use_the_default_values_when_only_the_mandatory_options_a
                 token = "MyAccessToken"
 
                 [auth]
-                private_key_path = "./share/default/jwt/private.pem"
-                public_key_path = "./share/default/jwt/public.pem"
             "#
         .to_string();
 

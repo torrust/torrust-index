@@ -189,8 +189,6 @@
 //! bind_address = "0.0.0.0:3001"
 //!
 //! [auth]
-//! private_key_path = "./share/default/jwt/private.pem"
-//! public_key_path = "./share/default/jwt/public.pem"
 //!
 //! [auth.password_constraints]
 //! min_password_length = 6

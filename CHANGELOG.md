@@ -21,8 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `VerifyClaims` with `aud: "email-verification"` for purpose separation.
 - RSA key pair configuration: `auth.private_key_path` / `auth.public_key_path`
   (or inline PEM via `auth.private_key_pem` / `auth.public_key_pem`).
-- Development RSA key pair shipped at `share/default/jwt/` with loud startup
-  warning when the default dev keys are detected.
+- Ephemeral auto-generated RSA-2048 key pair when no keys are configured.
+  Sessions do not survive server restarts with ephemeral keys. Deployers who
+  want persistent sessions supply their own key pair via config.
 - `kid` (Key ID) header in every JWT for future key rotation support.
 - Configurable token lifetimes: `auth.session_token_lifetime_secs` (default:
   2 weeks) and `auth.email_verification_token_lifetime_secs` (default: ~10 years).

@@ -149,10 +149,10 @@ The following environmental variables can be set:
 
 - `TORRUST_INDEX_CONFIG_TOML_PATH` - The in-container path to the index configuration file, (default: `"/etc/torrust/index/index.toml"`).
 - `TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN` - Override of the admin token. If set, this value overrides any value set in the config.
-- `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PATH` - Override of the RSA private key PEM file path for JWT signing. If set, this value overrides any value set in the config.
-- `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PATH` - Override of the RSA public key PEM file path for JWT verification. If set, this value overrides any value set in the config.
-- `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PEM` - Override with an inline RSA private key PEM string instead of a file path.
-- `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PEM` - Override with an inline RSA public key PEM string instead of a file path.
+- `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PATH` - Path to an RSA private key PEM file for JWT signing. Optional: without this, ephemeral auto-generated keys are used (sessions will not survive restarts).
+- `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PATH` - Path to an RSA public key PEM file for JWT verification. Required when `PRIVATE_KEY_PATH` is set.
+- `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PEM` - Inline RSA private key PEM string (alternative to file path). Optional: for persistent sessions.
+- `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PEM` - Inline RSA public key PEM string (alternative to file path). Required when `PRIVATE_KEY_PEM` is set.
 - `TORRUST_INDEX_DATABASE_DRIVER` - The database type used for the container, (options: `sqlite3`, `mysql`, default `sqlite3`). Please Note: This dose not override the database configuration within the `.toml` config file.
 - `TORRUST_INDEX_CONFIG_TOML` - Load config from this environmental variable instead from a file, (i.e: `TORRUST_INDEX_CONFIG_TOML=$(cat index-index.toml)`).
 - `USER_ID` - The user id for the runtime crated `torrust` user. Please Note: This user id should match the ownership of the host-mapped volumes, (default `1000`).
@@ -203,10 +203,12 @@ docker build --target release --tag torrust-index:release --file Containerfile .
 mkdir -p ./storage/index/lib/ ./storage/index/log/ ./storage/index/etc/
 
 ## Run Torrust Index Container Image
+## Note: Without key path env vars, ephemeral auto-generated keys are used.
+## For persistent sessions, supply your own RSA key pair:
+##   --env TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PATH="/var/lib/torrust/index/jwt/private.pem" \
+##   --env TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PATH="/var/lib/torrust/index/jwt/public.pem" \
 docker run -it \
     --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MySecretToken" \
-    --env TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PATH="/var/lib/torrust/index/jwt/private.pem" \
-    --env TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PATH="/var/lib/torrust/index/jwt/public.pem" \
     --env USER_ID="$(id -u)" \
     --publish 0.0.0.0:3001:3001/tcp \
     --volume ./storage/index/lib:/var/lib/torrust/index:Z \

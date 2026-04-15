@@ -4274,6 +4274,7 @@ dependencies = [
  "rand 0.10.0",
  "regex",
  "reqwest",
+ "rsa",
  "serde",
  "serde_bencode",
  "serde_bytes",

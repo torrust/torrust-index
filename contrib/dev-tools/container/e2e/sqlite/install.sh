@@ -12,10 +12,6 @@ if ! [ -f "./storage/index/lib/database/${TORRUST_INDEX_DATABASE}.db" ]; then
     sqlite3 "./storage/index/lib/database/${TORRUST_INDEX_DATABASE}.db" "VACUUM;"
 fi
 
-# Copy JWT PEM keys into the volume-mounted path
-mkdir -p ./storage/index/lib/jwt
-cp ./share/default/jwt/private.pem ./share/default/jwt/public.pem ./storage/index/lib/jwt/
-
 ## Tracker
 
 # Generate the Tracker sqlite database directory and file if it does not exist

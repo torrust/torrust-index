@@ -8,8 +8,6 @@ threshold = "info"
 token = "MyAccessToken"
 
 [auth]
-private_key_path = "/var/lib/torrust/index/jwt/private.pem"
-public_key_path = "/var/lib/torrust/index/jwt/public.pem"
 
 [core]
 listed = false

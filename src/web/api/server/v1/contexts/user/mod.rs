@@ -45,8 +45,9 @@
 //!
 //! ```toml
 //! [auth]
-//! private_key_path = "/path/to/private.pem"
-//! public_key_path = "/path/to/public.pem"
+//! # Optional: supply your own RSA key pair for persistent sessions.
+//! # private_key_path = "/path/to/private.pem"
+//! # public_key_path = "/path/to/public.pem"
 //! ```
 //!
 //! Refer to the [`RegistrationForm`](crate::web::api::server::v1::contexts::user::forms::RegistrationForm)
