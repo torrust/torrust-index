@@ -12,7 +12,9 @@ use super::forms::{ChangePasswordForm, JsonWebToken, LoginForm, RegistrationForm
 use super::responses::{self};
 use crate::common::AppData;
 use crate::services::user::ListingRequest;
-use crate::web::api::server::v1::extractors::optional_user_id::ExtractOptionalLoggedInUser;
+use crate::web::api::server::v1::extractors::require_permission::{
+    BanUser, ChangePassword, GenerateUserProfileSpecification, RequirePermission,
+};
 use crate::web::api::server::v1::responses::OkResponseData;
 
 // Registration
@@ -22,6 +24,7 @@ use crate::web::api::server::v1::responses::OkResponseData;
 /// # Errors
 ///
 /// It returns an error if the user could not be registered.
+// Public: no RequirePermission — pre-authentication endpoint.
 #[allow(clippy::unused_async)]
 pub async fn registration_handler(
     State(app_data): State<Arc<AppData>>,
@@ -54,6 +57,7 @@ pub async fn registration_handler(
 pub struct TokenParam(String);
 
 /// It handles the verification of the email verification token.
+// Public: no RequirePermission — pre-authentication endpoint.
 #[allow(clippy::unused_async)]
 pub async fn email_verification_handler(State(app_data): State<Arc<AppData>>, Path(token): Path<TokenParam>) -> String {
     match app_data.registration_service.verify_email(&token.0).await {
@@ -72,6 +76,7 @@ pub async fn email_verification_handler(State(app_data): State<Arc<AppData>>, Pa
 ///
 /// - Unable to verify the supplied payload as a valid JWT.
 /// - The JWT is invalid or expired.
+// Public: no RequirePermission — pre-authentication endpoint.
 #[allow(clippy::unused_async)]
 pub async fn login_handler(
     State(app_data): State<Arc<AppData>>,
@@ -96,6 +101,7 @@ pub async fn login_handler(
 /// - Unable to verify the supplied payload as a valid JWT.
 /// - The JWT is invalid or expired.
 /// - The token's generation has been revoked.
+// Public: no RequirePermission — pre-authentication endpoint.
 pub async fn verify_token_handler(
     State(app_data): State<Arc<AppData>>,
     extract::Json(token): extract::Json<JsonWebToken>,
@@ -124,6 +130,7 @@ pub struct UsernameParam(pub String);
 ///
 /// - Unable to parse the supplied payload as a valid JWT.
 /// - The JWT is invalid or expired.
+// Public: no RequirePermission — pre-authentication endpoint.
 #[allow(clippy::unused_async)]
 pub async fn renew_token_handler(
     State(app_data): State<Arc<AppData>>,
@@ -146,16 +153,14 @@ pub async fn renew_token_handler(
 #[allow(clippy::missing_panics_doc)]
 pub async fn change_password_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+    RequirePermission(actor, _): RequirePermission<ChangePassword>,
     extract::Json(change_password_form): extract::Json<ChangePasswordForm>,
 ) -> Response {
-    match app_data
-        .profile_service
-        .change_password(maybe_user_id, &change_password_form)
-        .await
-    {
+    let user_id = actor.user_id();
+
+    match app_data.profile_service.change_password(user_id, &change_password_form).await {
         Ok(()) => Json(OkResponseData {
-            data: format!("Password changed for user with ID: {}", maybe_user_id.unwrap()),
+            data: format!("Password changed for user with ID: {user_id}"),
         })
         .into_response(),
         Err(error) => error.into_response(),
@@ -174,11 +179,12 @@ pub async fn change_password_handler(
 pub async fn ban_handler(
     State(app_data): State<Arc<AppData>>,
     Path(to_be_banned_username): Path<UsernameParam>,
-    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+    RequirePermission(actor, _): RequirePermission<BanUser>,
 ) -> Response {
     // todo: add reason and `date_expiry` parameters to request
+    let user_id = actor.user_id();
 
-    match app_data.ban_service.ban_user(&to_be_banned_username.0, maybe_user_id).await {
+    match app_data.ban_service.ban_user(&to_be_banned_username.0, user_id).await {
         Ok(()) => Json(OkResponseData {
             data: format!("Banned user: {}", to_be_banned_username.0),
         })
@@ -208,11 +214,11 @@ fn api_base_url(host: &str) -> String {
 pub async fn get_user_profiles_handler(
     State(app_data): State<Arc<AppData>>,
     Query(criteria): Query<ListingRequest>,
-    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+    RequirePermission(_actor, _): RequirePermission<GenerateUserProfileSpecification>,
 ) -> Response {
     let listing = match app_data
         .listing_service
-        .listing_specification_from_user_request(maybe_user_id, &criteria)
+        .listing_specification_from_user_request(&criteria)
         .await
     {
         Ok(listing_value) => listing_value,

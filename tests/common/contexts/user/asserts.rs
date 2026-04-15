@@ -19,6 +19,11 @@ pub fn assert_successful_login_response(response: &TextResponse, username: &str)
     let logged_in_user = successful_login_response.data;
 
     assert_eq!(logged_in_user.username, username);
+    assert!(
+        logged_in_user.role == "admin" || logged_in_user.role == "registered",
+        "expected role to be \"admin\" or \"registered\", got {:?}",
+        logged_in_user.role
+    );
 
     assert_json_ok_response(response);
 }
@@ -42,6 +47,7 @@ pub fn assert_token_renewal_response(response: &TextResponse, logged_in_user: &L
             token: logged_in_user.token.clone(),
             username: logged_in_user.username.clone(),
             admin: logged_in_user.admin,
+            role: logged_in_user.role.clone(),
         }
     );
 

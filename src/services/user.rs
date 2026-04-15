@@ -13,7 +13,6 @@ use serde_derive::Deserialize;
 use tracing::{debug, info};
 
 use super::authentication::DbUserAuthenticationRepository;
-use super::authorization::{self, Action};
 use crate::config::{Configuration, PasswordConstraints};
 use crate::databases::database::{Database, Error, UsersFilters, UsersSorting};
 use crate::errors::UserError;
@@ -212,7 +211,6 @@ impl RegistrationService {
 pub struct ProfileService {
     configuration: Arc<Configuration>,
     user_authentication_repository: Arc<DbUserAuthenticationRepository>,
-    authorization_service: Arc<authorization::Service>,
 }
 
 impl ProfileService {
@@ -220,12 +218,10 @@ impl ProfileService {
     pub const fn new(
         configuration: Arc<Configuration>,
         user_repository: Arc<DbUserAuthenticationRepository>,
-        authorization_service: Arc<authorization::Service>,
     ) -> Self {
         Self {
             configuration,
             user_authentication_repository: user_repository,
-            authorization_service,
         }
     }
 
@@ -244,17 +240,9 @@ impl ProfileService {
     /// * An error if it is not possible to authorize the action
     pub async fn change_password(
         &self,
-        maybe_user_id: Option<UserId>,
+        user_id: UserId,
         change_password_form: &ChangePasswordForm,
     ) -> Result<(), UserError> {
-        let Some(user_id) = maybe_user_id else {
-            return Err(UserError::UnauthorizedActionForGuests);
-        };
-
-        self.authorization_service
-            .authorize(Action::ChangePassword, maybe_user_id)
-            .await?;
-
         info!("changing user password for user ID: {}", user_id);
 
         let settings = self.configuration.settings.read().await;
@@ -292,7 +280,6 @@ impl ProfileService {
 pub struct BanService {
     user_profile_repository: Arc<DbUserProfileRepository>,
     banned_user_list: Arc<DbBannedUserList>,
-    authorization_service: Arc<authorization::Service>,
 }
 
 impl BanService {
@@ -300,12 +287,10 @@ impl BanService {
     pub const fn new(
         user_profile_repository: Arc<DbUserProfileRepository>,
         banned_user_list: Arc<DbBannedUserList>,
-        authorization_service: Arc<authorization::Service>,
     ) -> Self {
         Self {
             user_profile_repository,
             banned_user_list,
-            authorization_service,
         }
     }
 
@@ -318,13 +303,7 @@ impl BanService {
     /// * `UserError::InternalServerError` if unable get user from the request.
     /// * An error if unable to get user profile from supplied username.
     /// * An error if unable to set the ban of the user in the database.
-    pub async fn ban_user(&self, username_to_be_banned: &str, maybe_user_id: Option<UserId>) -> Result<(), UserError> {
-        let Some(user_id) = maybe_user_id else {
-            return Err(UserError::UnauthorizedActionForGuests);
-        };
-
-        self.authorization_service.authorize(Action::BanUser, maybe_user_id).await?;
-
+    pub async fn ban_user(&self, username_to_be_banned: &str, user_id: UserId) -> Result<(), UserError> {
         debug!("user with ID {} banning username: {username_to_be_banned}", user_id);
 
         let user_profile = self
@@ -342,7 +321,6 @@ impl BanService {
 pub struct ListingService {
     configuration: Arc<Configuration>,
     user_profile_repository: Arc<DbUserProfileRepository>,
-    authorization_service: Arc<authorization::Service>,
 }
 
 impl ListingService {
@@ -350,12 +328,10 @@ impl ListingService {
     pub const fn new(
         configuration: Arc<Configuration>,
         user_profile_repository: Arc<DbUserProfileRepository>,
-        authorization_service: Arc<authorization::Service>,
     ) -> Self {
         Self {
             configuration,
             user_profile_repository,
-            authorization_service,
         }
     }
 
@@ -366,13 +342,8 @@ impl ListingService {
     /// Returns a `UserError::InvalidUserListing` if there is an incorrect value in the url params for the listing request.
     pub async fn listing_specification_from_user_request(
         &self,
-        maybe_user_id: Option<UserId>,
         request: &ListingRequest,
     ) -> Result<ListingSpecification, UserError> {
-        self.authorization_service
-            .authorize(Action::GenerateUserProfileSpecification, maybe_user_id)
-            .await?;
-
         let settings = self.configuration.settings.read().await;
         let default_user_profile_page_size = settings.api.default_user_profile_page_size;
         let max_user_profile_page_size = settings.api.max_user_profile_page_size;

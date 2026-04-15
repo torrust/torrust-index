@@ -8,7 +8,9 @@ use axum::response::{IntoResponse, Json, Response};
 use super::forms::{AddCategoryForm, DeleteCategoryForm};
 use super::responses::{Category, added_category, deleted_category};
 use crate::common::AppData;
-use crate::web::api::server::v1::extractors::optional_user_id::ExtractOptionalLoggedInUser;
+use crate::web::api::server::v1::extractors::require_permission::{
+    AddCategory, DeleteCategory, GetCategories, RequirePermission,
+};
 use crate::web::api::server::v1::responses::{self};
 
 /// It handles the request to get all the categories.
@@ -27,9 +29,9 @@ use crate::web::api::server::v1::responses::{self};
 #[allow(clippy::unused_async)]
 pub async fn get_all_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+    RequirePermission(_actor, _): RequirePermission<GetCategories>,
 ) -> Response {
-    match app_data.category_service.get_categories(maybe_user_id).await {
+    match app_data.category_service.get_categories().await {
         Ok(categories) => {
             let categories: Vec<Category> = categories.into_iter().map(Category::from).collect();
             Json(responses::OkResponseData { data: categories }).into_response()
@@ -49,14 +51,10 @@ pub async fn get_all_handler(
 #[allow(clippy::unused_async)]
 pub async fn add_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+    RequirePermission(_actor, _): RequirePermission<AddCategory>,
     extract::Json(category_form): extract::Json<AddCategoryForm>,
 ) -> Response {
-    match app_data
-        .category_service
-        .add_category(&category_form.name, maybe_user_id)
-        .await
-    {
+    match app_data.category_service.add_category(&category_form.name).await {
         Ok(_) => added_category(&category_form.name).into_response(),
         Err(error) => error.into_response(),
     }
@@ -73,18 +71,14 @@ pub async fn add_handler(
 #[allow(clippy::unused_async)]
 pub async fn delete_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+    RequirePermission(_actor, _): RequirePermission<DeleteCategory>,
     extract::Json(category_form): extract::Json<DeleteCategoryForm>,
 ) -> Response {
     // code-review: why do we need to send the whole category object to delete it?
     // And we should use the ID instead of the name, because the name could change
     // or we could add support for multiple languages.
 
-    match app_data
-        .category_service
-        .delete_category(&category_form.name, maybe_user_id)
-        .await
-    {
+    match app_data.category_service.delete_category(&category_form.name).await {
         Ok(()) => deleted_category(&category_form.name).into_response(),
         Err(error) => error.into_response(),
     }

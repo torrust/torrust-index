@@ -1,23 +1,19 @@
 //! Category service.
 use std::sync::Arc;
 
-use super::authorization::{self, Action};
 use crate::databases::database::{Category, Database, Error as DatabaseError};
 use crate::errors::CategoryTagError;
 use crate::models::category::CategoryId;
-use crate::models::user::UserId;
 
 pub struct Service {
     category_repository: Arc<DbCategoryRepository>,
-    authorization_service: Arc<authorization::Service>,
 }
 
 impl Service {
     #[must_use]
-    pub const fn new(category_repository: Arc<DbCategoryRepository>, authorization_service: Arc<authorization::Service>) -> Self {
+    pub const fn new(category_repository: Arc<DbCategoryRepository>) -> Self {
         Self {
             category_repository,
-            authorization_service,
         }
     }
 
@@ -31,11 +27,7 @@ impl Service {
     /// * The category name is empty.
     /// * The category already exists.
     /// * There is a database error.
-    pub async fn add_category(&self, category_name: &str, maybe_user_id: Option<UserId>) -> Result<i64, CategoryTagError> {
-        self.authorization_service
-            .authorize(Action::AddCategory, maybe_user_id)
-            .await?;
-
+    pub async fn add_category(&self, category_name: &str) -> Result<i64, CategoryTagError> {
         let trimmed_name = category_name.trim();
 
         if trimmed_name.is_empty() {
@@ -66,11 +58,7 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is a database error.
-    pub async fn delete_category(&self, category_name: &str, maybe_user_id: Option<UserId>) -> Result<(), CategoryTagError> {
-        self.authorization_service
-            .authorize(Action::DeleteCategory, maybe_user_id)
-            .await?;
-
+    pub async fn delete_category(&self, category_name: &str) -> Result<(), CategoryTagError> {
         match self.category_repository.delete(category_name).await {
             Ok(()) => Ok(()),
             Err(e) => match e {
@@ -88,11 +76,7 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is a database error retrieving the categories.
-    pub async fn get_categories(&self, maybe_user_id: Option<UserId>) -> Result<Vec<Category>, CategoryTagError> {
-        self.authorization_service
-            .authorize(Action::GetCategories, maybe_user_id)
-            .await?;
-
+    pub async fn get_categories(&self) -> Result<Vec<Category>, CategoryTagError> {
         self.category_repository
             .get_all()
             .await

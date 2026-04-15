@@ -16,12 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ApiError` delegation (ADR-T-006 §1–§4).
 - Native `PermissionMatrix` replacing Casbin: compile-time checked `Role` and
   `Action` enums with an exhaustive default-deny policy table (ADR-T-008).
-- `Permissions` trait abstraction consumed by `authorization::Service`.
+- `Permissions` trait abstraction for the authorization backend, consumed by
+  the `RequirePermission<A>` extractor via `AppData.permissions`.
 - `role: TEXT` column on `torrust_users` (migration for SQLite and MySQL);
   existing `administrator = true` rows migrated to `role = 'admin'`, others
   to `role = 'registered'`.
 - `role: String` field on `TokenResponse`, `UserCompact`, `UserProfile`, and
   `UserFull` API response models.
+- `RequirePermission<A>` Axum extractor enforcing role-based authorization at
+  the HTTP boundary before the handler runs (ADR-T-008 Phase 2).
+- `ActionMarker` trait and `action_markers!` macro mapping zero-sized types to
+  `Action` enum variants for compile-time handler–permission binding.
+- `Actor` struct yielded by `RequirePermission` carrying the resolved
+  `user_id` and `Role` for downstream handler use.
 - ADR-T-007: Document rationale for JWT system refactor.
 - Centralised JWT module (`src/jwt.rs`) consolidating all `jsonwebtoken` usage:
   key loading, signing, verification, and algorithm configuration.
@@ -62,11 +69,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING:** Raise MSRV from 1.85 to 1.88.
 - **BREAKING:** `administrator: bool` replaced by `role: String` in API
-  responses (`TokenResponse`, `UserCompact`, etc.). The `admin` boolean field
-  is removed (ADR-T-008).
+  responses (`TokenResponse`, `UserCompact`, etc.). The legacy `admin` boolean
+  field is retained alongside `role` for backward compatibility during the
+  transition (ADR-T-008).
 - **BREAKING:** `ACTION` enum renamed to `Action`; variants unchanged.
-- Authorization service (`authorization::Service`) now delegates to a
-  `PermissionMatrix` instead of a Casbin enforcer.
+- All HTTP handlers that require authorization now use
+  `RequirePermission<A>` extractors instead of calling
+  `authorization::Service::authorize()` (ADR-T-008 Phase 2).
+- Service methods no longer receive `maybe_user_id` for authorization
+  purposes — they receive an already-authorized `Actor` or are called
+  unconditionally.
+- Unauthorized requests are rejected at the extractor boundary before
+  reaching the service layer (fail-fast).
 - **BREAKING:** JWT signing algorithm changed from HMAC-HS256 to RS256
   (RSA + SHA-256). Existing HS256 tokens are invalidated; users must re-login.
 - **BREAKING:** JWT claims redesigned from `UserClaims { user, exp }` to
@@ -81,8 +95,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CategoryTagError`, and a thin `ApiError` wrapper (ADR-T-006).
 - `Authentication::get_user_id_from_bearer_token` now takes `BearerToken`
   directly instead of `Option<BearerToken>`.
-- `ExtractLoggedInUser` and `ExtractOptionalLoggedInUser` use `BearerToken`
-  directly instead of the old `Extract` wrapper.
 - `parse_token` returns `Result` instead of panicking on malformed headers.
 - JWT `exp` validation relies solely on the `jsonwebtoken` library; redundant
   manual expiration check removed.
@@ -97,6 +109,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error `From` impls use `tracing::error!` instead of `eprintln!`.
 - Standardise all error derives on `thiserror`.
 
+### Deprecated
+
+- `admin: bool` field on `TokenResponse` — superseded by `role: String`.
+  Retained for backward compatibility; to be removed in a future release.
+
 ### Removed
 
 - `casbin` crate dependency and all Casbin-related code
@@ -104,7 +121,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SCREAMING_CASE) — replaced by the native `PermissionMatrix` (ADR-T-008).
 - `unstable.auth.casbin` configuration section (`Unstable`, `Auth`, `Casbin`
   config structs in `src/config/v2/unstable.rs`).
-- `admin: bool` field from `TokenResponse` (replaced by `role: String`).
 - `bearer_token::Extract` wrapper struct (replaced by `BearerToken` directly).
 - `get_optional_logged_in_user` free function (logic moved into extractors).
 - `get_claims_from_bearer_token` private method on `Authentication` (inlined).
@@ -114,6 +130,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `http_status_code_for_service_error` and `map_database_error_to_service_error`
   helper functions.
 - `IntoResponse` impl for `database::Error` (now handled by domain errors).
+- `authorization::Service` struct — replaced by `RequirePermission<A>`
+  extractors consulting `PermissionMatrix` directly (ADR-T-008 Phase 2).
+- `ExtractLoggedInUser` (`user_id.rs`) and `ExtractOptionalLoggedInUser`
+  (`optional_user_id.rs`) extractors — replaced by `RequirePermission<A>`
+  (ADR-T-008 Phase 2).
+- Dead `Action` variants `GetSettings` and `GetCanonicalInfoHash` (no
+  corresponding handlers existed).
 
 ## [4.0.0] - 2026-03-23
 

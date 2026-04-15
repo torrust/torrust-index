@@ -1,34 +1,22 @@
 //! Templates for "about" static pages.
 
-use std::sync::Arc;
-
-use super::authorization::{self, Action};
-use crate::errors::AuthError;
-use crate::models::user::UserId;
-
-pub struct Service {
-    authorization_service: Arc<authorization::Service>,
-}
+#[derive(Default)]
+pub struct Service;
 
 impl Service {
     #[must_use]
-    pub const fn new(authorization_service: Arc<authorization::Service>) -> Self {
-        Self { authorization_service }
+    pub const fn new() -> Self {
+        Self
     }
 
-    /// Returns the html with the about page
+    /// Returns the html with the about page.
     ///
     /// # Errors
     ///
-    /// It returns an error if:
-    ///
-    /// * The user does not have the required permissions.
-    /// * There is an error authorizing the action.
-    pub async fn get_about_page(&self, maybe_user_id: Option<UserId>) -> Result<String, AuthError> {
-        self.authorization_service
-            .authorize(Action::GetAboutPage, maybe_user_id)
-            .await?;
-
+    /// This method is infallible but returns `Result` to keep the
+    /// handler signature uniform.
+    #[must_use]
+    pub fn get_about_page(&self) -> Result<String, std::convert::Infallible> {
         let html = r#"
     <html>
         <head>
@@ -50,19 +38,14 @@ impl Service {
         Ok(html.to_string())
     }
 
-    /// Returns the html with the license page
+    /// Returns the html with the license page.
     ///
     /// # Errors
     ///
-    /// It returns an error if:
-    ///
-    /// * The user does not have the required permissions.
-    /// * There is an error authorizing the action.
-    pub async fn get_license_page(&self, maybe_user_id: Option<UserId>) -> Result<String, AuthError> {
-        self.authorization_service
-            .authorize(Action::GetLicensePage, maybe_user_id)
-            .await?;
-
+    /// This method is infallible but returns `Result` to keep the
+    /// handler signature uniform.
+    #[must_use]
+    pub fn get_license_page(&self) -> Result<String, std::convert::Infallible> {
         let html = r#"
         <html>
             <head>

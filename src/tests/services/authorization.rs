@@ -75,7 +75,6 @@ fn action_all_is_exhaustive() {
         Action::DeleteCategory,
         Action::GetCategories,
         Action::GetImageByUrl,
-        Action::GetSettings,
         Action::GetSettingsSecret,
         Action::GetPublicSettings,
         Action::GetSiteName,
@@ -85,9 +84,9 @@ fn action_all_is_exhaustive() {
         Action::AddTorrent,
         Action::GetTorrent,
         Action::DeleteTorrent,
+        Action::UpdateTorrent,
         Action::GetTorrentInfo,
         Action::GenerateTorrentInfoListing,
-        Action::GetCanonicalInfoHash,
         Action::ChangePassword,
         Action::BanUser,
         Action::GenerateUserProfileSpecification,
@@ -102,7 +101,6 @@ fn action_all_is_exhaustive() {
             | Action::DeleteCategory
             | Action::GetCategories
             | Action::GetImageByUrl
-            | Action::GetSettings
             | Action::GetSettingsSecret
             | Action::GetPublicSettings
             | Action::GetSiteName
@@ -112,9 +110,9 @@ fn action_all_is_exhaustive() {
             | Action::AddTorrent
             | Action::GetTorrent
             | Action::DeleteTorrent
+            | Action::UpdateTorrent
             | Action::GetTorrentInfo
             | Action::GenerateTorrentInfoListing
-            | Action::GetCanonicalInfoHash
             | Action::ChangePassword
             | Action::BanUser
             | Action::GenerateUserProfileSpecification => {}
@@ -148,16 +146,15 @@ fn registered_grants_and_denials() {
         Action::GetTags,
         Action::AddTorrent,
         Action::GetTorrent,
+        Action::UpdateTorrent,
         Action::GetTorrentInfo,
         Action::GenerateTorrentInfoListing,
-        Action::GetCanonicalInfoHash,
         Action::ChangePassword,
     ];
 
     let denied = [
         Action::AddCategory,
         Action::DeleteCategory,
-        Action::GetSettings,
         Action::GetSettingsSecret,
         Action::AddTag,
         Action::DeleteTag,
@@ -192,19 +189,18 @@ fn guest_grants_and_denials() {
         Action::GetTorrent,
         Action::GetTorrentInfo,
         Action::GenerateTorrentInfoListing,
-        Action::GetCanonicalInfoHash,
     ];
 
     let denied = [
         Action::AddCategory,
         Action::DeleteCategory,
         Action::GetImageByUrl,
-        Action::GetSettings,
         Action::GetSettingsSecret,
         Action::AddTag,
         Action::DeleteTag,
         Action::AddTorrent,
         Action::DeleteTorrent,
+        Action::UpdateTorrent,
         Action::ChangePassword,
         Action::BanUser,
         Action::GenerateUserProfileSpecification,

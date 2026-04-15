@@ -1,23 +1,19 @@
 //! Tag service.
 use std::sync::Arc;
 
-use super::authorization::{self, Action};
 use crate::databases::database::{Database, Error as DatabaseError, Error};
 use crate::errors::CategoryTagError;
 use crate::models::torrent_tag::{TagId, TorrentTag};
-use crate::models::user::UserId;
 
 pub struct Service {
     tag_repository: Arc<DbTagRepository>,
-    authorization_service: Arc<authorization::Service>,
 }
 
 impl Service {
     #[must_use]
-    pub const fn new(tag_repository: Arc<DbTagRepository>, authorization_service: Arc<authorization::Service>) -> Self {
+    pub const fn new(tag_repository: Arc<DbTagRepository>) -> Self {
         Self {
             tag_repository,
-            authorization_service,
         }
     }
 
@@ -29,9 +25,7 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is a database error.
-    pub async fn add_tag(&self, tag_name: &str, maybe_user_id: Option<UserId>) -> Result<TagId, CategoryTagError> {
-        self.authorization_service.authorize(Action::AddTag, maybe_user_id).await?;
-
+    pub async fn add_tag(&self, tag_name: &str) -> Result<TagId, CategoryTagError> {
         let trimmed_name = tag_name.trim();
 
         if trimmed_name.is_empty() {
@@ -55,9 +49,7 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is a database error.
-    pub async fn delete_tag(&self, tag_id: &TagId, maybe_user_id: Option<UserId>) -> Result<(), CategoryTagError> {
-        self.authorization_service.authorize(Action::DeleteTag, maybe_user_id).await?;
-
+    pub async fn delete_tag(&self, tag_id: &TagId) -> Result<(), CategoryTagError> {
         match self.tag_repository.delete(tag_id).await {
             Ok(()) => Ok(()),
             Err(e) => match e {
@@ -75,9 +67,7 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is a database error retrieving the tags.
-    pub async fn get_tags(&self, maybe_user_id: Option<UserId>) -> Result<Vec<TorrentTag>, CategoryTagError> {
-        self.authorization_service.authorize(Action::GetTags, maybe_user_id).await?;
-
+    pub async fn get_tags(&self) -> Result<Vec<TorrentTag>, CategoryTagError> {
         self.tag_repository
             .get_all()
             .await

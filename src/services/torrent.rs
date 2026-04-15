@@ -7,7 +7,6 @@ use serde_derive::{Deserialize, Serialize};
 use tracing::debug;
 use url::Url;
 
-use super::authorization::{self, Action};
 use super::category::DbCategoryRepository;
 use crate::config::Configuration;
 use crate::databases::database::{Database, Error, Sorting};
@@ -18,7 +17,6 @@ use crate::models::torrent::{Metadata, TorrentId, TorrentListing};
 use crate::models::torrent_file::{DbTorrent, Torrent, TorrentFile};
 use crate::models::torrent_tag::{TagId, TorrentTag};
 use crate::models::user::UserId;
-use crate::services::user::Repository;
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::utils::parse_torrent::decode_and_validate_torrent_file;
 use crate::{AsCSV, tracker};
@@ -27,7 +25,6 @@ pub struct Index {
     configuration: Arc<Configuration>,
     tracker_statistics_importer: Arc<StatisticsImporter>,
     tracker_service: Arc<tracker::service::Service>,
-    user_repository: Arc<Box<dyn Repository>>,
     category_repository: Arc<DbCategoryRepository>,
     torrent_repository: Arc<DbTorrentRepository>,
     torrent_info_hash_repository: Arc<DbCanonicalInfoHashGroupRepository>,
@@ -36,7 +33,6 @@ pub struct Index {
     torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
     torrent_tag_repository: Arc<DbTorrentTagRepository>,
     torrent_listing_generator: Arc<DbTorrentListingGenerator>,
-    authorization_service: Arc<authorization::Service>,
 }
 
 pub struct AddTorrentRequest {
@@ -80,11 +76,10 @@ pub struct ListingSpecification {
 impl Index {
     #[allow(clippy::too_many_arguments)]
     #[must_use]
-    pub fn new(
+    pub const fn new(
         configuration: Arc<Configuration>,
         tracker_statistics_importer: Arc<StatisticsImporter>,
         tracker_service: Arc<tracker::service::Service>,
-        user_repository: Arc<Box<dyn Repository>>,
         category_repository: Arc<DbCategoryRepository>,
         torrent_repository: Arc<DbTorrentRepository>,
         torrent_info_hash_repository: Arc<DbCanonicalInfoHashGroupRepository>,
@@ -93,13 +88,11 @@ impl Index {
         torrent_announce_url_repository: Arc<DbTorrentAnnounceUrlRepository>,
         torrent_tag_repository: Arc<DbTorrentTagRepository>,
         torrent_listing_repository: Arc<DbTorrentListingGenerator>,
-        authorization_service: Arc<authorization::Service>,
     ) -> Self {
         Self {
             configuration,
             tracker_statistics_importer,
             tracker_service,
-            user_repository,
             category_repository,
             torrent_repository,
             torrent_info_hash_repository,
@@ -108,7 +101,6 @@ impl Index {
             torrent_announce_url_repository,
             torrent_tag_repository,
             torrent_listing_generator: torrent_listing_repository,
-            authorization_service,
         }
     }
 
@@ -133,16 +125,8 @@ impl Index {
     pub async fn add_torrent(
         &self,
         add_torrent_req: AddTorrentRequest,
-        maybe_user_id: Option<UserId>,
+        user_id: UserId,
     ) -> Result<AddTorrentResponse, TorrentError> {
-        let Some(user_id) = maybe_user_id else {
-            return Err(TorrentError::UnauthorizedActionForGuests);
-        };
-
-        self.authorization_service
-            .authorize(Action::AddTorrent, maybe_user_id)
-            .await?;
-
         let metadata = self.validate_and_build_metadata(&add_torrent_req).await?;
 
         let (mut torrent, original_info_hash) = decode_and_validate_torrent_file(&add_torrent_req.torrent_buffer)?;
@@ -267,10 +251,6 @@ impl Index {
     /// This function will return an error if unable to get the torrent from the
     /// database.
     pub async fn get_torrent(&self, info_hash: &InfoHash, maybe_user_id: Option<UserId>) -> Result<Torrent, TorrentError> {
-        self.authorization_service
-            .authorize(Action::GetTorrent, maybe_user_id)
-            .await?;
-
         let mut torrent = self.torrent_repository.get_by_info_hash(info_hash).await?;
 
         let tracker_url = self.get_tracker_url().await;
@@ -304,12 +284,7 @@ impl Index {
     pub async fn delete_torrent(
         &self,
         info_hash: &InfoHash,
-        maybe_user_id: Option<UserId>,
     ) -> Result<DeletedTorrentResponse, TorrentError> {
-        self.authorization_service
-            .authorize(Action::DeleteTorrent, maybe_user_id)
-            .await?;
-
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
 
         self.torrent_repository.delete(&torrent_listing.torrent_id).await?;
@@ -343,10 +318,6 @@ impl Index {
         info_hash: &InfoHash,
         maybe_user_id: Option<UserId>,
     ) -> Result<TorrentResponse, TorrentError> {
-        self.authorization_service
-            .authorize(Action::GetTorrentInfo, maybe_user_id)
-            .await?;
-
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
 
         let torrent_response = self
@@ -364,12 +335,7 @@ impl Index {
     pub async fn generate_torrent_info_listing(
         &self,
         request: &ListingRequest,
-        maybe_user_id: Option<UserId>,
     ) -> Result<TorrentsResponse, TorrentError> {
-        self.authorization_service
-            .authorize(Action::GenerateTorrentInfoListing, maybe_user_id)
-            .await?;
-
         let torrent_listing_specification = self.listing_specification_from_user_request(request).await;
 
         let torrents_response = self
@@ -432,17 +398,8 @@ impl Index {
         description: &Option<String>,
         category_id: &Option<CategoryId>,
         tags: &Option<Vec<TagId>>,
-        user_id: &UserId,
     ) -> Result<TorrentResponse, TorrentError> {
-        let updater = self.user_repository.get_compact(user_id).await?;
-
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
-
-        // Check if user is owner or admin
-        // todo: move this to an authorization service.
-        if !(torrent_listing.uploader == updater.username || updater.is_admin()) {
-            return Err(TorrentError::UnauthorizedAction);
-        }
 
         self.torrent_info_repository
             .update(&torrent_listing.torrent_id, title, description, category_id, tags)
@@ -578,12 +535,7 @@ impl Index {
     pub async fn get_canonical_info_hash(
         &self,
         info_hash: &InfoHash,
-        maybe_user_id: Option<UserId>,
     ) -> Result<Option<InfoHash>, TorrentError> {
-        self.authorization_service
-            .authorize(Action::GetCanonicalInfoHash, maybe_user_id)
-            .await?;
-
         self.torrent_info_hash_repository
             .find_canonical_info_hash_for(info_hash)
             .await

@@ -1,26 +1,20 @@
-//! Authorization service.
+//! Authorization module.
 //!
-//! Implements ADR-T-008 Phase 1: native Rust permission system.
+//! Implements ADR-T-008: native Rust permission system.
 //!
 //! # Architecture
 //!
 //! - [`Role`] — the user's privilege level (`Guest`, `Registered`, `Admin`).
 //! - [`Action`] — an operation the user wants to perform.
 //! - [`PermissionMatrix`] — the default-deny policy table.
-//! - [`Permissions`] trait — abstraction consumed by [`Service`].
-//! - [`Service`] — resolves the caller's role from the database and
-//!   delegates to the [`Permissions`] implementation.
+//! - [`Permissions`] trait — abstraction consumed by the
+//!   `RequirePermission` extractor (see `extractors::require_permission`).
 
 use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;
-use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-
-use super::user::Repository;
-use crate::errors::AuthError;
-use crate::models::user::UserId;
 
 // ── Role ─────────────────────────────────────────────────────────────
 
@@ -90,7 +84,6 @@ pub enum Action {
     DeleteCategory,
     GetCategories,
     GetImageByUrl,
-    GetSettings,
     GetSettingsSecret,
     GetPublicSettings,
     GetSiteName,
@@ -102,10 +95,10 @@ pub enum Action {
     DeleteTorrent,
     GetTorrentInfo,
     GenerateTorrentInfoListing,
-    GetCanonicalInfoHash,
     ChangePassword,
     BanUser,
     GenerateUserProfileSpecification,
+    UpdateTorrent,
 }
 
 impl Action {
@@ -117,7 +110,6 @@ impl Action {
         Self::DeleteCategory,
         Self::GetCategories,
         Self::GetImageByUrl,
-        Self::GetSettings,
         Self::GetSettingsSecret,
         Self::GetPublicSettings,
         Self::GetSiteName,
@@ -129,10 +121,10 @@ impl Action {
         Self::DeleteTorrent,
         Self::GetTorrentInfo,
         Self::GenerateTorrentInfoListing,
-        Self::GetCanonicalInfoHash,
         Self::ChangePassword,
         Self::BanUser,
         Self::GenerateUserProfileSpecification,
+        Self::UpdateTorrent,
     ];
 }
 
@@ -207,12 +199,11 @@ impl PermissionMatrix {
                 | Action::GetTorrent
                 | Action::GetTorrentInfo
                 | Action::GenerateTorrentInfoListing
-                | Action::GetCanonicalInfoHash
-                | Action::ChangePassword => true,
+                | Action::ChangePassword
+                | Action::UpdateTorrent => true,
 
                 Action::AddCategory
                 | Action::DeleteCategory
-                | Action::GetSettings
                 | Action::GetSettingsSecret
                 | Action::AddTag
                 | Action::DeleteTag
@@ -230,13 +221,11 @@ impl PermissionMatrix {
                 | Action::GetTags
                 | Action::GetTorrent
                 | Action::GetTorrentInfo
-                | Action::GenerateTorrentInfoListing
-                | Action::GetCanonicalInfoHash => true,
+                | Action::GenerateTorrentInfoListing => true,
 
                 Action::AddCategory
                 | Action::DeleteCategory
                 | Action::GetImageByUrl
-                | Action::GetSettings
                 | Action::GetSettingsSecret
                 | Action::AddTag
                 | Action::DeleteTag
@@ -244,7 +233,8 @@ impl PermissionMatrix {
                 | Action::DeleteTorrent
                 | Action::ChangePassword
                 | Action::BanUser
-                | Action::GenerateUserProfileSpecification => false,
+                | Action::GenerateUserProfileSpecification
+                | Action::UpdateTorrent => false,
             },
         }
     }
@@ -253,56 +243,5 @@ impl PermissionMatrix {
 impl Permissions for PermissionMatrix {
     fn can(&self, role: &Role, action: Action) -> bool {
         self.allowed.contains(&(*role, action))
-    }
-}
-
-// ── Service ──────────────────────────────────────────────────────────
-
-pub struct Service {
-    user_repository: Arc<Box<dyn Repository>>,
-    permissions: Arc<dyn Permissions>,
-}
-
-impl Service {
-    #[must_use]
-    pub fn new(user_repository: Arc<Box<dyn Repository>>, permissions: Arc<dyn Permissions>) -> Self {
-        Self {
-            user_repository,
-            permissions,
-        }
-    }
-
-    /// Allows or denies a user to perform an action based on their role.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the user is not authorized:
-    /// - `AuthError::UnauthorizedActionForGuests` for guest users.
-    /// - `AuthError::UnauthorizedAction` for authenticated users.
-    pub async fn authorize(&self, action: Action, maybe_user_id: Option<UserId>) -> Result<(), AuthError> {
-        let role = self.get_role(maybe_user_id).await;
-
-        if self.permissions.can(&role, action) {
-            Ok(())
-        } else if role == Role::Guest {
-            Err(AuthError::UnauthorizedActionForGuests)
-        } else {
-            Err(AuthError::UnauthorizedAction)
-        }
-    }
-
-    /// Resolve the role for a (possibly absent) user ID.
-    ///
-    /// - `None` → `Guest`
-    /// - `Some(id)` not found in DB → `Guest`
-    /// - `Some(id)` found → role from the `role` column
-    async fn get_role(&self, maybe_user_id: Option<UserId>) -> Role {
-        match maybe_user_id {
-            Some(user_id) => match self.user_repository.get_compact(&user_id).await {
-                Ok(user) => Role::from_str(&user.role).unwrap_or(Role::Registered),
-                Err(_) => Role::Guest,
-            },
-            None => Role::Guest,
-        }
     }
 }

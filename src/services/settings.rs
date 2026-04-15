@@ -6,22 +6,17 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use super::authorization::{self, Action};
 use crate::config::{self, Configuration, Settings};
-use crate::errors::AuthError;
-use crate::models::user::UserId;
 
 pub struct Service {
     configuration: Arc<Configuration>,
-    authorization_service: Arc<authorization::Service>,
 }
 
 impl Service {
     #[must_use]
-    pub const fn new(configuration: Arc<Configuration>, authorization_service: Arc<authorization::Service>) -> Self {
+    pub const fn new(configuration: Arc<Configuration>) -> Self {
         Self {
             configuration,
-            authorization_service,
         }
     }
 
@@ -30,11 +25,7 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if the user does not have the required permissions.
-    pub async fn get_all(&self, maybe_user_id: Option<UserId>) -> Result<Settings, AuthError> {
-        self.authorization_service
-            .authorize(Action::GetSettings, maybe_user_id)
-            .await?;
-
+    pub async fn get_all(&self) -> Result<Settings, std::convert::Infallible> {
         let torrust_index_configuration = self.configuration.get_all().await;
 
         Ok(torrust_index_configuration)
@@ -45,11 +36,7 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if the user does not have the required permissions.
-    pub async fn get_all_masking_secrets(&self, maybe_user_id: Option<UserId>) -> Result<Settings, AuthError> {
-        self.authorization_service
-            .authorize(Action::GetSettingsSecret, maybe_user_id)
-            .await?;
-
+    pub async fn get_all_masking_secrets(&self) -> Result<Settings, std::convert::Infallible> {
         let mut torrust_index_configuration = self.configuration.get_all().await;
 
         torrust_index_configuration.remove_secrets();
@@ -62,11 +49,7 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if the user does not have the required permissions.
-    pub async fn get_public(&self, maybe_user_id: Option<UserId>) -> Result<ConfigurationPublic, AuthError> {
-        self.authorization_service
-            .authorize(Action::GetPublicSettings, maybe_user_id)
-            .await?;
-
+    pub async fn get_public(&self) -> Result<ConfigurationPublic, std::convert::Infallible> {
         let settings_lock = self.configuration.get_all().await;
         Ok(extract_public_settings(&settings_lock))
     }
@@ -76,11 +59,7 @@ impl Service {
     /// # Errors
     ///
     /// It returns an error if the user does not have the required permissions.
-    pub async fn get_site_name(&self, maybe_user_id: Option<UserId>) -> Result<String, AuthError> {
-        self.authorization_service
-            .authorize(Action::GetSiteName, maybe_user_id)
-            .await?;
-
+    pub async fn get_site_name(&self) -> Result<String, std::convert::Infallible> {
         Ok(self.configuration.get_site_name().await)
     }
 }

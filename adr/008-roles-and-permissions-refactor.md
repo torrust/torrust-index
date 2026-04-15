@@ -633,7 +633,7 @@ Review performed 2026-04-15 against the initial Phase 1 commit.
 | 3 | `PermissionMatrix` with tests | ✅ | Every `(Role, Action)` pair covered by crate-level tests. |
 | 4 | Forward-only migration | ⚠️ | Migration adds the column but has no down-migration. See issue 1. |
 | 5 | Data migration | ✅ | `UPDATE … SET role = 'admin' WHERE administrator = TRUE` for both backends. |
-| 6 | API uses `role: String` | ✅ | `TokenResponse` uses `role: String`; legacy `admin: bool` removed. |
+| 6 | API uses `role: String` | ✅ | `TokenResponse` uses `role: String`; legacy `admin: bool` retained alongside for backward compatibility during transition. |
 | 7 | Clippy and tests pass | ✅ | Fixed during review (`doc_markdown` lint). |
 | 8 | No panics on startup | ✅ | `PermissionMatrix::default_matrix()` is infallible. |
 
@@ -695,3 +695,89 @@ to work when the Phase 1 migration subsequently runs.
 
 **Action:** Confirm the v1→v2 upgrade followed by the Phase 1
 migration produces correct `role` values in an integration test.
+
+## Phase 2 — Implementation Review
+
+Review performed 2026-04-15 against the Phase 2 commit that
+introduces `RequirePermission<A>` extractors on all handlers.
+
+### Status of Acceptance Criteria
+
+| # | Criterion | Status | Notes |
+|---|-----------|--------|-------|
+| 1 | Every authorized handler uses `RequirePermission<A>` | ✅ | All API context handlers are guarded. `create_random_torrent_handler` is documented as intentionally unguarded (testing/debug, no persistent state). Pre-auth endpoints carry `// Public: no RequirePermission` comments. |
+| 2 | No service method contains `authorize(...)` or inline admin/owner check | ✅ | Service layer is clean. The inline ownership check in `update_torrent_info_handler` (handler, not service) uses `actor.role == Role::Admin` from the already-resolved extractor — no redundant DB query. Phase 3 will replace with `RequireOwnership`. |
+| 3 | Insufficient permissions → 403; unauthenticated → 401 | ✅ | `AuthError::UnauthorizedAction` → 403 (`FORBIDDEN`), `AuthError::UnauthorizedActionForGuests` → 401 (`UNAUTHORIZED`). Correct across `AuthError`, `UserError`, and `TorrentError`. Verified by new crate-level extractor tests. |
+| 4 | Existing E2E tests pass or updated | ✅ | E2E test response types (`LoggedInUserData`, `TokenRenewalData`) now include `role: String` alongside `admin: bool`. Assertions verify the `role` value. |
+
+### What's Working Well
+
+- **Clean extractor design.** The `ActionMarker` trait +
+  `action_markers!` macro is ergonomic and compile-time safe.
+  Adding a new `Action` variant forces updates to both the
+  `PermissionMatrix` and the marker list.
+- **Service layer is authorization-free.** No production call-site
+  of `authorization::Service` remains — the struct has been removed
+  as dead code. No service
+  method performs an inline `if administrator` or
+  `if uploader == user` check.
+- **Old extractors removed from handlers.** `ExtractLoggedInUser`
+  and `ExtractOptionalLoggedInUser` are no longer imported by any
+  handler.
+- **401 vs. 403 distinction is correct.** Guest-denied → 401,
+  authenticated-but-insufficient → 403, consistent across all
+  error enums.
+- **`Actor` provides a clean identity carrier.** The `user_id()`
+  panic guard is appropriate for handlers where `Guest` is denied
+  by the permission matrix.
+
+### Open Issues (Resolved)
+
+All eight issues from the initial Phase 2 review have been
+resolved, plus one additional cleanup:
+
+1. **`create_random_torrent_handler`** — documented as intentionally
+   unguarded with a `// Public:` comment (testing/debug endpoint, no
+   persistent state).
+2. **Ownership check in `update_torrent_info_handler`** — updated to
+   use `actor.role == Role::Admin` from the already-resolved
+   extractor, avoiding a redundant DB query. The ownership check
+   itself remains as Phase 3 scope.
+3. **E2E test response types** — `LoggedInUserData` and
+   `TokenRenewalData` now include `role: String`. Assertions verify
+   the `role` value.
+4. **`GetSettings` and `GetCanonicalInfoHash`** — dead action
+   variants and markers removed from `Action` enum, `Action::ALL`,
+   `PermissionMatrix::default_grant`, `action_markers!`, and all
+   tests.
+5. **`authorization::Service`** — removed along with its unused
+   `user::Repository`, `AuthError`, and `UserId` imports. Module
+   doc updated.
+6. **Old extractors** — `ExtractLoggedInUser` (`user_id.rs`) and
+   `ExtractOptionalLoggedInUser` (`optional_user_id.rs`) deleted;
+   `extractors/mod.rs` updated.
+7. **Pre-auth endpoints** — all five handlers now carry
+   `// Public: no RequirePermission — pre-authentication endpoint`
+   comments.
+8. **Crate-level extractor tests** — added in
+   `src/tests/web/require_permission.rs`: 7 tests covering `Actor`
+   behavior and the full `RequirePermission<A>` extraction path
+   (guest → 401, guest → 200, registered → 403, registered → 200,
+   admin → 200) using a minimal Axum router backed by an ephemeral
+   SQLite database.
+9. **Double `.into_response()` in `license_page_handler`** —
+   `about/handlers.rs` called `.into_response().into_response()`
+   on the success path (harmless but redundant). Removed the
+   duplicate call.
+
+### Verification
+
+Independent review performed 2026-04-15. `cargo check`, `cargo
+clippy`, and `cargo test` (all `--workspace --all-targets
+--all-features`) pass cleanly (209 tests, 0 failures). `cargo
+check --workspace --no-default-features` also builds. The
+`CHANGELOG.md` has been updated to reflect the net state of the
+unreleased section: intermediate entries describing
+`authorization::Service` delegating to `PermissionMatrix` and
+`ExtractLoggedInUser` using `BearerToken` have been replaced by
+Removed entries documenting their deletion.

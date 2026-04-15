@@ -18,11 +18,13 @@ use super::responses::{new_torrent_response, torrent_file_response};
 use crate::common::AppData;
 use crate::errors::TorrentError;
 use crate::models::torrent_tag::TagId;
+use crate::services::authorization::Role;
 use crate::services::torrent::{AddTorrentRequest, ListingRequest};
 use crate::services::torrent_file::generate_random_torrent;
 use crate::utils::parse_torrent;
-use crate::web::api::server::v1::extractors::optional_user_id::ExtractOptionalLoggedInUser;
-use crate::web::api::server::v1::extractors::user_id::ExtractLoggedInUser;
+use crate::web::api::server::v1::extractors::require_permission::{
+    AddTorrent, DeleteTorrent, GenerateTorrentInfoListing, GetTorrent, GetTorrentInfo, RequirePermission, UpdateTorrent,
+};
 use crate::web::api::server::v1::responses::OkResponseData;
 use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 
@@ -37,7 +39,7 @@ use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 #[allow(clippy::unused_async)]
 pub async fn upload_torrent_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+    RequirePermission(actor, _): RequirePermission<AddTorrent>,
     multipart: Multipart,
 ) -> Response {
     let add_torrent_form = match build_add_torrent_request_from_payload(multipart).await {
@@ -45,7 +47,7 @@ pub async fn upload_torrent_handler(
         Err(error) => return error.into_response(),
     };
 
-    match app_data.torrent_service.add_torrent(add_torrent_form, maybe_user_id).await {
+    match app_data.torrent_service.add_torrent(add_torrent_form, actor.user_id()).await {
         Ok(response) => new_torrent_response(&response).into_response(),
         Err(error) => error.into_response(),
     }
@@ -68,7 +70,7 @@ impl InfoHashParam {
 #[allow(clippy::unused_async)]
 pub async fn download_torrent_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+    RequirePermission(actor, _): RequirePermission<GetTorrent>,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
@@ -77,13 +79,11 @@ pub async fn download_torrent_handler(
 
     debug!("Downloading torrent: {:?}", info_hash.to_hex_string());
 
-    if let Some(redirect_response) =
-        redirect_to_download_url_using_canonical_info_hash_if_needed(&app_data, &info_hash, maybe_user_id).await
-    {
+    if let Some(redirect_response) = redirect_to_download_url_using_canonical_info_hash_if_needed(&app_data, &info_hash).await {
         debug!("Redirecting to URL with canonical info-hash");
         redirect_response
     } else {
-        let torrent = match app_data.torrent_service.get_torrent(&info_hash, maybe_user_id).await {
+        let torrent = match app_data.torrent_service.get_torrent(&info_hash, actor.user_id).await {
             Ok(torrent) => torrent,
             Err(error) => return error.into_response(),
         };
@@ -103,13 +103,8 @@ pub async fn download_torrent_handler(
 async fn redirect_to_download_url_using_canonical_info_hash_if_needed(
     app_data: &Arc<AppData>,
     info_hash: &InfoHash,
-    maybe_user_id: Option<i64>,
 ) -> Option<Response> {
-    match app_data
-        .torrent_service
-        .get_canonical_info_hash(info_hash, maybe_user_id)
-        .await
-    {
+    match app_data.torrent_service.get_canonical_info_hash(info_hash).await {
         Ok(Some(canonical_info_hash)) => {
             if canonical_info_hash != *info_hash {
                 return Some(
@@ -138,13 +133,9 @@ async fn redirect_to_download_url_using_canonical_info_hash_if_needed(
 pub async fn get_torrents_handler(
     State(app_data): State<Arc<AppData>>,
     Query(criteria): Query<ListingRequest>,
-    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+    RequirePermission(_actor, _): RequirePermission<GenerateTorrentInfoListing>,
 ) -> Response {
-    match app_data
-        .torrent_service
-        .generate_torrent_info_listing(&criteria, maybe_user_id)
-        .await
-    {
+    match app_data.torrent_service.generate_torrent_info_listing(&criteria).await {
         Ok(torrents_response) => Json(OkResponseData { data: torrents_response }).into_response(),
         Err(error) => error.into_response(),
     }
@@ -161,16 +152,16 @@ pub async fn get_torrents_handler(
 #[allow(clippy::unused_async)]
 pub async fn get_torrent_info_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+    RequirePermission(actor, _): RequirePermission<GetTorrentInfo>,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
         return errors::Request::InvalidInfoHashParam.into_response();
     };
 
-    match redirect_to_details_url_using_canonical_info_hash_if_needed(&app_data, &info_hash, maybe_user_id).await {
+    match redirect_to_details_url_using_canonical_info_hash_if_needed(&app_data, &info_hash).await {
         Some(redirect_response) => redirect_response,
-        _ => match app_data.torrent_service.get_torrent_info(&info_hash, maybe_user_id).await {
+        _ => match app_data.torrent_service.get_torrent_info(&info_hash, actor.user_id).await {
             Ok(torrent_response) => Json(OkResponseData { data: torrent_response }).into_response(),
             Err(error) => error.into_response(),
         },
@@ -180,13 +171,8 @@ pub async fn get_torrent_info_handler(
 async fn redirect_to_details_url_using_canonical_info_hash_if_needed(
     app_data: &Arc<AppData>,
     info_hash: &InfoHash,
-    maybe_user_id: Option<i64>,
 ) -> Option<Response> {
-    match app_data
-        .torrent_service
-        .get_canonical_info_hash(info_hash, maybe_user_id)
-        .await
-    {
+    match app_data.torrent_service.get_canonical_info_hash(info_hash).await {
         Ok(Some(canonical_info_hash)) => {
             if canonical_info_hash != *info_hash {
                 return Some(
@@ -216,13 +202,29 @@ async fn redirect_to_details_url_using_canonical_info_hash_if_needed(
 #[allow(clippy::unused_async)]
 pub async fn update_torrent_info_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractLoggedInUser(user_id): ExtractLoggedInUser,
+    RequirePermission(actor, _): RequirePermission<UpdateTorrent>,
     Path(info_hash): Path<InfoHashParam>,
     extract::Json(update_torrent_info_form): extract::Json<UpdateTorrentInfoForm>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
         return errors::Request::InvalidInfoHashParam.into_response();
     };
+
+    let user_id = actor.user_id();
+
+    // Ownership check — Phase 3 will replace with RequireOwnership extractor.
+    {
+        let Ok(updater) = app_data.user_repository.get_compact(&user_id).await else {
+            return TorrentError::UnauthorizedAction.into_response();
+        };
+        let torrent_listing = match app_data.torrent_listing_generator.one_torrent_by_info_hash(&info_hash).await {
+            Ok(t) => t,
+            Err(e) => return TorrentError::from(e).into_response(),
+        };
+        if !(torrent_listing.uploader == updater.username || actor.role == Role::Admin) {
+            return TorrentError::UnauthorizedAction.into_response();
+        }
+    }
 
     match app_data
         .torrent_service
@@ -232,7 +234,6 @@ pub async fn update_torrent_info_handler(
             &update_torrent_info_form.description,
             &update_torrent_info_form.category,
             &update_torrent_info_form.tags,
-            &user_id,
         )
         .await
     {
@@ -253,14 +254,14 @@ pub async fn update_torrent_info_handler(
 #[allow(clippy::unused_async)]
 pub async fn delete_torrent_handler(
     State(app_data): State<Arc<AppData>>,
-    ExtractOptionalLoggedInUser(maybe_user_id): ExtractOptionalLoggedInUser,
+    RequirePermission(_actor, _): RequirePermission<DeleteTorrent>,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
         return errors::Request::InvalidInfoHashParam.into_response();
     };
 
-    match app_data.torrent_service.delete_torrent(&info_hash, maybe_user_id).await {
+    match app_data.torrent_service.delete_torrent(&info_hash).await {
         Ok(deleted_torrent_response) => Json(OkResponseData {
             data: deleted_torrent_response,
         })
@@ -285,6 +286,9 @@ impl UuidParam {
 /// # Errors
 ///
 /// Returns an error if the torrent info-hash is invalid.
+// Public: no RequirePermission — testing/debug endpoint that generates
+// deterministic random torrents from a UUID seed.  No authorization
+// needed; does not read or write any persistent state.
 #[allow(clippy::unused_async)]
 pub async fn create_random_torrent_handler(State(_app_data): State<Arc<AppData>>, Path(uuid): Path<UuidParam>) -> Response {
     let Ok(uuid) = Uuid::parse_str(&uuid.value()) else {

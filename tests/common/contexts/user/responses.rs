@@ -22,6 +22,7 @@ pub struct LoggedInUserData {
     pub token: String,
     pub username: String,
     pub admin: bool,
+    pub role: String,
 }
 
 #[derive(Deserialize)]
@@ -44,4 +45,5 @@ pub struct TokenRenewalData {
     pub token: String,
     pub username: String,
     pub admin: bool,
+    pub role: String,
 }
