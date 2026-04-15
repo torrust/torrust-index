@@ -275,6 +275,11 @@ impl ProfileService {
             .change_password(user_id, &password_hash)
             .await?;
 
+        // Invalidate all outstanding session tokens for this user
+        self.user_authentication_repository
+            .increment_token_generation(user_id)
+            .await?;
+
         Ok(())
     }
 }
@@ -323,6 +328,11 @@ impl BanService {
             .await?;
 
         self.banned_user_list.add(&user_profile.user_id).await?;
+
+        // Invalidate all outstanding session tokens for the banned user
+        self.banned_user_list
+            .increment_token_generation(&user_profile.user_id)
+            .await?;
 
         Ok(())
     }
@@ -465,7 +475,9 @@ impl Repository for DbUserRepository {
     ///
     /// It returns an error if there is a database error.
     async fn grant_admin_role(&self, user_id: &UserId) -> Result<(), Error> {
-        self.database.grant_admin_role(*user_id).await
+        self.database.grant_admin_role(*user_id).await?;
+        // Invalidate outstanding session tokens — the user's role changed.
+        self.database.increment_token_generation(*user_id).await
     }
 
     /// It deletes the user.
@@ -566,6 +578,16 @@ impl DbBannedUserList {
             .expect("Could not parse date from 9999-01-01 00:00:00.");
 
         self.database.ban_user(*user_id, &reason, date_expiry).await
+    }
+
+    /// Increment the user's `token_generation` counter, invalidating all
+    /// outstanding session tokens.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn increment_token_generation(&self, user_id: &UserId) -> Result<(), Error> {
+        self.database.increment_token_generation(*user_id).await
     }
 }
 

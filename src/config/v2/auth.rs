@@ -15,10 +15,13 @@ const DEFAULT_PUBLIC_KEY_PATH: &str = "./share/default/jwt/public.pem";
 
 /// Authentication options.
 ///
-/// ## Phase 3 (ADR-T-007)
+/// ## JWT signing (ADR-T-007)
 ///
-/// JWT signing has moved from HMAC-HS256 with shared secrets to
-/// RS256 (RSA + SHA-256) with a public/private key pair.
+/// JWT signing uses RS256 (RSA + SHA-256) with a public/private key
+/// pair. Session and email-verification tokens share the same key
+/// pair; purpose separation is via the `aud` claim. A per-user
+/// `token_generation` counter enables near-instant revocation on
+/// password change, role change, or ban.
 ///
 /// Configuration supports two mechanisms (in priority order):
 ///

@@ -74,7 +74,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
 
     let database = Arc::new(database::connect(&database_connect_url).await.expect("Database error."));
     let json_web_token = Arc::new(JsonWebToken::new(configuration.clone()).await);
-    let auth = Arc::new(Authentication::new(json_web_token.clone()));
+    let auth = Arc::new(Authentication::new(json_web_token.clone(), database.clone()));
 
     // Repositories
     let category_repository = Arc::new(DbCategoryRepository::new(database.clone()));
@@ -154,6 +154,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let authentication_service = Arc::new(Service::new(
         configuration.clone(),
         json_web_token.clone(),
+        database.clone(),
         user_repository.clone(),
         user_profile_repository.clone(),
         user_authentication_repository.clone(),

@@ -5,17 +5,27 @@
 //!
 //! See ADR-T-007 for the rationale behind centralising JWT handling.
 //!
-//! ## Phase 3 changes (ADR-T-007)
+//! # Architecture (ADR-T-007 Phases 1–4)
 //!
-//! - Switched from HMAC-HS256 to RS256 (RSA + SHA-256) asymmetric signing.
-//! - Single RSA key pair for all token purposes (session and
-//!   email-verification); purpose separation is via the `aud` claim.
-//! - `EncodingKey` (private) is used only for signing; `DecodingKey`
-//!   (public) is used only for verification.
-//! - A `kid` (Key ID) is included in every JWT header to support
-//!   future key rotation.
-//! - Keys are resolved once at construction time from PEM files or
-//!   inline PEM config, not on every request.
+//! **Phase 1 — Structural cleanup.** Consolidated all `jsonwebtoken`
+//! usage into this single module with `Result`-based error propagation.
+//!
+//! **Phase 2 — Claim redesign.** `SessionClaims` follows RFC 7519
+//! registered claim names (`sub`, `iss`, `aud`, `iat`, `exp`) with
+//! advisory `role`/`username` fields. Purpose separation between
+//! session and email-verification tokens is via the `aud` claim.
+//!
+//! **Phase 3 — RS256 asymmetric signing.** Switched from HMAC-HS256
+//! to RS256 (RSA + SHA-256). A single RSA key pair is used for all
+//! token purposes. `EncodingKey` (private) signs; `DecodingKey`
+//! (public) verifies. A `kid` (Key ID) is included in every JWT
+//! header for future key rotation. Keys are resolved once at
+//! construction time from PEM files or inline PEM config.
+//!
+//! **Phase 4 — Token revocation.** `SessionClaims` includes a `gen`
+//! (token generation) counter. Password changes, role changes, and
+//! bans increment the counter in the database; tokens carrying an
+//! older `gen` are rejected at verification time.
 
 use std::sync::Arc;
 
@@ -61,6 +71,11 @@ pub struct SessionClaims {
     pub role: String,
     /// Advisory username. Non-authoritative.
     pub username: String,
+    /// Token generation counter. Tokens with a `gen` older than the
+    /// current database value for this user are considered revoked.
+    /// See ADR-T-007 Phase 4 (Optional Revocation).
+    #[serde(rename = "gen")]
+    pub token_gen: u64,
 }
 
 /// Backward-compatible type alias.
@@ -130,7 +145,7 @@ impl JsonWebToken {
     ///
     /// Returns `AuthError::InternalServerError` if the token cannot be
     /// encoded.
-    pub async fn sign(&self, user: UserCompact) -> Result<String, AuthError> {
+    pub async fn sign(&self, user: UserCompact, token_generation: u64) -> Result<String, AuthError> {
         let settings = self.cfg.settings.read().await;
         let now = clock::now();
         let exp_date = now + settings.auth.session_token_lifetime_secs;
@@ -148,6 +163,7 @@ impl JsonWebToken {
                 "user".to_owned()
             },
             username: user.username,
+            token_gen: token_generation,
         };
 
         let mut header = Header::new(Algorithm::RS256);

@@ -238,6 +238,13 @@ pub trait Database: Sync + Send {
     /// Grant a user the administrator role.
     async fn grant_admin_role(&self, user_id: i64) -> Result<(), Error>;
 
+    /// Get the current `token_generation` counter for a user.
+    async fn get_token_generation(&self, user_id: i64) -> Result<u64, Error>;
+
+    /// Increment the `token_generation` counter for a user, invalidating
+    /// all outstanding session tokens.
+    async fn increment_token_generation(&self, user_id: i64) -> Result<(), Error>;
+
     /// Verify a user's email with `user_id`.
     async fn verify_email(&self, user_id: i64) -> Result<(), Error>;
 

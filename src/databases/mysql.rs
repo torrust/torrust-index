@@ -299,6 +299,30 @@ impl Database for Mysql {
             })
     }
 
+    async fn get_token_generation(&self, user_id: i64) -> Result<u64, database::Error> {
+        query_as("SELECT token_generation FROM torrust_users WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await
+            .map(|(v,): (i64,)| u64::try_from(v).unwrap_or(0))
+            .map_err(|_| database::Error::UserNotFound)
+    }
+
+    async fn increment_token_generation(&self, user_id: i64) -> Result<(), database::Error> {
+        query("UPDATE torrust_users SET token_generation = token_generation + 1 WHERE user_id = ?")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|_| database::Error::Error)
+            .and_then(|v| {
+                if v.rows_affected() > 0 {
+                    Ok(())
+                } else {
+                    Err(database::Error::UserNotFound)
+                }
+            })
+    }
+
     async fn verify_email(&self, user_id: i64) -> Result<(), database::Error> {
         query("UPDATE torrust_user_profiles SET email_verified = TRUE WHERE user_id = ?")
             .bind(user_id)

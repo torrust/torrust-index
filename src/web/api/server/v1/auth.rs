@@ -42,14 +42,15 @@
 //! ```json
 //! {
 //!     "data":{
-//!       "token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiJ9.-EfY9CrZz2OLfjiVQzkhxSjV7tWTFivP2yMuzZkbEak",
+//!       "token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE",
 //!       "username":"indexadmin",
 //!       "admin":true
 //!     }
 //!   }
 //! ```
 //!
-//! The JWT payload contains RFC 7519 registered claims:
+//! The JWT is signed with RS256 (RSA + SHA-256). The payload contains
+//! RFC 7519 registered claims plus advisory fields:
 //!
 //! ```json
 //! {
@@ -59,13 +60,19 @@
 //!   "iat": 1686215788,
 //!   "exp": 1687425388,
 //!   "role": "admin",
-//!   "username": "indexadmin"
+//!   "username": "indexadmin",
+//!   "gen": 0
 //! }
 //! ```
 //!
 //! The `role` and `username` fields are **advisory only** — the
 //! authoritative role is always re-checked from the database on each
 //! authenticated request (see ADR-T-007 Phase 2).
+//!
+//! The `gen` field is the token-generation counter. When a user's
+//! password changes, role changes, or the user is banned, the counter
+//! is incremented and any token carrying an older `gen` value is
+//! rejected (see ADR-T-007 Phase 4).
 //!
 //! **NOTICE**: The token lifetime is configurable via
 //! `auth.session_token_lifetime_secs` (default: 2 weeks / `1_209_600` seconds).
@@ -85,7 +92,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiJ9.-EfY9CrZz2OLfjiVQzkhxSjV7tWTFivP2yMuzZkbEak" \
+//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE" \
 //!   --request POST \
 //!   --data '{"name":"new category","icon":null}' \
 //!   http://127.0.0.1:3001/v1/category
@@ -102,7 +109,7 @@ use std::sync::Arc;
 
 use hyper::http::HeaderValue;
 
-use crate::common::AppData;
+use crate::databases::database::Database;
 use crate::errors::AuthError;
 use crate::jwt::{JsonWebToken, SessionClaims};
 use crate::models::user::{UserCompact, UserId};
@@ -110,12 +117,16 @@ use crate::web::api::server::v1::extractors::bearer_token::BearerToken;
 
 pub struct Authentication {
     json_web_token: Arc<JsonWebToken>,
+    database: Arc<Box<dyn Database>>,
 }
 
 impl Authentication {
     #[must_use]
-    pub const fn new(json_web_token: Arc<JsonWebToken>) -> Self {
-        Self { json_web_token }
+    pub fn new(json_web_token: Arc<JsonWebToken>, database: Arc<Box<dyn Database>>) -> Self {
+        Self {
+            json_web_token,
+            database,
+        }
     }
 
     /// Create Json Web Token
@@ -123,8 +134,8 @@ impl Authentication {
     /// # Errors
     ///
     /// Returns `AuthError::InternalServerError` if the token cannot be encoded.
-    pub async fn sign_jwt(&self, user: UserCompact) -> Result<String, AuthError> {
-        self.json_web_token.sign(user).await
+    pub async fn sign_jwt(&self, user: UserCompact, token_generation: u64) -> Result<String, AuthError> {
+        self.json_web_token.sign(user, token_generation).await
     }
 
     /// Verify Json Web Token
@@ -136,26 +147,31 @@ impl Authentication {
         self.json_web_token.verify(token)
     }
 
-    /// Get logged-in user ID from bearer token
+    /// Get logged-in user ID from bearer token, validating the token
+    /// generation counter against the database.
     ///
     /// # Errors
     ///
-    /// This function will return an error if it can get claims from the request
-    pub fn get_user_id_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<UserId, AuthError> {
-        let claims = self.get_claims_from_bearer_token(maybe_token)?;
+    /// This function will return an error if the JWT is invalid, expired,
+    /// or if the token's generation has been revoked.
+    pub async fn get_user_id_from_bearer_token(&self, token: BearerToken) -> Result<UserId, AuthError> {
+        let claims = self.json_web_token.verify(&token.value())?;
+        self.validate_token_generation(&claims).await?;
         Ok(claims.sub)
     }
 
-    /// Get Claims from bearer token
-    ///
-    /// # Errors
-    ///
-    /// This function will:
-    ///
-    /// - Return an `AuthError::TokenNotFound` if `HeaderValue` is `None`.
-    /// - Pass through the `AuthError::TokenInvalid` if unable to verify the JWT.
-    fn get_claims_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<SessionClaims, AuthError> {
-        maybe_token.map_or(Err(AuthError::TokenNotFound), |token| self.verify_jwt(&token.value()))
+    /// Checks that the token's `gen` claim matches the current
+    /// `token_generation` in the database. Returns `AuthError::TokenRevoked`
+    /// if the token is stale (e.g. after a password change, role change,
+    /// or ban).
+    async fn validate_token_generation(&self, claims: &SessionClaims) -> Result<(), AuthError> {
+        let current_gen = self.database.get_token_generation(claims.sub).await?;
+
+        if claims.token_gen < current_gen {
+            return Err(AuthError::TokenRevoked);
+        }
+
+        Ok(())
     }
 }
 
@@ -175,18 +191,4 @@ pub fn parse_token(authorization: &HeaderValue) -> Result<String, AuthError> {
     }
 
     Ok(token.to_string())
-}
-
-/// If the user is logged in, returns the user's ID. Otherwise, returns `None`.
-///
-/// # Errors
-///
-/// It returns an error if we cannot get the user from the bearer token.
-pub fn get_optional_logged_in_user(
-    maybe_bearer_token: Option<BearerToken>,
-    app_data: &Arc<AppData>,
-) -> Result<Option<UserId>, AuthError> {
-    maybe_bearer_token.map_or(Ok(None), |bearer_token| {
-        app_data.auth.get_user_id_from_bearer_token(Some(bearer_token)).map(Some)
-    })
 }

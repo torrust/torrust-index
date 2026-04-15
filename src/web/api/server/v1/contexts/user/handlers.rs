@@ -11,6 +11,7 @@ use serde::Deserialize;
 use super::forms::{ChangePasswordForm, JsonWebToken, LoginForm, RegistrationForm};
 use super::responses::{self};
 use crate::common::AppData;
+use crate::errors::AuthError;
 use crate::services::user::ListingRequest;
 use crate::web::api::server::v1::extractors::optional_user_id::ExtractOptionalLoggedInUser;
 use crate::web::api::server::v1::responses::OkResponseData;
@@ -95,18 +96,29 @@ pub async fn login_handler(
 ///
 /// - Unable to verify the supplied payload as a valid JWT.
 /// - The JWT is not invalid or expired.
-#[allow(clippy::unused_async)]
+/// - The token's generation has been revoked.
 pub async fn verify_token_handler(
     State(app_data): State<Arc<AppData>>,
     extract::Json(token): extract::Json<JsonWebToken>,
 ) -> Response {
-    match app_data.json_web_token.verify(&token.token) {
-        Ok(_) => axum::Json(OkResponseData {
-            data: "Token is valid.".to_string(),
-        })
-        .into_response(),
-        Err(error) => error.into_response(),
+    let claims = match app_data.json_web_token.verify(&token.token) {
+        Ok(claims) => claims,
+        Err(error) => return error.into_response(),
+    };
+
+    // Validate token generation against the database
+    let Ok(current_gen) = app_data.database.get_token_generation(claims.sub).await else {
+        return AuthError::UserNotFound.into_response();
+    };
+
+    if claims.token_gen < current_gen {
+        return AuthError::TokenRevoked.into_response();
     }
+
+    axum::Json(OkResponseData {
+        data: "Token is valid.".to_string(),
+    })
+    .into_response()
 }
 
 #[derive(Deserialize)]

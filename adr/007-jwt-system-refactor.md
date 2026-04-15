@@ -1,6 +1,6 @@
 # ADR-T-007: Refactor the JWT System
 
-**Status:** Phase 3 implemented
+**Status:** Phase 4 implemented
 **Date:** 2026-04-14
 
 ## Context
@@ -340,9 +340,8 @@ phased rollout that subsumes Options A and B.
   does not currently need instant revocation badly enough to
   justify the infrastructure cost and loss of statelessness.
 - **Option E (hybrid revocation):** The `token_generation` column
-  approach is elegant but adds complexity that can be layered on
-  later without changing the token format. It remains a valid
-  follow-up if revocation becomes a priority.
+  approach was originally deferred but has since been implemented
+  in Phase 4. See the Phase 4 section below.
 
 ### Implementation Phases
 
@@ -384,7 +383,9 @@ phased rollout that subsumes Options A and B.
   authenticated request (the authorization service already does
   this via `get_role`) so the token role is advisory only.
 - ✅ Enforce a minimum secret length (32 bytes) at config
-  validation time.
+  validation time. *(With Phase 3's move to RS256, this is now
+  enforced implicitly: `EncodingKey::from_rsa_pem` /
+  `DecodingKey::from_rsa_pem` reject invalid PEM at startup.)*
 - **Breaking change:** existing HS256 tokens are invalidated;
   users must re-login.
 
@@ -408,14 +409,23 @@ phased rollout that subsumes Options A and B.
   no longer supported. Deployers must generate an RSA key pair
   and update their configuration.
 
-#### Future — Optional Revocation (Option E scope)
+#### Phase 4 — Optional Revocation (Option E scope) ✅ Implemented
 
-- Add a `token_generation` column to `torrust_users`.
-- Include `gen` in `SessionClaims`; reject stale generations on
-  verify.
-- Increment generation on password change, role change, or ban.
-- This phase is independent and can be shipped whenever revocation
-  becomes a priority.
+- ✅ Add a `token_generation` column (default `0`) to
+  `torrust_users`.
+- ✅ Include `gen` in `SessionClaims`; reject tokens whose `gen`
+  is older than the current database value.
+- ✅ Increment `token_generation` on password change, role change
+  (admin grant), and ban.
+- ✅ Validation performed in the `Authentication` web layer
+  (`get_user_id_from_bearer_token`), the `verify_token_handler`,
+  and the `renew_token` service method.
+  *Defence in depth:* the generation check is intentionally
+  repeated at each entry point rather than consolidated into a
+  single layer, so that no call path can accidentally bypass
+  revocation.
+- **Breaking change:** existing tokens without a `gen` claim will
+  fail deserialization and be rejected (users re-login once).
 
 ### Configuration Migration
 
@@ -438,10 +448,25 @@ A migration guide will accompany the release that ships Phase 3.
 - Deployers must generate and manage an RSA key pair (Phase 3).
   A development-mode auto-generated key reduces friction for
   local setups.
-- Token revocation is **not** included in the initial scope but
-  the architecture cleanly supports adding it later (Phase 4 /
-  Option E).
+- Token revocation via a `token_generation` counter is included
+  (Phase 4 / Option E). Password changes, role changes, and bans
+  increment the counter and invalidate outstanding tokens.
 - The centralised `jwt` module makes future algorithm changes
   (e.g., migrating to EdDSA) a localised, single-module change.
 - External services can verify tokens using only the public key,
   enabling zero-trust verification without secret sharing.
+
+## Remaining Issues
+
+- **Problem #11 (`BearerToken` extractor returns `Ok(None)`).**
+  ✅ **Resolved.** The `BearerToken` extractor now implements
+  `FromRequestParts` directly and **rejects** missing
+  (`AuthError::TokenNotFound`) or malformed
+  (`AuthError::TokenInvalid`) `Authorization` headers at the
+  extraction boundary. The `Extract` wrapper has been removed.
+  `ExtractLoggedInUser` uses `BearerToken` directly (fails if
+  missing). `ExtractOptionalLoggedInUser` catches the rejection
+  and returns `None` for anonymous requests.
+  `Authentication::get_user_id_from_bearer_token` now takes
+  `BearerToken` (not `Option<BearerToken>`), eliminating the
+  `None`-handling indirection.
