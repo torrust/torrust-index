@@ -4,8 +4,7 @@ use hyper::{StatusCode, header};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::databases::database;
-use crate::errors::{ServiceError, http_status_code_for_service_error, map_database_error_to_service_error};
+use crate::errors::{ApiError, AuthError, CategoryTagError, TorrentError, UserError};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct OkResponseData<T> {
@@ -17,25 +16,33 @@ pub struct ErrorResponseData {
     pub error: String,
 }
 
-impl IntoResponse for ServiceError {
+impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
-        json_error_response(
-            http_status_code_for_service_error(&self),
-            &ErrorResponseData { error: self.to_string() },
-        )
+        json_error_response(self.status_code(), &ErrorResponseData { error: self.to_string() })
     }
 }
 
-impl IntoResponse for database::Error {
+impl IntoResponse for UserError {
     fn into_response(self) -> Response {
-        let service_error = map_database_error_to_service_error(&self);
+        json_error_response(self.status_code(), &ErrorResponseData { error: self.to_string() })
+    }
+}
 
-        json_error_response(
-            http_status_code_for_service_error(&service_error),
-            &ErrorResponseData {
-                error: service_error.to_string(),
-            },
-        )
+impl IntoResponse for TorrentError {
+    fn into_response(self) -> Response {
+        json_error_response(self.status_code(), &ErrorResponseData { error: self.to_string() })
+    }
+}
+
+impl IntoResponse for CategoryTagError {
+    fn into_response(self) -> Response {
+        json_error_response(self.status_code(), &ErrorResponseData { error: self.to_string() })
+    }
+}
+
+impl IntoResponse for ApiError {
+    fn into_response(self) -> Response {
+        json_error_response(self.status_code(), &ErrorResponseData { error: self.to_string() })
     }
 }
 

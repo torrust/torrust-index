@@ -4244,7 +4244,6 @@ checksum = "f17aaa1c6e3dc22b1da4b6bba97d066e354c7945cac2f7852d4e4e7ca7a6b56d"
 name = "torrust-index"
 version = "4.0.0-develop"
 dependencies = [
- "anyhow",
  "argon2",
  "async-trait",
  "axum",

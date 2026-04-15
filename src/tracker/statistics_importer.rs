@@ -59,7 +59,7 @@ impl StatisticsImporter {
                         torrent.torrent_id, torrent.info_hash, err
                     );
                     error!(target: "statistics_importer", "{}", message);
-                    // todo: return a service error that can be a tracker API error or a database error.
+                    // todo: return a domain error (e.g. TorrentError) that can be a tracker API error or a database error.
                 }
             }
         }
@@ -103,7 +103,7 @@ impl StatisticsImporter {
             Err(err) => {
                 let message = format!("Error getting torrents tracker stats. Error: {err:?}");
                 error!(target: LOG_TARGET, "{}", message);
-                // todo: return a service error that can be a tracker API error or a database error.
+                // todo: return a domain error (e.g. TorrentError) that can be a tracker API error or a database error.
                 return Ok(());
             }
         };

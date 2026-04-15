@@ -8,7 +8,7 @@ use pbkdf2::Pbkdf2;
 use super::user::DbUserProfileRepository;
 use crate::config::Configuration;
 use crate::databases::database::{Database, Error};
-use crate::errors::ServiceError;
+use crate::errors::AuthError;
 use crate::models::user::{UserAuthentication, UserClaims, UserCompact, UserId};
 use crate::services::user::Repository;
 use crate::utils::clock;
@@ -45,27 +45,27 @@ impl Service {
     ///
     /// It returns:
     ///
-    /// * A `ServiceError::WrongPasswordOrUsername` if unable to get user profile.
-    /// * A `ServiceError::InternalServerError` if unable to get user authentication data from the user id.
-    /// * A `ServiceError::EmailNotVerified` if the email should be, but is not verified.
+    /// * An `AuthError::WrongPasswordOrUsername` if unable to get user profile.
+    /// * An `AuthError::InternalServerError` if unable to get user authentication data from the user id.
+    /// * An `AuthError::EmailNotVerified` if the email should be, but is not verified.
     /// * An error if unable to verify the password.
     /// * An error if unable to get the user data from the database.
-    pub async fn login(&self, username: &str, password: &str) -> Result<(String, UserCompact), ServiceError> {
+    pub async fn login(&self, username: &str, password: &str) -> Result<(String, UserCompact), AuthError> {
         // Get the user profile from database
         let user_profile = self
             .user_profile_repository
             .get_user_profile_from_username(username)
             .await
-            .map_err(|_| ServiceError::WrongPasswordOrUsername)?;
+            .map_err(|_| AuthError::WrongPasswordOrUsername)?;
 
         // Should not be able to fail if user_profile succeeded
         let user_authentication = self
             .user_authentication_repository
             .get_user_authentication_from_id(&user_profile.user_id)
             .await
-            .map_err(|_| ServiceError::InternalServerError)?;
+            .map_err(|_| AuthError::InternalServerError)?;
 
-        verify_password(password.as_bytes(), &user_authentication).map_err(|_| ServiceError::WrongPasswordOrUsername)?;
+        verify_password(password.as_bytes(), &user_authentication).map_err(|_| AuthError::WrongPasswordOrUsername)?;
 
         let settings = self.configuration.settings.read().await;
 
@@ -73,7 +73,7 @@ impl Service {
         if let Some(registration) = &settings.registration {
             if let Some(email) = &registration.email {
                 if email.verification_required && !user_profile.email_verified {
-                    return Err(ServiceError::EmailNotVerified);
+                    return Err(AuthError::EmailNotVerified);
                 }
             }
         }
@@ -81,7 +81,14 @@ impl Service {
         // Drop read lock on settings
         drop(settings);
 
-        let user_compact = self.user_repository.get_compact(&user_profile.user_id).await?;
+        let user_compact = self
+            .user_repository
+            .get_compact(&user_profile.user_id)
+            .await
+            .map_err(|err| match err {
+                Error::UserNotFound => AuthError::UserNotFound,
+                err => AuthError::from(err),
+            })?;
 
         // Sign JWT with compact user details as payload
         let token = self.json_web_token.sign(user_compact.clone()).await;
@@ -97,13 +104,20 @@ impl Service {
     ///
     /// * Unable to verify the supplied payload as a valid jwt.
     /// * Unable to get user data from the database.
-    pub async fn renew_token(&self, token: &str) -> Result<(String, UserCompact), ServiceError> {
+    pub async fn renew_token(&self, token: &str) -> Result<(String, UserCompact), AuthError> {
         const ONE_WEEK_IN_SECONDS: u64 = 604_800;
 
         // Verify if token is valid
         let claims = self.json_web_token.verify(token).await?;
 
-        let user_compact = self.user_repository.get_compact(&claims.user.user_id).await?;
+        let user_compact = self
+            .user_repository
+            .get_compact(&claims.user.user_id)
+            .await
+            .map_err(|err| match err {
+                Error::UserNotFound => AuthError::UserNotFound,
+                err => AuthError::from(err),
+            })?;
 
         // Renew token if it is valid for less than one week
         let token = match claims.exp - clock::now() {
@@ -149,7 +163,7 @@ impl JsonWebToken {
     /// # Errors
     ///
     /// This function will return an error if the JWT is not good or expired.
-    pub async fn verify(&self, token: &str) -> Result<UserClaims, ServiceError> {
+    pub async fn verify(&self, token: &str) -> Result<UserClaims, AuthError> {
         let settings = self.cfg.settings.read().await;
 
         match decode::<UserClaims>(
@@ -159,11 +173,11 @@ impl JsonWebToken {
         ) {
             Ok(token_data) => {
                 if token_data.claims.exp < clock::now() {
-                    return Err(ServiceError::TokenExpired);
+                    return Err(AuthError::TokenExpired);
                 }
                 Ok(token_data.claims)
             }
-            Err(_) => Err(ServiceError::TokenInvalid),
+            Err(_) => Err(AuthError::TokenInvalid),
         }
     }
 }
@@ -203,26 +217,26 @@ impl DbUserAuthenticationRepository {
 /// # Errors
 ///
 /// This function will return an error if unable to parse password hash from the stored user authentication value.
-/// This function will return a `ServiceError::InvalidPassword` if unable to match the password with either `argon2id` or `pbkdf2-sha256`.
-pub fn verify_password(password: &[u8], user_authentication: &UserAuthentication) -> Result<(), ServiceError> {
+/// This function will return an `AuthError::InvalidPassword` if unable to match the password with either `argon2id` or `pbkdf2-sha256`.
+pub fn verify_password(password: &[u8], user_authentication: &UserAuthentication) -> Result<(), AuthError> {
     // wrap string of the hashed password into a PasswordHash struct for verification
     let parsed_hash = PasswordHash::new(&user_authentication.password_hash)?;
 
     match parsed_hash.algorithm.as_str() {
         "argon2id" => {
             if Argon2::default().verify_password(password, &parsed_hash).is_err() {
-                return Err(ServiceError::InvalidPassword);
+                return Err(AuthError::InvalidPassword);
             }
 
             Ok(())
         }
         "pbkdf2-sha256" => {
             if Pbkdf2.verify_password(password, &parsed_hash).is_err() {
-                return Err(ServiceError::InvalidPassword);
+                return Err(AuthError::InvalidPassword);
             }
 
             Ok(())
         }
-        _ => Err(ServiceError::InvalidPassword),
+        _ => Err(AuthError::InvalidPassword),
     }
 }

@@ -16,7 +16,7 @@ use super::authentication::DbUserAuthenticationRepository;
 use super::authorization::{self, ACTION};
 use crate::config::{Configuration, PasswordConstraints};
 use crate::databases::database::{Database, Error, UsersFilters, UsersSorting};
-use crate::errors::ServiceError;
+use crate::errors::UserError;
 use crate::mailer::VerifyClaims;
 use crate::models::response::UserProfilesResponse;
 use crate::models::user::{UserCompact, UserId, UserProfile, Username};
@@ -83,20 +83,16 @@ impl RegistrationService {
     ///
     /// This function will return a:
     ///
-    /// * `ServiceError::EmailMissing` if email is required, but missing.
-    /// * `ServiceError::EmailInvalid` if supplied email is badly formatted.
-    /// * `ServiceError::PasswordsDontMatch` if the supplied passwords do not match.
-    /// * `ServiceError::PasswordTooShort` if the supplied password is too short.
-    /// * `ServiceError::PasswordTooLong` if the supplied password is too long.
-    /// * `ServiceError::UsernameInvalid` if the supplied username is badly formatted.
-    /// * `ServiceError::FailedToSendVerificationEmail` if unable to send the required verification email.
+    /// * `UserError::EmailMissing` if email is required, but missing.
+    /// * `UserError::EmailInvalid` if supplied email is badly formatted.
+    /// * `UserError::PasswordsDontMatch` if the supplied passwords do not match.
+    /// * `UserError::PasswordTooShort` if the supplied password is too short.
+    /// * `UserError::PasswordTooLong` if the supplied password is too long.
+    /// * `UserError::UsernameInvalid` if the supplied username is badly formatted.
+    /// * `UserError::FailedToSendVerificationEmail` if unable to send the required verification email.
     /// * An error if unable to successfully hash the password.
     /// * An error if unable to insert user into the database.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the email is required, but missing.
-    pub async fn register_user(&self, registration_form: &RegistrationForm, api_base_url: &str) -> Result<UserId, ServiceError> {
+    pub async fn register_user(&self, registration_form: &RegistrationForm, api_base_url: &str) -> Result<UserId, UserError> {
         info!("registering user: {}", registration_form.username);
 
         let settings = self.configuration.settings.read().await;
@@ -104,7 +100,7 @@ impl RegistrationService {
         let registration = match &settings.registration {
             Some(registration) => registration.clone(),
             None => {
-                return Err(ServiceError::ClosedForRegistration);
+                return Err(UserError::ClosedForRegistration);
             }
         };
 
@@ -115,13 +111,13 @@ impl RegistrationService {
         drop(settings);
 
         let Ok(username) = registration_form.username.parse::<Username>() else {
-            return Err(ServiceError::UsernameInvalid);
+            return Err(UserError::UsernameInvalid);
         };
 
         let opt_email = match &registration.email {
             Some(email) => {
                 if email.required && registration_form.email.is_none() {
-                    return Err(ServiceError::EmailMissing);
+                    return Err(UserError::EmailMissing);
                 }
                 registration_form.email.as_ref().and_then(
                     |email| {
@@ -134,7 +130,7 @@ impl RegistrationService {
 
         if let Some(email) = &opt_email {
             if !validate_email_address(email) {
-                return Err(ServiceError::EmailInvalid);
+                return Err(UserError::EmailInvalid);
             }
         }
 
@@ -171,7 +167,7 @@ impl RegistrationService {
 
                     if mail_res.is_err() {
                         drop(self.user_repository.delete(&user_id).await);
-                        return Err(ServiceError::FailedToSendVerificationEmail);
+                        return Err(UserError::FailedToSendVerificationEmail);
                     }
                 }
             }
@@ -185,9 +181,9 @@ impl RegistrationService {
     ///
     /// # Errors
     ///
-    /// This function will return a `ServiceError::DatabaseError` if unable to
+    /// This function will return a `UserError::DatabaseError` if unable to
     /// update the user's email verification status.
-    pub async fn verify_email(&self, token: &str) -> Result<bool, ServiceError> {
+    pub async fn verify_email(&self, token: &str) -> Result<bool, UserError> {
         let settings = self.configuration.settings.read().await;
 
         let token_data = match decode::<VerifyClaims>(
@@ -210,7 +206,7 @@ impl RegistrationService {
         let user_id = token_data.sub;
 
         if self.user_profile_repository.verify_email(&user_id).await.is_err() {
-            return Err(ServiceError::DatabaseError);
+            return Err(UserError::DatabaseError);
         }
 
         Ok(true)
@@ -243,10 +239,10 @@ impl ProfileService {
     ///
     /// This function will return a:
     ///
-    /// * `ServiceError::InvalidPassword` if the current password supplied is invalid.
-    /// * `ServiceError::PasswordsDontMatch` if the supplied passwords do not match.
-    /// * `ServiceError::PasswordTooShort` if the supplied password is too short.
-    /// * `ServiceError::PasswordTooLong` if the supplied password is too long.
+    /// * `UserError::InvalidPassword` if the current password supplied is invalid.
+    /// * `UserError::PasswordsDontMatch` if the supplied passwords do not match.
+    /// * `UserError::PasswordTooShort` if the supplied password is too short.
+    /// * `UserError::PasswordTooLong` if the supplied password is too long.
     /// * An error if unable to successfully hash the password.
     /// * An error if unable to change the password in the database.
     /// * An error if it is not possible to authorize the action
@@ -254,9 +250,9 @@ impl ProfileService {
         &self,
         maybe_user_id: Option<UserId>,
         change_password_form: &ChangePasswordForm,
-    ) -> Result<(), ServiceError> {
+    ) -> Result<(), UserError> {
         let Some(user_id) = maybe_user_id else {
-            return Err(ServiceError::UnauthorizedActionForGuests);
+            return Err(UserError::UnauthorizedActionForGuests);
         };
 
         self.authorization_service
@@ -322,12 +318,12 @@ impl BanService {
     ///
     /// This function will return a:
     ///
-    /// * `ServiceError::InternalServerError` if unable get user from the request.
+    /// * `UserError::InternalServerError` if unable get user from the request.
     /// * An error if unable to get user profile from supplied username.
     /// * An error if unable to set the ban of the user in the database.
-    pub async fn ban_user(&self, username_to_be_banned: &str, maybe_user_id: Option<UserId>) -> Result<(), ServiceError> {
+    pub async fn ban_user(&self, username_to_be_banned: &str, maybe_user_id: Option<UserId>) -> Result<(), UserError> {
         let Some(user_id) = maybe_user_id else {
-            return Err(ServiceError::UnauthorizedActionForGuests);
+            return Err(UserError::UnauthorizedActionForGuests);
         };
 
         self.authorization_service.authorize(ACTION::BanUser, maybe_user_id).await?;
@@ -369,12 +365,12 @@ impl ListingService {
     ///    
     /// # Errors
     ///
-    /// Returns a `ServiceError::InvalidUserListing` if there is an incorrect value in the url params for the listing request.
+    /// Returns a `UserError::InvalidUserListing` if there is an incorrect value in the url params for the listing request.
     pub async fn listing_specification_from_user_request(
         &self,
         maybe_user_id: Option<UserId>,
         request: &ListingRequest,
-    ) -> Result<ListingSpecification, ServiceError> {
+    ) -> Result<ListingSpecification, UserError> {
         self.authorization_service
             .authorize(ACTION::GenerateUserProfileSpecification, maybe_user_id)
             .await?;
@@ -397,26 +393,26 @@ impl ListingService {
         let offset = u64::from(page * u32::from(page_size));
 
         let sort = match &request.sort {
-            Some(sort_value) => Some(UsersSorting::from_str(sort_value).map_err(|_| ServiceError::InvalidUserListing)?),
+            Some(sort_value) => Some(UsersSorting::from_str(sort_value).map_err(|_| UserError::InvalidUserListing)?),
             None => None,
         };
 
         let filter_values = request
             .filters
             .as_csv::<String>()
-            .map_err(|()| ServiceError::InvalidUserListing)?;
+            .map_err(|()| UserError::InvalidUserListing)?;
 
         let filters = if let Some(filter_values) = filter_values {
             let mut sanitized_filters: Vec<UsersFilters> = Vec::new();
             for filter in filter_values {
                 match filter.as_str() {
                     "TorrentUploader" => sanitized_filters
-                        .push(UsersFilters::from_str("TorrentUploader").map_err(|_| ServiceError::InvalidUserListing)?),
+                        .push(UsersFilters::from_str("TorrentUploader").map_err(|_| UserError::InvalidUserListing)?),
                     "EmailNotVerified" => sanitized_filters
-                        .push(UsersFilters::from_str("EmailNotVerified").map_err(|_| ServiceError::InvalidUserListing)?),
+                        .push(UsersFilters::from_str("EmailNotVerified").map_err(|_| UserError::InvalidUserListing)?),
                     "EmailVerified" => sanitized_filters
-                        .push(UsersFilters::from_str("EmailVerified").map_err(|_| ServiceError::InvalidUserListing)?),
-                    _ => return Err(ServiceError::InvalidUserListing),
+                        .push(UsersFilters::from_str("EmailVerified").map_err(|_| UserError::InvalidUserListing)?),
+                    _ => return Err(UserError::InvalidUserListing),
                 }
             }
             Some(sanitized_filters)
@@ -437,11 +433,8 @@ impl ListingService {
     ///
     /// # Errors
     ///
-    /// Returns a `ServiceError::DatabaseError` if the database query fails.
-    pub async fn generate_user_profile_listing(
-        &self,
-        listing: &ListingSpecification,
-    ) -> Result<UserProfilesResponse, ServiceError> {
+    /// Returns a `UserError::DatabaseError` if the database query fails.
+    pub async fn generate_user_profile_listing(&self, listing: &ListingSpecification) -> Result<UserProfilesResponse, UserError> {
         let user_profiles_response = self.user_profile_repository.generate_listing(listing).await?;
 
         Ok(user_profiles_response)
@@ -451,7 +444,7 @@ impl ListingService {
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait Repository: Sync + Send {
-    async fn get_compact(&self, user_id: &UserId) -> Result<UserCompact, ServiceError>;
+    async fn get_compact(&self, user_id: &UserId) -> Result<UserCompact, Error>;
     async fn grant_admin_role(&self, user_id: &UserId) -> Result<(), Error>;
     async fn delete(&self, user_id: &UserId) -> Result<(), Error>;
     async fn add(&self, username: &str, email: &str, password_hash: &str) -> Result<UserId, Error>;
@@ -475,13 +468,8 @@ impl Repository for DbUserRepository {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    async fn get_compact(&self, user_id: &UserId) -> Result<UserCompact, ServiceError> {
-        // todo: persistence layer should have its own errors instead of
-        // returning a `ServiceError`.
-        self.database
-            .get_user_compact_from_id(*user_id)
-            .await
-            .map_err(|_| ServiceError::UserNotFound)
+    async fn get_compact(&self, user_id: &UserId) -> Result<UserCompact, Error> {
+        self.database.get_user_compact_from_id(*user_id).await
     }
 
     /// It grants the admin role to the user.
@@ -598,25 +586,25 @@ fn validate_password_constraints(
     password: &str,
     confirm_password: &str,
     password_rules: &PasswordConstraints,
-) -> Result<(), ServiceError> {
+) -> Result<(), UserError> {
     if password != confirm_password {
-        return Err(ServiceError::PasswordsDontMatch);
+        return Err(UserError::PasswordsDontMatch);
     }
 
     let password_length = password.len();
 
     if password_length < password_rules.min_password_length {
-        return Err(ServiceError::PasswordTooShort);
+        return Err(UserError::PasswordTooShort);
     }
 
     if password_length > password_rules.max_password_length {
-        return Err(ServiceError::PasswordTooLong);
+        return Err(UserError::PasswordTooLong);
     }
 
     Ok(())
 }
 
-fn hash_password(password: &str) -> Result<String, ServiceError> {
+fn hash_password(password: &str) -> Result<String, UserError> {
     let salt = SaltString::generate(&mut OsRng);
 
     // Argon2 with default params (Argon2id v19)

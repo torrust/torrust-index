@@ -126,6 +126,7 @@ The following services are provided by the default configuration:
 - [ADR-T-003: Preparing for Rust Edition 2024](adr/003-edition-2024-preparation.md) — Pin dependencies to avoid edition-2024-only crates while the workspace remains on edition 2021; raise MSRV to 1.83.
 - [ADR-T-004: Remove `located-error` Package](adr/004-remove-located-error.md) — Replace the `torrust-index-located-error` wrapper with `tracing` for error context.
 - [ADR-T-005: Migrate to Rust Edition 2024](adr/005-edition-2024.md) — Migrate the entire workspace to `edition = "2024"` and raise the MSRV to 1.85.
+- [ADR-T-006: Refactor the Error System](adr/006-error-system-refactor.md) — Replace the 41-variant `ServiceError` god enum with domain-scoped error enums (`AuthError`, `UserError`, `TorrentError`, `CategoryTagError`) and a thin `ApiError` wrapper.
 
 ## Contributing
 

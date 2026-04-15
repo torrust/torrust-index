@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- ADR-T-006: Document rationale for error system refactor.
+- 188 crate-level tests for the domain error system (`src/tests/errors/`):
+  status-code mapping, display messages, `From` impl coverage, and
+  `ApiError` delegation (ADR-T-006 §1–§4).
+
+### Changed
+
+- **BREAKING:** Replace `ServiceError` (41 variants) and `ServiceResult` with
+  domain-scoped error enums: `AuthError`, `UserError`, `TorrentError`,
+  `CategoryTagError`, and a thin `ApiError` wrapper (ADR-T-006).
+- Service functions now return domain-specific `Result<T, DomainError>` instead
+  of `Result<T, ServiceError>`.
+- Each domain error co-locates its HTTP status-code mapping via a
+  `status_code()` method.
+- Error `From` impls use `tracing::error!` instead of `eprintln!`.
+- Standardise all error derives on `thiserror`.
+
+### Removed
+
+- `ServiceError` enum and `ServiceResult` type alias from `src/errors.rs`.
+- `http_status_code_for_service_error` and `map_database_error_to_service_error`
+  helper functions.
+- `IntoResponse` impl for `database::Error` (now handled by domain errors).
+
 ## [4.0.0] - 2026-03-23
 
 ### Added

@@ -2,11 +2,15 @@ pub mod image;
 
 use bytes::Bytes;
 use indexmap::IndexMap;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
+    #[error("entry size limit exceeds total capacity")]
     EntrySizeLimitExceedsTotalCapacity,
+    #[error("bytes exceed entry size limit")]
     BytesExceedEntrySizeLimit,
+    #[error("cache capacity is too small")]
     CacheCapacityIsTooSmall,
 }
 

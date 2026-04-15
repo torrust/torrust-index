@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use super::authorization::{self, ACTION};
 use crate::databases::database::{Category, Database, Error as DatabaseError};
-use crate::errors::ServiceError;
+use crate::errors::CategoryTagError;
 use crate::models::category::CategoryId;
 use crate::models::user::UserId;
 
@@ -31,7 +31,7 @@ impl Service {
     /// * The category name is empty.
     /// * The category already exists.
     /// * There is a database error.
-    pub async fn add_category(&self, category_name: &str, maybe_user_id: Option<UserId>) -> Result<i64, ServiceError> {
+    pub async fn add_category(&self, category_name: &str, maybe_user_id: Option<UserId>) -> Result<i64, CategoryTagError> {
         self.authorization_service
             .authorize(ACTION::AddCategory, maybe_user_id)
             .await?;
@@ -39,21 +39,21 @@ impl Service {
         let trimmed_name = category_name.trim();
 
         if trimmed_name.is_empty() {
-            return Err(ServiceError::CategoryNameEmpty);
+            return Err(CategoryTagError::CategoryNameEmpty);
         }
 
         // Try to get the category by name to check if it already exists
         match self.category_repository.get_by_name(trimmed_name).await {
-            // Return ServiceError::CategoryAlreadyExists if the category exists
-            Ok(_) => Err(ServiceError::CategoryAlreadyExists),
+            // Return CategoryTagError::CategoryAlreadyExists if the category exists
+            Ok(_) => Err(CategoryTagError::CategoryAlreadyExists),
             Err(e) => match e {
                 // Otherwise try to create it
                 DatabaseError::CategoryNotFound => self
                     .category_repository
                     .add(trimmed_name)
                     .await
-                    .map_err(|_| ServiceError::DatabaseError),
-                _ => Err(ServiceError::DatabaseError),
+                    .map_err(|_| CategoryTagError::DatabaseError),
+                _ => Err(CategoryTagError::DatabaseError),
             },
         }
     }
@@ -66,7 +66,7 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is a database error.
-    pub async fn delete_category(&self, category_name: &str, maybe_user_id: Option<UserId>) -> Result<(), ServiceError> {
+    pub async fn delete_category(&self, category_name: &str, maybe_user_id: Option<UserId>) -> Result<(), CategoryTagError> {
         self.authorization_service
             .authorize(ACTION::DeleteCategory, maybe_user_id)
             .await?;
@@ -74,8 +74,8 @@ impl Service {
         match self.category_repository.delete(category_name).await {
             Ok(()) => Ok(()),
             Err(e) => match e {
-                DatabaseError::CategoryNotFound => Err(ServiceError::CategoryNotFound),
-                _ => Err(ServiceError::DatabaseError),
+                DatabaseError::CategoryNotFound => Err(CategoryTagError::CategoryNotFound),
+                _ => Err(CategoryTagError::DatabaseError),
             },
         }
     }
@@ -88,7 +88,7 @@ impl Service {
     ///
     /// * The user does not have the required permissions.
     /// * There is a database error retrieving the categories.
-    pub async fn get_categories(&self, maybe_user_id: Option<UserId>) -> Result<Vec<Category>, ServiceError> {
+    pub async fn get_categories(&self, maybe_user_id: Option<UserId>) -> Result<Vec<Category>, CategoryTagError> {
         self.authorization_service
             .authorize(ACTION::GetCategories, maybe_user_id)
             .await?;
@@ -96,7 +96,7 @@ impl Service {
         self.category_repository
             .get_all()
             .await
-            .map_err(|_| ServiceError::DatabaseError)
+            .map_err(|_| CategoryTagError::DatabaseError)
     }
 }
 
