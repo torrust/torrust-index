@@ -129,7 +129,7 @@ fn internal_server_error_returns_500() {
 fn display_closed_for_registration() {
     assert_eq!(
         UserError::ClosedForRegistration.to_string(),
-        "This server is is closed for registration. Contact admin if this is unexpected"
+        "This server is closed for registration. Contact admin if this is unexpected"
     );
 }
 

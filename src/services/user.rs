@@ -92,10 +92,6 @@ impl RegistrationService {
     /// * `UserError::FailedToSendVerificationEmail` if unable to send the required verification email.
     /// * An error if unable to successfully hash the password.
     /// * An error if unable to insert user into the database.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the email is required, but missing.
     pub async fn register_user(&self, registration_form: &RegistrationForm, api_base_url: &str) -> Result<UserId, UserError> {
         info!("registering user: {}", registration_form.username);
 

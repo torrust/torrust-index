@@ -39,7 +39,7 @@ pub enum TrackerAPIError {
     #[error("Expected body in tracker response, received empty body.")]
     MissingResponseBody,
 
-    #[error("Expected body in tracker response, received empty body.")]
+    #[error("Failed to parse tracker response body.")]
     FailedToParseTrackerResponse { body: String },
 }
 

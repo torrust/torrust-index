@@ -104,8 +104,8 @@
 //!
 //! ## `category_tag_error` (status codes, display, `From` impls)
 //!
-//! - status-code tests for all 12 variants
-//! - display tests for all 12 variants
+//! - status-code tests for all 11 variants
+//! - display tests for all 11 variants
 //! - `from_auth_unauthorized_action`
 //! - `from_auth_unauthorized_action_for_guests`
 //! - `from_auth_fallback`

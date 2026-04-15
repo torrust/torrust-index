@@ -79,10 +79,11 @@ impl AuthError {
 
 impl From<database::Error> for AuthError {
     fn from(e: database::Error) -> Self {
-        error!(error = %e, "database error (auth)");
-        match e {
-            database::Error::UserNotFound => Self::UserNotFound,
-            _ => Self::DatabaseError,
+        if matches!(e, database::Error::UserNotFound) {
+            Self::UserNotFound
+        } else {
+            error!(error = %e, "database error (auth)");
+            Self::DatabaseError
         }
     }
 }
@@ -102,7 +103,7 @@ impl From<argon2::password_hash::Error> for AuthError {
 /// Status-code mapping is co-located via [`UserError::status_code`].
 #[derive(Debug, PartialEq, Eq, Error)]
 pub enum UserError {
-    #[error("This server is is closed for registration. Contact admin if this is unexpected")]
+    #[error("This server is closed for registration. Contact admin if this is unexpected")]
     ClosedForRegistration,
 
     #[error("Email is required")]
@@ -211,12 +212,14 @@ impl From<AuthError> for UserError {
 
 impl From<database::Error> for UserError {
     fn from(e: database::Error) -> Self {
-        error!(error = %e, "database error (user)");
         match e {
             database::Error::UsernameTaken => Self::UsernameTaken,
             database::Error::EmailTaken => Self::EmailTaken,
             database::Error::UserNotFound => Self::UserNotFound,
-            _ => Self::DatabaseError,
+            _ => {
+                error!(error = %e, "database error (user)");
+                Self::DatabaseError
+            }
         }
     }
 }
@@ -353,14 +356,16 @@ impl From<AuthError> for TorrentError {
 
 impl From<database::Error> for TorrentError {
     fn from(e: database::Error) -> Self {
-        error!(error = %e, "database error (torrent)");
         match e {
             database::Error::TorrentNotFound | database::Error::TorrentInfoHashNotFound => Self::TorrentNotFound,
             database::Error::TorrentAlreadyExists => Self::InfoHashAlreadyExists,
             database::Error::TorrentTitleAlreadyExists => Self::TorrentTitleAlreadyExists,
             database::Error::CategoryNotFound => Self::InvalidCategory,
             database::Error::TagNotFound => Self::InvalidTag,
-            _ => Self::DatabaseError,
+            _ => {
+                error!(error = %e, "database error (torrent)");
+                Self::DatabaseError
+            }
         }
     }
 }
@@ -378,8 +383,12 @@ impl From<sqlx::Error> for TorrentError {
                     Self::InternalServerError
                 }
             } else {
-                Self::TorrentNotFound
+                Self::DatabaseError
             };
+        }
+
+        if matches!(e, sqlx::Error::RowNotFound) {
+            return Self::TorrentNotFound;
         }
 
         Self::InternalServerError

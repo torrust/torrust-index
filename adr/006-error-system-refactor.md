@@ -324,10 +324,12 @@ status-code mapping with the error definition.
    `Result<T, AuthError>` cannot produce a `TorrentNotFound`. The
    type system communicates which failures are possible.
 
-2. **Source chains.** Each domain error carries `#[source]`,
-   preserving the full cause chain for logging without the lossy
-   `From` impls that currently erase `argon2::Error`,
-   `io::Error`, etc. into a single `InternalServerError` variant.
+2. **Source chains.** Option B supports carrying `#[source]`
+   on domain errors so the full cause chain can be preserved for
+   logging. The current implementation is still partly lossy:
+   some `From` impls erase `argon2::Error`, `io::Error`, etc.
+   into higher-level variants such as `InternalServerError`
+   instead of retaining them as sources.
 
 3. **Co-located status codes.** Each domain error implements a
    `fn status_code(&self) -> StatusCode` method (or the mapping
@@ -370,8 +372,8 @@ implementation.
 
 2. **Phase 1 — Extract domain errors:** ✅ Done
    - Extracted `AuthError` (13 variants: JWT, password, authorization).
-   - Extracted `UserError` (21 variants: registration, profile, banning).
-   - Extracted `TorrentError` (~24 variants: upload, listing, tracker).
+   - Extracted `UserError` (22 variants: registration, profile, banning).
+   - Extracted `TorrentError` (22 variants: upload, listing, tracker).
    - Retained `CategoryTagError` (already extracted prior to this ADR).
    - Each domain error has a co-located `status_code()` method and
      typed `From` impls for lower-level errors (`database::Error`,
@@ -399,8 +401,8 @@ implementation.
      Testing Acceptance Guide.
    - `auth_error.rs` — 29 tests (status codes, display, `From` impls).
    - `user_error.rs` — 54 tests (status codes, display, `From` impls).
-   - `torrent_error.rs` — 73 tests (status codes, display, `From` impls).
-   - `category_tag_error.rs` — 24 tests (status codes, display, `From` impls).
+   - `torrent_error.rs` — 72 tests (status codes, display, `From` impls).
+   - `category_tag_error.rs` — 25 tests (status codes, display, `From` impls).
    - `api_error.rs` — 8 tests (`status_code()` and `Display` delegation).
    - §5 (tracing capture) and §6 (integration `IntoResponse`) remain
      as future work.

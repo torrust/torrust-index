@@ -169,13 +169,14 @@ struct Args {
 
 /// # Errors
 ///
-/// Will not return any errors for the time being.
+/// Returns an error if the API base URL cannot be parsed or if an uploaded
+/// torrent cannot be serialized to JSON.
 pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
     logging::setup(LevelFilter::INFO);
 
     let args = Args::parse();
 
-    let api_url = Url::from_str(&args.api_base_url)?;
+    let api_url = Url::from_str(&args.api_base_url).map_err(|e| format!("failed to parse API base URL: {e}"))?;
 
     let api_user = login_index_api(&api_url, &args.user, &args.password).await;
 
@@ -190,7 +191,8 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
             Ok(uploaded_torrent) => {
                 debug!(target:"seeder", "Uploaded torrent {uploaded_torrent:?}");
 
-                let json = serde_json::to_string(&uploaded_torrent)?;
+                let json = serde_json::to_string(&uploaded_torrent)
+                    .map_err(|e| format!("failed to serialize upload response into JSON: {e}"))?;
 
                 info!(target:"seeder", "Uploaded torrent: {}", json.yellow());
             }

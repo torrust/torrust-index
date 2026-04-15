@@ -85,7 +85,10 @@ impl Service {
             .user_repository
             .get_compact(&user_profile.user_id)
             .await
-            .map_err(|_| AuthError::UserNotFound)?;
+            .map_err(|err| match err {
+                Error::UserNotFound => AuthError::UserNotFound,
+                err => AuthError::from(err),
+            })?;
 
         // Sign JWT with compact user details as payload
         let token = self.json_web_token.sign(user_compact.clone()).await;
@@ -111,7 +114,10 @@ impl Service {
             .user_repository
             .get_compact(&claims.user.user_id)
             .await
-            .map_err(|_| AuthError::UserNotFound)?;
+            .map_err(|err| match err {
+                Error::UserNotFound => AuthError::UserNotFound,
+                err => AuthError::from(err),
+            })?;
 
         // Renew token if it is valid for less than one week
         let token = match claims.exp - clock::now() {

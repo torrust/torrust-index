@@ -5,6 +5,7 @@ use std::sync::Arc;
 use casbin::{CoreApi, DefaultModel, Enforcer, MgmtApi};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
+use tracing::error;
 
 use super::user::Repository;
 use crate::errors::AuthError;
@@ -80,7 +81,10 @@ impl Service {
 
         let enforcer = self.casbin_enforcer.enforcer.read().await;
 
-        let authorize = enforcer.enforce((&role, action)).map_err(|_| AuthError::UnauthorizedAction)?;
+        let authorize = enforcer.enforce((&role, action)).map_err(|e| {
+            error!(error = %e, "casbin enforcer error");
+            AuthError::InternalServerError
+        })?;
         drop(enforcer);
 
         if authorize {
@@ -98,10 +102,7 @@ impl Service {
     ///
     /// It returns an error if there is a database error.
     async fn get_user(&self, user_id: UserId) -> std::result::Result<UserCompact, AuthError> {
-        self.user_repository
-            .get_compact(&user_id)
-            .await
-            .map_err(|_| AuthError::UserNotFound)
+        self.user_repository.get_compact(&user_id).await.map_err(AuthError::from)
     }
 
     /// It returns the role of the user.
