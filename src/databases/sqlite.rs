@@ -604,6 +604,7 @@ impl Database for Sqlite {
         let mut query_string = format!(
             "SELECT
             tt.torrent_id,
+            tt.uploader_id,
             tp.username AS uploader,
             tt.info_hash,
             ti.title,
@@ -1055,6 +1056,7 @@ impl Database for Sqlite {
         query_as::<_, TorrentListing>(
             "SELECT 
             tt.torrent_id,
+            tt.uploader_id,
             tp.username AS uploader,
             tt.info_hash, ti.title,
             ti.description,
@@ -1085,6 +1087,7 @@ impl Database for Sqlite {
         query_as::<_, TorrentListing>(
             "SELECT
             tt.torrent_id,
+            tt.uploader_id,
             tp.username AS uploader,
             tt.info_hash, ti.title,
             ti.description,

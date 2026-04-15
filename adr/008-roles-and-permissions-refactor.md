@@ -631,70 +631,42 @@ Review performed 2026-04-15 against the initial Phase 1 commit.
 | 1 | Casbin removed | ✅ | No `casbin` in `Cargo.toml`; `unstable.auth.casbin` config section removed entirely (no backward compatibility needed — never released). |
 | 2 | Compile-time safe enums | ✅ | `default_grant` uses exhaustive `match` for `Registered` and `Guest`. |
 | 3 | `PermissionMatrix` with tests | ✅ | Every `(Role, Action)` pair covered by crate-level tests. |
-| 4 | Forward-only migration | ⚠️ | Migration adds the column but has no down-migration. See issue 1. |
+| 4 | Forward-only migration | ✅ | Migration adds `role`; a follow-up migration drops `administrator` via table-rebuild (SQLite) / `DROP COLUMN` (MySQL). |
 | 5 | Data migration | ✅ | `UPDATE … SET role = 'admin' WHERE administrator = TRUE` for both backends. |
-| 6 | API uses `role: String` | ✅ | `TokenResponse` uses `role: String`; legacy `admin: bool` retained alongside for backward compatibility during transition. |
+| 6 | API uses `role: String` | ✅ | `TokenResponse` uses `role: String`; legacy `admin: bool` field removed. |
 | 7 | Clippy and tests pass | ✅ | Fixed during review (`doc_markdown` lint). |
 | 8 | No panics on startup | ✅ | `PermissionMatrix::default_matrix()` is infallible. |
 
-### Open Issues
+### Open Issues (Resolved)
 
-#### 1. Migration is forward-only
+All five issues from the initial Phase 1 review have been resolved.
 
-The current migration only adds the `role` column — there is no
-down-migration to drop it and restore `administrator` as the
-authoritative column. This is acceptable because Casbin was never
-part of a released version, so there is no deployed state to roll
-back to. SQLite before 3.35.0 does not support
-`ALTER TABLE … DROP COLUMN`, so a future column-drop migration
-would need either a table-rebuild approach or a minimum SQLite
-version constraint.
+1. **Migration is forward-only** — accepted. The first migration
+   adds the `role` column; a follow-up migration
+   (`20260415000001_torrust_drop_administrator_column`) drops the
+   `administrator` column via a table-rebuild approach on SQLite
+   (compatible with SQLite < 3.35.0) and `ALTER TABLE DROP COLUMN`
+   on MySQL.
 
-**Action:** Document the forward-only nature of this migration.
+2. **`administrator` column dropped** — resolved. The column is
+   removed by the follow-up migration. All code paths use `role`
+   exclusively.
 
-#### 2. `administrator` column should be dropped
+3. **`get_role` silently swallows invalid role strings** —
+   resolved. The `RequirePermission` extractor logs a
+   `tracing::warn!` when `Role::from_str` fails, then defaults to
+   `Registered`.
 
-The migration adds `role` alongside `administrator` but does not
-drop the old column. Since Casbin was never released, there is no
-need for a deprecation period — the `administrator` column can be
-dropped in a follow-up migration.
+4. **E2E test assertion needs `role` field** — resolved. The
+   `admin: bool` field has been removed from all response types
+   (`TokenResponse`, `LoggedInUserData`, `TokenRenewalData`).
+   Test assertions use `role: String` exclusively.
 
-**Action:** Add a migration that drops the `administrator` column
-once all code paths use `role` exclusively.
-
-#### 3. `get_role` silently swallows invalid role strings
-
-`Service::get_role` does
-`Role::from_str(&user.role).unwrap_or(Role::Registered)`. If an
-operator manually sets an invalid value (e.g. `"moderator"` before
-it is a recognised variant), the user silently receives
-`Registered` permissions with no log output.
-
-**Action:** Add a `tracing::warn!` on the `Err` path so that
-corrupt or unrecognised role values are visible in server logs.
-
-#### 4. E2E test assertion needs `role` field
-
-`tests/common/contexts/user/asserts.rs` —
-`assert_token_renewal_response` constructs a `TokenRenewalData`
-without the `role` field, relying on `String::default()` (empty
-string). The server returns `"role": "admin"` or
-`"role": "registered"`, so the `assert_eq!` will fail at runtime
-unless the test is updated.
-
-**Action:** Populate the expected `role` field in the test
-assertion and remove any references to the legacy `admin` boolean.
-
-#### 5. `v1 → v2` upgrade path references the old schema
-
-The `upgrades/from_v1_0_0_to_v2_0_0` module
-(`sqlite_v2_0_0.rs`) still inserts into the `administrator`
-column directly. This is correct because it targets the *old*
-schema prior to the Phase 1 migration, but should be verified
-to work when the Phase 1 migration subsequently runs.
-
-**Action:** Confirm the v1→v2 upgrade followed by the Phase 1
-migration produces correct `role` values in an integration test.
+5. **v1 → v2 upgrade path** — resolved.
+   `insert_imported_user` now converts the v1 `administrator: bool`
+   to a `role` string (`"admin"` / `"registered"`) and inserts into
+   the `role` column directly. The upgrade test verifies the
+   correct `role` value in the target database.
 
 ## Phase 2 — Implementation Review
 
@@ -708,7 +680,7 @@ introduces `RequirePermission<A>` extractors on all handlers.
 | 1 | Every authorized handler uses `RequirePermission<A>` | ✅ | All API context handlers are guarded. `create_random_torrent_handler` is documented as intentionally unguarded (testing/debug, no persistent state). Pre-auth endpoints carry `// Public: no RequirePermission` comments. |
 | 2 | No service method contains `authorize(...)` or inline admin/owner check | ✅ | Service layer is clean. The inline ownership check in `update_torrent_info_handler` (handler, not service) uses `actor.role == Role::Admin` from the already-resolved extractor — no redundant DB query. Phase 3 will replace with `RequireOwnership`. |
 | 3 | Insufficient permissions → 403; unauthenticated → 401 | ✅ | `AuthError::UnauthorizedAction` → 403 (`FORBIDDEN`), `AuthError::UnauthorizedActionForGuests` → 401 (`UNAUTHORIZED`). Correct across `AuthError`, `UserError`, and `TorrentError`. Verified by new crate-level extractor tests. |
-| 4 | Existing E2E tests pass or updated | ✅ | E2E test response types (`LoggedInUserData`, `TokenRenewalData`) now include `role: String` alongside `admin: bool`. Assertions verify the `role` value. |
+| 4 | Existing E2E tests pass or updated | ✅ | E2E test response types (`LoggedInUserData`, `TokenRenewalData`) use `role: String`; the legacy `admin: bool` field has been removed. Assertions verify the `role` value. |
 
 ### What's Working Well
 
@@ -744,8 +716,8 @@ resolved, plus one additional cleanup:
    extractor, avoiding a redundant DB query. The ownership check
    itself remains as Phase 3 scope.
 3. **E2E test response types** — `LoggedInUserData` and
-   `TokenRenewalData` now include `role: String`. Assertions verify
-   the `role` value.
+   `TokenRenewalData` use `role: String`; the legacy `admin: bool`
+   field has been removed. Assertions verify the `role` value.
 4. **`GetSettings` and `GetCanonicalInfoHash`** — dead action
    variants and markers removed from `Action` enum, `Action::ALL`,
    `PermissionMatrix::default_grant`, `action_markers!`, and all
@@ -781,3 +753,100 @@ unreleased section: intermediate entries describing
 `authorization::Service` delegating to `PermissionMatrix` and
 `ExtractLoggedInUser` using `BearerToken` have been replaced by
 Removed entries documenting their deletion.
+
+## Phase 3 — Implementation Review
+
+Review performed 2026-04-15 against the working-tree changes that
+introduce `/me/permissions`, `can_on_resource`, TOML permission
+overrides, and the `GetMyPermissions` action.
+
+### Status of Acceptance Criteria
+
+| # | Criterion | Status | Notes |
+|---|-----------|--------|-------|
+| 1 | `GET /me/permissions` returns allowed actions for the user's role | ✅ | Handler calls `permissions.allowed_actions(&actor.role)` and returns `{"role": "...", "actions": [...]}` in `OkResponseData`. |
+| 2 | `GET /me/permissions` without a token returns guest-level actions | ✅ | `GetMyPermissions` is granted to `Guest` in `default_grant`, so a missing token resolves to `Guest` → returns `{"role": "guest", "actions": [...]}`. |
+| 3 | Resource-level ownership via `can_on_resource`, not inline `if` blocks | ✅ | Both `update_torrent_info_handler` and `delete_torrent_handler` use `app_data.permissions.can_on_resource(...)` with `torrent_listing.uploader_id == user_id`. |
+| 4 | TOML permissions override loaded at startup | ✅ | `[[permissions.overrides]]` config section, `PermissionOverride` struct, `PermissionMatrix::with_overrides()`, wired in `app.rs` with an `info!` log when overrides are applied. |
+| 5 | `cargo test` passes (dev + release, all features) | ✅ | All tests pass in both `dev` and `--release`. `cargo clippy` clean. `--no-default-features` builds. Doc tests pass. |
+
+### What's Working Well
+
+- **`can_on_resource` default implementation on the trait.** The
+  ownership logic (`Admin` bypasses, others must be owner) lives
+  in a single `Permissions::can_on_resource` default method with
+  no per-handler duplication. Adding ownership checks to future
+  handlers is a one-liner.
+- **`allowed_actions` is a trait default, not a separate service.**
+  Any `Permissions` implementor gets it for free, and the endpoint
+  is just `permissions.allowed_actions(&actor.role)`.
+- **TOML override is clean and minimal.** The `Effect` enum
+  (`allow`/`deny`) and `PermissionOverride` struct map directly to
+  insert/remove on the `HashSet` — no complex merge logic.
+  The `app.rs` startup path logs the override count, making
+  misconfigurations visible.
+- **Compile-time safety preserved.** Adding `GetMyPermissions` to
+  `Action` required updating `default_grant` (exhaustive match for
+  `Registered` and `Guest`), `Action::ALL`, `action_markers!`, and
+  all crate-level test lists — any omission would be a build error.
+- **Good crate-level test coverage.** 7 new tests cover
+  `can_on_resource` (owner allowed, non-owner denied, admin bypass,
+  denied action), `allowed_actions` (correct list), and
+  `with_overrides` (allow adds, deny removes, empty matches
+  default).
+- **Ownership checks use `uploader_id` (integer) instead of
+  username (string).** `TorrentListing` now carries `uploader_id`
+  directly from the SQL query, so ownership comparisons are
+  `torrent_listing.uploader_id == user_id` — no extra
+  `UserCompact` fetch required.
+- **`/me/permissions` response includes the resolved `role`.**
+  The response body is `{"data": {"role": "registered", "actions":
+  [...]}}`, letting frontends know the actor's effective role
+  without a separate API call.
+
+### Open Issues (Resolved)
+
+Issues 1, 3, and 4 from the initial Phase 3 review have been
+resolved. Issue 2 is deferred.
+
+1. **`delete_torrent_handler` `can_on_resource` check** — added.
+   The handler now mirrors `update_torrent_info_handler`: loads the
+   torrent listing, compares `uploader_id`, and calls
+   `permissions.can_on_resource(&actor.role, Action::DeleteTorrent,
+   is_owner)`. Operators can now use a TOML override to grant
+   `Registered` users `DeleteTorrent` and the ownership check will
+   correctly restrict deletion to their own torrents.
+
+2. **No E2E tests for Phase 3 features** — **deferred**. The
+   crate-level tests provide good coverage of the underlying logic
+   (`can_on_resource`, `allowed_actions`, `with_overrides`). E2E
+   tests for the full HTTP round-trip (ownership → 200/403,
+   `/me/permissions` per role, TOML override runtime behaviour)
+   should be added in a follow-up.
+
+3. **`/me/permissions` response now includes the resolved `role`.**
+   The response body changed from `{"data": [...]}` to
+   `{"data": {"role": "registered", "actions": [...]}}`. This is a
+   non-breaking enrichment (new structured object instead of a bare
+   array).
+
+4. **Ownership checks now use `uploader_id` instead of username.**
+   `TorrentListing` gained an `uploader_id: UserId` field
+   (populated by `tt.uploader_id` in all 6 SQL queries across both
+   SQLite and MySQL backends). Both `update_torrent_info_handler`
+   and `delete_torrent_handler` compare `torrent_listing.uploader_id
+   == user_id` directly, eliminating the `UserCompact` fetch.
+
+### Verification
+
+Review performed 2026-04-15. Issues 1, 3, 4 resolved; issue 2
+deferred.
+
+- `cargo check --workspace --all-targets --all-features` — clean.
+- `cargo clippy --workspace --all-targets --all-features` — clean.
+- `cargo test --workspace --all-targets --all-features` — 126
+  tests, 0 failures.
+- `cargo test --workspace --all-targets --all-features --release`
+  — 217 tests, 0 failures.
+- `cargo check --workspace --no-default-features` — clean.
+- `cargo test --workspace --doc` — clean.

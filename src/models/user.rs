@@ -42,17 +42,6 @@ pub struct UserCompact {
     pub role: String,
 }
 
-impl UserCompact {
-    /// Whether this user has the admin role.
-    ///
-    /// Convenience for backward-compatible API responses during the
-    /// deprecation period (ADR-T-008 Phase 1).
-    #[must_use]
-    pub fn is_admin(&self) -> bool {
-        self.role == "admin"
-    }
-}
-
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Serialize, Deserialize, Clone, sqlx::FromRow)]
 pub struct UserFull {

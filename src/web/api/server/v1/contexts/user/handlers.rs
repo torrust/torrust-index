@@ -6,14 +6,15 @@ use axum::Json;
 use axum::extract::{self, Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::forms::{ChangePasswordForm, JsonWebToken, LoginForm, RegistrationForm};
 use super::responses::{self};
 use crate::common::AppData;
+use crate::services::authorization::{Action, Role};
 use crate::services::user::ListingRequest;
 use crate::web::api::server::v1::extractors::require_permission::{
-    BanUser, ChangePassword, GenerateUserProfileSpecification, RequirePermission,
+    BanUser, ChangePassword, GenerateUserProfileSpecification, GetMyPermissions, RequirePermission,
 };
 use crate::web::api::server::v1::responses::OkResponseData;
 
@@ -229,4 +230,32 @@ pub async fn get_user_profiles_handler(
         Ok(users) => Json(crate::web::api::server::v1::responses::OkResponseData { data: users }).into_response(),
         Err(error) => error.into_response(),
     }
+}
+
+/// Returns the list of allowed actions for the authenticated user's
+/// role (or guest-level actions when no token is provided).
+///
+/// # Errors
+///
+/// This endpoint always succeeds for any role (including `Guest`).
+#[allow(clippy::unused_async)]
+pub async fn get_my_permissions_handler(
+    State(app_data): State<Arc<AppData>>,
+    RequirePermission(actor, _): RequirePermission<GetMyPermissions>,
+) -> Response {
+    let actions = app_data.permissions.allowed_actions(&actor.role);
+    Json(OkResponseData {
+        data: MyPermissions {
+            role: actor.role,
+            actions,
+        },
+    })
+    .into_response()
+}
+
+/// Response body for `GET /me/permissions`.
+#[derive(Serialize)]
+struct MyPermissions {
+    role: Role,
+    actions: Vec<Action>,
 }

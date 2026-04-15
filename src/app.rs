@@ -63,6 +63,8 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     // From [net] config
     let config_bind_address = settings.net.bind_address;
     let opt_net_tsl = settings.net.tsl.clone();
+    // From [permissions] config
+    let permission_overrides = settings.permissions.overrides.clone();
 
     // IMPORTANT: drop settings before starting server to avoid read locks that
     // leads to requests hanging.
@@ -88,7 +90,12 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let torrent_tag_repository = Arc::new(DbTorrentTagRepository::new(database.clone()));
     let torrent_listing_generator = Arc::new(DbTorrentListingGenerator::new(database.clone()));
     let banned_user_list = Arc::new(DbBannedUserList::new(database.clone()));
-    let permissions: Arc<dyn crate::services::authorization::Permissions> = Arc::new(PermissionMatrix::default_matrix());
+    let permissions: Arc<dyn crate::services::authorization::Permissions> = if permission_overrides.is_empty() {
+        Arc::new(PermissionMatrix::default_matrix())
+    } else {
+        info!(count = permission_overrides.len(), "applying permission overrides from config");
+        Arc::new(PermissionMatrix::with_overrides(&permission_overrides))
+    };
 
     // Services
     let tracker_service = Arc::new(tracker::service::Service::new(configuration.clone(), database.clone()).await);

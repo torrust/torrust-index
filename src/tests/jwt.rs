@@ -72,7 +72,7 @@ async fn session_token_contains_expected_claims() {
 
     assert_eq!(claims.iss, "torrust-index");
     assert_eq!(claims.aud, "session");
-    assert_eq!(claims.role, "user");
+    assert_eq!(claims.role, "registered");
     assert_eq!(claims.token_gen, 7);
     assert!(claims.iat > 0);
     assert!(claims.exp > claims.iat);

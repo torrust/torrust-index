@@ -612,6 +612,7 @@ impl Database for Mysql {
         let mut query_string = format!(
             "SELECT
             tt.torrent_id,
+            tt.uploader_id,
             tp.username AS uploader,
             tt.info_hash,
             ti.title,
@@ -1059,6 +1060,7 @@ impl Database for Mysql {
         query_as::<_, TorrentListing>(
             "SELECT
             tt.torrent_id,
+            tt.uploader_id,
             tp.username AS uploader,
             tt.info_hash,
             ti.title,
@@ -1090,6 +1092,7 @@ impl Database for Mysql {
         query_as::<_, TorrentListing>(
             "SELECT
             tt.torrent_id,
+            tt.uploader_id,
             tp.username AS uploader,
             tt.info_hash,
             ti.title,

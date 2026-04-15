@@ -5,6 +5,7 @@ pub mod image_cache;
 pub mod logging;
 pub mod mail;
 pub mod net;
+pub mod permissions;
 pub mod registration;
 pub mod tracker;
 pub mod tracker_statistics_importer;
@@ -20,6 +21,7 @@ use self::database::Database;
 use self::image_cache::ImageCache;
 use self::mail::Mail;
 use self::net::Network;
+use self::permissions::Permissions;
 use self::tracker::{ApiToken, Tracker};
 use self::tracker_statistics_importer::TrackerStatisticsImporter;
 use self::website::Website;
@@ -73,6 +75,10 @@ pub struct Settings {
     #[serde(default = "Settings::default_registration")]
     pub registration: Option<Registration>,
 
+    /// The permission overrides configuration.
+    #[serde(default = "Settings::default_permissions")]
+    pub permissions: Permissions,
+
     /// The tracker statistics importer job configuration.
     #[serde(default = "Settings::default_tracker_statistics_importer")]
     pub tracker_statistics_importer: TrackerStatisticsImporter,
@@ -92,6 +98,7 @@ impl Default for Settings {
             image_cache: Self::default_image_cache(),
             api: Self::default_api(),
             registration: Self::default_registration(),
+            permissions: Self::default_permissions(),
             tracker_statistics_importer: Self::default_tracker_statistics_importer(),
         }
     }
@@ -180,6 +187,10 @@ impl Settings {
 
     const fn default_registration() -> Option<Registration> {
         None
+    }
+
+    fn default_permissions() -> Permissions {
+        Permissions::default()
     }
 
     fn default_tracker_statistics_importer() -> TrackerStatisticsImporter {

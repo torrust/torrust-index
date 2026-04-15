@@ -29,8 +29,33 @@
 //!
 //! - [`permissions_trait_delegates_to_matrix`] — calling `can()` on the
 //!   trait object matches the matrix.
+//!
+//! ## Resource-level authorization (Phase 3)
+//!
+//! - [`can_on_resource_allows_owner`] — owner is allowed for granted
+//!   action.
+//! - [`can_on_resource_denies_non_owner`] — non-owner is denied even
+//!   when the base matrix grants the action.
+//! - [`can_on_resource_admin_bypasses_ownership`] — admin is allowed
+//!   regardless of ownership.
+//! - [`can_on_resource_denied_action_returns_false`] — denied action
+//!   returns false even for owner.
+//!
+//! ## `allowed_actions` (Phase 3)
+//!
+//! - [`allowed_actions_returns_correct_list`] — matches the granted set
+//!   for each role.
+//!
+//! ## `with_overrides` (Phase 3)
+//!
+//! - [`with_overrides_allow_adds_permission`] — an `allow` override
+//!   grants a previously denied action.
+//! - [`with_overrides_deny_removes_permission`] — a `deny` override
+//!   revokes a previously granted action.
+//! - [`with_overrides_empty_matches_default`] — empty overrides produce
+//!   the same matrix as the default.
 
-use crate::services::authorization::{Action, PermissionMatrix, Permissions, Role};
+use crate::services::authorization::{Action, Effect, PermissionMatrix, PermissionOverride, Permissions, Role};
 
 // ── Role ─────────────────────────────────────────────────────────────
 
@@ -90,6 +115,7 @@ fn action_all_is_exhaustive() {
         Action::ChangePassword,
         Action::BanUser,
         Action::GenerateUserProfileSpecification,
+        Action::GetMyPermissions,
     ];
 
     // Exhaustive match — compile error if a variant is missing.
@@ -115,7 +141,8 @@ fn action_all_is_exhaustive() {
             | Action::GenerateTorrentInfoListing
             | Action::ChangePassword
             | Action::BanUser
-            | Action::GenerateUserProfileSpecification => {}
+            | Action::GenerateUserProfileSpecification
+            | Action::GetMyPermissions => {}
         }
     }
 
@@ -150,6 +177,7 @@ fn registered_grants_and_denials() {
         Action::GetTorrentInfo,
         Action::GenerateTorrentInfoListing,
         Action::ChangePassword,
+        Action::GetMyPermissions,
     ];
 
     let denied = [
@@ -189,6 +217,7 @@ fn guest_grants_and_denials() {
         Action::GetTorrent,
         Action::GetTorrentInfo,
         Action::GenerateTorrentInfoListing,
+        Action::GetMyPermissions,
     ];
 
     let denied = [
@@ -248,4 +277,100 @@ fn permissions_trait_delegates_to_matrix() {
     assert!(!permissions.can(&Role::Guest, Action::BanUser));
     assert!(permissions.can(&Role::Registered, Action::AddTorrent));
     assert!(!permissions.can(&Role::Guest, Action::AddTorrent));
+}
+
+// ── Resource-level authorization (Phase 3) ───────────────────────────
+
+#[test]
+fn can_on_resource_allows_owner() {
+    let matrix = PermissionMatrix::default_matrix();
+    // Registered + UpdateTorrent is granted in the base matrix.
+    // Owner → allowed.
+    assert!(matrix.can_on_resource(&Role::Registered, Action::UpdateTorrent, true));
+}
+
+#[test]
+fn can_on_resource_denies_non_owner() {
+    let matrix = PermissionMatrix::default_matrix();
+    // Registered + UpdateTorrent is granted in the base matrix,
+    // but non-owner → denied.
+    assert!(!matrix.can_on_resource(&Role::Registered, Action::UpdateTorrent, false));
+}
+
+#[test]
+fn can_on_resource_admin_bypasses_ownership() {
+    let matrix = PermissionMatrix::default_matrix();
+    // Admin bypasses ownership — allowed even as non-owner.
+    assert!(matrix.can_on_resource(&Role::Admin, Action::UpdateTorrent, false));
+    assert!(matrix.can_on_resource(&Role::Admin, Action::UpdateTorrent, true));
+}
+
+#[test]
+fn can_on_resource_denied_action_returns_false() {
+    let matrix = PermissionMatrix::default_matrix();
+    // Guest + UpdateTorrent is denied in the base matrix.
+    // Even as "owner" → denied.
+    assert!(!matrix.can_on_resource(&Role::Guest, Action::UpdateTorrent, true));
+}
+
+// ── allowed_actions (Phase 3) ────────────────────────────────────────
+
+#[test]
+fn allowed_actions_returns_correct_list() {
+    let matrix = PermissionMatrix::default_matrix();
+
+    // Admin should get all actions.
+    let admin_actions = matrix.allowed_actions(&Role::Admin);
+    assert_eq!(admin_actions.len(), Action::ALL.len());
+
+    // Guest should get the expected subset.
+    let guest_actions = matrix.allowed_actions(&Role::Guest);
+    assert!(guest_actions.contains(&Action::GetAboutPage));
+    assert!(guest_actions.contains(&Action::GetMyPermissions));
+    assert!(!guest_actions.contains(&Action::AddTorrent));
+    assert!(!guest_actions.contains(&Action::BanUser));
+}
+
+// ── with_overrides (Phase 3) ─────────────────────────────────────────
+
+#[test]
+fn with_overrides_allow_adds_permission() {
+    let overrides = vec![PermissionOverride {
+        role: Role::Guest,
+        action: Action::AddTorrent,
+        effect: Effect::Allow,
+    }];
+    let matrix = PermissionMatrix::with_overrides(&overrides);
+
+    // Guest + AddTorrent is normally denied; override grants it.
+    assert!(matrix.can(&Role::Guest, Action::AddTorrent));
+}
+
+#[test]
+fn with_overrides_deny_removes_permission() {
+    let overrides = vec![PermissionOverride {
+        role: Role::Registered,
+        action: Action::AddTorrent,
+        effect: Effect::Deny,
+    }];
+    let matrix = PermissionMatrix::with_overrides(&overrides);
+
+    // Registered + AddTorrent is normally granted; override revokes it.
+    assert!(!matrix.can(&Role::Registered, Action::AddTorrent));
+}
+
+#[test]
+fn with_overrides_empty_matches_default() {
+    let matrix_default = PermissionMatrix::default_matrix();
+    let matrix_overridden = PermissionMatrix::with_overrides(&[]);
+
+    for &role in Role::ALL {
+        for &action in Action::ALL {
+            assert_eq!(
+                matrix_default.can(&role, action),
+                matrix_overridden.can(&role, action),
+                "mismatch for ({role}, {action})"
+            );
+        }
+    }
 }

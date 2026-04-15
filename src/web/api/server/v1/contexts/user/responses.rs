@@ -24,7 +24,6 @@ pub const fn added_user(user_id: i64) -> Json<OkResponseData<NewUser>> {
 pub struct TokenResponse {
     pub token: String,
     pub username: String,
-    pub admin: bool,
     pub role: String,
 }
 
@@ -34,7 +33,6 @@ pub fn logged_in_user(token: String, user_compact: UserCompact) -> Json<OkRespon
         data: TokenResponse {
             token,
             username: user_compact.username.clone(),
-            admin: user_compact.is_admin(),
             role: user_compact.role,
         },
     })
@@ -46,7 +44,6 @@ pub fn renewed_token(token: String, user_compact: UserCompact) -> Json<OkRespons
         data: TokenResponse {
             token,
             username: user_compact.username.clone(),
-            admin: user_compact.is_admin(),
             role: user_compact.role,
         },
     })

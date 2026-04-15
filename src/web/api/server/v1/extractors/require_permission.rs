@@ -101,6 +101,7 @@ action_markers! {
     BanUser,
     GenerateUserProfileSpecification,
     UpdateTorrent,
+    GetMyPermissions,
 }
 
 // ── RequirePermission extractor ──────────────────────────────────────

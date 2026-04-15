@@ -18,7 +18,7 @@ use super::responses::{new_torrent_response, torrent_file_response};
 use crate::common::AppData;
 use crate::errors::TorrentError;
 use crate::models::torrent_tag::TagId;
-use crate::services::authorization::Role;
+use crate::services::authorization::Action;
 use crate::services::torrent::{AddTorrentRequest, ListingRequest};
 use crate::services::torrent_file::generate_random_torrent;
 use crate::utils::parse_torrent;
@@ -212,16 +212,17 @@ pub async fn update_torrent_info_handler(
 
     let user_id = actor.user_id();
 
-    // Ownership check — Phase 3 will replace with RequireOwnership extractor.
+    // Resource-level ownership check (ADR-T-008 Phase 3).
     {
-        let Ok(updater) = app_data.user_repository.get_compact(&user_id).await else {
-            return TorrentError::UnauthorizedAction.into_response();
-        };
         let torrent_listing = match app_data.torrent_listing_generator.one_torrent_by_info_hash(&info_hash).await {
             Ok(t) => t,
             Err(e) => return TorrentError::from(e).into_response(),
         };
-        if !(torrent_listing.uploader == updater.username || actor.role == Role::Admin) {
+        let is_owner = torrent_listing.uploader_id == user_id;
+        if !app_data
+            .permissions
+            .can_on_resource(&actor.role, Action::UpdateTorrent, is_owner)
+        {
             return TorrentError::UnauthorizedAction.into_response();
         }
     }
@@ -254,12 +255,28 @@ pub async fn update_torrent_info_handler(
 #[allow(clippy::unused_async)]
 pub async fn delete_torrent_handler(
     State(app_data): State<Arc<AppData>>,
-    RequirePermission(_actor, _): RequirePermission<DeleteTorrent>,
+    RequirePermission(actor, _): RequirePermission<DeleteTorrent>,
     Path(info_hash): Path<InfoHashParam>,
 ) -> Response {
     let Ok(info_hash) = InfoHash::from_str(&info_hash.lowercase()) else {
         return errors::Request::InvalidInfoHashParam.into_response();
     };
+
+    // Resource-level ownership check (ADR-T-008 Phase 3).
+    {
+        let user_id = actor.user_id();
+        let torrent_listing = match app_data.torrent_listing_generator.one_torrent_by_info_hash(&info_hash).await {
+            Ok(t) => t,
+            Err(e) => return TorrentError::from(e).into_response(),
+        };
+        let is_owner = torrent_listing.uploader_id == user_id;
+        if !app_data
+            .permissions
+            .can_on_resource(&actor.role, Action::DeleteTorrent, is_owner)
+        {
+            return TorrentError::UnauthorizedAction.into_response();
+        }
+    }
 
     match app_data.torrent_service.delete_torrent(&info_hash).await {
         Ok(deleted_torrent_response) => Json(OkResponseData {

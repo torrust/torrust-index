@@ -130,10 +130,11 @@ impl SqliteDatabaseV2_0_0 {
     }
 
     pub async fn insert_imported_user(&self, user_id: i64, date_imported: &str, administrator: bool) -> Result<i64, sqlx::Error> {
-        query("INSERT INTO torrust_users (user_id, date_imported, administrator) VALUES (?, ?, ?)")
+        let role = if administrator { "admin" } else { "registered" };
+        query("INSERT INTO torrust_users (user_id, date_imported, role) VALUES (?, ?, ?)")
             .bind(user_id)
             .bind(date_imported)
-            .bind(administrator)
+            .bind(role)
             .execute(&self.pool)
             .await
             .map(|v| v.last_insert_rowid())

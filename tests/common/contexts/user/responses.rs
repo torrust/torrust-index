@@ -21,7 +21,6 @@ pub struct SuccessfulLoginResponse {
 pub struct LoggedInUserData {
     pub token: String,
     pub username: String,
-    pub admin: bool,
     pub role: String,
 }
 
@@ -44,6 +43,5 @@ pub struct TokenRenewalResponse {
 pub struct TokenRenewalData {
     pub token: String,
     pub username: String,
-    pub admin: bool,
     pub role: String,
 }

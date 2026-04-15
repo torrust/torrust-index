@@ -43,7 +43,7 @@ pub async fn new_logged_in_user(env: &TestEnv) -> LoggedInUserData {
 
     let user = res.data;
 
-    if !user.admin {
+    if user.role != "admin" {
         return user;
     }
 

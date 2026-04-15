@@ -31,7 +31,6 @@ pub struct ErrorResponse<T> {
 pub struct TokenResponse {
     pub token: String,
     pub username: String,
-    pub admin: bool,
     pub role: String,
 }
 

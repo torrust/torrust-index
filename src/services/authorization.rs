@@ -99,6 +99,7 @@ pub enum Action {
     BanUser,
     GenerateUserProfileSpecification,
     UpdateTorrent,
+    GetMyPermissions,
 }
 
 impl Action {
@@ -125,6 +126,7 @@ impl Action {
         Self::BanUser,
         Self::GenerateUserProfileSpecification,
         Self::UpdateTorrent,
+        Self::GetMyPermissions,
     ];
 }
 
@@ -140,6 +142,24 @@ impl fmt::Display for Action {
 pub trait Permissions: Send + Sync {
     /// Returns `true` if `role` is allowed to perform `action`.
     fn can(&self, role: &Role, action: Action) -> bool;
+
+    /// Returns `true` if `role` is allowed to perform `action` on a
+    /// resource, taking ownership into account.
+    ///
+    /// - `Admin` bypasses the ownership requirement (if the base
+    ///   matrix grants the action).
+    /// - Other roles must be the resource owner.
+    fn can_on_resource(&self, role: &Role, action: Action, is_owner: bool) -> bool {
+        if !self.can(role, action) {
+            return false;
+        }
+        matches!(role, Role::Admin) || is_owner
+    }
+
+    /// Returns the list of actions allowed for `role`.
+    fn allowed_actions(&self, role: &Role) -> Vec<Action> {
+        Action::ALL.iter().copied().filter(|&a| self.can(role, a)).collect()
+    }
 }
 
 // ── PermissionMatrix ─────────────────────────────────────────────────
@@ -200,7 +220,8 @@ impl PermissionMatrix {
                 | Action::GetTorrentInfo
                 | Action::GenerateTorrentInfoListing
                 | Action::ChangePassword
-                | Action::UpdateTorrent => true,
+                | Action::UpdateTorrent
+                | Action::GetMyPermissions => true,
 
                 Action::AddCategory
                 | Action::DeleteCategory
@@ -221,7 +242,8 @@ impl PermissionMatrix {
                 | Action::GetTags
                 | Action::GetTorrent
                 | Action::GetTorrentInfo
-                | Action::GenerateTorrentInfoListing => true,
+                | Action::GenerateTorrentInfoListing
+                | Action::GetMyPermissions => true,
 
                 Action::AddCategory
                 | Action::DeleteCategory
@@ -238,10 +260,50 @@ impl PermissionMatrix {
             },
         }
     }
+
+    /// Build a matrix from the defaults, then apply TOML overrides.
+    ///
+    /// Each override inserts (allow) or removes (deny) a `(Role, Action)` pair.
+    #[must_use]
+    pub fn with_overrides(overrides: &[PermissionOverride]) -> Self {
+        let mut matrix = Self::default_matrix();
+        for ov in overrides {
+            match ov.effect {
+                Effect::Allow => {
+                    matrix.allowed.insert((ov.role, ov.action));
+                }
+                Effect::Deny => {
+                    matrix.allowed.remove(&(ov.role, ov.action));
+                }
+            }
+        }
+        matrix
+    }
 }
 
 impl Permissions for PermissionMatrix {
     fn can(&self, role: &Role, action: Action) -> bool {
         self.allowed.contains(&(*role, action))
     }
+}
+
+// ── PermissionOverride ───────────────────────────────────────────────
+
+/// Effect of a permission override.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Effect {
+    Allow,
+    Deny,
+}
+
+/// A single operator-supplied permission override.
+///
+/// Loaded from the `[[permissions.overrides]]` TOML array and applied
+/// on top of the default matrix at startup.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PermissionOverride {
+    pub role: Role,
+    pub action: Action,
+    pub effect: Effect,
 }

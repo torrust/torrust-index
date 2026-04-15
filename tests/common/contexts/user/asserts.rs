@@ -46,7 +46,6 @@ pub fn assert_token_renewal_response(response: &TextResponse, logged_in_user: &L
         TokenRenewalData {
             token: logged_in_user.token.clone(),
             username: logged_in_user.username.clone(),
-            admin: logged_in_user.admin,
             role: logged_in_user.role.clone(),
         }
     );

@@ -69,9 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING:** Raise MSRV from 1.85 to 1.88.
 - **BREAKING:** `administrator: bool` replaced by `role: String` in API
-  responses (`TokenResponse`, `UserCompact`, etc.). The legacy `admin` boolean
-  field is retained alongside `role` for backward compatibility during the
-  transition (ADR-T-008).
+  responses (`TokenResponse`, `UserCompact`, etc.). The legacy `admin: bool`
+  field has been removed entirely (ADR-T-008).
+- **BREAKING:** `administrator` column dropped from `torrust_users`; the
+  `role: TEXT` column is now the sole authority. Migration
+  `20260415000001_torrust_drop_administrator_column` handles both SQLite
+  (table-rebuild) and MySQL (`DROP COLUMN`).
 - **BREAKING:** `ACTION` enum renamed to `Action`; variants unchanged.
 - All HTTP handlers that require authorization now use
   `RequirePermission<A>` extractors instead of calling
@@ -107,15 +110,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Each domain error co-locates its HTTP status-code mapping via a
   `status_code()` method.
 - Error `From` impls use `tracing::error!` instead of `eprintln!`.
+- JWT session token `role` claim now carries the database `role` value
+  directly (`"registered"`, `"admin"`) instead of the previous mapping
+  (`"user"`, `"admin"`).
+- v1→v2 upgrade path: `insert_imported_user` now writes the `role` column
+  (`"admin"` / `"registered"`) instead of the removed `administrator` column.
 - Standardise all error derives on `thiserror`.
-
-### Deprecated
-
-- `admin: bool` field on `TokenResponse` — superseded by `role: String`.
-  Retained for backward compatibility; to be removed in a future release.
 
 ### Removed
 
+- `admin: bool` field from `TokenResponse`, `LoggedInUserData`, and
+  `TokenRenewalData` — superseded by `role: String` (ADR-T-008).
+- `UserCompact::is_admin()` convenience method — no longer needed after
+  `admin: bool` removal.
+- `administrator` column from `torrust_users` schema (migration for both
+  SQLite and MySQL).
 - `casbin` crate dependency and all Casbin-related code
   (`CasbinConfiguration`, `CasbinEnforcer`, the `ACTION` enum in
   SCREAMING_CASE) — replaced by the native `PermissionMatrix` (ADR-T-008).
