@@ -93,7 +93,10 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let permissions: Arc<dyn crate::services::authorization::Permissions> = if permission_overrides.is_empty() {
         Arc::new(PermissionMatrix::default_matrix())
     } else {
-        info!(count = permission_overrides.len(), "applying permission overrides from config");
+        info!(
+            count = permission_overrides.len(),
+            "applying permission overrides from config"
+        );
         Arc::new(PermissionMatrix::with_overrides(&permission_overrides))
     };
 

@@ -123,7 +123,7 @@
 //!
 //! Name | Type | Description | Required | Example
 //! ---|---|---|---|---
-//! `token` | `String` | The token you want to verify  | Yes | `<JWT_TOKEN>`
+//! `token` | `String` | The token you want to verify  | Yes | `eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE`
 //!
 //! Refer to the [`JsonWebToken`](crate::web::api::server::v1::contexts::user::forms::JsonWebToken)
 //! struct for more information about the token.
@@ -134,7 +134,7 @@
 //! curl \
 //!   --header "Content-Type: application/json" \
 //!   --request POST \
-//!   --data '{"token":"<JWT_TOKEN>"}' \
+//!   --data '{"token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE"}' \
 //!   http://127.0.0.1:3001/v1/user/token/verify
 //! ```
 //!
@@ -169,7 +169,7 @@
 //!
 //! Name | Type | Description | Required | Example
 //! ---|---|---|---|---
-//! `token` | `String` | The current valid token | Yes | `<JWT_TOKEN>`
+//! `token` | `String` | The current valid token | Yes | `eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE`
 //!
 //! Refer to the [`JsonWebToken`](crate::web::api::server::v1::contexts::user::forms::JsonWebToken)
 //! struct for more information about the token.
@@ -180,7 +180,7 @@
 //! curl \
 //!   --header "Content-Type: application/json" \
 //!   --request POST \
-//!   --data '{"token":"<JWT_TOKEN>"}' \
+//!   --data '{"token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE"}' \
 //!   http://127.0.0.1:3001/v1/user/token/renew
 //! ```
 //!
@@ -191,9 +191,9 @@
 //! ```json
 //! {
 //!   "data": {
-//!     "token": "<JWT_TOKEN>",
+//!     "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE",
 //!     "username": "indexadmin",
-//!     "admin": true
+//!     "role": "admin"
 //!   }
 //! }
 //! ```
@@ -201,10 +201,11 @@
 //! You will get the same token. If a new token is generated, the response will
 //! be the same but with the new token.
 //!
-//! **WARNING**: The token is associated to the user's role. The application does not support
-//! changing the role of a user. If you change the user's role manually in the
-//! database, the token will still be valid but with the same role. That should
-//! only be done for testing purposes.
+//! **NOTICE**: The `role` field in the JWT is advisory only. The authoritative
+//! role is always re-checked from the database on each request. If a user's
+//! role changes in the database, the `token_generation` counter is incremented
+//! and any existing token with an older `gen` claim is rejected — the user
+//! must re-login to get a token reflecting the new role (see ADR-T-007).
 //!
 //! # Ban a user
 //!
@@ -225,7 +226,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer <JWT_TOKEN>" \
+//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE" \
 //!   --request DELETE \
 //!   http://127.0.0.1:3001/v1/user/ban/indexadmin
 //! ```

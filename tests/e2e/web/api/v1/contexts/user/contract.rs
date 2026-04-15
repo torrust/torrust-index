@@ -410,3 +410,205 @@ mod authorization {
         }
     }
 }
+
+mod permissions_discovery {
+
+    use torrust_index::services::authorization::Action;
+    use torrust_index::web::api;
+
+    use crate::common::client::Client;
+    use crate::common::contexts::user::responses::MyPermissionsResponse;
+    use crate::e2e::environment::TestEnv;
+    use crate::e2e::web::api::v1::contexts::user::steps::{new_logged_in_admin, new_logged_in_user};
+
+    #[tokio::test]
+    async fn it_should_return_all_actions_for_an_admin() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
+
+        let logged_in_admin = new_logged_in_admin(&env).await;
+
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_admin.token);
+
+        let response = client.get_my_permissions().await;
+
+        assert_eq!(response.status, 200);
+
+        let permissions: MyPermissionsResponse = serde_json::from_str(&response.body)
+            .unwrap_or_else(|_| panic!("response should be MyPermissionsResponse: {}", response.body));
+
+        assert_eq!(permissions.data.role, "admin");
+
+        // Admin is granted every action.
+        let mut expected: Vec<String> = Action::ALL.iter().map(|a| format!("{a}")).collect();
+        let mut actual = permissions.data.actions;
+        actual.sort();
+        expected.sort();
+        assert_eq!(actual, expected);
+    }
+
+    #[tokio::test]
+    async fn it_should_return_registered_actions_for_a_registered_user() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
+
+        let logged_in_user = new_logged_in_user(&env).await;
+
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_user.token);
+
+        let response = client.get_my_permissions().await;
+
+        assert_eq!(response.status, 200);
+
+        let permissions: MyPermissionsResponse = serde_json::from_str(&response.body)
+            .unwrap_or_else(|_| panic!("response should be MyPermissionsResponse: {}", response.body));
+
+        assert_eq!(permissions.data.role, "registered");
+
+        let mut actual = permissions.data.actions;
+        actual.sort();
+
+        let mut expected = vec![
+            "GetAboutPage",
+            "GetLicensePage",
+            "GetCategories",
+            "GetImageByUrl",
+            "GetPublicSettings",
+            "GetSiteName",
+            "GetTags",
+            "AddTorrent",
+            "GetTorrent",
+            "GetTorrentInfo",
+            "GenerateTorrentInfoListing",
+            "ChangePassword",
+            "UpdateTorrent",
+            "GetMyPermissions",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+        expected.sort();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[tokio::test]
+    async fn it_should_return_guest_actions_when_no_token_is_provided() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
+
+        let client = Client::unauthenticated(&env.server_socket_addr().unwrap());
+
+        let response = client.get_my_permissions().await;
+
+        assert_eq!(response.status, 200);
+
+        let permissions: MyPermissionsResponse = serde_json::from_str(&response.body)
+            .unwrap_or_else(|_| panic!("response should be MyPermissionsResponse: {}", response.body));
+
+        assert_eq!(permissions.data.role, "guest");
+
+        let mut actual = permissions.data.actions;
+        actual.sort();
+
+        let mut expected = vec![
+            "GetAboutPage",
+            "GetLicensePage",
+            "GetCategories",
+            "GetPublicSettings",
+            "GetSiteName",
+            "GetTags",
+            "GetTorrent",
+            "GetTorrentInfo",
+            "GenerateTorrentInfoListing",
+            "GetMyPermissions",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
+        expected.sort();
+
+        assert_eq!(actual, expected);
+    }
+}
+
+mod permission_overrides {
+
+    use torrust_index::services::authorization::{Action, Effect, PermissionOverride, Role};
+    use torrust_index::web::api;
+
+    use crate::common::client::Client;
+    use crate::common::contexts::torrent::fixtures::random_torrent;
+    use crate::common::contexts::torrent::forms::UploadTorrentMultipartForm;
+    use crate::common::contexts::user::responses::MyPermissionsResponse;
+    use crate::e2e::environment::TestEnv;
+    use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
+
+    #[tokio::test]
+    async fn it_should_grant_a_normally_denied_action_via_toml_override() {
+        let mut env = TestEnv::new();
+        env.start_with(api::Version::V1, |cfg| {
+            cfg.permissions.overrides = vec![PermissionOverride {
+                role: Role::Registered,
+                action: Action::DeleteTorrent,
+                effect: Effect::Allow,
+            }];
+        })
+        .await;
+
+        let logged_in_user = new_logged_in_user(&env).await;
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_user.token);
+
+        let response = client.get_my_permissions().await;
+
+        assert_eq!(response.status, 200);
+
+        let permissions: MyPermissionsResponse = serde_json::from_str(&response.body)
+            .unwrap_or_else(|_| panic!("response should be MyPermissionsResponse: {}", response.body));
+
+        assert_eq!(permissions.data.role, "registered");
+        assert!(
+            permissions.data.actions.contains(&"DeleteTorrent".to_string()),
+            "expected DeleteTorrent in actions after TOML override grant, got: {:?}",
+            permissions.data.actions
+        );
+    }
+
+    #[tokio::test]
+    async fn it_should_deny_a_normally_allowed_action_via_toml_override() {
+        let mut env = TestEnv::new();
+        env.start_with(api::Version::V1, |cfg| {
+            cfg.permissions.overrides = vec![PermissionOverride {
+                role: Role::Registered,
+                action: Action::AddTorrent,
+                effect: Effect::Deny,
+            }];
+        })
+        .await;
+
+        let logged_in_user = new_logged_in_user(&env).await;
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &logged_in_user.token);
+
+        // Verify the action is absent from /me/permissions
+        let response = client.get_my_permissions().await;
+
+        let permissions: MyPermissionsResponse = serde_json::from_str(&response.body)
+            .unwrap_or_else(|_| panic!("response should be MyPermissionsResponse: {}", response.body));
+
+        assert!(
+            !permissions.data.actions.contains(&"AddTorrent".to_string()),
+            "expected AddTorrent to be absent after TOML override deny, got: {:?}",
+            permissions.data.actions
+        );
+
+        // Attempt to upload — the extractor should reject with 403
+        // before the handler parses the multipart body.
+        let test_torrent = random_torrent();
+        let form: UploadTorrentMultipartForm = test_torrent.index_info.into();
+        let response = client
+            .upload_torrent(form.try_into().expect("multipart form should be valid"))
+            .await;
+
+        assert_eq!(response.status, 403);
+    }
+}

@@ -59,7 +59,11 @@ impl UserTester {
         assert_eq!(imported_user.user_id, self.test_data.user.user_id);
         assert!(imported_user.date_registered.is_none());
         assert_eq!(imported_user.date_imported.unwrap(), self.execution_time);
-        let expected_role = if self.test_data.user.administrator { "admin" } else { "registered" };
+        let expected_role = if self.test_data.user.administrator {
+            "admin"
+        } else {
+            "registered"
+        };
         assert_eq!(imported_user.role, expected_role);
     }
 

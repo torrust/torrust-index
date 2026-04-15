@@ -281,10 +281,7 @@ impl Index {
     /// * The user does not have permission to delete the torrent.
     /// * Unable to get the torrent listing from it's ID.
     /// * Unable to delete the torrent from the database.
-    pub async fn delete_torrent(
-        &self,
-        info_hash: &InfoHash,
-    ) -> Result<DeletedTorrentResponse, TorrentError> {
+    pub async fn delete_torrent(&self, info_hash: &InfoHash) -> Result<DeletedTorrentResponse, TorrentError> {
         let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
 
         self.torrent_repository.delete(&torrent_listing.torrent_id).await?;
@@ -332,10 +329,7 @@ impl Index {
     /// # Errors
     ///
     /// Returns a `TorrentError::DatabaseError` if the database query fails.
-    pub async fn generate_torrent_info_listing(
-        &self,
-        request: &ListingRequest,
-    ) -> Result<TorrentsResponse, TorrentError> {
+    pub async fn generate_torrent_info_listing(&self, request: &ListingRequest) -> Result<TorrentsResponse, TorrentError> {
         let torrent_listing_specification = self.listing_specification_from_user_request(request).await;
 
         let torrents_response = self
@@ -532,10 +526,7 @@ impl Index {
     /// # Errors
     ///
     /// Returns an error if the user is not authorized or if there is a problem with the database.
-    pub async fn get_canonical_info_hash(
-        &self,
-        info_hash: &InfoHash,
-    ) -> Result<Option<InfoHash>, TorrentError> {
+    pub async fn get_canonical_info_hash(&self, info_hash: &InfoHash) -> Result<Option<InfoHash>, TorrentError> {
         self.torrent_info_hash_repository
             .find_canonical_info_hash_for(info_hash)
             .await

@@ -12,9 +12,7 @@ pub struct Service {
 impl Service {
     #[must_use]
     pub const fn new(tag_repository: Arc<DbTagRepository>) -> Self {
-        Self {
-            tag_repository,
-        }
+        Self { tag_repository }
     }
 
     /// Adds a new tag.

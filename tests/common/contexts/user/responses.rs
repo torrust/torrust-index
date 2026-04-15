@@ -45,3 +45,14 @@ pub struct TokenRenewalData {
     pub username: String,
     pub role: String,
 }
+
+#[derive(Deserialize, Debug)]
+pub struct MyPermissionsResponse {
+    pub data: MyPermissionsData,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct MyPermissionsData {
+    pub role: String,
+    pub actions: Vec<String>,
+}

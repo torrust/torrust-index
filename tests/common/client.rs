@@ -177,6 +177,10 @@ impl Client {
     pub async fn ban_user(&self, username: Username) -> TextResponse {
         self.http_client.delete(&format!("/user/ban/{}", &username.value)).await
     }
+
+    pub async fn get_my_permissions(&self) -> TextResponse {
+        self.http_client.get("/user/me/permissions", Query::empty()).await
+    }
 }
 
 /// Generic HTTP Client

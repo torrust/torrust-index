@@ -22,6 +22,12 @@ suite, for example when finishing up.)
 When running tests, tee to a temp file (`/tmp/...`) and then grep that
 file after the tests have completed.
 
+## Counts and Numbers
+
+Do not use use exact numbers, i.e. not: "100 tests passed".
+Instead: put fuzzy numbers i.e. "A hundred tests passed", or "~320 functions in total".
+Precise numbers may be used for qualified historical records. e.g. "on 21.12.1992 phase 3 was marked as accepted with 465 passing tests and 3 failures."
+
 ## Test Locations
 
 We use three levels of tests based upon viability. In general, crate tests

@@ -75,6 +75,19 @@ impl TestEnv {
         }
     }
 
+    /// Starts an **isolated** test environment with a custom config mutator.
+    ///
+    /// The mutator is applied on top of the ephemeral test configuration
+    /// before the app starts. Always uses an isolated (in-process) env.
+    pub async fn start_with<F>(&mut self, api_version: Version, mutator: F)
+    where
+        F: FnOnce(&mut torrust_index::config::Settings),
+    {
+        let isolated_env = isolated::TestEnv::running_with(api_version, mutator).await;
+        self.isolated = Some(isolated_env);
+        self.starting_settings = self.server_settings_for_isolated_env();
+    }
+
     /// Some test requires a real tracker running.
     pub fn provides_a_tracker(&self) -> bool {
         self.is_shared() && self.server_settings().is_some()

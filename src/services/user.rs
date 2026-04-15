@@ -215,10 +215,7 @@ pub struct ProfileService {
 
 impl ProfileService {
     #[must_use]
-    pub const fn new(
-        configuration: Arc<Configuration>,
-        user_repository: Arc<DbUserAuthenticationRepository>,
-    ) -> Self {
+    pub const fn new(configuration: Arc<Configuration>, user_repository: Arc<DbUserAuthenticationRepository>) -> Self {
         Self {
             configuration,
             user_authentication_repository: user_repository,
@@ -238,11 +235,7 @@ impl ProfileService {
     /// * An error if unable to successfully hash the password.
     /// * An error if unable to change the password in the database.
     /// * An error if it is not possible to authorize the action
-    pub async fn change_password(
-        &self,
-        user_id: UserId,
-        change_password_form: &ChangePasswordForm,
-    ) -> Result<(), UserError> {
+    pub async fn change_password(&self, user_id: UserId, change_password_form: &ChangePasswordForm) -> Result<(), UserError> {
         info!("changing user password for user ID: {}", user_id);
 
         let settings = self.configuration.settings.read().await;
@@ -284,10 +277,7 @@ pub struct BanService {
 
 impl BanService {
     #[must_use]
-    pub const fn new(
-        user_profile_repository: Arc<DbUserProfileRepository>,
-        banned_user_list: Arc<DbBannedUserList>,
-    ) -> Self {
+    pub const fn new(user_profile_repository: Arc<DbUserProfileRepository>, banned_user_list: Arc<DbBannedUserList>) -> Self {
         Self {
             user_profile_repository,
             banned_user_list,
@@ -325,10 +315,7 @@ pub struct ListingService {
 
 impl ListingService {
     #[must_use]
-    pub const fn new(
-        configuration: Arc<Configuration>,
-        user_profile_repository: Arc<DbUserProfileRepository>,
-    ) -> Self {
+    pub const fn new(configuration: Arc<Configuration>, user_profile_repository: Arc<DbUserProfileRepository>) -> Self {
         Self {
             configuration,
             user_profile_repository,

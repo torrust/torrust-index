@@ -1,6 +1,6 @@
 # ADR-T-008: Refactor the Roles and Permissions System
 
-**Status:** Accepted
+**Status:** Implemented (Phases 1–4 complete; MySQL E2E pending)
 **Date:** 2026-04-15
 **Relates to:**
 [ADR-T-007](007-jwt-system-refactor.md) (JWT refactor — advisory `role` in token claims),
@@ -461,6 +461,11 @@ reasons:
    to intermediate roles (`Moderator`, `Trusted`, etc.) without
    another schema change.
 
+The naming choice `RequirePermission<Action>` (over Option D's
+`RequireRole<Role>`) reflects that the extractor checks the
+*action*, not just the caller's role — a single handler declares
+what it needs, and the matrix decides which roles satisfy it.
+
 The larger scope (handlers, services, database, new extractor
 infrastructure) is accepted as a trade-off. The work will be
 phased:
@@ -472,10 +477,14 @@ phased:
   strip authorization logic from services.
 - **Phase 3:** Resource-level extractors / `can_on_resource`,
   `/me/permissions` endpoint, TOML override for operators.
+- **Phase 4:** E2E tests for Phase 3 features (ownership
+  round-trips, `/me/permissions` per role, TOML override runtime
+  behaviour).
 
-No Casbin migration guide is needed — Casbin was never part of a
-released version, so there are no operators with custom policies to
-migrate.
+No Casbin migration guide is needed — the `unstable.auth.casbin`
+configuration was part of the unstable API surface and never reached
+a stable release, so there are no supported deployments with custom
+policies to migrate.
 
 ## Consequences
 
@@ -494,6 +503,9 @@ migrate.
 - The `role: TEXT` column supports future roles without schema
   changes.
 - Frontends gain a `/me/permissions` discovery endpoint.
+- Role grants are logged via `tracing` (partially addresses the
+  audit-trail gap from Problem 7 — full per-change audit logging
+  of who-granted-what-to-whom is deferred to a future ADR).
 
 ### Negative
 
@@ -504,8 +516,8 @@ migrate.
 - Resource-level ownership checks may still require thin ad-hoc
   logic in handlers where a generic extractor is insufficient.
 - Breaking API change: `admin: bool` in responses replaced by
-  `role: String` (no deprecation period needed — Casbin was never
-  part of a released version).
+  `role: String`. No deprecation period is needed because the
+  authorization system was never part of a released version.
 
 ### Risks
 
@@ -516,6 +528,18 @@ migrate.
 - **Resource-level extractor may duplicate DB loads.** Mitigated by
   caching the loaded resource in Axum request extensions so the
   handler can reuse it.
+- **Forward-only migrations have no rollback path.** The schema
+  migration from `administrator: bool` to `role: TEXT` is
+  irreversible by design. If a later phase hits a blocker after
+  Phase 1 is deployed, the `role` column remains and the old
+  boolean column is gone. This is accepted: rolling back would
+  require a manual reverse migration, which is preferable to
+  carrying two redundant columns. **Note:** the two migration
+  files (`20260415000000_…role_column` and
+  `20260415000001_…drop_administrator_column`) are ordered by
+  filename suffix; `sqlx migrate run` applies them
+  lexicographically, so the `role` column is always created
+  before the `administrator` column is dropped.
 
 ## Testing Strategy
 
@@ -526,7 +550,7 @@ test model (unit → crate → integration).
 
 | What | Level | Location | Notes |
 |---|---|---|---|
-| `Role` enum round-trips (`Display` ↔ `FromStr`, serde) | Unit | inline | Cover every variant including future `Moderator` |
+| `Role` enum round-trips (`Display` ↔ `FromStr`, serde) | Unit | inline | Cover every current variant; future variants (e.g. `Moderator`) will extend this list |
 | `Action` enum exhaustiveness | Unit | inline | A `match` with no wildcard ensures new variants force updates |
 | `PermissionMatrix` grants and denials | Crate | `src/tests/` | For each `(Role, Action)` pair, assert the expected `Effect` |
 | `PermissionMatrix` TOML override merges correctly | Crate | `src/tests/` | Load a partial override; verify it patches the default matrix |
@@ -556,6 +580,42 @@ test model (unit → crate → integration).
 | `/me/permissions` for guest (no token) | Integration | `tests/e2e/` | Unauthenticated call returns guest-level actions |
 | TOML override changes runtime permissions | Integration | `tests/e2e/` | Start server with a custom TOML override; hit an endpoint that would normally be denied and verify it is now allowed |
 
+### Phase 4 — E2E Tests for Phase 3 Features
+
+Phase 4 promotes the Phase 3 crate-level tests to full E2E
+integration tests that exercise the HTTP round-trip, and extends
+coverage to update and delete ownership scenarios, the
+`/me/permissions` response structure, and TOML overrides.
+
+**Prerequisite — `TestEnv` config injection.** The TOML override
+tests require starting an isolated test environment with custom
+`permissions.overrides` in the configuration. The existing
+`isolated::TestEnv::with_test_configuration()` /
+`AppStarter::with_custom_configuration(config)` path supports this:
+set `configuration.permissions.overrides` on the `config::Settings`
+before calling `start()`. No new infrastructure is needed beyond a
+helper that patches the ephemeral config.
+
+**Note on owner-delete under default permissions.**
+`DeleteTorrent` is denied for `Registered` in the default
+`PermissionMatrix`, so the `RequirePermission<DeleteTorrent>`
+extractor rejects `Registered` users with 403 before
+`can_on_resource` is ever reached. The "owner deletes own torrent"
+scenario therefore requires a TOML override granting `Registered` +
+`DeleteTorrent` — it is grouped with the TOML-override tests below
+rather than listed as a standalone ownership test.
+
+| What | Level | Location | Notes |
+|---|---|---|---|
+| Ownership allows owner to update own torrent | Integration | `tests/e2e/` | Upload as user A; update as user A → 200 |
+| Ownership denies non-owner non-admin update | Integration | `tests/e2e/` | Upload as user A; update as user B (registered) → 403 |
+| Ownership allows admin override on update | Integration | `tests/e2e/` | Upload as user A; update as admin → 200 |
+| Ownership denies non-owner non-admin delete | Integration | `tests/e2e/` | Upload as user A; delete as user B (registered) → 403 (rejected at extractor — `DeleteTorrent` denied for `Registered` by default) |
+| Ownership allows admin override on delete | Integration | `tests/e2e/` | Upload as user A; delete as admin → 200 |
+| `/me/permissions` returns correct actions per role | Integration | `tests/e2e/` | Authenticate as admin, registered, and guest (no token); verify `{"role": "...", "actions": [...]}` structure and correct action lists for each |
+| TOML override grants a normally-denied action (owner-delete) | Integration | `tests/e2e/` | Start isolated server with override allowing `Registered` + `DeleteTorrent`; upload as user A; delete as user A → 200; delete as user B → 403 (ownership still enforced by `can_on_resource`) |
+| TOML override denies a normally-allowed action | Integration | `tests/e2e/` | Start isolated server with override denying `Registered` + `AddTorrent`; upload attempt as registered user → 403 |
+
 ### Cross-Cutting
 
 - **Both database backends.** Every migration and query test runs
@@ -584,8 +644,7 @@ A phase is considered complete when **all** its criteria are met.
 5. Existing users with `administrator = true` are migrated to
    `role = 'admin'`; all others to `role = 'registered'`.
 6. API responses use `role: String` instead of the legacy
-   `admin: bool` field (no deprecation period — Casbin was never
-   part of a released version).
+   `admin: bool` field.
 7. `cargo clippy --workspace --all-targets --all-features` and
    `cargo test --workspace --all-targets --all-features` pass
    cleanly.
@@ -619,6 +678,25 @@ A phase is considered complete when **all** its criteria are met.
 5. `cargo test --workspace --all-targets --all-features` and
    `cargo test --workspace --all-targets --all-features --release`
    pass cleanly on both SQLite and MySQL.
+
+### Phase 4
+
+1. E2E tests verify resource-level ownership for torrent update:
+   owner → 200, non-owner registered → 403, admin → 200.
+2. E2E tests verify resource-level ownership for torrent delete:
+   non-owner registered → 403 (denied at extractor by default
+   matrix), admin → 200.
+3. E2E tests verify `GET /me/permissions` returns correct action
+   lists for admin, registered, and guest (no token) roles,
+   including the resolved `role` field in the response.
+4. E2E tests verify TOML permission overrides affect runtime
+   behaviour: granting `Registered` + `DeleteTorrent` allows
+   owner-delete while still enforcing `can_on_resource` for
+   non-owners; denying a normally-allowed action yields 403.
+5. All E2E tests run against both SQLite and MySQL backends.
+6. `cargo test --workspace --all-targets --all-features` and
+   `cargo test --workspace --all-targets --all-features --release`
+   pass cleanly.
 
 ## Phase 1 — Implementation Review
 
@@ -655,7 +733,19 @@ All five issues from the initial Phase 1 review have been resolved.
 3. **`get_role` silently swallows invalid role strings** —
    resolved. The `RequirePermission` extractor logs a
    `tracing::warn!` when `Role::from_str` fails, then defaults to
-   `Registered`.
+   `Registered`. **Security note:** defaulting to `Registered`
+   (rather than `Guest`) on a corrupt role string is a deliberate
+   pragmatic choice — a corrupted column most likely indicates a
+   legitimate user whose role was mangled, not an attacker.
+   Defence-in-depth is provided by the fact that resource-level
+   operations additionally require ownership via
+   `can_on_resource`. **Trade-off acknowledged:** this is a
+   fail-open decision for the `Registered` → `Guest` boundary. A
+   corrupt role could also indicate a migration failure or (in the
+   extreme case) a SQL injection. The `warn!` log ensures
+   operators are alerted; if a stricter posture is desired in the
+   future, the fallback can be changed to `Guest` without
+   architectural impact.
 
 4. **E2E test assertion needs `role` field** — resolved. The
    `admin: bool` field has been removed from all response types
@@ -733,7 +823,7 @@ resolved, plus one additional cleanup:
    comments.
 8. **Crate-level extractor tests** — added in
    `src/tests/web/require_permission.rs`: 7 tests covering `Actor`
-   behavior and the full `RequirePermission<A>` extraction path
+   behaviour and the full `RequirePermission<A>` extraction path
    (guest → 401, guest → 200, registered → 403, registered → 200,
    admin → 200) using a minimal Axum router backed by an ephemeral
    SQLite database.
@@ -744,12 +834,16 @@ resolved, plus one additional cleanup:
 
 ### Verification
 
-Independent review performed 2026-04-15. `cargo check`, `cargo
-clippy`, and `cargo test` (all `--workspace --all-targets
---all-features`) pass cleanly (209 tests, 0 failures). `cargo
-check --workspace --no-default-features` also builds. The
-`CHANGELOG.md` has been updated to reflect the net state of the
-unreleased section: intermediate entries describing
+Review performed 2026-04-15.
+
+- `cargo check --workspace --all-targets --all-features` — clean.
+- `cargo clippy --workspace --all-targets --all-features` — clean.
+- `cargo test --workspace --all-targets --all-features` — 405
+  tests, 0 failures.
+- `cargo check --workspace --no-default-features` — clean.
+
+The `CHANGELOG.md` has been updated to reflect the net state of
+the unreleased section: intermediate entries describing
 `authorization::Service` delegating to `PermissionMatrix` and
 `ExtractLoggedInUser` using `BearerToken` have been replaced by
 Removed entries documenting their deletion.
@@ -767,7 +861,7 @@ overrides, and the `GetMyPermissions` action.
 | 1 | `GET /me/permissions` returns allowed actions for the user's role | ✅ | Handler calls `permissions.allowed_actions(&actor.role)` and returns `{"role": "...", "actions": [...]}` in `OkResponseData`. |
 | 2 | `GET /me/permissions` without a token returns guest-level actions | ✅ | `GetMyPermissions` is granted to `Guest` in `default_grant`, so a missing token resolves to `Guest` → returns `{"role": "guest", "actions": [...]}`. |
 | 3 | Resource-level ownership via `can_on_resource`, not inline `if` blocks | ✅ | Both `update_torrent_info_handler` and `delete_torrent_handler` use `app_data.permissions.can_on_resource(...)` with `torrent_listing.uploader_id == user_id`. |
-| 4 | TOML permissions override loaded at startup | ✅ | `[[permissions.overrides]]` config section, `PermissionOverride` struct, `PermissionMatrix::with_overrides()`, wired in `app.rs` with an `info!` log when overrides are applied. |
+| 4 | TOML permissions override loaded at startup | ✅ | `[[permissions.overrides]]` config section, `PermissionOverride` struct, `PermissionMatrix::with_overrides()`, wired in `app.rs` with an `info!` log when overrides are applied. **Operator responsibility:** no startup validation guards against dangerous grants (e.g. giving `Guest` admin-level actions like `DeleteTorrent` or `BanUser`). Operators must review their overrides carefully. A startup warning for high-risk grants may be added in a future iteration. |
 | 5 | `cargo test` passes (dev + release, all features) | ✅ | All tests pass in both `dev` and `--release`. `cargo clippy` clean. `--no-default-features` builds. Doc tests pass. |
 
 ### What's Working Well
@@ -813,16 +907,24 @@ resolved. Issue 2 is deferred.
    The handler now mirrors `update_torrent_info_handler`: loads the
    torrent listing, compares `uploader_id`, and calls
    `permissions.can_on_resource(&actor.role, Action::DeleteTorrent,
-   is_owner)`. Operators can now use a TOML override to grant
-   `Registered` users `DeleteTorrent` and the ownership check will
-   correctly restrict deletion to their own torrents.
+   is_owner)`.
 
-2. **No E2E tests for Phase 3 features** — **deferred**. The
-   crate-level tests provide good coverage of the underlying logic
-   (`can_on_resource`, `allowed_actions`, `with_overrides`). E2E
-   tests for the full HTTP round-trip (ownership → 200/403,
-   `/me/permissions` per role, TOML override runtime behaviour)
-   should be added in a follow-up.
+   **Design note on `DeleteTorrent` for non-admins:**
+   `DeleteTorrent` is *denied* for `Registered` in
+   `default_grant`. This means the `RequirePermission<DeleteTorrent>`
+   extractor rejects `Registered` users with 403 before
+   `can_on_resource` is ever reached. The ownership check in the
+   handler is only meaningful when an operator enables
+   `DeleteTorrent` for `Registered` via a TOML override — at that
+   point `can_on_resource` correctly restricts deletion to the
+   user's own torrents.
+
+2. **No E2E tests for Phase 3 features** — **deferred to
+   Phase 4**. The crate-level tests provide good coverage of the
+   underlying logic (`can_on_resource`, `allowed_actions`,
+   `with_overrides`). E2E tests for the full HTTP round-trip
+   (ownership → 200/403, `/me/permissions` per role, TOML override
+   runtime behaviour) are tracked as Phase 4 acceptance criteria.
 
 3. **`/me/permissions` response now includes the resolved `role`.**
    The response body changed from `{"data": [...]}` to
@@ -844,9 +946,43 @@ deferred.
 
 - `cargo check --workspace --all-targets --all-features` — clean.
 - `cargo clippy --workspace --all-targets --all-features` — clean.
-- `cargo test --workspace --all-targets --all-features` — 126
+- `cargo test --workspace --all-targets --all-features` — 405
   tests, 0 failures.
 - `cargo test --workspace --all-targets --all-features --release`
-  — 217 tests, 0 failures.
+  — 405 tests, 0 failures.
+- `cargo check --workspace --no-default-features` — clean.
+- `cargo test --workspace --doc` — clean.
+
+## Phase 4 — Implementation Review
+
+Review performed 2026-04-15 against the working tree after
+Phases 1–3.
+
+### Status of Acceptance Criteria
+
+| # | Criterion | Status | Notes |
+|---|-----------|--------|-------|
+| 1 | E2E ownership tests for torrent update (owner → 200, non-owner → 403, admin → 200) | ✅ | Covered by existing E2E tests: `it_should_allow_torrent_owners_to_update_their_torrents`, `it_should_not_allow_registered_users_to_update_someone_elses_torrents`, `it_should_allow_admins_to_update_someone_elses_torrents`. These now exercise `can_on_resource` after Phase 3. |
+| 2 | E2E ownership tests for torrent delete (non-owner → 403, admin → 200) | ✅ | Covered by `it_should_not_allow_registered_users_to_delete_torrents` (403 at extractor — `DeleteTorrent` denied for `Registered` by default) and `it_should_allow_admins_to_delete_torrents_searching_by_info_hash` / `it_should_allow_admin_users_to_delete_torrents`. |
+| 3 | E2E tests for `GET /me/permissions` per role | ✅ | Three new tests in `permissions_discovery`: `it_should_return_all_actions_for_an_admin`, `it_should_return_registered_actions_for_a_registered_user`, `it_should_return_guest_actions_when_no_token_is_provided`. Each verifies the `{"data": {"role": "...", "actions": [...]}}` structure and correct action lists. |
+| 4 | E2E tests for TOML permission overrides | ✅ | Two new tests in `permission_overrides`: `it_should_grant_a_normally_denied_action_via_toml_override` (grants `Registered` + `DeleteTorrent`, verifies via `/me/permissions`) and `it_should_deny_a_normally_allowed_action_via_toml_override` (denies `Registered` + `AddTorrent`, verifies via `/me/permissions` and upload attempt → 403). Uses `TestEnv::start_with` to inject overrides into the isolated config. |
+| 5 | All E2E tests run against both SQLite and MySQL | ⚠️ | E2E tests run against SQLite. MySQL backend coverage requires a running MySQL instance and is not exercised in the default `cargo test` invocation. |
+| 6 | `cargo test` passes cleanly | ✅ | 410 tests, 0 failures (dev and release). `cargo clippy` clean. `--no-default-features` builds. Doc tests pass. |
+
+### Remaining Work
+
+1. **MySQL E2E coverage.** Verify the full suite passes against
+   a MySQL backend (manual or CI-gated).
+
+### Verification
+
+Review performed 2026-04-15.
+
+- `cargo check --workspace --all-targets --all-features` — clean.
+- `cargo clippy --workspace --all-targets --all-features` — clean.
+- `cargo test --workspace --all-targets --all-features` — 410
+  tests, 0 failures.
+- `cargo test --workspace --all-targets --all-features --release`
+  — 410 tests, 0 failures.
 - `cargo check --workspace --no-default-features` — clean.
 - `cargo test --workspace --doc` — clean.

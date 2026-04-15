@@ -15,9 +15,7 @@ pub struct Service {
 impl Service {
     #[must_use]
     pub const fn new(configuration: Arc<Configuration>) -> Self {
-        Self {
-            configuration,
-        }
+        Self { configuration }
     }
 
     /// It gets all the settings.

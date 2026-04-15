@@ -20,9 +20,7 @@ pub struct Service {
 impl Service {
     #[must_use]
     pub const fn new(image_cache_service: Arc<ImageCacheService>) -> Self {
-        Self {
-            image_cache_service,
-        }
+        Self { image_cache_service }
     }
 
     /// It gets image by URL and caches it.

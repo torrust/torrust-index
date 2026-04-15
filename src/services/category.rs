@@ -12,9 +12,7 @@ pub struct Service {
 impl Service {
     #[must_use]
     pub const fn new(category_repository: Arc<DbCategoryRepository>) -> Self {
-        Self {
-            category_repository,
-        }
+        Self { category_repository }
     }
 
     /// Adds a new category.
