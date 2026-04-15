@@ -71,7 +71,9 @@ COPY --from=build_debug \
 RUN cargo nextest run --workspace-remap /test/src/ --extract-to /test/src/ --no-run --archive-file /test/torrust-index-debug.tar.zst
 RUN cargo nextest run --workspace-remap /test/src/ --target-dir-remap /test/src/target/ --cargo-metadata /test/src/target/nextest/cargo-metadata.json --binaries-metadata /test/src/target/nextest/binaries-metadata.json
 
-RUN mkdir -p /app/bin/; cp -l /test/src/target/debug/torrust-index /app/bin/torrust-index
+RUN mkdir -p /app/bin/; \
+  cp -l /test/src/target/debug/torrust-index /app/bin/torrust-index; \
+  cp -l /test/src/target/debug/torrust-generate-auth-keypair /app/bin/torrust-generate-auth-keypair
 # RUN mkdir /app/lib/; cp -l $(realpath $(ldd /app/bin/torrust-index | grep "libz\.so\.1" | awk '{print $3}')) /app/lib/libz.so.1
 RUN chown -R root:root /app; chmod -R u=rw,go=r,a+X /app; chmod -R a+x /app/bin
 
@@ -87,7 +89,8 @@ RUN cargo nextest run --workspace-remap /test/src/ --target-dir-remap /test/src/
 
 RUN mkdir -p /app/bin/; \
   cp -l /test/src/target/release/torrust-index /app/bin/torrust-index; \
-  cp -l /test/src/target/release/health_check /app/bin/health_check;
+  cp -l /test/src/target/release/health_check /app/bin/health_check; \
+  cp -l /test/src/target/release/torrust-generate-auth-keypair /app/bin/torrust-generate-auth-keypair
 # RUN mkdir -p /app/lib/; cp -l $(realpath $(ldd /app/bin/torrust-index | grep "libz\.so\.1" | awk '{print $3}')) /app/lib/libz.so.1
 RUN chown -R root:root /app; chmod -R u=rw,go=r,a+X /app; chmod -R a+x /app/bin
 

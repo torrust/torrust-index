@@ -118,6 +118,9 @@ TORRUST_INDEX_CONFIG_TOML=$(cat "./storage/index/etc/index.toml") \
   cargo run
 ```
 
+> **Container deployments** auto-generate persistent keys on first boot — no
+> manual setup is required. See the [container guide][containers.md] for details.
+
 > Please view our [crate documentation][docs] for more detailed instructions.
 
 ### Services

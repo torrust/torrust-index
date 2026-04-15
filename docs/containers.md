@@ -67,10 +67,19 @@ storage/index/
 │       └── localhost.key  => /var/lib/torrust/index/tls/localhost.key [user supplied]
 ├── log                    => /var/log/torrust/index (future use)
 └── etc
+    ├── auth
+    │   ├── private.pem    => /etc/torrust/index/auth/private.pem [auto generated on first boot]
+    │   └── public.pem     => /etc/torrust/index/auth/public.pem  [auto generated on first boot]
     └── index.toml        => /etc/torrust/index/index.toml [auto populated]
 ```
 
 > NOTE: you only need the `tls` directory and certificates in case you have enabled SSL.
+>
+> The `auth/` directory and RSA key pair are auto-generated on first boot by the
+> container entry script. Sessions persist across restarts as long as the
+> `/etc/torrust/index` volume is retained. To use your own keys, either
+> pre-populate the volume before first boot or overwrite the generated files and
+> restart.
 
 ## Building the Container
 

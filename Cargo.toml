@@ -104,6 +104,10 @@ url = { version = "2", features = ["serde"] }
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
 
+[[bin]]
+name = "torrust-generate-auth-keypair"
+path = "src/bin/generate_auth_keypair.rs"
+
 [dev-dependencies]
 tempfile = "3"
 which = "8"

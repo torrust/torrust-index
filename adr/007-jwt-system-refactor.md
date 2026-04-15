@@ -461,9 +461,11 @@ phased rollout that subsumes Options A and B.
 The `rsa` crate (already a transitive dependency via
 `jsonwebtoken`'s `rust_crypto` feature) must be added as a
 **direct** dependency in `Cargo.toml` along with `rand` (for
-`OsRng`). PEM export requires the `pkcs8` + `pem` features on
-`rsa` (for `EncodePrivateKey::to_pkcs8_pem`) and `spki` (for
-`EncodePublicKey::to_public_key_pem`).
+`OsRng`). PEM export uses `EncodePrivateKey::to_pkcs8_pem`
+(from `pkcs8`) and `EncodePublicKey::to_public_key_pem` (from
+`spki`). Both are pulled in transitively by the `pem` feature
+on `rsa` — no extra feature flags are needed beyond
+`rsa = { features = ["std", "pem"] }`.
 
 ##### Key generation details
 
@@ -527,7 +529,7 @@ touches the following files (non-exhaustive):
 | `compose.yaml` | Remove or comment out `AUTH__PRIVATE_KEY_PATH` / `AUTH__PUBLIC_KEY_PATH` env vars |
 | `src/web/api/server/v1/contexts/user/mod.rs` | Update module-level doc example |
 
-#### Phase 6 — `generate-auth-keypair` CLI + Container Auto-Generation
+#### Phase 6 — `generate-auth-keypair` CLI + Container Auto-Generation ✅ Implemented
 
 ##### Motivation
 
@@ -560,43 +562,87 @@ pair and writes both PEM blocks to **stdout**. Design constraints:
   standard PEM (Base64-encoded PKCS#8 / SPKI) format. The two
   blocks are self-delimiting via their `-----BEGIN …-----` /
   `-----END …-----` markers.
-- **Diagnostic message on stderr** confirming the key was
-  generated (type, bit size).
-- Uses `clap` (already a dependency) for `--help` and future
-  extensibility (e.g., `--bits`, `--out-dir`).
+- **Diagnostic output on stderr** via `tracing` (already a
+  dependency). A `--debug` flag switches the subscriber from
+  the default `info` level to `debug`, giving deployers
+  detailed timing and key-fingerprint output without polluting
+  the PEM stream on stdout.
+- Uses `clap` (already a dependency) for polished `--help`
+  output and future extensibility (e.g., `--bits`, `--out-dir`).
 - Reuses the same `rsa` + `pkcs8` code path as the ephemeral
   generator in `src/jwt.rs`.
 
 ##### Container integration
 
 The container entry script (`share/container/entry_script_sh`)
-auto-generates persistent keys on first boot:
+auto-generates persistent keys on first boot (runs **after**
+`adduser`, so the `torrust` user already exists):
 
 ```sh
 # Generate auth keys if not already present on the volume.
-private_key="/etc/torrust/index/private.pem"
-public_key="/etc/torrust/index/public.pem"
+auth_dir="/etc/torrust/index/auth"
+private_key="$auth_dir/private.pem"
+public_key="$auth_dir/public.pem"
+tmpfile=$(mktemp /tmp/auth_keys.XXXXXX)
+chmod 0600 "$tmpfile"
+trap 'rm -f "$tmpfile"' EXIT
 
-if [ ! -f "$private_key" ] || [ ! -f "$public_key" ]; then
-    torrust-generate-auth-keypair > /tmp/auth_keys.pem 2>/dev/null
-    sed -n '/BEGIN PRIVATE/,/END PRIVATE/p' /tmp/auth_keys.pem > "$private_key"
-    sed -n '/BEGIN PUBLIC/,/END PUBLIC/p'   /tmp/auth_keys.pem > "$public_key"
-    rm -f /tmp/auth_keys.pem
+if [ ! -s "$private_key" ] || [ ! -s "$public_key" ]; then
+    mkdir -p "$auth_dir"
+    chown torrust:torrust "$auth_dir"
+    chmod 0700 "$auth_dir"
+
+    if ! torrust-generate-auth-keypair > "$tmpfile"; then
+        echo "ERROR: Failed to generate auth keypair" >&2
+        exit 1
+    fi
+    sed -n '/BEGIN PRIVATE KEY/,/END PRIVATE KEY/p' "$tmpfile" > "$private_key"
+    sed -n '/BEGIN PUBLIC KEY/,/END PUBLIC KEY/p'   "$tmpfile" > "$public_key"
+    rm -f "$tmpfile"
     chown torrust:torrust "$private_key" "$public_key"
     chmod 0400 "$private_key"
     chmod 0440 "$public_key"
 fi
 ```
 
+Hardening notes:
+- **`mkdir -p "$auth_dir"` with `chmod 0700`** creates the
+  `auth/` subdirectory with restrictive permissions before any
+  key material is written.
+- **`mktemp` + `chmod 0600`** creates the temp file with a
+  unique name and restrictive permissions immediately, so key
+  material is never world-readable — even momentarily.
+- **`[ ! -s … ]`** (not `[ ! -f … ]`) checks that the file
+  exists **and** is non-empty, protecting against a previous run
+  that was killed mid-write and left a 0-byte PEM file.
+- **`trap … EXIT`** ensures the temp file is cleaned up even if
+  the script is interrupted between write and `rm`. `/tmp` in
+  the container is typically `tmpfs` (RAM-backed), so the key
+  material never touches persistent storage.
+- **`sed` patterns match the exact PEM markers** (`BEGIN PRIVATE
+  KEY` / `BEGIN PUBLIC KEY`) produced by PKCS#8 / SPKI encoding,
+  rather than loose substrings.
+- **stderr flows to the container log** — only stdout is
+  redirected to the temp file, so diagnostic `tracing` output
+  and any error messages from the binary are visible in
+  `docker logs`. If generation fails, the script exits
+  non-zero.
+- **TOCTOU note:** if two containers race against the same
+  volume, both could pass the `[ ! -s … ]` check and
+  overwrite each other's keys. This is unlikely in practice
+  (single-container deployments are the norm), but can be
+  mitigated with `flock` if needed.
+
 Because `/etc/torrust/index` is a declared `VOLUME`, the
 generated keys persist across container restarts and image
 upgrades. Sessions survive as long as the volume is retained.
 
-All container configuration files (`share/default/config/`) set:
+All **container** configuration files (those with `container` in
+the name under `share/default/config/`) set:
 ```toml
 [auth]
-private_key_path = "/etc/torrust/index/private.pem"
-public_key_path  = "/etc/torrust/index/public.pem"
+private_key_path = "/etc/torrust/index/auth/private.pem"
+public_key_path  = "/etc/torrust/index/auth/public.pem"
 ```
 
 ##### Containerfile changes
@@ -606,17 +652,22 @@ both the debug and release runtime images alongside
 `torrust-index` and `health_check`:
 
 ```dockerfile
-# Extract and Test (debug)
+# Extract and Test (debug)  — add to the existing cp -l line:
 RUN mkdir -p /app/bin/; \
   cp -l /test/src/target/debug/torrust-index /app/bin/torrust-index; \
   cp -l /test/src/target/debug/torrust-generate-auth-keypair /app/bin/torrust-generate-auth-keypair
 
-# Extract and Test (release)
+# Extract and Test (release) — add to the existing cp -l block:
 RUN mkdir -p /app/bin/; \
   cp -l /test/src/target/release/torrust-index /app/bin/torrust-index; \
   cp -l /test/src/target/release/health_check /app/bin/health_check; \
   cp -l /test/src/target/release/torrust-generate-auth-keypair /app/bin/torrust-generate-auth-keypair
 ```
+
+Note: the debug stage currently copies only `torrust-index`
+(no `health_check`). The new binary follows the same pattern.
+The release stage already copies both `torrust-index` and
+`health_check`, so the new binary is appended to that block.
 
 ##### Host-supplied keys (custom key workflow)
 
@@ -624,7 +675,7 @@ Hosts who want to use their own RSA key pair have two options:
 
 1. **Pre-supply before first boot.** Mount or copy key files into
    the `/etc/torrust/index` volume before starting the container.
-   The entry script's existence check (`[ ! -f … ]`) will skip
+   The entry script's existence check (`[ ! -s … ]`) will skip
    generation and the server will use the host's keys directly.
 
 2. **Overwrite after first boot.** Let the container auto-generate
@@ -637,19 +688,26 @@ Hosts who want to use their own RSA key pair have two options:
 ##### Usage outside containers
 
 ```sh
-# Generate and split into two files:
-cargo run --bin torrust-generate-auth-keypair \
-  | tee >(sed -n '/BEGIN PRIVATE/,/END PRIVATE/p' > private.pem) \
-        >(sed -n '/BEGIN PUBLIC/,/END PUBLIC/p'   > public.pem) \
-        > /dev/null
+tmpfile=$(mktemp /tmp/auth_keys.XXXXXX)
+chmod 0600 "$tmpfile"
+cargo run --bin torrust-generate-auth-keypair > "$tmpfile"
+sed -n '/BEGIN PRIVATE KEY/,/END PRIVATE KEY/p' "$tmpfile" > private.pem
+sed -n '/BEGIN PUBLIC KEY/,/END PUBLIC KEY/p'   "$tmpfile" > public.pem
+rm -f "$tmpfile"
 ```
+
+> **Avoid** the Bash process-substitution form
+> (`tee >(sed …) >(sed …)`). The `>(…)` sub-processes run
+> asynchronously, so the `sed` writes may not have flushed
+> when the pipeline exits — producing truncated PEM files.
+> The POSIX version above is strictly correct.
 
 ##### Files affected
 
 | File | Change |
 |---|---|
-| `src/bin/torrust-generate-auth-keypair.rs` | New binary |
-| `Cargo.toml` | No change — auto-discovered by Cargo |
+| `src/bin/generate_auth_keypair.rs` | New binary |
+| `Cargo.toml` | Add `[[bin]]` section: `name = "torrust-generate-auth-keypair"`, `path = "src/bin/generate_auth_keypair.rs"` |
 | `Containerfile` | Copy `torrust-generate-auth-keypair` into `/app/bin/` in both debug and release stages |
 | `share/container/entry_script_sh` | Add key-generation block before `exec su-exec` |
 | `share/default/config/index.container.sqlite3.toml` | Add `private_key_path` / `public_key_path` to `[auth]` |
@@ -657,6 +715,10 @@ cargo run --bin torrust-generate-auth-keypair \
 | `share/default/config/index.public.e2e.container.sqlite3.toml` | Add `private_key_path` / `public_key_path` to `[auth]` |
 | `share/default/config/index.public.e2e.container.mysql.toml` | Add `private_key_path` / `public_key_path` to `[auth]` |
 | `share/default/config/index.private.e2e.container.sqlite3.toml` | Add `private_key_path` / `public_key_path` to `[auth]` |
+
+Note: there is no `index.private.e2e.container.mysql.toml` at
+present. If one is added in the future, it will also need the
+`[auth]` key paths.
 
 ##### No breaking changes
 
@@ -694,7 +756,7 @@ long as the volume is retained.
 Note: the **serialized default config** changes in Phase 5 — the
 bare-metal `[auth]` section will no longer contain
 `private_key_path` / `public_key_path` entries. Container configs
-*do* include these paths (pointing to `/etc/torrust/index/`).
+*do* include these paths (pointing to `/etc/torrust/index/auth/`).
 Deployers who generate their config from defaults should be aware
 of this difference. Existing configs that explicitly set these
 fields are unaffected.

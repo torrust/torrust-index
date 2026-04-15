@@ -5,7 +5,7 @@
 //!
 //! See ADR-T-007 for the rationale behind centralising JWT handling.
 //!
-//! # Architecture (ADR-T-007 Phases 1–5)
+//! # Architecture (ADR-T-007 Phases 1–6)
 //!
 //! **Phase 1 — Structural cleanup.** Consolidated all `jsonwebtoken`
 //! usage into this single module with `Result`-based error propagation.
@@ -32,6 +32,13 @@
 //! auto-generated in memory at startup. The keys are never written to
 //! disk; sessions do not survive server restarts. Deployers who want
 //! persistent sessions supply their own key pair via config.
+//!
+//! **Phase 6 — `generate-auth-keypair` CLI.** A standalone binary
+//! (`torrust-generate-auth-keypair`) generates an RSA-2048 key pair
+//! and writes both PEM blocks to stdout. The container entry script
+//! uses it to auto-generate persistent keys on first boot. See
+//! `src/bin/generate_auth_keypair.rs` for the binary and ADR-T-007
+//! Phase 6 for full context.
 
 use std::sync::Arc;
 

@@ -19,6 +19,8 @@ token = "MyAccessToken"
 url = "http://tracker:7070"
 
 [auth]
+private_key_path = "/etc/torrust/index/auth/private.pem"
+public_key_path = "/etc/torrust/index/auth/public.pem"
 
 [database]
 connect_url = "sqlite:///var/lib/torrust/index/database/e2e_testing_sqlite3.db?mode=rwc"

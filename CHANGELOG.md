@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ephemeral auto-generated RSA-2048 key pair when no keys are configured.
   Sessions do not survive server restarts with ephemeral keys. Deployers who
   want persistent sessions supply their own key pair via config.
+- `torrust-generate-auth-keypair` CLI binary for generating RSA-2048 key pairs.
+  Outputs both PEM blocks to stdout; refuses to run if stdout is a terminal.
+- Container auto-generation of persistent auth keys on first boot. The entry
+  script runs `torrust-generate-auth-keypair` and writes the PEM files to
+  `/etc/torrust/index/auth/` on the volume. Sessions survive restarts with no
+  manual setup.
 - `kid` (Key ID) header in every JWT for future key rotation support.
 - Configurable token lifetimes: `auth.session_token_lifetime_secs` (default:
   2 weeks) and `auth.email_verification_token_lifetime_secs` (default: ~10 years).
