@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING:** Raise MSRV from 1.85 to 1.88.
 - **BREAKING:** JWT signing algorithm changed from HMAC-HS256 to RS256
   (RSA + SHA-256). Existing HS256 tokens are invalidated; users must re-login.
 - **BREAKING:** JWT claims redesigned from `UserClaims { user, exp }` to

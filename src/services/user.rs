@@ -139,10 +139,10 @@ impl RegistrationService {
             None => None,
         };
 
-        if let Some(email) = &opt_email {
-            if !validate_email_address(email) {
-                return Err(UserError::EmailInvalid);
-            }
+        if let Some(email) = &opt_email
+            && !validate_email_address(email)
+        {
+            return Err(UserError::EmailInvalid);
         }
 
         validate_password_constraints(
@@ -167,19 +167,19 @@ impl RegistrationService {
             drop(self.user_repository.grant_admin_role(&user_id).await);
         }
 
-        if let Some(email) = &registration.email {
-            if email.verification_required {
-                // Email verification is enabled
-                if let Some(email) = opt_email {
-                    let mail_res = self
-                        .mailer
-                        .send_verification_mail(&email, &registration_form.username, user_id, api_base_url)
-                        .await;
+        if let Some(email) = &registration.email
+            && email.verification_required
+        {
+            // Email verification is enabled
+            if let Some(email) = opt_email {
+                let mail_res = self
+                    .mailer
+                    .send_verification_mail(&email, &registration_form.username, user_id, api_base_url)
+                    .await;
 
-                    if mail_res.is_err() {
-                        drop(self.user_repository.delete(&user_id).await);
-                        return Err(UserError::FailedToSendVerificationEmail);
-                    }
+                if mail_res.is_err() {
+                    drop(self.user_repository.delete(&user_id).await);
+                    return Err(UserError::FailedToSendVerificationEmail);
                 }
             }
         }

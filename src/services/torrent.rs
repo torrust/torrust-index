@@ -664,7 +664,7 @@ pub struct DbCanonicalInfoHashGroupRepository {
 
 impl CanonicalInfoHashGroup {
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.original_info_hashes.is_empty()
     }
 

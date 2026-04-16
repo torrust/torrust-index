@@ -171,12 +171,7 @@ impl Torrent {
     }
 
     const fn is_private(&self) -> bool {
-        if let Some(private) = self.info.private {
-            if private == 1 {
-                return true;
-            }
-        }
-        false
+        matches!(self.info.private, Some(1))
     }
 
     /// It calculates the info hash of the torrent file.
@@ -191,7 +186,7 @@ impl Torrent {
         hasher.update(info_bencoded);
         let sum_hex = hasher.finalize();
         let mut sum_bytes: [u8; 20] = Default::default();
-        sum_bytes.copy_from_slice(sum_hex.as_slice());
+        sum_bytes.copy_from_slice(&sum_hex);
         sum_bytes
     }
 

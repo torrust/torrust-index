@@ -43,10 +43,10 @@ pub fn decode_and_validate_torrent_file(bytes: &[u8]) -> Result<(Torrent, InfoHa
     let torrent = decode_torrent(bytes).map_err(|_| DecodeTorrentFileError::InvalidBencodeData)?;
 
     // Make sure that the pieces key has a length that is a multiple of 20
-    if let Some(pieces) = torrent.info.pieces.as_ref() {
-        if pieces.as_ref().len() % 20 != 0 {
-            return Err(DecodeTorrentFileError::InvalidTorrentPiecesLength);
-        }
+    if let Some(pieces) = torrent.info.pieces.as_ref()
+        && pieces.as_ref().len() % 20 != 0
+    {
+        return Err(DecodeTorrentFileError::InvalidTorrentPiecesLength);
     }
 
     Ok((torrent, original_info_hash))

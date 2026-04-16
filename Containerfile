@@ -6,7 +6,7 @@
 FROM rust:bookworm AS chef
 WORKDIR /tmp
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-RUN cargo binstall --no-confirm cargo-chef cargo-nextest
+RUN cargo binstall --no-confirm --locked cargo-chef cargo-nextest
 
 ## Tester Image
 FROM rust:slim-bookworm AS tester
@@ -14,7 +14,7 @@ WORKDIR /tmp
 
 RUN apt-get update; apt-get install -y curl sqlite3; apt-get autoclean
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-RUN cargo binstall --no-confirm cargo-nextest imdl
+RUN cargo binstall --no-confirm --locked cargo-nextest imdl
 
 COPY ./share/ /app/share/torrust
 RUN mkdir -p /app/share/torrust/default/database/; \

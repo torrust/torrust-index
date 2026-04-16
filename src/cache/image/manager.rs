@@ -177,10 +177,10 @@ impl ImageCacheService {
     }
 
     async fn check_user_quota(&self, user_id: &UserId) -> Result<(), Error> {
-        if let Some(quota) = self.user_quotas.read().await.get(user_id) {
-            if quota.is_reached() {
-                return Err(Error::UserQuotaMet);
-            }
+        if let Some(quota) = self.user_quotas.read().await.get(user_id)
+            && quota.is_reached()
+        {
+            return Err(Error::UserQuotaMet);
         }
 
         Ok(())

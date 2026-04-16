@@ -90,7 +90,7 @@ edition-2024-only releases in the lock file:
 | `uuid`              | 1.22.0  | 1.20.0  | `getrandom 0.4` edition 2024               |
 | `base64ct`          | 1.8.3   | 1.7.3   | edition 2024                               |
 | `psm`               | 0.1.30  | 0.1.24  | removed `ar_archive_writer` (edition 2024) |
-| `tera`              | 1.20.1  | 1.20.0  | required rustc 1.85                        |
+| `tera`              | 1.20.1  | 1.20.0  | edition 2024                               |
 
 ### Removed crates
 
