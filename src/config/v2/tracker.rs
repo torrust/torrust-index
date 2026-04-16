@@ -101,7 +101,7 @@ impl ApiToken {
     }
 
     #[must_use]
-    pub fn as_bytes(&self) -> &[u8] {
+    pub const fn as_bytes(&self) -> &[u8] {
         self.0.as_bytes()
     }
 }

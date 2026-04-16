@@ -52,15 +52,15 @@ impl StatisticsImporter {
 
             let ret = self.import_torrent_statistics(torrent.torrent_id, &torrent.info_hash).await;
 
-            if let Some(err) = ret.err() {
-                if err != TrackerAPIError::TorrentNotFound {
-                    let message = format!(
-                        "Error updating torrent tracker stats for torrent. Torrent: id {}; infohash {}. Error: {:?}",
-                        torrent.torrent_id, torrent.info_hash, err
-                    );
-                    error!(target: "statistics_importer", "{}", message);
-                    // todo: return a domain error (e.g. TorrentError) that can be a tracker API error or a database error.
-                }
+            if let Some(err) = ret.err()
+                && err != TrackerAPIError::TorrentNotFound
+            {
+                let message = format!(
+                    "Error updating torrent tracker stats for torrent. Torrent: id {}; infohash {}. Error: {:?}",
+                    torrent.torrent_id, torrent.info_hash, err
+                );
+                error!(target: "statistics_importer", "{}", message);
+                // todo: return a domain error (e.g. TorrentError) that can be a tracker API error or a database error.
             }
         }
 
