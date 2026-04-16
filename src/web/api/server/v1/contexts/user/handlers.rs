@@ -72,7 +72,7 @@ pub async fn email_verification_handler(State(app_data): State<Arc<AppData>>, Pa
 /// It returns an error if:
 ///
 /// - Unable to verify the supplied payload as a valid JWT.
-/// - The JWT is not invalid or expired.
+/// - The JWT is invalid or expired.
 #[allow(clippy::unused_async)]
 pub async fn login_handler(
     State(app_data): State<Arc<AppData>>,
@@ -95,7 +95,7 @@ pub async fn login_handler(
 /// It returns an error if:
 ///
 /// - Unable to verify the supplied payload as a valid JWT.
-/// - The JWT is not invalid or expired.
+/// - The JWT is invalid or expired.
 /// - The token's generation has been revoked.
 pub async fn verify_token_handler(
     State(app_data): State<Arc<AppData>>,
@@ -106,12 +106,18 @@ pub async fn verify_token_handler(
         Err(error) => return error.into_response(),
     };
 
-    // Validate token generation against the database
-    let Ok(current_gen) = app_data.database.get_token_generation(claims.sub).await else {
-        return AuthError::UserNotFound.into_response();
+    // Validate token generation against the database (ADR-T-007 §A-1: exact match)
+    let current_gen = match app_data.database.get_token_generation(claims.sub).await {
+        Ok(generation) => generation,
+        Err(e) => return AuthError::from(e).into_response(),
     };
 
-    if claims.token_gen < current_gen {
+    if claims.token_gen != current_gen {
+        return AuthError::TokenRevoked.into_response();
+    }
+
+    // Defence-in-depth: reject tokens for banned users (ADR-T-007 §A-3)
+    if app_data.database.is_user_banned(claims.sub).await.unwrap_or(false) {
         return AuthError::TokenRevoked.into_response();
     }
 
@@ -131,7 +137,7 @@ pub struct UsernameParam(pub String);
 /// It returns an error if:
 ///
 /// - Unable to parse the supplied payload as a valid JWT.
-/// - The JWT is not invalid or expired.
+/// - The JWT is invalid or expired.
 #[allow(clippy::unused_async)]
 pub async fn renew_token_handler(
     State(app_data): State<Arc<AppData>>,

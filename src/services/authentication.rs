@@ -128,10 +128,15 @@ impl Service {
         // Verify if token is valid
         let claims = self.json_web_token.verify(token)?;
 
-        // Validate token generation — reject revoked tokens
+        // Validate token generation — reject revoked tokens (ADR-T-007 §A-1: exact match)
         let current_gen = self.database.get_token_generation(claims.sub).await?;
 
-        if claims.token_gen < current_gen {
+        if claims.token_gen != current_gen {
+            return Err(AuthError::TokenRevoked);
+        }
+
+        // Defence-in-depth: reject tokens for banned users (ADR-T-007 §A-3)
+        if self.database.is_user_banned(claims.sub).await.unwrap_or(false) {
             return Err(AuthError::TokenRevoked);
         }
 
@@ -177,6 +182,18 @@ impl DbUserAuthenticationRepository {
     /// It returns an error if there is a database error.
     pub async fn change_password(&self, user_id: UserId, password_hash: &str) -> Result<(), Error> {
         self.database.change_user_password(user_id, password_hash).await
+    }
+
+    /// Change password and increment `token_generation` atomically.
+    /// See ADR-T-007 §A-2a.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn change_password_and_revoke_tokens(&self, user_id: UserId, password_hash: &str) -> Result<(), Error> {
+        self.database
+            .change_user_password_and_revoke_tokens(user_id, password_hash)
+            .await
     }
 
     /// Increment the user's `token_generation` counter, invalidating all

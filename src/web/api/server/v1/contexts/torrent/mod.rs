@@ -48,7 +48,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: multipart/form-data" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiJ9.-EfY9CrZz2OLfjiVQzkhxSjV7tWTFivP2yMuzZkbEak" \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
 //!   --request POST \
 //!   --form "title=MandelbrotSet" \
 //!   --form "description=MandelbrotSet image" \
@@ -87,7 +87,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/x-bittorrent" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiJ9.-EfY9CrZz2OLfjiVQzkhxSjV7tWTFivP2yMuzZkbEak" \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
 //!   --output mandelbrot_2048x2048_infohash_v1.png.torrent \
 //!   "http://127.0.0.1:3001/v1/torrent/download/5452869BE36F9F3350CCEE6B4544E7E76CAAADAB"
 //! ```
@@ -129,7 +129,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiJ9.-EfY9CrZz2OLfjiVQzkhxSjV7tWTFivP2yMuzZkbEak" \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
 //!   --request GET \
 //!   "http://127.0.0.1:3001/v1/torrent/5452869BE36F9F3350CCEE6B4544E7E76CAAADAB"
 //! ```
@@ -215,7 +215,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiJ9.-EfY9CrZz2OLfjiVQzkhxSjV7tWTFivP2yMuzZkbEak" \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
 //!   --request GET \
 //!   "http://127.0.0.1:3001/v1/torrents"
 //! ```
@@ -279,7 +279,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiJ9.-EfY9CrZz2OLfjiVQzkhxSjV7tWTFivP2yMuzZkbEak" \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
 //!   --request PUT \
 //!   --data '{"title":"MandelbrotSet", "description":"MandelbrotSet image"}' \
 //!   "http://127.0.0.1:3001/v1/torrent/5452869BE36F9F3350CCEE6B4544E7E76CAAADAB"
@@ -336,7 +336,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiJ9.-EfY9CrZz2OLfjiVQzkhxSjV7tWTFivP2yMuzZkbEak" \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
 //!   --request DELETE \
 //!   "http://127.0.0.1:3001/v1/torrent/5452869BE36F9F3350CCEE6B4544E7E76CAAADAB"
 //! ```

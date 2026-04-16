@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 /// Default session-token lifetime: 2 weeks (1 209 600 s).
 const DEFAULT_SESSION_TOKEN_LIFETIME_SECS: u64 = 1_209_600;
@@ -123,6 +124,7 @@ impl Auth {
             if Path::new(path).exists() {
                 return Some(std::fs::read(path).unwrap_or_else(|e| panic!("Failed to read RSA private key from `{path}`: {e}")));
             }
+            warn!("configured private_key_path `{path}` does not exist, falling back to ephemeral keys");
         }
 
         None
@@ -151,6 +153,7 @@ impl Auth {
             if Path::new(path).exists() {
                 return Some(std::fs::read(path).unwrap_or_else(|e| panic!("Failed to read RSA public key from `{path}`: {e}")));
             }
+            warn!("configured public_key_path `{path}` does not exist, falling back to ephemeral keys");
         }
 
         None

@@ -23,8 +23,8 @@ pub struct BearerToken(String);
 
 impl BearerToken {
     #[must_use]
-    pub fn value(&self) -> String {
-        self.0.clone()
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 

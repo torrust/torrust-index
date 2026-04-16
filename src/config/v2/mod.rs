@@ -111,8 +111,18 @@ impl Settings {
             let _ = self.database.connect_url.set_password(Some("***"));
         }
         "***".clone_into(&mut self.mail.smtp.credentials.password);
-        self.auth.private_key_pem = Some("***-redacted-private-key-pem***".to_owned());
-        self.auth.private_key_path = Some("***-redacted***".to_owned());
+        if let Some(private_key_pem) = self.auth.private_key_pem.as_mut() {
+            "***-redacted-private-key-pem***".clone_into(private_key_pem);
+        }
+        if let Some(private_key_path) = self.auth.private_key_path.as_mut() {
+            "***-redacted***".clone_into(private_key_path);
+        }
+        if let Some(public_key_pem) = self.auth.public_key_pem.as_mut() {
+            "***-redacted-public-key-pem***".clone_into(public_key_pem);
+        }
+        if let Some(public_key_path) = self.auth.public_key_path.as_mut() {
+            "***-redacted***".clone_into(public_key_path);
+        }
     }
 
     /// Encodes the configuration to TOML.

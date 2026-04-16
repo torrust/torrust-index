@@ -271,13 +271,9 @@ impl ProfileService {
 
         let password_hash = hash_password(&change_password_form.password)?;
 
+        // Atomically change password and revoke tokens (ADR-T-007 §A-2a)
         self.user_authentication_repository
-            .change_password(user_id, &password_hash)
-            .await?;
-
-        // Invalidate all outstanding session tokens for this user
-        self.user_authentication_repository
-            .increment_token_generation(user_id)
+            .change_password_and_revoke_tokens(user_id, &password_hash)
             .await?;
 
         Ok(())
@@ -327,11 +323,9 @@ impl BanService {
             .get_user_profile_from_username(username_to_be_banned)
             .await?;
 
-        self.banned_user_list.add(&user_profile.user_id).await?;
-
-        // Invalidate all outstanding session tokens for the banned user
+        // Atomically ban and revoke tokens (ADR-T-007 §A-2c)
         self.banned_user_list
-            .increment_token_generation(&user_profile.user_id)
+            .add_and_revoke_tokens(&user_profile.user_id)
             .await?;
 
         Ok(())
@@ -475,9 +469,8 @@ impl Repository for DbUserRepository {
     ///
     /// It returns an error if there is a database error.
     async fn grant_admin_role(&self, user_id: &UserId) -> Result<(), Error> {
-        self.database.grant_admin_role(*user_id).await?;
-        // Invalidate outstanding session tokens — the user's role changed.
-        self.database.increment_token_generation(*user_id).await
+        // Atomically grant admin and revoke tokens (ADR-T-007 §A-2b)
+        self.database.grant_admin_role_and_revoke_tokens(*user_id).await
     }
 
     /// It deletes the user.
@@ -578,6 +571,27 @@ impl DbBannedUserList {
             .expect("Could not parse date from 9999-01-01 00:00:00.");
 
         self.database.ban_user(*user_id, &reason, date_expiry).await
+    }
+
+    /// Ban a user and atomically increment `token_generation`.
+    /// See ADR-T-007 §A-2c.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    ///
+    /// # Panics
+    ///
+    /// It panics if the expiration date cannot be parsed.
+    pub async fn add_and_revoke_tokens(&self, user_id: &UserId) -> Result<(), Error> {
+        let reason = "no reason".to_string();
+
+        let date_expiry = chrono::NaiveDateTime::parse_from_str("9999-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
+            .expect("Could not parse date from 9999-01-01 00:00:00.");
+
+        self.database
+            .ban_user_and_revoke_tokens(*user_id, &reason, date_expiry)
+            .await
     }
 
     /// Increment the user's `token_generation` counter, invalidating all

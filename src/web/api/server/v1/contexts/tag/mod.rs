@@ -61,7 +61,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiJ9.-EfY9CrZz2OLfjiVQzkhxSjV7tWTFivP2yMuzZkbEak" \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
 //!   --request POST \
 //!   --data '{"name":"new tag"}' \
 //!   http://127.0.0.1:3001/v1/tag
@@ -98,7 +98,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiJ9.-EfY9CrZz2OLfjiVQzkhxSjV7tWTFivP2yMuzZkbEak" \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
 //!   --request DELETE \
 //!   --data '{"tag_id":1}' \
 //!   http://127.0.0.1:3001/v1/tag

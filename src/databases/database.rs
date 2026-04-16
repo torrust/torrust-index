@@ -204,6 +204,11 @@ pub trait Database: Sync + Send {
     /// Change user's password.
     async fn change_user_password(&self, user_id: i64, new_password: &str) -> Result<(), Error>;
 
+    /// Change user's password **and** increment `token_generation` in a
+    /// single transaction, ensuring both succeed or neither does.
+    /// See ADR-T-007 §A-2a.
+    async fn change_user_password_and_revoke_tokens(&self, user_id: i64, new_password: &str) -> Result<(), Error>;
+
     /// Get `User` from `user_id`.
     async fn get_user_from_id(&self, user_id: i64) -> Result<User, Error>;
 
@@ -235,8 +240,23 @@ pub trait Database: Sync + Send {
     /// Ban user with `user_id`, `reason` and `date_expiry`.
     async fn ban_user(&self, user_id: i64, reason: &str, date_expiry: NaiveDateTime) -> Result<(), Error>;
 
+    /// Ban a user **and** increment `token_generation` in a single
+    /// transaction, ensuring both succeed or neither does.
+    /// See ADR-T-007 §A-2c.
+    async fn ban_user_and_revoke_tokens(&self, user_id: i64, reason: &str, date_expiry: NaiveDateTime) -> Result<(), Error>;
+
+    /// Check whether a user is currently banned (has a non-expired
+    /// entry in `torrust_user_bans`). Defence-in-depth for the
+    /// authentication path. See ADR-T-007 §A-3.
+    async fn is_user_banned(&self, user_id: i64) -> Result<bool, Error>;
+
     /// Grant a user the administrator role.
     async fn grant_admin_role(&self, user_id: i64) -> Result<(), Error>;
+
+    /// Grant a user the administrator role **and** increment
+    /// `token_generation` in a single `UPDATE` statement.
+    /// See ADR-T-007 §A-2b.
+    async fn grant_admin_role_and_revoke_tokens(&self, user_id: i64) -> Result<(), Error>;
 
     /// Get the current `token_generation` counter for a user.
     async fn get_token_generation(&self, user_id: i64) -> Result<u64, Error>;

@@ -131,6 +131,52 @@ impl Database for Mysql {
             })
     }
 
+    /// Change user's password and increment `token_generation` atomically.
+    /// See ADR-T-007 §A-2a.
+    async fn change_user_password_and_revoke_tokens(&self, user_id: i64, new_password: &str) -> Result<(), database::Error> {
+        let mut conn = self.pool.acquire().await.map_err(|_| database::Error::Error)?;
+        let mut tx = conn.begin().await.map_err(|_| database::Error::Error)?;
+
+        let pw_result = query("UPDATE torrust_user_authentication SET password_hash = ? WHERE user_id = ?")
+            .bind(new_password)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| database::Error::Error)
+            .and_then(|v| {
+                if v.rows_affected() > 0 {
+                    Ok(())
+                } else {
+                    Err(database::Error::UserNotFound)
+                }
+            });
+
+        if let Err(e) = pw_result {
+            drop(tx.rollback().await);
+            return Err(e);
+        }
+
+        let gen_result = query("UPDATE torrust_users SET token_generation = token_generation + 1 WHERE user_id = ?")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| database::Error::Error)
+            .and_then(|v| {
+                if v.rows_affected() > 0 {
+                    Ok(())
+                } else {
+                    Err(database::Error::UserNotFound)
+                }
+            });
+
+        if let Err(e) = gen_result {
+            drop(tx.rollback().await);
+            return Err(e);
+        }
+
+        tx.commit().await.map_err(|_| database::Error::Error)
+    }
+
     async fn get_user_from_id(&self, user_id: i64) -> Result<User, database::Error> {
         query_as::<_, User>("SELECT * FROM torrust_users WHERE user_id = ?")
             .bind(user_id)
@@ -284,8 +330,83 @@ impl Database for Mysql {
             .map_err(|_| database::Error::Error)
     }
 
+    /// Ban a user and increment `token_generation` atomically.
+    /// See ADR-T-007 §A-2c.
+    async fn ban_user_and_revoke_tokens(
+        &self,
+        user_id: i64,
+        reason: &str,
+        date_expiry: NaiveDateTime,
+    ) -> Result<(), database::Error> {
+        let date_expiry_string = date_expiry.format("%Y-%m-%d %H:%M:%S").to_string();
+
+        let mut conn = self.pool.acquire().await.map_err(|_| database::Error::Error)?;
+        let mut tx = conn.begin().await.map_err(|_| database::Error::Error)?;
+
+        let ban_result = query("INSERT INTO torrust_user_bans (user_id, reason, date_expiry) VALUES (?, ?, ?)")
+            .bind(user_id)
+            .bind(reason)
+            .bind(date_expiry_string)
+            .execute(&mut *tx)
+            .await
+            .map(|_| ())
+            .map_err(|_| database::Error::Error);
+
+        if let Err(e) = ban_result {
+            drop(tx.rollback().await);
+            return Err(e);
+        }
+
+        let gen_result = query("UPDATE torrust_users SET token_generation = token_generation + 1 WHERE user_id = ?")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|_| database::Error::Error)
+            .and_then(|v| {
+                if v.rows_affected() > 0 {
+                    Ok(())
+                } else {
+                    Err(database::Error::UserNotFound)
+                }
+            });
+
+        if let Err(e) = gen_result {
+            drop(tx.rollback().await);
+            return Err(e);
+        }
+
+        tx.commit().await.map_err(|_| database::Error::Error)
+    }
+
+    /// Defence-in-depth ban check. See ADR-T-007 §A-3.
+    async fn is_user_banned(&self, user_id: i64) -> Result<bool, database::Error> {
+        query_as::<_, (i64,)>("SELECT COUNT(*) FROM torrust_user_bans WHERE user_id = ? AND date_expiry > NOW()")
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await
+            .map(|(count,)| count > 0)
+            .map_err(|_| database::Error::Error)
+    }
+
     async fn grant_admin_role(&self, user_id: i64) -> Result<(), database::Error> {
         query("UPDATE torrust_users SET administrator = TRUE WHERE user_id = ?")
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|_| database::Error::Error)
+            .and_then(|v| {
+                if v.rows_affected() > 0 {
+                    Ok(())
+                } else {
+                    Err(database::Error::UserNotFound)
+                }
+            })
+    }
+
+    /// Grant admin role and increment `token_generation` in a single UPDATE.
+    /// See ADR-T-007 §A-2b.
+    async fn grant_admin_role_and_revoke_tokens(&self, user_id: i64) -> Result<(), database::Error> {
+        query("UPDATE torrust_users SET administrator = TRUE, token_generation = token_generation + 1 WHERE user_id = ?")
             .bind(user_id)
             .execute(&self.pool)
             .await
@@ -304,8 +425,11 @@ impl Database for Mysql {
             .bind(user_id)
             .fetch_one(&self.pool)
             .await
-            .map(|(v,): (i64,)| u64::try_from(v).unwrap_or(0))
-            .map_err(|_| database::Error::UserNotFound)
+            .map_err(|e| match e {
+                sqlx::Error::RowNotFound => database::Error::UserNotFound,
+                _ => database::Error::Error,
+            })
+            .and_then(|(v,): (i64,)| u64::try_from(v).map_err(|_| database::Error::Error))
     }
 
     async fn increment_token_generation(&self, user_id: i64) -> Result<(), database::Error> {

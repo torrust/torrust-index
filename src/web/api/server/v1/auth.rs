@@ -155,7 +155,7 @@ impl Authentication {
     /// This function will return an error if the JWT is invalid, expired,
     /// or if the token's generation has been revoked.
     pub async fn get_user_id_from_bearer_token(&self, token: BearerToken) -> Result<UserId, AuthError> {
-        let claims = self.json_web_token.verify(&token.value())?;
+        let claims = self.json_web_token.verify(token.as_str())?;
         self.validate_token_generation(&claims).await?;
         Ok(claims.sub)
     }
@@ -164,10 +164,23 @@ impl Authentication {
     /// `token_generation` in the database. Returns `AuthError::TokenRevoked`
     /// if the token is stale (e.g. after a password change, role change,
     /// or ban).
+    ///
+    /// Uses exact-match (`!=`) rather than `<` so that tokens are also
+    /// rejected when the database generation *decreases* (e.g. restore
+    /// from backup). See ADR-T-007 §A-1.
+    ///
+    /// Also checks the ban table as a defence-in-depth measure
+    /// (ADR-T-007 §A-3).
     async fn validate_token_generation(&self, claims: &SessionClaims) -> Result<(), AuthError> {
         let current_gen = self.database.get_token_generation(claims.sub).await?;
 
-        if claims.token_gen < current_gen {
+        if claims.token_gen != current_gen {
+            return Err(AuthError::TokenRevoked);
+        }
+
+        // Defence-in-depth: reject tokens for banned users even if
+        // token_generation somehow matches (ADR-T-007 §A-3).
+        if self.database.is_user_banned(claims.sub).await.unwrap_or(false) {
             return Err(AuthError::TokenRevoked);
         }
 
@@ -184,7 +197,7 @@ impl Authentication {
 pub fn parse_token(authorization: &HeaderValue) -> Result<String, AuthError> {
     let header_str = authorization.to_str().map_err(|_| AuthError::TokenInvalid)?;
 
-    let token = header_str.strip_prefix("Bearer").ok_or(AuthError::TokenInvalid)?.trim();
+    let token = header_str.strip_prefix("Bearer ").ok_or(AuthError::TokenInvalid)?.trim();
 
     if token.is_empty() {
         return Err(AuthError::TokenInvalid);
