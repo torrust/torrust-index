@@ -2,18 +2,18 @@ use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::sync::{Arc, LazyLock};
 
-use jsonwebtoken::{EncodingKey, Header, encode};
 use lettre::message::{MessageBuilder, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
-use serde::{Deserialize, Serialize};
 use serde_json::value::{Value, to_value};
 use tera::{Context, Tera, try_get_value};
 use tracing::error;
 
 use crate::config::Configuration;
 use crate::errors::UserError;
-use crate::utils::clock;
+use crate::jwt::JsonWebToken;
+// Re-export so existing `use crate::mailer::VerifyClaims` paths keep compiling.
+pub use crate::jwt::VerifyClaims;
 use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 
 /// Default verify-email template, compiled into the binary.
@@ -64,21 +64,19 @@ pub fn do_nothing_filter(value: &Value, _: &HashMap<String, Value>) -> tera::Res
 
 pub struct Service {
     cfg: Arc<Configuration>,
+    json_web_token: Arc<JsonWebToken>,
     mailer: Arc<Mailer>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct VerifyClaims {
-    pub iss: String,
-    pub sub: i64,
-    pub exp: u64,
-}
-
 impl Service {
-    pub async fn new(cfg: Arc<Configuration>) -> Self {
+    pub async fn new(cfg: Arc<Configuration>, json_web_token: Arc<JsonWebToken>) -> Self {
         let mailer = Arc::new(Self::get_mailer(&cfg).await);
 
-        Self { cfg, mailer }
+        Self {
+            cfg,
+            json_web_token,
+            mailer,
+        }
     }
 
     async fn get_mailer(cfg: &Configuration) -> Mailer {
@@ -115,7 +113,7 @@ impl Service {
     /// This function will panic if the multipart builder had an error.
     pub async fn send_verification_mail(&self, to: &str, username: &str, user_id: i64, base_url: &str) -> Result<(), UserError> {
         let builder = self.get_builder(to).await;
-        let verification_url = self.get_verification_url(user_id, base_url).await;
+        let verification_url = self.get_verification_url(user_id, base_url).await?;
 
         let mail = build_letter(verification_url.as_str(), username, builder)?;
 
@@ -137,21 +135,14 @@ impl Service {
             .to(to.parse().unwrap())
     }
 
-    async fn get_verification_url(&self, user_id: i64, base_url: &str) -> String {
+    async fn get_verification_url(&self, user_id: i64, base_url: &str) -> Result<String, UserError> {
+        let token = self
+            .json_web_token
+            .sign_email_verification(user_id)
+            .await
+            .map_err(|_| UserError::InternalServerError)?;
+
         let settings = self.cfg.settings.read().await;
-
-        // create verification JWT
-        let key = settings.auth.user_claim_token_pepper.as_bytes();
-
-        // Create non expiring token that is only valid for email-verification
-        let claims = VerifyClaims {
-            iss: String::from("email-verification"),
-            sub: user_id,
-            exp: clock::now() + 315_569_260, // 10 years from now
-        };
-
-        let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(key)).unwrap();
-
         let base_url = settings
             .net
             .base_url
@@ -159,7 +150,7 @@ impl Service {
             .map_or_else(|| base_url.to_string(), std::string::ToString::to_string);
         drop(settings);
 
-        format!("{base_url}/{API_VERSION_URL_PREFIX}/user/email/verify/{token}")
+        Ok(format!("{base_url}/{API_VERSION_URL_PREFIX}/user/email/verify/{token}"))
     }
 }
 

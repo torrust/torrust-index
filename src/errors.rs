@@ -36,6 +36,9 @@ pub enum AuthError {
     #[error("Token invalid.")]
     TokenInvalid,
 
+    #[error("Token has been revoked. Please sign in again.")]
+    TokenRevoked,
+
     #[error("Unauthorized action.")]
     UnauthorizedAction,
 
@@ -70,6 +73,7 @@ impl AuthError {
             Self::TokenNotFound
             | Self::TokenExpired
             | Self::TokenInvalid
+            | Self::TokenRevoked
             | Self::LoggedInUserNotFound
             | Self::UnauthorizedActionForGuests => StatusCode::UNAUTHORIZED,
             Self::InternalServerError | Self::DatabaseError => StatusCode::INTERNAL_SERVER_ERROR,

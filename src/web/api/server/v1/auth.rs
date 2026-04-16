@@ -42,19 +42,48 @@
 //! ```json
 //! {
 //!     "data":{
-//!       "token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI",
+//!       "token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE",
 //!       "username":"indexadmin",
 //!       "admin":true
 //!     }
 //!   }
 //! ```
 //!
-//! **NOTICE**: The token is valid for 2 weeks (`1_209_600` seconds). After that,
-//! you will have to renew the token.
+//! The JWT is signed with RS256 (RSA + SHA-256). The payload contains
+//! RFC 7519 registered claims plus advisory fields:
 //!
-//! **NOTICE**: The token is associated with the user role. If you change the
-//! user's role, you will have to log in again to get a new token with the new
-//! role.
+//! ```json
+//! {
+//!   "sub": 1,
+//!   "iss": "torrust-index",
+//!   "aud": "session",
+//!   "iat": 1686215788,
+//!   "exp": 1687425388,
+//!   "role": "admin",
+//!   "username": "indexadmin",
+//!   "gen": 0
+//! }
+//! ```
+//!
+//! The `role` and `username` fields are **advisory only** — the
+//! authoritative role is always re-checked from the database on each
+//! authenticated request (see ADR-T-007 Phase 2).
+//!
+//! The `gen` field is the token-generation counter. When a user's
+//! password changes, role changes, or the user is banned, the counter
+//! is incremented and any token carrying an older `gen` value is
+//! rejected. Validation is performed by
+//! [`JsonWebToken::validate_session`](crate::jwt::JsonWebToken::validate_session)
+//! (see ADR-T-007 Phases 4 & 7).
+//!
+//! **NOTICE**: The token lifetime is configurable via
+//! `auth.session_token_lifetime_secs` (default: 2 weeks / `1_209_600` seconds).
+//! After expiry you will have to renew the token.
+//!
+//! **NOTICE**: The token `role` is advisory. If the user's role changes in
+//! the database, the new role takes effect immediately on the next request.
+//! However, you may still want to log in again to get a token that reflects
+//! the current role.
 //!
 //! ## Using the token
 //!
@@ -65,7 +94,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
+//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE" \
 //!   --request POST \
 //!   --data '{"name":"new category","icon":null}' \
 //!   http://127.0.0.1:3001/v1/category
@@ -82,25 +111,33 @@ use std::sync::Arc;
 
 use hyper::http::HeaderValue;
 
-use crate::common::AppData;
+use crate::databases::database::Database;
 use crate::errors::AuthError;
-use crate::models::user::{UserClaims, UserCompact, UserId};
-use crate::services::authentication::JsonWebToken;
+use crate::jwt::{JsonWebToken, SessionClaims};
+use crate::models::user::{UserCompact, UserId};
 use crate::web::api::server::v1::extractors::bearer_token::BearerToken;
 
 pub struct Authentication {
     json_web_token: Arc<JsonWebToken>,
+    database: Arc<Box<dyn Database>>,
 }
 
 impl Authentication {
     #[must_use]
-    pub const fn new(json_web_token: Arc<JsonWebToken>) -> Self {
-        Self { json_web_token }
+    pub fn new(json_web_token: Arc<JsonWebToken>, database: Arc<Box<dyn Database>>) -> Self {
+        Self {
+            json_web_token,
+            database,
+        }
     }
 
     /// Create Json Web Token
-    pub async fn sign_jwt(&self, user: UserCompact) -> String {
-        self.json_web_token.sign(user).await
+    ///
+    /// # Errors
+    ///
+    /// Returns `AuthError::InternalServerError` if the token cannot be encoded.
+    pub async fn sign_jwt(&self, user: UserCompact, token_generation: u64) -> Result<String, AuthError> {
+        self.json_web_token.sign(user, token_generation).await
     }
 
     /// Verify Json Web Token
@@ -108,68 +145,42 @@ impl Authentication {
     /// # Errors
     ///
     /// This function will return an error if the JWT is not good or expired.
-    pub async fn verify_jwt(&self, token: &str) -> Result<UserClaims, AuthError> {
-        self.json_web_token.verify(token).await
+    pub fn verify_jwt(&self, token: &str) -> Result<SessionClaims, AuthError> {
+        self.json_web_token.verify(token)
     }
 
-    /// Get logged-in user ID from bearer token
+    /// Get logged-in user ID from bearer token, validating the token
+    /// generation counter against the database.
     ///
     /// # Errors
     ///
-    /// This function will return an error if it can get claims from the request
-    pub async fn get_user_id_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<UserId, AuthError> {
-        let claims = self.get_claims_from_bearer_token(maybe_token).await?;
-        Ok(claims.user.user_id)
-    }
-
-    /// Get Claims from bearer token
-    ///
-    /// # Errors
-    ///
-    /// This function will:
-    ///
-    /// - Return an `AuthError::TokenNotFound` if `HeaderValue` is `None`.
-    /// - Pass through the `AuthError::TokenInvalid` if unable to verify the JWT.
-    async fn get_claims_from_bearer_token(&self, maybe_token: Option<BearerToken>) -> Result<UserClaims, AuthError> {
-        match maybe_token {
-            Some(token) => match self.verify_jwt(&token.value()).await {
-                Ok(claims) => Ok(claims),
-                Err(e) => Err(e),
-            },
-            None => Err(AuthError::TokenNotFound),
-        }
+    /// This function will return an error if the JWT is invalid, expired,
+    /// or if the token's generation has been revoked.
+    pub async fn get_user_id_from_bearer_token(&self, token: BearerToken) -> Result<UserId, AuthError> {
+        let claims = self.json_web_token.validate_session(&**self.database, token.as_str()).await?;
+        Ok(claims.sub)
     }
 }
 
 /// Parses the token from the `Authorization` header.
 ///
-/// # Panics
-///
-/// This function will panic if the `Authorization` header is not a valid `String`.
-pub fn parse_token(authorization: &HeaderValue) -> String {
-    let split: Vec<&str> = authorization
-        .to_str()
-        .expect("variable `auth` contains data that is not visible ASCII chars.")
-        .split("Bearer")
-        .collect();
-    let token = split[1].trim();
-    token.to_string()
-}
-
-/// If the user is logged in, returns the user's ID. Otherwise, returns `None`.
-///
 /// # Errors
 ///
-/// It returns an error if we cannot get the user from the bearer token.
-pub async fn get_optional_logged_in_user(
-    maybe_bearer_token: Option<BearerToken>,
-    app_data: Arc<AppData>,
-) -> Result<Option<UserId>, AuthError> {
-    match maybe_bearer_token {
-        Some(bearer_token) => match app_data.auth.get_user_id_from_bearer_token(Some(bearer_token)).await {
-            Ok(user_id) => Ok(Some(user_id)),
-            Err(error) => Err(error),
-        },
-        None => Ok(None),
+/// Returns `AuthError::TokenInvalid` if the header value is not valid
+/// ASCII or does not contain a `Bearer <token>` pair. The scheme name
+/// is matched case-insensitively per RFC 7235 §2.1.
+pub fn parse_token(authorization: &HeaderValue) -> Result<String, AuthError> {
+    let header_str = authorization.to_str().map_err(|_| AuthError::TokenInvalid)?;
+
+    let token = header_str
+        .get(7..)
+        .filter(|_| header_str[..7].eq_ignore_ascii_case("bearer "))
+        .ok_or(AuthError::TokenInvalid)?
+        .trim();
+
+    if token.is_empty() {
+        return Err(AuthError::TokenInvalid);
     }
+
+    Ok(token.to_string())
 }

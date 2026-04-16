@@ -78,5 +78,30 @@ echo '[ ! -z "$TERM" -a -r /etc/motd ] && cat /etc/motd' >> /etc/profile
 
 cd /home/torrust || exit 1
 
+# Generate auth keys if not already present on the volume.
+auth_dir="/etc/torrust/index/auth"
+private_key="$auth_dir/private.pem"
+public_key="$auth_dir/public.pem"
+tmpfile=$(mktemp /tmp/auth_keys.XXXXXX)
+chmod 0600 "$tmpfile"
+trap 'rm -f "$tmpfile"' EXIT
+
+if [ ! -s "$private_key" ] || [ ! -s "$public_key" ]; then
+    mkdir -p "$auth_dir"
+    chown torrust:torrust "$auth_dir"
+    chmod 0700 "$auth_dir"
+
+    if ! torrust-generate-auth-keypair > "$tmpfile"; then
+        echo "ERROR: Failed to generate auth keypair" >&2
+        exit 1
+    fi
+    sed -n '/BEGIN PRIVATE KEY/,/END PRIVATE KEY/p' "$tmpfile" > "$private_key"
+    sed -n '/BEGIN PUBLIC KEY/,/END PUBLIC KEY/p'   "$tmpfile" > "$public_key"
+    rm -f "$tmpfile"
+    chown torrust:torrust "$private_key" "$public_key"
+    chmod 0400 "$private_key"
+    chmod 0440 "$public_key"
+fi
+
 # Switch to torrust user
 exec /bin/su-exec torrust "$@"

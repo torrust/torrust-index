@@ -47,7 +47,7 @@
 //!
 //! ```bash
 //! curl \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
 //!   --header "cache-control: no-cache" \
 //!   --header "pragma: no-cache" \
 //!   --output mandelbrotset.jpg \

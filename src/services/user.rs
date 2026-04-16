@@ -1,11 +1,11 @@
 //! User services.
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
 use async_trait::async_trait;
-use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
+use chrono::NaiveDate;
 #[cfg(test)]
 use mockall::automock;
 use pbkdf2::password_hash::rand_core::OsRng;
@@ -17,13 +17,21 @@ use super::authorization::{self, ACTION};
 use crate::config::{Configuration, PasswordConstraints};
 use crate::databases::database::{Database, Error, UsersFilters, UsersSorting};
 use crate::errors::UserError;
-use crate::mailer::VerifyClaims;
+use crate::jwt::JsonWebToken;
 use crate::models::response::UserProfilesResponse;
 use crate::models::user::{UserCompact, UserId, UserProfile, Username};
 use crate::services::authentication::verify_password;
 use crate::utils::validation::validate_email_address;
 use crate::web::api::server::v1::contexts::user::forms::{ChangePasswordForm, RegistrationForm};
 use crate::{AsCSV, mailer};
+
+/// Permanent ban expiry date (year 9999).
+static PERMANENT_BAN_EXPIRY: LazyLock<chrono::NaiveDateTime> = LazyLock::new(|| {
+    NaiveDate::from_ymd_opt(9999, 1, 1)
+        .expect("valid date")
+        .and_hms_opt(0, 0, 0)
+        .expect("valid time")
+});
 
 /// Since user email could be optional, we need a way to represent "no email"
 /// in the database. This function returns the string that should be used for
@@ -56,6 +64,7 @@ pub struct ListingSpecification {
 
 pub struct RegistrationService {
     configuration: Arc<Configuration>,
+    json_web_token: Arc<JsonWebToken>,
     mailer: Arc<mailer::Service>,
     user_repository: Arc<Box<dyn Repository>>,
     user_profile_repository: Arc<DbUserProfileRepository>,
@@ -65,12 +74,14 @@ impl RegistrationService {
     #[must_use]
     pub fn new(
         configuration: Arc<Configuration>,
+        json_web_token: Arc<JsonWebToken>,
         mailer: Arc<mailer::Service>,
         user_repository: Arc<Box<dyn Repository>>,
         user_profile_repository: Arc<DbUserProfileRepository>,
     ) -> Self {
         Self {
             configuration,
+            json_web_token,
             mailer,
             user_repository,
             user_profile_repository,
@@ -184,24 +195,9 @@ impl RegistrationService {
     /// This function will return a `UserError::DatabaseError` if unable to
     /// update the user's email verification status.
     pub async fn verify_email(&self, token: &str) -> Result<bool, UserError> {
-        let settings = self.configuration.settings.read().await;
-
-        let token_data = match decode::<VerifyClaims>(
-            token,
-            &DecodingKey::from_secret(settings.auth.user_claim_token_pepper.as_bytes()),
-            &Validation::new(Algorithm::HS256),
-        ) {
-            Ok(token_data) => {
-                if !token_data.claims.iss.eq("email-verification") {
-                    return Ok(false);
-                }
-
-                token_data.claims
-            }
-            Err(_) => return Ok(false),
+        let Ok(token_data) = self.json_web_token.verify_email_token(token) else {
+            return Ok(false);
         };
-
-        drop(settings);
 
         let user_id = token_data.sub;
 
@@ -284,8 +280,9 @@ impl ProfileService {
 
         let password_hash = hash_password(&change_password_form.password)?;
 
+        // Atomically change password and revoke tokens (ADR-T-007 §A-2a)
         self.user_authentication_repository
-            .change_password(user_id, &password_hash)
+            .change_password_and_revoke_tokens(user_id, &password_hash)
             .await?;
 
         Ok(())
@@ -335,7 +332,8 @@ impl BanService {
             .get_user_profile_from_username(username_to_be_banned)
             .await?;
 
-        self.banned_user_list.add(&user_profile.user_id).await?;
+        // Atomically ban and revoke tokens (ADR-T-007 §A-2c)
+        self.banned_user_list.add_and_revoke_tokens(&user_profile.user_id).await?;
 
         Ok(())
     }
@@ -478,7 +476,8 @@ impl Repository for DbUserRepository {
     ///
     /// It returns an error if there is a database error.
     async fn grant_admin_role(&self, user_id: &UserId) -> Result<(), Error> {
-        self.database.grant_admin_role(*user_id).await
+        // Atomically grant admin and revoke tokens (ADR-T-007 §A-2b)
+        self.database.grant_admin_role_and_revoke_tokens(*user_id).await
     }
 
     /// It deletes the user.
@@ -561,11 +560,6 @@ impl DbBannedUserList {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    ///
-    /// # Panics
-    ///
-    /// It panics if the expiration date cannot be parsed. It should never
-    /// happen as the date is hardcoded for now.
     pub async fn add(&self, user_id: &UserId) -> Result<(), Error> {
         // todo: add reason and `date_expiry` parameters to request.
 
@@ -574,11 +568,31 @@ impl DbBannedUserList {
         // For the time being, we will not use a reason for banning a user.
         let reason = "no reason".to_string();
 
-        // User will be banned until the year 9999
-        let date_expiry = chrono::NaiveDateTime::parse_from_str("9999-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
-            .expect("Could not parse date from 9999-01-01 00:00:00.");
+        self.database.ban_user(*user_id, &reason, *PERMANENT_BAN_EXPIRY).await
+    }
 
-        self.database.ban_user(*user_id, &reason, date_expiry).await
+    /// Ban a user and atomically increment `token_generation`.
+    /// See ADR-T-007 §A-2c.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn add_and_revoke_tokens(&self, user_id: &UserId) -> Result<(), Error> {
+        let reason = "no reason".to_string();
+
+        self.database
+            .ban_user_and_revoke_tokens(*user_id, &reason, *PERMANENT_BAN_EXPIRY)
+            .await
+    }
+
+    /// Increment the user's `token_generation` counter, invalidating all
+    /// outstanding session tokens.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn increment_token_generation(&self, user_id: &UserId) -> Result<(), Error> {
+        self.database.increment_token_generation(*user_id).await
     }
 }
 

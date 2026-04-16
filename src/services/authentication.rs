@@ -1,21 +1,36 @@
 //! Authentication services.
+//!
+//! Provides login (username + password → JWT) and token renewal.
+//! JWT signing and verification are delegated to [`crate::jwt::JsonWebToken`].
+//!
+//! ## Token revocation (ADR-T-007 Phases 4 & 7)
+//!
+//! On login, the service fetches the user's current
+//! `token_generation` from the database and embeds it in the JWT
+//! (`gen` claim). On renewal, validation is delegated to
+//! [`JsonWebToken::validate_session`](crate::jwt::JsonWebToken::validate_session),
+//! which verifies the JWT, checks the generation counter, and
+//! rejects banned users in a single code path.
 use std::sync::Arc;
 
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use pbkdf2::Pbkdf2;
 
 use super::user::DbUserProfileRepository;
 use crate::config::Configuration;
 use crate::databases::database::{Database, Error};
 use crate::errors::AuthError;
-use crate::models::user::{UserAuthentication, UserClaims, UserCompact, UserId};
+// Re-export so that existing `use crate::services::authentication::JsonWebToken`
+// paths keep compiling.
+pub use crate::jwt::JsonWebToken;
+use crate::models::user::{UserAuthentication, UserCompact, UserId};
 use crate::services::user::Repository;
 use crate::utils::clock;
 
 pub struct Service {
     configuration: Arc<Configuration>,
     json_web_token: Arc<JsonWebToken>,
+    database: Arc<Box<dyn Database>>,
     user_repository: Arc<Box<dyn Repository>>,
     user_profile_repository: Arc<DbUserProfileRepository>,
     user_authentication_repository: Arc<DbUserAuthenticationRepository>,
@@ -25,6 +40,7 @@ impl Service {
     pub fn new(
         configuration: Arc<Configuration>,
         json_web_token: Arc<JsonWebToken>,
+        database: Arc<Box<dyn Database>>,
         user_repository: Arc<Box<dyn Repository>>,
         user_profile_repository: Arc<DbUserProfileRepository>,
         user_authentication_repository: Arc<DbUserAuthenticationRepository>,
@@ -32,6 +48,7 @@ impl Service {
         Self {
             configuration,
             json_web_token,
+            database,
             user_repository,
             user_profile_repository,
             user_authentication_repository,
@@ -90,8 +107,11 @@ impl Service {
                 err => AuthError::from(err),
             })?;
 
+        // Fetch the current token generation for this user
+        let token_generation = self.database.get_token_generation(user_compact.user_id).await?;
+
         // Sign JWT with compact user details as payload
-        let token = self.json_web_token.sign(user_compact.clone()).await;
+        let token = self.json_web_token.sign(user_compact.clone(), token_generation).await?;
 
         Ok((token, user_compact))
     }
@@ -107,78 +127,20 @@ impl Service {
     pub async fn renew_token(&self, token: &str) -> Result<(String, UserCompact), AuthError> {
         const ONE_WEEK_IN_SECONDS: u64 = 604_800;
 
-        // Verify if token is valid
-        let claims = self.json_web_token.verify(token).await?;
+        let claims = self.json_web_token.validate_session(&**self.database, token).await?;
 
-        let user_compact = self
-            .user_repository
-            .get_compact(&claims.user.user_id)
-            .await
-            .map_err(|err| match err {
-                Error::UserNotFound => AuthError::UserNotFound,
-                err => AuthError::from(err),
-            })?;
+        let user_compact = self.user_repository.get_compact(&claims.sub).await.map_err(|err| match err {
+            Error::UserNotFound => AuthError::UserNotFound,
+            err => AuthError::from(err),
+        })?;
 
         // Renew token if it is valid for less than one week
-        let token = match claims.exp - clock::now() {
-            x if x < ONE_WEEK_IN_SECONDS => self.json_web_token.sign(user_compact.clone()).await,
+        let token = match claims.exp.saturating_sub(clock::now()) {
+            x if x < ONE_WEEK_IN_SECONDS => self.json_web_token.sign(user_compact.clone(), claims.token_gen).await?,
             _ => token.to_string(),
         };
 
         Ok((token, user_compact))
-    }
-}
-
-pub struct JsonWebToken {
-    cfg: Arc<Configuration>,
-}
-
-impl JsonWebToken {
-    pub const fn new(cfg: Arc<Configuration>) -> Self {
-        Self { cfg }
-    }
-
-    /// Create Json Web Token.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the default encoding algorithm does not ç
-    /// match the encoding key.
-    pub async fn sign(&self, user: UserCompact) -> String {
-        let key = self.cfg.settings.read().await.auth.user_claim_token_pepper.clone();
-
-        // Create JWT that expires in two weeks
-        let key = key.as_bytes();
-
-        // todo: create config option for setting the token validity in seconds.
-        let exp_date = clock::now() + 1_209_600; // two weeks from now
-
-        let claims = UserClaims { user, exp: exp_date };
-
-        encode(&Header::default(), &claims, &EncodingKey::from_secret(key)).expect("argument `Header` should match `EncodingKey`")
-    }
-
-    /// Verify Json Web Token.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the JWT is not good or expired.
-    pub async fn verify(&self, token: &str) -> Result<UserClaims, AuthError> {
-        let settings = self.cfg.settings.read().await;
-
-        match decode::<UserClaims>(
-            token,
-            &DecodingKey::from_secret(settings.auth.user_claim_token_pepper.as_bytes()),
-            &Validation::new(Algorithm::HS256),
-        ) {
-            Ok(token_data) => {
-                if token_data.claims.exp < clock::now() {
-                    return Err(AuthError::TokenExpired);
-                }
-                Ok(token_data.claims)
-            }
-            Err(_) => Err(AuthError::TokenInvalid),
-        }
     }
 }
 
@@ -209,6 +171,28 @@ impl DbUserAuthenticationRepository {
     /// It returns an error if there is a database error.
     pub async fn change_password(&self, user_id: UserId, password_hash: &str) -> Result<(), Error> {
         self.database.change_user_password(user_id, password_hash).await
+    }
+
+    /// Change password and increment `token_generation` atomically.
+    /// See ADR-T-007 §A-2a.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn change_password_and_revoke_tokens(&self, user_id: UserId, password_hash: &str) -> Result<(), Error> {
+        self.database
+            .change_user_password_and_revoke_tokens(user_id, password_hash)
+            .await
+    }
+
+    /// Increment the user's `token_generation` counter, invalidating all
+    /// outstanding session tokens.
+    ///
+    /// # Errors
+    ///
+    /// It returns an error if there is a database error.
+    pub async fn increment_token_generation(&self, user_id: UserId) -> Result<(), Error> {
+        self.database.increment_token_generation(user_id).await
     }
 }
 

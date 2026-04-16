@@ -8,7 +8,6 @@ threshold = "info"
 token = "MyAccessToken"
 
 [auth]
-user_claim_token_pepper = "MaxVerstappenWC2021"
 
 [core]
 listed = false

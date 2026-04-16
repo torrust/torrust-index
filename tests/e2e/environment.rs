@@ -114,7 +114,12 @@ impl TestEnv {
 
                 "***".clone_into(&mut settings.mail.smtp.credentials.password);
 
-                "***".clone_into(&mut settings.auth.user_claim_token_pepper);
+                if let Some(private_key_path) = settings.auth.private_key_path.as_mut() {
+                    "***-redacted***".clone_into(private_key_path);
+                }
+                if let Some(public_key_path) = settings.auth.public_key_path.as_mut() {
+                    "***-redacted***".clone_into(public_key_path);
+                }
 
                 Some(settings)
             }

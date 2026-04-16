@@ -15,7 +15,8 @@ threshold = "info"
 token = "MyAccessToken"
 
 [auth]
-user_claim_token_pepper = "MaxVerstappenWC2021"
+private_key_path = "/etc/torrust/index/auth/private.pem"
+public_key_path = "/etc/torrust/index/auth/public.pem"
 
 [database]
 connect_url = "sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc"

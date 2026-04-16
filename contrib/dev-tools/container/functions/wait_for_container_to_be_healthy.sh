@@ -24,3 +24,5 @@ wait_for_container_to_be_healthy() {
     echo "Timeout reached, container $container_name is not healthy"
     return 1
 }
+
+wait_for_container_to_be_healthy "$@"

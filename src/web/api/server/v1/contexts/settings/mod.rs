@@ -19,7 +19,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
 //!   --request GET \
 //!   "http://127.0.0.1:3001/v1/settings"
 //! ```
@@ -54,7 +54,12 @@
 //!       "tsl": null
 //!     },
 //!     "auth": {
-//!       "user_claim_token_pepper": "***",
+//!       "private_key_pem": null,
+//!       "public_key_pem": null,
+//!       "private_key_path": null,
+//!       "public_key_path": null,
+//!       "session_token_lifetime_secs": 1209600,
+//!       "email_verification_token_lifetime_secs": 315569260,
 //!       "password_constraints": {
 //!         "max_password_length": 64,
 //!         "min_password_length": 6

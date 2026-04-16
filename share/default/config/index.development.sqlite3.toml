@@ -17,7 +17,6 @@ threshold = "info"
 token = "MyAccessToken"
 
 [auth]
-user_claim_token_pepper = "MaxVerstappenWC2021"
 
 # Uncomment if you want to enable TSL for development
 #[net.tsl]

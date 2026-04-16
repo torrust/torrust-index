@@ -189,7 +189,6 @@
 //! bind_address = "0.0.0.0:3001"
 //!
 //! [auth]
-//! user_claim_token_pepper = "MaxVerstappenWC2021"
 //!
 //! [auth.password_constraints]
 //! min_password_length = 6
@@ -288,6 +287,7 @@ pub mod config;
 pub mod console;
 pub mod databases;
 pub mod errors;
+pub mod jwt;
 pub mod mailer;
 pub mod models;
 pub mod services;

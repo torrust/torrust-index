@@ -2,7 +2,7 @@ mod v2;
 
 use url::Url;
 
-use crate::config::{ApiToken, Configuration, Info, SecretKey, Settings};
+use crate::config::{ApiToken, Configuration, Info, Settings};
 
 fn default_config_toml() -> String {
     use std::fs;
@@ -97,7 +97,6 @@ fn configuration_should_use_the_default_values_when_only_the_mandatory_options_a
                 token = "MyAccessToken"
 
                 [auth]
-                user_claim_token_pepper = "MaxVerstappenWC2021"
             "#,
         )?;
 
@@ -129,7 +128,6 @@ fn configuration_should_use_the_default_values_when_only_the_mandatory_options_a
                 token = "MyAccessToken"
 
                 [auth]
-                user_claim_token_pepper = "MaxVerstappenWC2021"
             "#
         .to_string();
 
@@ -170,14 +168,14 @@ async fn configuration_should_allow_to_override_the_tracker_api_token_provided_i
 
 #[tokio::test]
 #[allow(clippy::result_large_err)]
-async fn configuration_should_allow_to_override_the_authentication_user_claim_token_pepper_provided_in_the_toml_file() {
+async fn configuration_should_allow_to_override_the_private_key_path_provided_in_the_toml_file() {
     figment::Jail::expect_with(|jail| {
         jail.create_dir("templates")?;
         jail.create_file("templates/verify.html", "EMAIL TEMPLATE")?;
 
         jail.set_env(
-            "TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__USER_CLAIM_TOKEN_PEPPER",
-            "OVERRIDDEN AUTH SECRET KEY",
+            "TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PATH",
+            "/custom/path/private.pem",
         );
 
         let info = Info {
@@ -187,10 +185,7 @@ async fn configuration_should_allow_to_override_the_authentication_user_claim_to
 
         let settings = Configuration::load_settings(&info).expect("Could not load configuration from file");
 
-        assert_eq!(
-            settings.auth.user_claim_token_pepper,
-            SecretKey::new("OVERRIDDEN AUTH SECRET KEY")
-        );
+        assert_eq!(settings.auth.private_key_path, Some("/custom/path/private.pem".to_owned()));
 
         Ok(())
     });

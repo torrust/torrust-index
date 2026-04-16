@@ -93,18 +93,33 @@ _Optionally, you may choose to supply the entire configuration as an environment
 TORRUST_INDEX_CONFIG_TOML=$(cat "./storage/index/etc/index.toml") cargo run
 ```
 
-_For deployment, you __should__ override:
-
-- The `tracker_api_token` and the `index_auth_secret_key` by using environmental variables:_
+_For deployment, you __should__ override the `tracker_api_token`:_
 
 ```sh
-# Please use the secret that you generated for the torrust-tracker configuration.
-# Override secret in configuration using an environmental variable
+# Override secrets in configuration using environmental variables
 TORRUST_INDEX_CONFIG_TOML=$(cat "./storage/index/etc/index.toml") \
   TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN=$(cat "./storage/tracker/lib/tracker_api_admin_token.secret") \
-  TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__SECRET_KEY="MaxVerstappenWC2021" \
   cargo run
 ```
+
+_By default, an ephemeral RSA key pair is auto-generated in memory for JWT
+signing. Sessions will not survive server restarts. For **persistent sessions**,
+generate your own RSA key pair and configure the paths:_
+
+```sh
+# Generate an RSA key pair for JWT signing:
+openssl genrsa -out private.pem 2048
+openssl rsa -in private.pem -pubout -out public.pem
+
+# Supply key paths via environment variables:
+TORRUST_INDEX_CONFIG_TOML=$(cat "./storage/index/etc/index.toml") \
+  TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PATH="/path/to/private.pem" \
+  TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PATH="/path/to/public.pem" \
+  cargo run
+```
+
+> **Container deployments** auto-generate persistent keys on first boot — no
+> manual setup is required. See the [container guide][containers.md] for details.
 
 > Please view our [crate documentation][docs] for more detailed instructions.
 
@@ -127,6 +142,7 @@ The following services are provided by the default configuration:
 - [ADR-T-004: Remove `located-error` Package](adr/004-remove-located-error.md) — Replace the `torrust-index-located-error` wrapper with `tracing` for error context.
 - [ADR-T-005: Migrate to Rust Edition 2024](adr/005-edition-2024.md) — Migrate the entire workspace to `edition = "2024"` and raise the MSRV to 1.85.
 - [ADR-T-006: Refactor the Error System](adr/006-error-system-refactor.md) — Replace the 41-variant `ServiceError` god enum with domain-scoped error enums (`AuthError`, `UserError`, `TorrentError`, `CategoryTagError`) and a thin `ApiError` wrapper.
+- [ADR-T-007: Refactor the JWT System](adr/007-jwt-system-refactor.md) — Centralise JWT handling into `src/jwt.rs`, redesign claims to RFC 7519, move to RS256 asymmetric signing, and consolidate session validation into a single code path.
 
 ## Contributing
 

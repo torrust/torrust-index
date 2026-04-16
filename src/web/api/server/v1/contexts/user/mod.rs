@@ -45,7 +45,9 @@
 //!
 //! ```toml
 //! [auth]
-//! user_claim_token_pepper = "MaxVerstappenWC2021"
+//! # Optional: supply your own RSA key pair for persistent sessions.
+//! # private_key_path = "/path/to/private.pem"
+//! # public_key_path = "/path/to/public.pem"
 //! ```
 //!
 //! Refer to the [`RegistrationForm`](crate::web::api::server::v1::contexts::user::forms::RegistrationForm)
@@ -121,7 +123,7 @@
 //!
 //! Name | Type | Description | Required | Example
 //! ---|---|---|---|---
-//! `token` | `String` | The token you want to verify  | Yes | `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI`
+//! `token` | `String` | The token you want to verify  | Yes | `<JWT_TOKEN>`
 //!
 //! Refer to the [`JsonWebToken`](crate::web::api::server::v1::contexts::user::forms::JsonWebToken)
 //! struct for more information about the token.
@@ -132,7 +134,7 @@
 //! curl \
 //!   --header "Content-Type: application/json" \
 //!   --request POST \
-//!   --data '{"token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI"}' \
+//!   --data '{"token":"<JWT_TOKEN>"}' \
 //!   http://127.0.0.1:3001/v1/user/token/verify
 //! ```
 //!
@@ -167,7 +169,7 @@
 //!
 //! Name | Type | Description | Required | Example
 //! ---|---|---|---|---
-//! `token` | `String` | The current valid token | Yes | `eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI`
+//! `token` | `String` | The current valid token | Yes | `<JWT_TOKEN>`
 //!
 //! Refer to the [`JsonWebToken`](crate::web::api::server::v1::contexts::user::forms::JsonWebToken)
 //! struct for more information about the token.
@@ -178,7 +180,7 @@
 //! curl \
 //!   --header "Content-Type: application/json" \
 //!   --request POST \
-//!   --data '{"token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI"}' \
+//!   --data '{"token":"<JWT_TOKEN>"}' \
 //!   http://127.0.0.1:3001/v1/user/token/renew
 //! ```
 //!
@@ -189,7 +191,7 @@
 //! ```json
 //! {
 //!   "data": {
-//!     "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI",
+//!     "token": "<JWT_TOKEN>",
 //!     "username": "indexadmin",
 //!     "admin": true
 //!   }
@@ -223,7 +225,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyIjp7InVzZXJfaWQiOjEsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImFkbWluaXN0cmF0b3IiOnRydWV9LCJleHAiOjE2ODYyMTU3ODh9.4k8ty27DiWwOk4WVcYEhIrAndhpXMRWnLZ3i_HlJnvI" \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
 //!   --request DELETE \
 //!   http://127.0.0.1:3001/v1/user/ban/indexadmin
 //! ```

@@ -71,7 +71,7 @@ pub async fn email_verification_handler(State(app_data): State<Arc<AppData>>, Pa
 /// It returns an error if:
 ///
 /// - Unable to verify the supplied payload as a valid JWT.
-/// - The JWT is not invalid or expired.
+/// - The JWT is invalid or expired.
 #[allow(clippy::unused_async)]
 pub async fn login_handler(
     State(app_data): State<Arc<AppData>>,
@@ -94,13 +94,17 @@ pub async fn login_handler(
 /// It returns an error if:
 ///
 /// - Unable to verify the supplied payload as a valid JWT.
-/// - The JWT is not invalid or expired.
-#[allow(clippy::unused_async)]
+/// - The JWT is invalid or expired.
+/// - The token's generation has been revoked.
 pub async fn verify_token_handler(
     State(app_data): State<Arc<AppData>>,
     extract::Json(token): extract::Json<JsonWebToken>,
 ) -> Response {
-    match app_data.json_web_token.verify(&token.token).await {
+    match app_data
+        .json_web_token
+        .validate_session(&**app_data.database, &token.token)
+        .await
+    {
         Ok(_) => axum::Json(OkResponseData {
             data: "Token is valid.".to_string(),
         })
@@ -119,7 +123,7 @@ pub struct UsernameParam(pub String);
 /// It returns an error if:
 ///
 /// - Unable to parse the supplied payload as a valid JWT.
-/// - The JWT is not invalid or expired.
+/// - The JWT is invalid or expired.
 #[allow(clippy::unused_async)]
 pub async fn renew_token_handler(
     State(app_data): State<Arc<AppData>>,

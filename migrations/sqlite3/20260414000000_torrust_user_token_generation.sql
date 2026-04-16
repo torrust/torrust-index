@@ -1,0 +1,1 @@
+ALTER TABLE torrust_users ADD COLUMN token_generation INTEGER NOT NULL DEFAULT 0

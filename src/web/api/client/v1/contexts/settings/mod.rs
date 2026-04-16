@@ -49,7 +49,8 @@ pub struct Network {
 
 #[derive(Deserialize, Serialize, PartialEq, Eq, Debug, Clone)]
 pub struct Auth {
-    pub user_claim_token_pepper: String,
+    pub private_key_path: Option<String>,
+    pub public_key_path: Option<String>,
     pub password_constraints: PasswordConstraints,
 }
 
@@ -152,7 +153,8 @@ impl From<DomainNetwork> for Network {
 impl From<DomainAuth> for Auth {
     fn from(auth: DomainAuth) -> Self {
         Self {
-            user_claim_token_pepper: auth.user_claim_token_pepper.to_string(),
+            private_key_path: auth.private_key_path,
+            public_key_path: auth.public_key_path,
             password_constraints: auth.password_constraints.into(),
         }
     }

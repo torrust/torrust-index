@@ -44,7 +44,6 @@ url = "udp://localhost:6969"
 bind_address = "0.0.0.0:3001"
 
 [auth]
-user_claim_token_pepper = "MaxVerstappenWC2021"
 
 [auth.password_constraints]
 max_password_length = 64
