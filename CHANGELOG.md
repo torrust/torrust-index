@@ -84,6 +84,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unconditionally.
 - Unauthorized requests are rejected at the extractor boundary before
   reaching the service layer (fail-fast).
+- First-user auto-admin grant in `RegistrationService::register` now logs
+  a `warn!` on failure instead of silently discarding the `Result` via
+  `drop()`.
 - **BREAKING:** JWT signing algorithm changed from HMAC-HS256 to RS256
   (RSA + SHA-256). Existing HS256 tokens are invalidated; users must re-login.
 - **BREAKING:** JWT claims redesigned from `UserClaims { user, exp }` to

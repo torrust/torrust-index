@@ -26,6 +26,10 @@
 //!
 //! - [Ban a user](#ban-a-user)
 //!
+//! Permissions discovery:
+//!
+//! - [Get my permissions](#get-my-permissions)
+//!
 //! # Registration
 //!
 //! `POST /v1/user/register`
@@ -123,7 +127,7 @@
 //!
 //! Name | Type | Description | Required | Example
 //! ---|---|---|---|---
-//! `token` | `String` | The token you want to verify  | Yes | `eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE`
+//! `token` | `String` | The token you want to verify  | Yes | `<JWT_TOKEN>`
 //!
 //! Refer to the [`JsonWebToken`](crate::web::api::server::v1::contexts::user::forms::JsonWebToken)
 //! struct for more information about the token.
@@ -134,7 +138,7 @@
 //! curl \
 //!   --header "Content-Type: application/json" \
 //!   --request POST \
-//!   --data '{"token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE"}' \
+//!   --data '{"token":"<JWT_TOKEN>"}' \
 //!   http://127.0.0.1:3001/v1/user/token/verify
 //! ```
 //!
@@ -169,7 +173,7 @@
 //!
 //! Name | Type | Description | Required | Example
 //! ---|---|---|---|---
-//! `token` | `String` | The current valid token | Yes | `eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE`
+//! `token` | `String` | The current valid token | Yes | `<JWT_TOKEN>`
 //!
 //! Refer to the [`JsonWebToken`](crate::web::api::server::v1::contexts::user::forms::JsonWebToken)
 //! struct for more information about the token.
@@ -180,7 +184,7 @@
 //! curl \
 //!   --header "Content-Type: application/json" \
 //!   --request POST \
-//!   --data '{"token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE"}' \
+//!   --data '{"token":"<JWT_TOKEN>"}' \
 //!   http://127.0.0.1:3001/v1/user/token/renew
 //! ```
 //!
@@ -191,7 +195,7 @@
 //! ```json
 //! {
 //!   "data": {
-//!     "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE",
+//!     "token": "<JWT_TOKEN>",
 //!     "username": "indexadmin",
 //!     "role": "admin"
 //!   }
@@ -226,7 +230,7 @@
 //! ```bash
 //! curl \
 //!   --header "Content-Type: application/json" \
-//!   --header "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE" \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
 //!   --request DELETE \
 //!   http://127.0.0.1:3001/v1/user/ban/indexadmin
 //! ```
@@ -244,6 +248,86 @@
 //! **WARNING**: The admin can ban themselves. If they do, they will not be able
 //! to unban themselves. The only way to unban themselves is to manually remove
 //! the user from the banned user list in the database.
+//!
+//! # Get my permissions
+//!
+//! `GET /v1/user/me/permissions`
+//!
+//! Returns the list of allowed actions for the authenticated user's role.
+//! Unauthenticated requests (no token) receive guest-level actions.
+//!
+//! **Example request** (authenticated)
+//!
+//! ```bash
+//! curl \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
+//!   --request GET \
+//!   http://127.0.0.1:3001/v1/user/me/permissions
+//! ```
+//!
+//! **Example response** `200`
+//!
+//! ```json
+//! {
+//!   "data": {
+//!     "role": "admin",
+//!     "actions": [
+//!       "GetAboutPage",
+//!       "GetLicensePage",
+//!       "AddCategory",
+//!       "DeleteCategory",
+//!       "GetCategories",
+//!       "GetImageByUrl",
+//!       "GetSettingsSecret",
+//!       "GetPublicSettings",
+//!       "GetSiteName",
+//!       "AddTag",
+//!       "DeleteTag",
+//!       "GetTags",
+//!       "AddTorrent",
+//!       "GetTorrent",
+//!       "DeleteTorrent",
+//!       "GetTorrentInfo",
+//!       "GenerateTorrentInfoListing",
+//!       "ChangePassword",
+//!       "BanUser",
+//!       "GenerateUserProfileSpecification",
+//!       "UpdateTorrent",
+//!       "GetMyPermissions"
+//!     ]
+//!   }
+//! }
+//! ```
+//!
+//! **Example request** (unauthenticated — guest)
+//!
+//! ```bash
+//! curl \
+//!   --request GET \
+//!   http://127.0.0.1:3001/v1/user/me/permissions
+//! ```
+//!
+//! **Example response** `200`
+//!
+//! ```json
+//! {
+//!   "data": {
+//!     "role": "guest",
+//!     "actions": [
+//!       "GetAboutPage",
+//!       "GetLicensePage",
+//!       "GetCategories",
+//!       "GetPublicSettings",
+//!       "GetSiteName",
+//!       "GetTags",
+//!       "GetTorrent",
+//!       "GetTorrentInfo",
+//!       "GenerateTorrentInfoListing",
+//!       "GetMyPermissions"
+//!     ]
+//!   }
+//! }
+//! ```
 pub mod forms;
 pub mod handlers;
 pub mod responses;

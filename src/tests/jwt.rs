@@ -40,11 +40,11 @@ async fn jwt_service() -> JsonWebToken {
     JsonWebToken::new(cfg).await
 }
 
-fn test_user(admin: bool) -> UserCompact {
+fn test_user(is_admin: bool) -> UserCompact {
     UserCompact {
         user_id: 42,
         username: "testuser".to_string(),
-        role: if admin {
+        role: if is_admin {
             "admin".to_string()
         } else {
             "registered".to_string()

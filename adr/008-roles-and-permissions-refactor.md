@@ -540,6 +540,11 @@ policies to migrate.
   filename suffix; `sqlx migrate run` applies them
   lexicographically, so the `role` column is always created
   before the `administrator` column is dropped.
+- **`Admin` arm is now exhaustive.** The `default_grant`
+  function uses an exhaustive `match` on `Action` for all roles,
+  including `Admin`. Adding a new `Action` variant is a compile
+  error until the developer explicitly grants or denies it for
+  every role.
 
 ## Testing Strategy
 
@@ -822,8 +827,9 @@ resolved, plus one additional cleanup:
    `// Public: no RequirePermission — pre-authentication endpoint`
    comments.
 8. **Crate-level extractor tests** — added in
-   `src/tests/web/require_permission.rs`: 7 tests covering `Actor`
-   behaviour and the full `RequirePermission<A>` extraction path
+   `src/tests/web/require_permission.rs`: several tests covering
+   `Actor` behaviour and the full `RequirePermission<A>` extraction
+   path
    (guest → 401, guest → 200, registered → 403, registered → 200,
    admin → 200) using a minimal Axum router backed by an ephemeral
    SQLite database.
@@ -838,7 +844,7 @@ Review performed 2026-04-15.
 
 - `cargo check --workspace --all-targets --all-features` — clean.
 - `cargo clippy --workspace --all-targets --all-features` — clean.
-- `cargo test --workspace --all-targets --all-features` — 405
+- `cargo test --workspace --all-targets --all-features` — ~400
   tests, 0 failures.
 - `cargo check --workspace --no-default-features` — clean.
 
@@ -883,7 +889,7 @@ overrides, and the `GetMyPermissions` action.
   `Action` required updating `default_grant` (exhaustive match for
   `Registered` and `Guest`), `Action::ALL`, `action_markers!`, and
   all crate-level test lists — any omission would be a build error.
-- **Good crate-level test coverage.** 7 new tests cover
+- **Good crate-level test coverage.** Several new tests cover
   `can_on_resource` (owner allowed, non-owner denied, admin bypass,
   denied action), `allowed_actions` (correct list), and
   `with_overrides` (allow adds, deny removes, empty matches
@@ -946,17 +952,19 @@ deferred.
 
 - `cargo check --workspace --all-targets --all-features` — clean.
 - `cargo clippy --workspace --all-targets --all-features` — clean.
-- `cargo test --workspace --all-targets --all-features` — 405
+- `cargo test --workspace --all-targets --all-features` — ~400
   tests, 0 failures.
 - `cargo test --workspace --all-targets --all-features --release`
-  — 405 tests, 0 failures.
+  — ~400 tests, 0 failures.
 - `cargo check --workspace --no-default-features` — clean.
 - `cargo test --workspace --doc` — clean.
 
-## Phase 4 — Implementation Review
+## Phase 4 — E2E Coverage Audit
 
 Review performed 2026-04-15 against the working tree after
-Phases 1–3.
+Phases 1–3. Phase 4 adds no new implementation — it audits
+existing E2E tests for Phase 3 coverage and adds targeted tests
+where gaps exist.
 
 ### Status of Acceptance Criteria
 
@@ -967,12 +975,16 @@ Phases 1–3.
 | 3 | E2E tests for `GET /me/permissions` per role | ✅ | Three new tests in `permissions_discovery`: `it_should_return_all_actions_for_an_admin`, `it_should_return_registered_actions_for_a_registered_user`, `it_should_return_guest_actions_when_no_token_is_provided`. Each verifies the `{"data": {"role": "...", "actions": [...]}}` structure and correct action lists. |
 | 4 | E2E tests for TOML permission overrides | ✅ | Two new tests in `permission_overrides`: `it_should_grant_a_normally_denied_action_via_toml_override` (grants `Registered` + `DeleteTorrent`, verifies via `/me/permissions`) and `it_should_deny_a_normally_allowed_action_via_toml_override` (denies `Registered` + `AddTorrent`, verifies via `/me/permissions` and upload attempt → 403). Uses `TestEnv::start_with` to inject overrides into the isolated config. |
 | 5 | All E2E tests run against both SQLite and MySQL | ⚠️ | E2E tests run against SQLite. MySQL backend coverage requires a running MySQL instance and is not exercised in the default `cargo test` invocation. |
-| 6 | `cargo test` passes cleanly | ✅ | 410 tests, 0 failures (dev and release). `cargo clippy` clean. `--no-default-features` builds. Doc tests pass. |
+| 6 | `cargo test` passes cleanly | ✅ | ~410 tests, 0 failures (dev and release). `cargo clippy` clean. `--no-default-features` builds. Doc tests pass. |
 
 ### Remaining Work
 
-1. **MySQL E2E coverage.** Verify the full suite passes against
-   a MySQL backend (manual or CI-gated).
+1. **MySQL E2E coverage (blocking for full sign-off).** The entire
+   E2E suite must be verified against a MySQL backend. This
+   requires a running MySQL instance and is not exercised by the
+   default `cargo test` invocation. Until this is done, Phase 4
+   criterion 5 remains ⚠️. This should be run manually or gated
+   in CI before the ADR status is changed to fully implemented.
 
 ### Verification
 
@@ -980,9 +992,71 @@ Review performed 2026-04-15.
 
 - `cargo check --workspace --all-targets --all-features` — clean.
 - `cargo clippy --workspace --all-targets --all-features` — clean.
-- `cargo test --workspace --all-targets --all-features` — 410
+- `cargo test --workspace --all-targets --all-features` — ~410
   tests, 0 failures.
 - `cargo test --workspace --all-targets --all-features --release`
-  — 410 tests, 0 failures.
+  — ~410 tests, 0 failures.
 - `cargo check --workspace --no-default-features` — clean.
 - `cargo test --workspace --doc` — clean.
+
+## Remaining Issues
+
+1. **MySQL E2E coverage (Phase 4, criterion 5).**
+   The full E2E suite has been verified against SQLite only.
+   MySQL backend testing requires a running MySQL instance and is
+   not exercised by the default `cargo test` invocation. This must
+   be run manually or gated in CI before the ADR status can be
+   changed from ⚠️ to fully implemented. The migrations and SQL
+   queries are dual-backend (separate `sqlite3/` and `mysql/`
+   files), so the most likely failure mode is a syntax or
+   type-mapping difference in the new `role` column handling.
+
+2. ~~**No startup validation for dangerous TOML overrides.**~~
+   ✅ **Resolved.** `PermissionMatrix::with_overrides` now emits
+   a `warn!` for each override that grants a high-risk action
+   (`DeleteTorrent`, `DeleteCategory`, `DeleteTag`, `BanUser`,
+   `GetSettingsSecret`, `GenerateUserProfileSpecification`) to a
+   non-admin role. The override is still applied — the warning is
+   advisory so operators can review their configuration.
+   `HIGH_RISK_ACTIONS` is a `const` list on `PermissionMatrix`,
+   easily extended if future actions warrant the same treatment.
+
+3. ~~**`Admin` wildcard in `default_grant`.**~~
+   ✅ **Resolved.** The `Admin` arm now uses an exhaustive `match`
+   on `Action` (no wildcard). Adding a new `Action` variant forces
+   an explicit decision for every role, including `Admin`. This
+   eliminates the silent-grant risk: a new variant like
+   `PurgeAllData` would be a compile error until the developer
+   explicitly grants or denies it for `Admin`.
+
+4. ~~**No per-change audit logging for role grants.**~~
+   ✅ **Partially resolved.** `grant_admin_role` in
+   `DbUserRepository` now emits `info!(user_id, "granting admin
+   role")` via `tracing`, and the first-user auto-admin path in
+   `RegistrationService::register` logs the grant explicitly.
+   Failures in the first-user auto-admin grant now emit a
+   `warn!` instead of being silently dropped (see item 6).
+   Full persistent audit logging (who-granted-what-to-whom with
+   timestamps in a dedicated table) is still deferred to a future
+   ADR.
+
+5. ~~**`Moderator` role is defined in the ADR but not yet
+   implemented.**~~
+   ✅ **Resolved.** `Role::Moderator` has been added to the `Role`
+   enum with `Display`, `FromStr`, and serde support. The
+   `default_grant` function defines `Moderator` permissions as a
+   superset of `Registered` (adds `AddTag`, `DeleteTag`,
+   `DeleteTorrent`). Crate-level tests cover the full
+   `Moderator` grant/denial matrix. No data migration is needed —
+   no existing users have the `moderator` role string; it becomes
+   available for operators to assign manually or via a future
+   admin endpoint.
+
+6. ~~**First-user auto-admin silently swallows
+   `grant_admin_role` errors.**~~
+   ✅ **Resolved.** `RegistrationService::register` previously
+   used `drop(self.user_repository.grant_admin_role(...).await)`
+   to discard the `Result`. If the grant failed, the first user
+   silently became `Registered` with no diagnostic output.
+   Replaced with `if let Err(err) = ... { warn!(...) }` so
+   operators are alerted via `tracing` when the grant fails.

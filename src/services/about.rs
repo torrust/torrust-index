@@ -15,7 +15,7 @@ impl Service {
     ///
     /// This method is infallible but returns `Result` to keep the
     /// handler signature uniform.
-    #[must_use]
+    #[must_use = "contains the rendered about page HTML"]
     pub fn get_about_page(&self) -> Result<String, std::convert::Infallible> {
         let html = r#"
     <html>
@@ -44,7 +44,7 @@ impl Service {
     ///
     /// This method is infallible but returns `Result` to keep the
     /// handler signature uniform.
-    #[must_use]
+    #[must_use = "contains the rendered license page HTML"]
     pub fn get_license_page(&self) -> Result<String, std::convert::Infallible> {
         let html = r#"
         <html>

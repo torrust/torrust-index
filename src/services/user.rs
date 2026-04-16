@@ -10,7 +10,7 @@ use chrono::NaiveDate;
 use mockall::automock;
 use pbkdf2::password_hash::rand_core::OsRng;
 use serde_derive::Deserialize;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use super::authentication::DbUserAuthenticationRepository;
 use crate::config::{Configuration, PasswordConstraints};
@@ -163,7 +163,10 @@ impl RegistrationService {
 
         // If this is the first created account, grant the admin role.
         if user_id == 1 {
-            drop(self.user_repository.grant_admin_role(&user_id).await);
+            info!(user_id, "first registered user — granting admin role");
+            if let Err(err) = self.user_repository.grant_admin_role(&user_id).await {
+                warn!(user_id, %err, "failed to grant admin role to first user");
+            }
         }
 
         if let Some(email) = &registration.email
@@ -434,6 +437,7 @@ impl Repository for DbUserRepository {
     ///
     /// It returns an error if there is a database error.
     async fn grant_admin_role(&self, user_id: &UserId) -> Result<(), Error> {
+        info!(user_id = *user_id, "granting admin role");
         // Atomically grant admin and revoke tokens (ADR-T-007 §A-2b)
         self.database.grant_admin_role_and_revoke_tokens(*user_id).await
     }

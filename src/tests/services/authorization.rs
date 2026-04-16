@@ -19,6 +19,8 @@
 //! ## `PermissionMatrix`
 //!
 //! - [`admin_is_granted_every_action`] — `Admin` can do everything.
+//! - [`moderator_grants_and_denials`] — `Moderator` gets the
+//!   expected subset (Registered + tag/torrent moderation).
 //! - [`registered_grants_and_denials`] — `Registered` gets the
 //!   expected subset.
 //! - [`guest_grants_and_denials`] — `Guest` gets the expected subset.
@@ -54,6 +56,8 @@
 //!   revokes a previously granted action.
 //! - [`with_overrides_empty_matches_default`] — empty overrides produce
 //!   the same matrix as the default.
+//! - [`with_overrides_high_risk_grant_still_applies`] — a high-risk
+//!   override is applied (the `warn!` is emitted but does not block).
 
 use crate::services::authorization::{Action, Effect, PermissionMatrix, PermissionOverride, Permissions, Role};
 
@@ -79,10 +83,10 @@ fn role_serde_round_trip() {
 
 #[test]
 fn role_from_str_rejects_unknown() {
-    let err = "moderator".parse::<Role>();
+    let err = "superuser".parse::<Role>();
     assert!(err.is_err());
     let err = err.unwrap_err();
-    assert!(err.0.contains("moderator"));
+    assert!(err.0.contains("superuser"));
 }
 
 // ── Action ───────────────────────────────────────────────────────────
@@ -157,6 +161,50 @@ fn admin_is_granted_every_action() {
     for &action in Action::ALL {
         assert!(matrix.can(&Role::Admin, action), "Admin should be granted {action}");
     }
+}
+
+#[test]
+fn moderator_grants_and_denials() {
+    let matrix = PermissionMatrix::default_matrix();
+
+    let granted = [
+        Action::GetAboutPage,
+        Action::GetLicensePage,
+        Action::GetCategories,
+        Action::GetImageByUrl,
+        Action::GetPublicSettings,
+        Action::GetSiteName,
+        Action::GetTags,
+        Action::AddTorrent,
+        Action::GetTorrent,
+        Action::UpdateTorrent,
+        Action::GetTorrentInfo,
+        Action::GenerateTorrentInfoListing,
+        Action::ChangePassword,
+        Action::GetMyPermissions,
+        Action::AddTag,
+        Action::DeleteTag,
+        Action::DeleteTorrent,
+    ];
+
+    let denied = [
+        Action::AddCategory,
+        Action::DeleteCategory,
+        Action::GetSettingsSecret,
+        Action::BanUser,
+        Action::GenerateUserProfileSpecification,
+    ];
+
+    for action in granted {
+        assert!(matrix.can(&Role::Moderator, action), "Moderator should be granted {action}");
+    }
+
+    for action in denied {
+        assert!(!matrix.can(&Role::Moderator, action), "Moderator should be denied {action}");
+    }
+
+    // Sanity: granted + denied == all actions
+    assert_eq!(granted.len() + denied.len(), Action::ALL.len());
 }
 
 #[test]
@@ -373,4 +421,18 @@ fn with_overrides_empty_matches_default() {
             );
         }
     }
+}
+
+#[test]
+fn with_overrides_high_risk_grant_still_applies() {
+    // A high-risk override emits a warn! but still takes effect.
+    let overrides = vec![PermissionOverride {
+        role: Role::Guest,
+        action: Action::DeleteTorrent,
+        effect: Effect::Allow,
+    }];
+    let matrix = PermissionMatrix::with_overrides(&overrides);
+
+    // Guest + DeleteTorrent is normally denied; override grants it.
+    assert!(matrix.can(&Role::Guest, Action::DeleteTorrent));
 }

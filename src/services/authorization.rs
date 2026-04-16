@@ -4,7 +4,8 @@
 //!
 //! # Architecture
 //!
-//! - [`Role`] — the user's privilege level (`Guest`, `Registered`, `Admin`).
+//! - [`Role`] — the user's privilege level (`Guest`, `Registered`,
+//!   `Moderator`, `Admin`).
 //! - [`Action`] — an operation the user wants to perform.
 //! - [`PermissionMatrix`] — the default-deny policy table.
 //! - [`Permissions`] trait — abstraction consumed by the
@@ -15,6 +16,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 // ── Role ─────────────────────────────────────────────────────────────
 
@@ -26,12 +28,13 @@ use serde::{Deserialize, Serialize};
 pub enum Role {
     Guest,
     Registered,
+    Moderator,
     Admin,
 }
 
 impl Role {
     /// All variants (compile-time safe — see tests).
-    pub const ALL: &[Self] = &[Self::Guest, Self::Registered, Self::Admin];
+    pub const ALL: &[Self] = &[Self::Guest, Self::Registered, Self::Moderator, Self::Admin];
 }
 
 impl fmt::Display for Role {
@@ -39,6 +42,7 @@ impl fmt::Display for Role {
         let s = match self {
             Self::Guest => "guest",
             Self::Registered => "registered",
+            Self::Moderator => "moderator",
             Self::Admin => "admin",
         };
         write!(f, "{s}")
@@ -52,6 +56,7 @@ impl FromStr for Role {
         match s {
             "guest" => Ok(Self::Guest),
             "registered" => Ok(Self::Registered),
+            "moderator" => Ok(Self::Moderator),
             "admin" => Ok(Self::Admin),
             _ => Err(RoleParseError(s.to_owned())),
         }
@@ -97,6 +102,7 @@ pub enum Action {
     GenerateTorrentInfoListing,
     ChangePassword,
     BanUser,
+    /// Render a user profile as a PNG image (admin-only).
     GenerateUserProfileSpecification,
     UpdateTorrent,
     GetMyPermissions,
@@ -204,8 +210,58 @@ impl PermissionMatrix {
     /// - `Admin` intentionally grants all actions by default.
     const fn default_grant(role: Role, action: Action) -> bool {
         match role {
-            // Admin is granted every action.
-            Role::Admin => true,
+            Role::Admin => match action {
+                Action::GetAboutPage
+                | Action::GetLicensePage
+                | Action::AddCategory
+                | Action::DeleteCategory
+                | Action::GetCategories
+                | Action::GetImageByUrl
+                | Action::GetSettingsSecret
+                | Action::GetPublicSettings
+                | Action::GetSiteName
+                | Action::AddTag
+                | Action::DeleteTag
+                | Action::GetTags
+                | Action::AddTorrent
+                | Action::GetTorrent
+                | Action::DeleteTorrent
+                | Action::GetTorrentInfo
+                | Action::GenerateTorrentInfoListing
+                | Action::ChangePassword
+                | Action::BanUser
+                | Action::GenerateUserProfileSpecification
+                | Action::UpdateTorrent
+                | Action::GetMyPermissions => true,
+            },
+
+            // Moderator: everything Registered has, plus tag and
+            // torrent moderation actions.
+            Role::Moderator => match action {
+                Action::GetAboutPage
+                | Action::GetLicensePage
+                | Action::GetCategories
+                | Action::GetImageByUrl
+                | Action::GetPublicSettings
+                | Action::GetSiteName
+                | Action::GetTags
+                | Action::AddTorrent
+                | Action::GetTorrent
+                | Action::GetTorrentInfo
+                | Action::GenerateTorrentInfoListing
+                | Action::ChangePassword
+                | Action::UpdateTorrent
+                | Action::GetMyPermissions
+                | Action::AddTag
+                | Action::DeleteTag
+                | Action::DeleteTorrent => true,
+
+                Action::AddCategory
+                | Action::DeleteCategory
+                | Action::GetSettingsSecret
+                | Action::BanUser
+                | Action::GenerateUserProfileSpecification => false,
+            },
 
             Role::Registered => match action {
                 Action::GetAboutPage
@@ -261,15 +317,36 @@ impl PermissionMatrix {
         }
     }
 
+    /// Actions considered high-risk when granted to `Guest` or
+    /// `Registered` via a TOML override.  A `warn!` is emitted at
+    /// startup for each such grant so operators are alerted.
+    const HIGH_RISK_ACTIONS: &[Action] = &[
+        Action::DeleteTorrent,
+        Action::DeleteCategory,
+        Action::DeleteTag,
+        Action::BanUser,
+        Action::GetSettingsSecret,
+        Action::GenerateUserProfileSpecification,
+    ];
+
     /// Build a matrix from the defaults, then apply TOML overrides.
     ///
     /// Each override inserts (allow) or removes (deny) a `(Role, Action)` pair.
+    /// A `warn!` is emitted for overrides that grant high-risk actions to
+    /// non-admin roles.
     #[must_use]
     pub fn with_overrides(overrides: &[PermissionOverride]) -> Self {
         let mut matrix = Self::default_matrix();
         for ov in overrides {
             match ov.effect {
                 Effect::Allow => {
+                    if !matches!(ov.role, Role::Admin) && Self::HIGH_RISK_ACTIONS.contains(&ov.action) {
+                        warn!(
+                            role = %ov.role,
+                            action = %ov.action,
+                            "high-risk permission override: granting a destructive action to a non-admin role",
+                        );
+                    }
                     matrix.allowed.insert((ov.role, ov.action));
                 }
                 Effect::Deny => {
