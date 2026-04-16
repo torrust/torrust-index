@@ -5,7 +5,7 @@
 //!
 //! See ADR-T-007 for the rationale behind centralising JWT handling.
 //!
-//! # Architecture (ADR-T-007 Phases 1–6)
+//! # Architecture (ADR-T-007 Phases 1–7)
 //!
 //! **Phase 1 — Structural cleanup.** Consolidated all `jsonwebtoken`
 //! usage into this single module with `Result`-based error propagation.
@@ -39,6 +39,12 @@
 //! uses it to auto-generate persistent keys on first boot. See
 //! `src/bin/generate_auth_keypair.rs` for the binary and ADR-T-007
 //! Phase 6 for full context.
+//!
+//! **Phase 7 — Consolidated session validation.** `validate_session`
+//! is the sole entry point for session-token validation: it verifies
+//! the JWT, checks the token-generation counter, and rejects banned
+//! users. All callers delegate here instead of re-implementing the
+//! sequence. See ADR-T-007 Phase 7.
 
 use std::sync::Arc;
 
@@ -50,6 +56,7 @@ use sha2::{Digest, Sha256};
 use tracing::info;
 
 use crate::config::Configuration;
+use crate::databases::database::Database;
 use crate::errors::AuthError;
 use crate::models::user::{UserCompact, UserId};
 use crate::utils::clock;
@@ -87,9 +94,10 @@ pub struct SessionClaims {
     pub role: String,
     /// Advisory username. Non-authoritative.
     pub username: String,
-    /// Token generation counter. Tokens with a `gen` older than the
-    /// current database value for this user are considered revoked.
-    /// See ADR-T-007 Phase 4 (Optional Revocation).
+    /// Token generation counter. Validated by
+    /// [`JsonWebToken::validate_session`] — tokens whose `gen` does
+    /// not match the current database value are rejected.
+    /// See ADR-T-007 Phases 4 & 7.
     #[serde(rename = "gen")]
     pub token_gen: u64,
 }
@@ -241,6 +249,33 @@ impl JsonWebToken {
                 jsonwebtoken::errors::ErrorKind::ExpiredSignature => AuthError::TokenExpired,
                 _ => AuthError::TokenInvalid,
             })
+    }
+
+    /// Verify a session JWT and validate it against the database.
+    ///
+    /// This is the **sole entry point** for session-token validation.
+    /// It verifies the JWT signature and expiry, checks the token
+    /// generation counter, and rejects banned users.
+    ///
+    /// # Errors
+    ///
+    /// * `AuthError::TokenExpired` — the token's `exp` is in the past.
+    /// * `AuthError::TokenInvalid` — signature mismatch or malformed token.
+    /// * `AuthError::TokenRevoked` — generation mismatch or user is banned.
+    pub async fn validate_session(&self, db: &dyn Database, token: &str) -> Result<SessionClaims, AuthError> {
+        let claims = self.verify(token)?;
+
+        let current_gen = db.get_token_generation(claims.sub).await?;
+
+        if claims.token_gen != current_gen {
+            return Err(AuthError::TokenRevoked);
+        }
+
+        if db.is_user_banned(claims.sub).await.unwrap_or(false) {
+            return Err(AuthError::TokenRevoked);
+        }
+
+        Ok(claims)
     }
 
     /// Sign an email-verification JWT for the given user ID.

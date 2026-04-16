@@ -72,7 +72,9 @@
 //! The `gen` field is the token-generation counter. When a user's
 //! password changes, role changes, or the user is banned, the counter
 //! is incremented and any token carrying an older `gen` value is
-//! rejected (see ADR-T-007 Phase 4).
+//! rejected. Validation is performed by
+//! [`JsonWebToken::validate_session`](crate::jwt::JsonWebToken::validate_session)
+//! (see ADR-T-007 Phases 4 & 7).
 //!
 //! **NOTICE**: The token lifetime is configurable via
 //! `auth.session_token_lifetime_secs` (default: 2 weeks / `1_209_600` seconds).
@@ -155,36 +157,8 @@ impl Authentication {
     /// This function will return an error if the JWT is invalid, expired,
     /// or if the token's generation has been revoked.
     pub async fn get_user_id_from_bearer_token(&self, token: BearerToken) -> Result<UserId, AuthError> {
-        let claims = self.json_web_token.verify(token.as_str())?;
-        self.validate_token_generation(&claims).await?;
+        let claims = self.json_web_token.validate_session(&**self.database, token.as_str()).await?;
         Ok(claims.sub)
-    }
-
-    /// Checks that the token's `gen` claim matches the current
-    /// `token_generation` in the database. Returns `AuthError::TokenRevoked`
-    /// if the token is stale (e.g. after a password change, role change,
-    /// or ban).
-    ///
-    /// Uses exact-match (`!=`) rather than `<` so that tokens are also
-    /// rejected when the database generation *decreases* (e.g. restore
-    /// from backup). See ADR-T-007 §A-1.
-    ///
-    /// Also checks the ban table as a defence-in-depth measure
-    /// (ADR-T-007 §A-3).
-    async fn validate_token_generation(&self, claims: &SessionClaims) -> Result<(), AuthError> {
-        let current_gen = self.database.get_token_generation(claims.sub).await?;
-
-        if claims.token_gen != current_gen {
-            return Err(AuthError::TokenRevoked);
-        }
-
-        // Defence-in-depth: reject tokens for banned users even if
-        // token_generation somehow matches (ADR-T-007 §A-3).
-        if self.database.is_user_banned(claims.sub).await.unwrap_or(false) {
-            return Err(AuthError::TokenRevoked);
-        }
-
-        Ok(())
     }
 }
 

@@ -11,7 +11,6 @@ use serde::Deserialize;
 use super::forms::{ChangePasswordForm, JsonWebToken, LoginForm, RegistrationForm};
 use super::responses::{self};
 use crate::common::AppData;
-use crate::errors::AuthError;
 use crate::services::user::ListingRequest;
 use crate::web::api::server::v1::extractors::optional_user_id::ExtractOptionalLoggedInUser;
 use crate::web::api::server::v1::responses::OkResponseData;
@@ -101,30 +100,17 @@ pub async fn verify_token_handler(
     State(app_data): State<Arc<AppData>>,
     extract::Json(token): extract::Json<JsonWebToken>,
 ) -> Response {
-    let claims = match app_data.json_web_token.verify(&token.token) {
-        Ok(claims) => claims,
-        Err(error) => return error.into_response(),
-    };
-
-    // Validate token generation against the database (ADR-T-007 §A-1: exact match)
-    let current_gen = match app_data.database.get_token_generation(claims.sub).await {
-        Ok(generation) => generation,
-        Err(e) => return AuthError::from(e).into_response(),
-    };
-
-    if claims.token_gen != current_gen {
-        return AuthError::TokenRevoked.into_response();
+    match app_data
+        .json_web_token
+        .validate_session(&**app_data.database, &token.token)
+        .await
+    {
+        Ok(_) => axum::Json(OkResponseData {
+            data: "Token is valid.".to_string(),
+        })
+        .into_response(),
+        Err(error) => error.into_response(),
     }
-
-    // Defence-in-depth: reject tokens for banned users (ADR-T-007 §A-3)
-    if app_data.database.is_user_banned(claims.sub).await.unwrap_or(false) {
-        return AuthError::TokenRevoked.into_response();
-    }
-
-    axum::Json(OkResponseData {
-        data: "Token is valid.".to_string(),
-    })
-    .into_response()
 }
 
 #[derive(Deserialize)]

@@ -3,12 +3,14 @@
 //! Provides login (username + password → JWT) and token renewal.
 //! JWT signing and verification are delegated to [`crate::jwt::JsonWebToken`].
 //!
-//! ## Token revocation (ADR-T-007 Phase 4)
+//! ## Token revocation (ADR-T-007 Phases 4 & 7)
 //!
-//! On login and renewal, the service fetches the user's current
+//! On login, the service fetches the user's current
 //! `token_generation` from the database and embeds it in the JWT
-//! (`gen` claim). On renewal, tokens whose `gen` is older than the
-//! database value are rejected as revoked.
+//! (`gen` claim). On renewal, validation is delegated to
+//! [`JsonWebToken::validate_session`](crate::jwt::JsonWebToken::validate_session),
+//! which verifies the JWT, checks the generation counter, and
+//! rejects banned users in a single code path.
 use std::sync::Arc;
 
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
@@ -125,20 +127,7 @@ impl Service {
     pub async fn renew_token(&self, token: &str) -> Result<(String, UserCompact), AuthError> {
         const ONE_WEEK_IN_SECONDS: u64 = 604_800;
 
-        // Verify if token is valid
-        let claims = self.json_web_token.verify(token)?;
-
-        // Validate token generation — reject revoked tokens (ADR-T-007 §A-1: exact match)
-        let current_gen = self.database.get_token_generation(claims.sub).await?;
-
-        if claims.token_gen != current_gen {
-            return Err(AuthError::TokenRevoked);
-        }
-
-        // Defence-in-depth: reject tokens for banned users (ADR-T-007 §A-3)
-        if self.database.is_user_banned(claims.sub).await.unwrap_or(false) {
-            return Err(AuthError::TokenRevoked);
-        }
+        let claims = self.json_web_token.validate_session(&**self.database, token).await?;
 
         let user_compact = self.user_repository.get_compact(&claims.sub).await.map_err(|err| match err {
             Error::UserNotFound => AuthError::UserNotFound,
@@ -147,7 +136,7 @@ impl Service {
 
         // Renew token if it is valid for less than one week
         let token = match claims.exp - clock::now() {
-            x if x < ONE_WEEK_IN_SECONDS => self.json_web_token.sign(user_compact.clone(), current_gen).await?,
+            x if x < ONE_WEEK_IN_SECONDS => self.json_web_token.sign(user_compact.clone(), claims.token_gen).await?,
             _ => token.to_string(),
         };
 

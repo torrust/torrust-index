@@ -324,9 +324,7 @@ impl BanService {
             .await?;
 
         // Atomically ban and revoke tokens (ADR-T-007 §A-2c)
-        self.banned_user_list
-            .add_and_revoke_tokens(&user_profile.user_id)
-            .await?;
+        self.banned_user_list.add_and_revoke_tokens(&user_profile.user_id).await?;
 
         Ok(())
     }
@@ -589,9 +587,7 @@ impl DbBannedUserList {
         let date_expiry = chrono::NaiveDateTime::parse_from_str("9999-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
             .expect("Could not parse date from 9999-01-01 00:00:00.");
 
-        self.database
-            .ban_user_and_revoke_tokens(*user_id, &reason, date_expiry)
-            .await
+        self.database.ban_user_and_revoke_tokens(*user_id, &reason, date_expiry).await
     }
 
     /// Increment the user's `token_generation` counter, invalidating all

@@ -36,9 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `token_generation` column on `torrust_users` (migration for SQLite and MySQL).
 - Token revocation: password changes, role changes (admin grant), and bans
   increment `token_generation`; tokens with an older `gen` claim are rejected.
-- Revocation checks at three entry points (defence in depth):
-  `Authentication::get_user_id_from_bearer_token`, `verify_token_handler`,
-  and `authentication::Service::renew_token`.
+- Consolidated session validation: `JsonWebToken::validate_session` is the
+  sole entry point for verifying a session JWT, checking the token-generation
+  counter, and rejecting banned users. All callers delegate here.
 - `BearerToken` extractor rejects missing/malformed `Authorization` headers at
   the extraction boundary (`AuthError::TokenNotFound` / `AuthError::TokenInvalid`).
 - `ExtractOptionalLoggedInUser` catches extraction rejection and returns `None`

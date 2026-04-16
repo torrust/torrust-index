@@ -1,6 +1,6 @@
 # ADR-T-007: Refactor the JWT System
 
-**Status:** Phases 1–6 implemented · Phase 7 pending
+**Status:** Phases 1–7 implemented
 **Date:** 2026-04-14
 **Updated:** 2026-04-16
 
@@ -186,8 +186,8 @@ The ban table is also checked as a secondary guard: if
 `token_generation` somehow matches despite an active ban,
 `is_user_banned` catches it.
 
-Validation is currently performed inline at three entry points.
-Phase 7 consolidates these into a single code path.
+Validation is consolidated into `JsonWebToken::validate_session`
+(Phase 7).
 
 **Breaking:** tokens without a `gen` claim fail deserialization.
 
@@ -280,7 +280,7 @@ rm -f "$tmpfile"
 > when the pipeline exits — producing truncated PEM files.
 > The POSIX version above is strictly correct.
 
-### Phase 7 — Consolidate Session Validation ⬜ Pending
+### Phase 7 — Consolidate Session Validation ✅
 
 #### Problem
 
