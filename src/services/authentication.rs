@@ -135,7 +135,7 @@ impl Service {
         })?;
 
         // Renew token if it is valid for less than one week
-        let token = match claims.exp - clock::now() {
+        let token = match claims.exp.saturating_sub(clock::now()) {
             x if x < ONE_WEEK_IN_SECONDS => self.json_web_token.sign(user_compact.clone(), claims.token_gen).await?,
             _ => token.to_string(),
         };

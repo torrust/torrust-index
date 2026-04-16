@@ -271,7 +271,7 @@ impl JsonWebToken {
             return Err(AuthError::TokenRevoked);
         }
 
-        if db.is_user_banned(claims.sub).await.unwrap_or(false) {
+        if db.is_user_banned(claims.sub).await? {
             return Err(AuthError::TokenRevoked);
         }
 

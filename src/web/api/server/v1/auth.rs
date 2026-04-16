@@ -167,11 +167,16 @@ impl Authentication {
 /// # Errors
 ///
 /// Returns `AuthError::TokenInvalid` if the header value is not valid
-/// ASCII or does not contain a `Bearer <token>` pair.
+/// ASCII or does not contain a `Bearer <token>` pair. The scheme name
+/// is matched case-insensitively per RFC 7235 §2.1.
 pub fn parse_token(authorization: &HeaderValue) -> Result<String, AuthError> {
     let header_str = authorization.to_str().map_err(|_| AuthError::TokenInvalid)?;
 
-    let token = header_str.strip_prefix("Bearer ").ok_or(AuthError::TokenInvalid)?.trim();
+    let token = header_str
+        .get(7..)
+        .filter(|_| header_str[..7].eq_ignore_ascii_case("bearer "))
+        .ok_or(AuthError::TokenInvalid)?
+        .trim();
 
     if token.is_empty() {
         return Err(AuthError::TokenInvalid);

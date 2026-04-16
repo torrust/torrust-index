@@ -1,10 +1,11 @@
 //! User services.
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
 use async_trait::async_trait;
+use chrono::NaiveDate;
 #[cfg(test)]
 use mockall::automock;
 use pbkdf2::password_hash::rand_core::OsRng;
@@ -23,6 +24,14 @@ use crate::services::authentication::verify_password;
 use crate::utils::validation::validate_email_address;
 use crate::web::api::server::v1::contexts::user::forms::{ChangePasswordForm, RegistrationForm};
 use crate::{AsCSV, mailer};
+
+/// Permanent ban expiry date (year 9999).
+static PERMANENT_BAN_EXPIRY: LazyLock<chrono::NaiveDateTime> = LazyLock::new(|| {
+    NaiveDate::from_ymd_opt(9999, 1, 1)
+        .expect("valid date")
+        .and_hms_opt(0, 0, 0)
+        .expect("valid time")
+});
 
 /// Since user email could be optional, we need a way to represent "no email"
 /// in the database. This function returns the string that should be used for
@@ -551,11 +560,6 @@ impl DbBannedUserList {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    ///
-    /// # Panics
-    ///
-    /// It panics if the expiration date cannot be parsed. It should never
-    /// happen as the date is hardcoded for now.
     pub async fn add(&self, user_id: &UserId) -> Result<(), Error> {
         // todo: add reason and `date_expiry` parameters to request.
 
@@ -564,11 +568,7 @@ impl DbBannedUserList {
         // For the time being, we will not use a reason for banning a user.
         let reason = "no reason".to_string();
 
-        // User will be banned until the year 9999
-        let date_expiry = chrono::NaiveDateTime::parse_from_str("9999-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
-            .expect("Could not parse date from 9999-01-01 00:00:00.");
-
-        self.database.ban_user(*user_id, &reason, date_expiry).await
+        self.database.ban_user(*user_id, &reason, *PERMANENT_BAN_EXPIRY).await
     }
 
     /// Ban a user and atomically increment `token_generation`.
@@ -577,17 +577,12 @@ impl DbBannedUserList {
     /// # Errors
     ///
     /// It returns an error if there is a database error.
-    ///
-    /// # Panics
-    ///
-    /// It panics if the expiration date cannot be parsed.
     pub async fn add_and_revoke_tokens(&self, user_id: &UserId) -> Result<(), Error> {
         let reason = "no reason".to_string();
 
-        let date_expiry = chrono::NaiveDateTime::parse_from_str("9999-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
-            .expect("Could not parse date from 9999-01-01 00:00:00.");
-
-        self.database.ban_user_and_revoke_tokens(*user_id, &reason, date_expiry).await
+        self.database
+            .ban_user_and_revoke_tokens(*user_id, &reason, *PERMANENT_BAN_EXPIRY)
+            .await
     }
 
     /// Increment the user's `token_generation` counter, invalidating all
