@@ -21,7 +21,8 @@ impl Service {
     ///
     /// It returns an error if:
     ///
-    /// * The user does not have the required permissions.
+    /// * The tag name is empty.
+    /// * The tag already exists.
     /// * There is a database error.
     pub async fn add_tag(&self, tag_name: &str) -> Result<TagId, CategoryTagError> {
         let trimmed_name = tag_name.trim();
@@ -45,7 +46,7 @@ impl Service {
     ///
     /// It returns an error if:
     ///
-    /// * The user does not have the required permissions.
+    /// * The tag is not found.
     /// * There is a database error.
     pub async fn delete_tag(&self, tag_id: &TagId) -> Result<(), CategoryTagError> {
         match self.tag_repository.delete(tag_id).await {
@@ -57,14 +58,11 @@ impl Service {
         }
     }
 
-    /// Returns all the tags from the database
+    /// Returns all the tags from the database.
     ///
     /// # Errors
     ///
-    /// It returns an error if:
-    ///
-    /// * The user does not have the required permissions.
-    /// * There is a database error retrieving the tags.
+    /// It returns an error if there is a database error retrieving the tags.
     pub async fn get_tags(&self) -> Result<Vec<TorrentTag>, CategoryTagError> {
         self.tag_repository
             .get_all()

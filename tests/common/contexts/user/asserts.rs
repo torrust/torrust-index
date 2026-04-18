@@ -1,3 +1,7 @@
+use std::str::FromStr;
+
+use torrust_index::services::authorization::Role;
+
 use super::forms::RegistrationForm;
 use super::responses::LoggedInUserData;
 use crate::common::asserts::assert_json_ok_response;
@@ -20,8 +24,8 @@ pub fn assert_successful_login_response(response: &TextResponse, username: &str)
 
     assert_eq!(logged_in_user.username, username);
     assert!(
-        logged_in_user.role == "admin" || logged_in_user.role == "registered",
-        "expected role to be \"admin\" or \"registered\", got {:?}",
+        Role::from_str(&logged_in_user.role).is_ok(),
+        "expected a known role, got {:?}",
         logged_in_user.role
     );
 

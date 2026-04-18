@@ -206,10 +206,13 @@
 //! be the same but with the new token.
 //!
 //! **NOTICE**: The `role` field in the JWT is advisory only. The authoritative
-//! role is always re-checked from the database on each request. If a user's
-//! role changes in the database, the `token_generation` counter is incremented
-//! and any existing token with an older `gen` claim is rejected — the user
-//! must re-login to get a token reflecting the new role (see ADR-T-007).
+//! role is always re-checked from the database on each request. When the role
+//! is changed through the application (e.g. `grant_admin_role_and_revoke_tokens`),
+//! the `token_generation` counter is incremented and any existing token with an
+//! older `gen` claim is rejected — the user must re-login to get a token
+//! reflecting the new role (see ADR-T-007). A manual SQL update of
+//! `torrust_users.role` will **not** automatically bump `token_generation`;
+//! operators must also increment it explicitly.
 //!
 //! # Ban a user
 //!

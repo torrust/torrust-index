@@ -2,6 +2,10 @@
 
 **Status:** Implemented (Phases 1–4 complete; MySQL E2E pending)
 **Date:** 2026-04-15
+**Updated:** 2026-04-18 — Post-review hardening: `Actor::try_user_id()` /
+`Actor::is_authenticated()` convenience methods, compile-time
+`action_markers!` ↔ `Action::ALL` sync assertion, non-owner denial
+E2E tests added.
 **Relates to:**
 [ADR-T-007](007-jwt-system-refactor.md) (JWT refactor — advisory `role` in token claims),
 [ADR-T-006](006-error-system-refactor.md) (error refactor — `AuthError::UnauthorizedAction` variants)
@@ -794,9 +798,11 @@ introduces `RequirePermission<A>` extractors on all handlers.
 - **401 vs. 403 distinction is correct.** Guest-denied → 401,
   authenticated-but-insufficient → 403, consistent across all
   error enums.
-- **`Actor` provides a clean identity carrier.** The `user_id()`
-  panic guard is appropriate for handlers where `Guest` is denied
-  by the permission matrix.
+- **`Actor` provides a clean identity carrier.** `user_id()`
+  panics only on `Guest` actors and is appropriate for handlers
+  where `Guest` is denied by the permission matrix.
+  `try_user_id()` returns `Option<UserId>` for safe use in
+  any handler, and `is_authenticated()` is a convenience predicate.
 
 ### Open Issues (Resolved)
 
@@ -889,6 +895,9 @@ overrides, and the `GetMyPermissions` action.
   `Action` required updating `default_grant` (exhaustive match for
   `Registered` and `Guest`), `Action::ALL`, `action_markers!`, and
   all crate-level test lists — any omission would be a build error.
+  A `const` assertion in `action_markers!` now also verifies that
+  the marker count equals `Action::ALL.len()`, catching
+  marker/enum drift without needing to run tests.
 - **Good crate-level test coverage.** Several new tests cover
   `can_on_resource` (owner allowed, non-owner denied, admin bypass,
   denied action), `allowed_actions` (correct list), and

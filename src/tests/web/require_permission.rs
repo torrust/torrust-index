@@ -12,6 +12,14 @@
 //!   returns the stored `UserId` for an authenticated actor.
 //! - [`actor_user_id_panics_for_guest`] — `user_id()` panics when
 //!   called on a `Guest` actor.
+//! - [`actor_try_user_id_returns_some_for_authenticated`] —
+//!   `try_user_id()` returns `Some` for an authenticated actor.
+//! - [`actor_try_user_id_returns_none_for_guest`] — `try_user_id()`
+//!   returns `None` for a `Guest` actor.
+//! - [`actor_is_authenticated_returns_true_for_user`] —
+//!   `is_authenticated()` returns `true` for an authenticated actor.
+//! - [`actor_is_authenticated_returns_false_for_guest`] —
+//!   `is_authenticated()` returns `false` for a `Guest` actor.
 //!
 //! ## `RequirePermission` extractor (full path)
 //!
@@ -73,6 +81,42 @@ fn actor_user_id_panics_for_guest() {
         role: Role::Guest,
     };
     let _ = actor.user_id();
+}
+
+#[test]
+fn actor_try_user_id_returns_some_for_authenticated() {
+    let actor = Actor {
+        user_id: Some(42),
+        role: Role::Registered,
+    };
+    assert_eq!(actor.try_user_id(), Some(42));
+}
+
+#[test]
+fn actor_try_user_id_returns_none_for_guest() {
+    let actor = Actor {
+        user_id: None,
+        role: Role::Guest,
+    };
+    assert_eq!(actor.try_user_id(), None);
+}
+
+#[test]
+fn actor_is_authenticated_returns_true_for_user() {
+    let actor = Actor {
+        user_id: Some(1),
+        role: Role::Registered,
+    };
+    assert!(actor.is_authenticated());
+}
+
+#[test]
+fn actor_is_authenticated_returns_false_for_guest() {
+    let actor = Actor {
+        user_id: None,
+        role: Role::Guest,
+    };
+    assert!(!actor.is_authenticated());
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────

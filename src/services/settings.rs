@@ -19,46 +19,28 @@ impl Service {
     }
 
     /// It gets all the settings.
-    ///
-    /// # Errors
-    ///
-    /// It returns an error if the user does not have the required permissions.
-    pub async fn get_all(&self) -> Result<Settings, std::convert::Infallible> {
-        let torrust_index_configuration = self.configuration.get_all().await;
-
-        Ok(torrust_index_configuration)
+    pub async fn get_all(&self) -> Settings {
+        self.configuration.get_all().await
     }
 
-    /// It gets all the settings making the secrets with asterisks.
-    ///
-    /// # Errors
-    ///
-    /// It returns an error if the user does not have the required permissions.
-    pub async fn get_all_masking_secrets(&self) -> Result<Settings, std::convert::Infallible> {
+    /// It gets all the settings, masking secrets with asterisks.
+    pub async fn get_all_masking_secrets(&self) -> Settings {
         let mut torrust_index_configuration = self.configuration.get_all().await;
 
         torrust_index_configuration.remove_secrets();
 
-        Ok(torrust_index_configuration)
+        torrust_index_configuration
     }
 
     /// It gets only the public settings.
-    ///
-    /// # Errors
-    ///
-    /// It returns an error if the user does not have the required permissions.
-    pub async fn get_public(&self) -> Result<ConfigurationPublic, std::convert::Infallible> {
+    pub async fn get_public(&self) -> ConfigurationPublic {
         let settings_lock = self.configuration.get_all().await;
-        Ok(extract_public_settings(&settings_lock))
+        extract_public_settings(&settings_lock)
     }
 
     /// It gets the site name from the settings.
-    ///
-    /// # Errors
-    ///
-    /// It returns an error if the user does not have the required permissions.
-    pub async fn get_site_name(&self) -> Result<String, std::convert::Infallible> {
-        Ok(self.configuration.get_site_name().await)
+    pub async fn get_site_name(&self) -> String {
+        self.configuration.get_site_name().await
     }
 }
 

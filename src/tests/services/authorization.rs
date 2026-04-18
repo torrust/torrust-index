@@ -151,6 +151,13 @@ fn action_all_is_exhaustive() {
     }
 
     assert_eq!(Action::ALL.len(), expected.len());
+
+    let all_set: std::collections::HashSet<Action> = Action::ALL.iter().copied().collect();
+    let expected_set: std::collections::HashSet<Action> = expected.iter().copied().collect();
+    assert_eq!(
+        all_set, expected_set,
+        "Action::ALL and expected must contain the same variants"
+    );
 }
 
 // ── PermissionMatrix ─────────────────────────────────────────────────
@@ -298,19 +305,24 @@ fn guest_grants_and_denials() {
 fn every_role_action_pair_has_a_decision() {
     let matrix = PermissionMatrix::default_matrix();
 
-    // Every (Role, Action) must be either granted or denied —
-    // i.e. the matrix was populated for every pair.
-    // With a HashSet-based matrix, an absent pair is a denial,
-    // but we want to confirm the builder visited every pair.
-    let mut visited = 0usize;
+    // Verify that every per-role grant/deny list accounts for all actions,
+    // i.e. each role's granted + denied count equals Action::ALL.len().
     for &role in Role::ALL {
-        for &action in Action::ALL {
-            // Just exercise the lookup — it must not panic.
-            let _ = matrix.can(&role, action);
-            visited += 1;
+        let granted: Vec<_> = Action::ALL.iter().filter(|&&a| matrix.can(&role, a)).collect();
+        let denied: Vec<_> = Action::ALL.iter().filter(|&&a| !matrix.can(&role, a)).collect();
+        assert_eq!(
+            granted.len() + denied.len(),
+            Action::ALL.len(),
+            "role {role}: granted + denied must cover every action",
+        );
+        // Ensure no action appears in both sets (sanity check).
+        for &action in &granted {
+            assert!(
+                !denied.contains(&action),
+                "role {role}: action {action} appears in both granted and denied",
+            );
         }
     }
-    assert_eq!(visited, Role::ALL.len() * Action::ALL.len());
 }
 
 // ── Permissions trait ────────────────────────────────────────────────

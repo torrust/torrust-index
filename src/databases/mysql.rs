@@ -406,7 +406,7 @@ impl Database for Mysql {
     /// Grant admin role and increment `token_generation` in a single UPDATE.
     /// See ADR-T-007 §A-2b.
     async fn grant_admin_role_and_revoke_tokens(&self, user_id: i64) -> Result<(), database::Error> {
-        query("UPDATE torrust_users SET administrator = TRUE, token_generation = token_generation + 1 WHERE user_id = ?")
+        query("UPDATE torrust_users SET role = 'admin', token_generation = token_generation + 1 WHERE user_id = ?")
             .bind(user_id)
             .execute(&self.pool)
             .await

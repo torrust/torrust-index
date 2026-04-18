@@ -29,22 +29,16 @@ pub struct TokenResponse {
 
 /// Response after successfully logging in a user.
 pub fn logged_in_user(token: String, user_compact: UserCompact) -> Json<OkResponseData<TokenResponse>> {
+    let UserCompact { username, role, .. } = user_compact;
     Json(OkResponseData {
-        data: TokenResponse {
-            token,
-            username: user_compact.username.clone(),
-            role: user_compact.role,
-        },
+        data: TokenResponse { token, username, role },
     })
 }
 
 /// Response after successfully renewing a JWT.
 pub fn renewed_token(token: String, user_compact: UserCompact) -> Json<OkResponseData<TokenResponse>> {
+    let UserCompact { username, role, .. } = user_compact;
     Json(OkResponseData {
-        data: TokenResponse {
-            token,
-            username: user_compact.username.clone(),
-            role: user_compact.role,
-        },
+        data: TokenResponse { token, username, role },
     })
 }

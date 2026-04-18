@@ -10,7 +10,16 @@
 //! - [`PermissionMatrix`] — the default-deny policy table.
 //! - [`Permissions`] trait — abstraction consumed by the
 //!   `RequirePermission` extractor (see `extractors::require_permission`).
-
+//!
+//! # Compile-time guarantees
+//!
+//! - Adding a `Role` variant without updating `default_grant` is a
+//!   compile error (exhaustive top-level `match`).
+//! - Adding an `Action` variant without updating `default_grant` is a
+//!   compile error (exhaustive inner `match` for every role).
+//! - The `action_markers!` macro in `extractors::require_permission`
+//!   emits a `const` assertion that its marker count equals
+//!   `Action::ALL.len()`, catching marker/enum drift at compile time.
 use std::collections::HashSet;
 use std::fmt;
 use std::str::FromStr;

@@ -29,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Action` enum variants for compile-time handler–permission binding.
 - `Actor` struct yielded by `RequirePermission` carrying the resolved
   `user_id` and `Role` for downstream handler use.
+- `Actor::try_user_id()` non-panicking accessor returning `Option<UserId>`,
+  safe for handlers that may serve guests (ADR-T-008).
+- `Actor::is_authenticated()` convenience predicate (ADR-T-008).
+- Compile-time `action_markers!` ↔ `Action::ALL` sync assertion: adding an
+  `Action` variant without a matching marker (or vice versa) is a compile
+  error (ADR-T-008).
+- E2E tests for non-owner update and delete denial (`and_non_owners` module
+  in `tests/e2e/web/api/v1/contexts/torrent/contract.rs`) (ADR-T-008 Phase 4).
 - ADR-T-007: Document rationale for JWT system refactor.
 - Centralised JWT module (`src/jwt.rs`) consolidating all `jsonwebtoken` usage:
   key loading, signing, verification, and algorithm configuration.

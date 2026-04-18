@@ -19,6 +19,25 @@
 //! 4. Rejects with 401 (`Guest` denied) or 403 (authenticated but
 //!    insufficient role).
 //! 5. On success, yields the resolved [`Actor`] to the handler.
+//!
+//! # `Actor` API
+//!
+//! The [`Actor`] struct provides three accessors for the caller’s
+//! identity:
+//!
+//! - [`Actor::user_id()`] — panics on `Guest`; use only in handlers
+//!   guarded by an action that denies `Guest`.
+//! - [`Actor::try_user_id()`] — returns `Option<UserId>`, safe for
+//!   any caller including guests.
+//! - [`Actor::is_authenticated()`] — returns `true` for non-guest
+//!   actors.
+//!
+//! # Compile-time safety
+//!
+//! The `action_markers!` macro emits a `const` assertion that the
+//! number of marker structs equals `Action::ALL.len()`.  Adding an
+//! `Action` variant without a corresponding marker (or vice versa) is
+//! a compile error.
 
 use std::marker::PhantomData;
 use std::str::FromStr;
@@ -44,6 +63,12 @@ pub struct Actor {
 }
 
 impl Actor {
+    /// Returns the user ID, or `None` for a guest actor.
+    #[must_use]
+    pub const fn try_user_id(&self) -> Option<UserId> {
+        self.user_id
+    }
+
     /// Returns the user ID.
     ///
     /// # Panics
@@ -55,6 +80,13 @@ impl Actor {
     pub const fn user_id(&self) -> UserId {
         self.user_id
             .expect("BUG: called user_id() on a Guest actor — the handler's permission must deny Guest")
+    }
+
+    /// Returns `true` if the actor is an authenticated user (not a
+    /// guest).
+    #[must_use]
+    pub const fn is_authenticated(&self) -> bool {
+        self.user_id.is_some()
     }
 }
 
@@ -76,6 +108,17 @@ macro_rules! action_markers {
                 const ACTION: Action = Action::$variant;
             }
         )*
+
+        /// Compile-time check: one marker per `Action` variant.
+        /// If `Action::ALL` gains or loses a variant without a
+        /// matching update here, this static assert fires.
+        const _: () = {
+            const MARKER_COUNT: usize = 0 $(+ { let _ = Action::$variant; 1 })*;
+            assert!(
+                MARKER_COUNT == Action::ALL.len(),
+                "action_markers! list is out of sync with Action::ALL",
+            );
+        };
     };
 }
 
@@ -137,11 +180,17 @@ where
                 .map_err(IntoResponse::into_response)?;
 
             let role = match app_data.user_repository.get_compact(&user_id).await {
-                Ok(user) => Role::from_str(&user.role).unwrap_or_else(|_| {
-                    tracing::warn!(user_id, role = %user.role, "unrecognised role, defaulting to Registered");
-                    Role::Registered
-                }),
-                Err(_) => Role::Guest,
+                Ok(user) => {
+                    if let Ok(role) = Role::from_str(&user.role) {
+                        role
+                    } else {
+                        tracing::error!(user_id, role = %user.role, "unrecognised role in database — rejecting request");
+                        return Err(AuthError::UnrecognisedRole.into_response());
+                    }
+                }
+                Err(err) => {
+                    return Err(AuthError::from(err).into_response());
+                }
             };
 
             Actor {

@@ -21,7 +21,6 @@ impl Service {
     ///
     /// It returns an error if:
     ///
-    /// * The user does not have the required permissions.
     /// * The category name is empty.
     /// * The category already exists.
     /// * There is a database error.
@@ -54,7 +53,7 @@ impl Service {
     ///
     /// It returns an error if:
     ///
-    /// * The user does not have the required permissions.
+    /// * The category is not found.
     /// * There is a database error.
     pub async fn delete_category(&self, category_name: &str) -> Result<(), CategoryTagError> {
         match self.category_repository.delete(category_name).await {
@@ -66,14 +65,11 @@ impl Service {
         }
     }
 
-    /// Returns all the categories from the database
+    /// Returns all the categories from the database.
     ///
     /// # Errors
     ///
-    /// It returns an error if:
-    ///
-    /// * The user does not have the required permissions.
-    /// * There is a database error retrieving the categories.
+    /// It returns an error if there is a database error retrieving the categories.
     pub async fn get_categories(&self) -> Result<Vec<Category>, CategoryTagError> {
         self.category_repository
             .get_all()

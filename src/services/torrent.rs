@@ -277,13 +277,12 @@ impl Index {
     ///
     /// This function will return an error if:
     ///
-    /// * Unable to get the user who is deleting the torrent (logged-in user).
-    /// * The user does not have permission to delete the torrent.
-    /// * Unable to get the torrent listing from it's ID.
     /// * Unable to delete the torrent from the database.
-    pub async fn delete_torrent(&self, info_hash: &InfoHash) -> Result<DeletedTorrentResponse, TorrentError> {
-        let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
-
+    pub async fn delete_torrent(
+        &self,
+        info_hash: &InfoHash,
+        torrent_listing: &TorrentListing,
+    ) -> Result<DeletedTorrentResponse, TorrentError> {
         self.torrent_repository.delete(&torrent_listing.torrent_id).await?;
 
         // Remove info-hash from tracker whitelist
@@ -295,7 +294,7 @@ impl Index {
 
         Ok(DeletedTorrentResponse {
             torrent_id: torrent_listing.torrent_id,
-            info_hash: torrent_listing.info_hash,
+            info_hash: torrent_listing.info_hash.clone(),
         })
     }
 
@@ -381,20 +380,16 @@ impl Index {
     ///
     /// This function will return an error if:
     ///
-    /// * Unable to get the user.
-    /// * Unable to get listing from id.
-    /// * Unable to update the torrent tile or description.
-    /// * User does not have the permissions to update the torrent.
+    /// * Unable to update the torrent title, description, category, or tags.
     pub async fn update_torrent_info(
         &self,
         info_hash: &InfoHash,
+        torrent_listing: &TorrentListing,
         title: &Option<String>,
         description: &Option<String>,
         category_id: &Option<CategoryId>,
         tags: &Option<Vec<TagId>>,
     ) -> Result<TorrentResponse, TorrentError> {
-        let torrent_listing = self.torrent_listing_generator.one_torrent_by_info_hash(info_hash).await?;
-
         self.torrent_info_repository
             .update(&torrent_listing.torrent_id, title, description, category_id, tags)
             .await?;

@@ -213,11 +213,11 @@ pub async fn update_torrent_info_handler(
     let user_id = actor.user_id();
 
     // Resource-level ownership check (ADR-T-008 Phase 3).
+    let torrent_listing = match app_data.torrent_listing_generator.one_torrent_by_info_hash(&info_hash).await {
+        Ok(t) => t,
+        Err(e) => return TorrentError::from(e).into_response(),
+    };
     {
-        let torrent_listing = match app_data.torrent_listing_generator.one_torrent_by_info_hash(&info_hash).await {
-            Ok(t) => t,
-            Err(e) => return TorrentError::from(e).into_response(),
-        };
         let is_owner = torrent_listing.uploader_id == user_id;
         if !app_data
             .permissions
@@ -231,6 +231,7 @@ pub async fn update_torrent_info_handler(
         .torrent_service
         .update_torrent_info(
             &info_hash,
+            &torrent_listing,
             &update_torrent_info_form.title,
             &update_torrent_info_form.description,
             &update_torrent_info_form.category,
@@ -263,12 +264,12 @@ pub async fn delete_torrent_handler(
     };
 
     // Resource-level ownership check (ADR-T-008 Phase 3).
+    let torrent_listing = match app_data.torrent_listing_generator.one_torrent_by_info_hash(&info_hash).await {
+        Ok(t) => t,
+        Err(e) => return TorrentError::from(e).into_response(),
+    };
     {
         let user_id = actor.user_id();
-        let torrent_listing = match app_data.torrent_listing_generator.one_torrent_by_info_hash(&info_hash).await {
-            Ok(t) => t,
-            Err(e) => return TorrentError::from(e).into_response(),
-        };
         let is_owner = torrent_listing.uploader_id == user_id;
         if !app_data
             .permissions
@@ -278,7 +279,7 @@ pub async fn delete_torrent_handler(
         }
     }
 
-    match app_data.torrent_service.delete_torrent(&info_hash).await {
+    match app_data.torrent_service.delete_torrent(&info_hash, &torrent_listing).await {
         Ok(deleted_torrent_response) => Json(OkResponseData {
             data: deleted_torrent_response,
         })

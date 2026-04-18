@@ -48,7 +48,7 @@
 //!
 //! ## Minimum requirements
 //!
-//! - Rust Stable `1.85` (edition 2024)
+//! - Rust Stable `1.88` (edition 2024)
 //!
 //! ## Prerequisites
 //!

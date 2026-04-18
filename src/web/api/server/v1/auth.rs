@@ -23,6 +23,8 @@
 //! **NOTICE**: The first registered user is automatically granted the
 //! `admin` role. You can grant the admin role to additional users by
 //! setting the `role` column in the `torrust_users` table to `'admin'`.
+//! When doing so manually, also increment the user's `token_generation`
+//! column so that any existing tokens are revoked (see ADR-T-007).
 //!
 //! ## Login
 //!

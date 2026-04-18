@@ -1,4 +1,4 @@
-//! API handlers for the the [`settings`](crate::web::api::server::v1::contexts::settings) API
+//! API handlers for the [`settings`](crate::web::api::server::v1::contexts::settings) API
 //! context.
 use std::sync::Arc;
 
@@ -12,20 +12,12 @@ use crate::web::api::server::v1::extractors::require_permission::{
 use crate::web::api::server::v1::responses;
 
 /// Get all settings (with secrets masked).
-///
-/// # Errors
-///
-/// This function will return an error if the user does not have permission to
-/// view all the settings.
 #[allow(clippy::unused_async)]
 pub async fn get_all_handler(
     State(app_data): State<Arc<AppData>>,
     RequirePermission(_actor, _): RequirePermission<GetSettingsSecret>,
 ) -> Response {
-    let all_settings = match app_data.settings_service.get_all_masking_secrets().await {
-        Ok(all_settings) => all_settings,
-        Err(error) => return error.into_response(),
-    };
+    let all_settings = app_data.settings_service.get_all_masking_secrets().await;
 
     Json(responses::OkResponseData { data: all_settings }).into_response()
 }
@@ -36,10 +28,8 @@ pub async fn get_public_handler(
     State(app_data): State<Arc<AppData>>,
     RequirePermission(_actor, _): RequirePermission<GetPublicSettings>,
 ) -> Response {
-    match app_data.settings_service.get_public().await {
-        Ok(public_settings) => Json(responses::OkResponseData { data: public_settings }).into_response(),
-        Err(error) => error.into_response(),
-    }
+    let public_settings = app_data.settings_service.get_public().await;
+    Json(responses::OkResponseData { data: public_settings }).into_response()
 }
 
 /// Get website name.
@@ -48,8 +38,6 @@ pub async fn get_site_name_handler(
     State(app_data): State<Arc<AppData>>,
     RequirePermission(_actor, _): RequirePermission<GetSiteName>,
 ) -> Response {
-    match app_data.settings_service.get_site_name().await {
-        Ok(site_name) => Json(responses::OkResponseData { data: site_name }).into_response(),
-        Err(error) => error.into_response(),
-    }
+    let site_name = app_data.settings_service.get_site_name().await;
+    Json(responses::OkResponseData { data: site_name }).into_response()
 }

@@ -237,7 +237,10 @@ pub async fn get_user_profiles_handler(
 ///
 /// # Errors
 ///
-/// This endpoint always succeeds for any role (including `Guest`).
+/// Succeeds for every role in the default permission matrix.
+/// A TOML `[[permissions.overrides]]` entry that denies
+/// `GetMyPermissions` will cause the extractor to return
+/// 401 (guest) or 403 (authenticated).
 #[allow(clippy::unused_async)]
 pub async fn get_my_permissions_handler(
     State(app_data): State<Arc<AppData>>,
