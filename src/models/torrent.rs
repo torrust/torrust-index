@@ -3,6 +3,7 @@ use thiserror::Error;
 
 use super::category::CategoryId;
 use super::torrent_tag::TagId;
+use super::user::UserId;
 
 const MIN_TORRENT_TITLE_LENGTH: usize = 3;
 
@@ -14,6 +15,7 @@ pub type TorrentId = i64;
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, sqlx::FromRow)]
 pub struct TorrentListing {
     pub torrent_id: TorrentId,
+    pub uploader_id: UserId,
     pub uploader: String,
     pub info_hash: String,
     pub title: String,

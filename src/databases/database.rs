@@ -250,7 +250,7 @@ pub trait Database: Sync + Send {
     /// authentication path. See ADR-T-007 §A-3.
     async fn is_user_banned(&self, user_id: i64) -> Result<bool, Error>;
 
-    /// Grant a user the administrator role.
+    /// Grant a user the admin role.
     async fn grant_admin_role(&self, user_id: i64) -> Result<(), Error>;
 
     /// Grant a user the administrator role **and** increment

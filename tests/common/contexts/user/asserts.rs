@@ -1,3 +1,7 @@
+use std::str::FromStr;
+
+use torrust_index::services::authorization::Role;
+
 use super::forms::RegistrationForm;
 use super::responses::LoggedInUserData;
 use crate::common::asserts::assert_json_ok_response;
@@ -19,6 +23,11 @@ pub fn assert_successful_login_response(response: &TextResponse, username: &str)
     let logged_in_user = successful_login_response.data;
 
     assert_eq!(logged_in_user.username, username);
+    assert!(
+        Role::from_str(&logged_in_user.role).is_ok(),
+        "expected a known role, got {:?}",
+        logged_in_user.role
+    );
 
     assert_json_ok_response(response);
 }
@@ -41,7 +50,7 @@ pub fn assert_token_renewal_response(response: &TextResponse, logged_in_user: &L
         TokenRenewalData {
             token: logged_in_user.token.clone(),
             username: logged_in_user.username.clone(),
-            admin: logged_in_user.admin,
+            role: logged_in_user.role.clone(),
         }
     );
 

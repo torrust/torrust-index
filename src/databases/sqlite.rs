@@ -244,7 +244,7 @@ impl Database for Sqlite {
         tp.email,
         tp.email_verified,
         tu.date_registered,
-        tu.administrator
+        tu.role
         FROM torrust_user_profiles tp 
         INNER JOIN torrust_users tu
         ON tp.user_id = tu.user_id 
@@ -282,7 +282,7 @@ impl Database for Sqlite {
     }
 
     async fn get_user_compact_from_id(&self, user_id: i64) -> Result<UserCompact, database::Error> {
-        query_as::<_, UserCompact>("SELECT tu.user_id, tp.username, tu.administrator FROM torrust_users tu INNER JOIN torrust_user_profiles tp ON tu.user_id = tp.user_id WHERE tu.user_id = ?")
+        query_as::<_, UserCompact>("SELECT tu.user_id, tp.username, tu.role FROM torrust_users tu INNER JOIN torrust_user_profiles tp ON tu.user_id = tp.user_id WHERE tu.user_id = ?")
             .bind(user_id)
             .fetch_one(&self.pool)
             .await
@@ -387,7 +387,7 @@ impl Database for Sqlite {
     }
 
     async fn grant_admin_role(&self, user_id: i64) -> Result<(), database::Error> {
-        query("UPDATE torrust_users SET administrator = TRUE WHERE user_id = ?")
+        query("UPDATE torrust_users SET role = 'admin' WHERE user_id = ?")
             .bind(user_id)
             .execute(&self.pool)
             .await
@@ -404,7 +404,7 @@ impl Database for Sqlite {
     /// Grant admin role and increment `token_generation` in a single UPDATE.
     /// See ADR-T-007 §A-2b.
     async fn grant_admin_role_and_revoke_tokens(&self, user_id: i64) -> Result<(), database::Error> {
-        query("UPDATE torrust_users SET administrator = TRUE, token_generation = token_generation + 1 WHERE user_id = ?")
+        query("UPDATE torrust_users SET role = 'admin', token_generation = token_generation + 1 WHERE user_id = ?")
             .bind(user_id)
             .execute(&self.pool)
             .await
@@ -604,6 +604,7 @@ impl Database for Sqlite {
         let mut query_string = format!(
             "SELECT
             tt.torrent_id,
+            tt.uploader_id,
             tp.username AS uploader,
             tt.info_hash,
             ti.title,
@@ -1055,6 +1056,7 @@ impl Database for Sqlite {
         query_as::<_, TorrentListing>(
             "SELECT 
             tt.torrent_id,
+            tt.uploader_id,
             tp.username AS uploader,
             tt.info_hash, ti.title,
             ti.description,
@@ -1085,6 +1087,7 @@ impl Database for Sqlite {
         query_as::<_, TorrentListing>(
             "SELECT
             tt.torrent_id,
+            tt.uploader_id,
             tp.username AS uploader,
             tt.info_hash, ti.title,
             ti.description,

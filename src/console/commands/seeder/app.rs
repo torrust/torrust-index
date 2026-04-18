@@ -215,7 +215,7 @@ pub async fn login_index_api(api_url: &Url, username: &str, password: &str) -> L
 
     let user: LoggedInUserData = login(&unauthenticated_client, username, password).await;
 
-    if user.admin {
+    if user.role == "admin" {
         info!(target:"seeder", "Logged as admin with account: {} ", username.yellow());
     } else {
         info!(target:"seeder", "Logged as {} ", username.yellow());

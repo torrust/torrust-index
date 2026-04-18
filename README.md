@@ -2,7 +2,7 @@
 
 [![container_wf_b]][container_wf] [![coverage_wf_b]][coverage_wf] [![deployment_wf_b]][deployment_wf] [![testing_wf_b]][testing_wf] [![labels_wf_b]][labels_wf]
 
-__Torrust Index__ is a library for [BitTorrent][bittorrent] Files. Written in [Rust Language][rust] (edition 2024, MSRV 1.88) with the [Axum] web framework. ___This index aims to be respectful to established standards, (both [formal][BEP 00] and [otherwise][torrent_source_felid]).___
+__Torrust Index__ is a library for [BitTorrent][bittorrent] Files. Written in [Rust Language][rust] (edition 2024, MSRV 1.88) with the [Axum] web framework. ___This index aims to be respectful to established standards, (both [formal][BEP 00] and [otherwise][torrent_source_field]).___
 
 > This is a [Torrust][torrust] project and is in active development. It is community supported as well as sponsored by [Nautilus Cyberneering][nautilus].
 
@@ -10,7 +10,7 @@ __Torrust Index__ is a library for [BitTorrent][bittorrent] Files. Written in [R
 
 The core purpose of a [BitTorrent][bittorrent] Index is to maintain a database that connects torrent files with useful metadata. Allowing a community of users to keep track of their torrents in a well-organized and informative manner.
 
-The __Torrust Index__ serves as a [high-level API][API] for our [Torrust Index GUI][gui] client. It also connects to the [management api][api_tracker] of our [Torrust Tracker][tracker], to provide statistics and whitelisting functionally.
+The __Torrust Index__ serves as a [high-level API][API] for our [Torrust Index GUI][gui] client. It also connects to the [management api][api_tracker] of our [Torrust Tracker][tracker], to provide statistics and whitelisting functionality.
 
 ![Torrust Index Architecture](./docs/images/torrust-index-architecture.jpg)
 
@@ -18,7 +18,7 @@ The __Torrust Index__ serves as a [high-level API][API] for our [Torrust Index G
 
 - [x] High Quality and Modern Rust Codebase.
 - [x] [Documentation][docs] Generated from Code Comments.
-- [x] [Comprehensive Suit][coverage] of Unit and Functional Tests.
+- [x] [Comprehensive Suite][coverage] of Unit and Functional Tests.
 - [x] Good Performance in Busy Conditions.
 - [x] Native `IPv4` and `IPv6` support.
 - [x] Persistent `SQLite3` or `MySQL` Databases.
@@ -143,10 +143,11 @@ The following services are provided by the default configuration:
 - [ADR-T-005: Migrate to Rust Edition 2024](adr/005-edition-2024.md) — Migrate the entire workspace to `edition = "2024"` and raise the MSRV to 1.88.
 - [ADR-T-006: Refactor the Error System](adr/006-error-system-refactor.md) — Replace the 41-variant `ServiceError` god enum with domain-scoped error enums (`AuthError`, `UserError`, `TorrentError`, `CategoryTagError`) and a thin `ApiError` wrapper.
 - [ADR-T-007: Refactor the JWT System](adr/007-jwt-system-refactor.md) — Centralise JWT handling into `src/jwt.rs`, redesign claims to RFC 7519, move to RS256 asymmetric signing, and consolidate session validation into a single code path.
+- [ADR-T-008: Refactor the Roles and Permissions System](adr/008-roles-and-permissions-refactor.md) — Replace Casbin with a native Rust permission system (`PermissionMatrix` + `RequirePermission<A>` Axum extractors), migrate from `administrator: bool` to a `role` column, and add a `/me/permissions` discovery endpoint.
 
 ## Contributing
 
-We are happy to support and welcome new people to our project. Please consider our [contributor guide][guide.md].</br>
+We are happy to support and welcome new people to our project. Please consider our [contributor guide][guide.md].<br>
 This is an open-source community-supported project. We welcome contributions from the community!
 
 __How can you contribute?__
@@ -170,18 +171,18 @@ Some files include explicit copyright notices and/or license notices.
 
 ### Legacy Exception
 
-For prosperity, versions of Torrust Tracker that are older than five years are automatically granted the [MIT-0][MIT_0] license in addition to the existing [AGPL-3.0-only][AGPL_3_0] license.
+For posterity, versions of Torrust Index that are older than five years are automatically granted the [MIT-0][MIT_0] license in addition to the existing [AGPL-3.0-only][AGPL_3_0] license.
 
 ## Contributor Agreement
 
-The copyright of the Torrust Tracker is retained by the respective authors.
+The copyright of the Torrust Index is retained by the respective authors.
 
 **Contributors agree that:**
 
-- All their contributions be granted a license(s) __compatible__ with the [Torrust Trackers License](#license).
-- All contributors signal __clearly__ and __explicitly__ any other compilable licenses if they are not: __[AGPL-3.0-only with the legacy MIT-0 exception](#license)__.
+- All their contributions be granted a license(s) __compatible__ with the [Torrust Index License](#license).
+- All contributors signal __clearly__ and __explicitly__ any other compatible licenses if they are not: __[AGPL-3.0-only with the legacy MIT-0 exception](#license)__.
 
-**The Torrust-Tracker project has no copyright assignment agreement.**
+**The Torrust Index project has no copyright assignment agreement.**
 
 _We kindly ask you to take time and consider The Torrust Project [Contributor Agreement][agreement.md] in full._
 
@@ -211,7 +212,7 @@ This project was a joint effort by [Nautilus Cyberneering GmbH][nautilus] and [D
 
 [dockerhub]: https://hub.docker.com/r/torrust/index/tags
 
-[torrent_source_felid]: https://github.com/qbittorrent/qBittorrent/discussions/19406
+[torrent_source_field]: https://github.com/qbittorrent/qBittorrent/discussions/19406
 
 [BEP 00]: https://www.bittorrent.org/beps/bep_0000.html
 

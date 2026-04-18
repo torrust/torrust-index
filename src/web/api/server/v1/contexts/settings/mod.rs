@@ -101,6 +101,9 @@
 //!     "tracker_statistics_importer": {
 //!       "port": 3002,
 //!       "torrent_info_update_interval": 3600
+//!     },
+//!     "permissions": {
+//!       "overrides": []
 //!     }
 //!   }
 //! }

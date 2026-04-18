@@ -1,4 +1,12 @@
 //! API contract for `torrent` context.
+//!
+//! # Test modules
+//!
+//! - [`for_guests`] — unauthenticated access (listing, download, details).
+//! - [`for_authenticated_users`] — upload, download, listing, details.
+//! - [`and_torrent_owners`] — owner updates own torrent.
+//! - [`and_non_owners`] — non-owner registered user denied update/delete.
+//! - [`and_admins`] — admin CRUD and cross-user operations.
 
 /*
 todo:
@@ -1313,6 +1321,76 @@ mod and_torrent_owners {
         assert_eq!(torrent.title, new_title);
         assert_eq!(torrent.description, new_description);
         assert!(response.is_json_and_ok());
+    }
+}
+
+mod and_non_owners {
+
+    use torrust_index::web::api;
+
+    use crate::common::client::Client;
+    use crate::common::contexts::torrent::forms::UpdateTorrentFrom;
+    use crate::e2e::environment::TestEnv;
+    use crate::e2e::web::api::v1::contexts::torrent::steps::upload_random_torrent_to_index;
+    use crate::e2e::web::api::v1::contexts::user::steps::new_logged_in_user;
+
+    #[tokio::test]
+    async fn it_should_deny_non_owner_registered_users_from_updating_torrents() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
+
+        if !env.provides_a_tracker() {
+            println!("test skipped. It requires a tracker to be running.");
+            return;
+        }
+
+        // User A uploads a torrent.
+        let uploader = new_logged_in_user(&env).await;
+        let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+        // User B (registered, non-owner) tries to update it → 403.
+        let other_user = new_logged_in_user(&env).await;
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &other_user.token);
+
+        let response = client
+            .update_torrent(
+                &test_torrent.file_info_hash(),
+                UpdateTorrentFrom {
+                    title: Some("hijacked-title".to_string()),
+                    description: Some("hijacked-description".to_string()),
+                    category: None,
+                    tags: None,
+                },
+            )
+            .await;
+
+        assert_eq!(response.status, 403);
+    }
+
+    #[tokio::test]
+    async fn it_should_deny_non_owner_registered_users_from_deleting_torrents() {
+        let mut env = TestEnv::new();
+        env.start(api::Version::V1).await;
+
+        if !env.provides_a_tracker() {
+            println!("test skipped. It requires a tracker to be running.");
+            return;
+        }
+
+        // User A uploads a torrent.
+        let uploader = new_logged_in_user(&env).await;
+        let (test_torrent, _uploaded_torrent) = upload_random_torrent_to_index(&uploader, &env).await;
+
+        // User B (registered, non-owner) tries to delete it → 403.
+        // DeleteTorrent is denied for Registered in the default matrix,
+        // so the RequirePermission extractor rejects before the
+        // ownership check is reached.
+        let other_user = new_logged_in_user(&env).await;
+        let client = Client::authenticated(&env.server_socket_addr().unwrap(), &other_user.token);
+
+        let response = client.delete_torrent(&test_torrent.file_info_hash()).await;
+
+        assert_eq!(response.status, 403);
     }
 }
 

@@ -26,6 +26,24 @@ impl TestEnv {
         env
     }
 
+    /// Provides a running app instance with a custom configuration mutator.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the temporary directory cannot be created.
+    pub async fn running_with<F>(api_version: Version, mutator: F) -> Self
+    where
+        F: FnOnce(&mut config::Settings),
+    {
+        let temp_dir = TempDir::new().expect("failed to create a temporary directory");
+        let mut configuration = ephemeral(&temp_dir);
+        mutator(&mut configuration);
+        let app_starter = AppStarter::with_custom_configuration(configuration);
+        let mut env = Self { app_starter, temp_dir };
+        env.start(api_version).await;
+        env
+    }
+
     /// Provides a test environment with a default configuration for testing
     /// application.
     ///

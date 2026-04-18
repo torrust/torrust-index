@@ -16,7 +16,7 @@ pub struct UserRecordV2 {
     pub user_id: i64,
     pub date_registered: Option<String>,
     pub date_imported: Option<String>,
-    pub administrator: bool,
+    pub role: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]

@@ -13,7 +13,7 @@ pub struct User {
     pub user_id: UserId,
     pub date_registered: Option<String>,
     pub date_imported: Option<String>,
-    pub administrator: bool,
+    pub role: String,
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -39,7 +39,7 @@ pub struct UserProfile {
 pub struct UserCompact {
     pub user_id: UserId,
     pub username: String,
-    pub administrator: bool,
+    pub role: String,
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -48,7 +48,7 @@ pub struct UserFull {
     pub user_id: UserId,
     pub date_registered: Option<String>,
     pub date_imported: Option<String>,
-    pub administrator: bool,
+    pub role: String,
     pub username: String,
     pub email: String,
     pub email_verified: bool,
@@ -64,7 +64,7 @@ pub struct UserListing {
     pub email: String,
     pub email_verified: bool,
     pub date_registered: String,
-    pub administrator: bool,
+    pub role: String,
 }
 
 pub(crate) const MAX_USERNAME_LENGTH: usize = 20;

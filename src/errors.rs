@@ -59,6 +59,9 @@ pub enum AuthError {
 
     #[error("User not found")]
     UserNotFound,
+
+    #[error("Unrecognised user role. Contact admin.")]
+    UnrecognisedRole,
 }
 
 impl AuthError {
@@ -76,7 +79,7 @@ impl AuthError {
             | Self::TokenRevoked
             | Self::LoggedInUserNotFound
             | Self::UnauthorizedActionForGuests => StatusCode::UNAUTHORIZED,
-            Self::InternalServerError | Self::DatabaseError => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::InternalServerError | Self::DatabaseError | Self::UnrecognisedRole => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

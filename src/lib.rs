@@ -31,7 +31,7 @@
 //! - Torrent categories
 //! - Image proxy cache for torrent descriptions
 //! - User registration and authentication
-//! - DB Support for `SQLite` and `MySQl`
+//! - DB Support for `SQLite` and `MySQL`
 //!
 //! # Services
 //!
@@ -48,7 +48,7 @@
 //!
 //! ## Minimum requirements
 //!
-//! - Rust Stable `1.68`
+//! - Rust Stable `1.88` (edition 2024)
 //!
 //! ## Prerequisites
 //!
@@ -167,67 +167,28 @@
 //! > **NOTICE**: You can run the index with [tmux](https://github.com/tmux/tmux/wiki) with `tmux new -s torrust-index`.
 //!
 //! # Configuration
-//! In order to run the index you need to provide the configuration. If you run the index without providing the configuration,
-//! the tracker will generate the default configuration the first time you run it. It will generate a `config.toml` file with
-//! in the root directory.
 //!
-//! The default configuration is:
+//! The index uses a TOML configuration file. If you run the index without
+//! providing a configuration, a default one is generated on first startup.
 //!
-//! ```toml
-//! [website]
-//! name = "Torrust"
+//! See [`share/default/config/`](https://github.com/torrust/torrust-index/tree/develop/share/default/config)
+//! for example configuration files, or the [`config`] module documentation
+//! for the full schema reference.
 //!
-//! [tracker]
-//! api_url = "http://localhost:1212/"
-//! listed = false
-//! private = false
-//! token = "MyAccessToken"
-//! token_valid_seconds = 7257600
-//! url = "udp://localhost:6969"
+//! Key sections:
 //!
-//! [net]
-//! bind_address = "0.0.0.0:3001"
+//! - `[tracker]` — Tracker connection (API URL, token).
+//! - `[auth]` — Password constraints. Optionally supply RSA key paths
+//!   (`auth.private_key_path` / `auth.public_key_path`) for persistent
+//!   JWT sessions; otherwise an ephemeral key pair is auto-generated.
+//! - `[database]` — `SQLite` or `MySQL` connection URL.
+//! - `[net]` — Bind address (default: `0.0.0.0:3001`).
+//! - `[[permissions.overrides]]` — Optional TOML-based permission
+//!   overrides (see ADR-T-008).
 //!
-//! [auth]
+//! For more information about configuration you can visit the documentation for the [`config`] module.
 //!
-//! [auth.password_constraints]
-//! min_password_length = 6
-//! max_password_length = 64
-//!
-//! [database]
-//! connect_url = "sqlite://data.db?mode=rwc"
-//!
-//! [mail]
-//! from = "example@email.com"
-//! reply_to = "noreply@email.com"
-//!
-//! [mail.smtp]
-//! port = 25
-//! server = ""
-//!
-//! [mail.smtp.credentials]
-//! password = ""
-//! username = ""
-//!
-//! [image_cache]
-//! max_request_timeout_ms = 1000
-//! capacity = 128000000
-//! entry_size_limit = 4000000
-//! user_quota_period_seconds = 3600
-//! user_quota_bytes = 64000000
-//!
-//! [api]
-//! default_torrent_page_size = 10
-//! max_torrent_page_size = 100
-//!
-//! [tracker_statistics_importer]
-//! torrent_info_update_interval = 3600
-//! port = 3002
-//! ```
-//!
-//! For more information about configuration you can visit the documentation for the [`config`]) module.
-//!
-//! Alternatively to the `config.toml` file you can use one environment variable `TORRUST_INDEX_CONFIG_TOML` to pass the configuration to the tracker:
+//! Alternatively to the config file you can use one environment variable `TORRUST_INDEX_CONFIG_TOML` to pass the configuration to the index:
 //!
 //! ```text
 //! TORRUST_INDEX_CONFIG_TOML=$(cat config.toml)

@@ -21,7 +21,7 @@ pub struct SuccessfulLoginResponse {
 pub struct LoggedInUserData {
     pub token: String,
     pub username: String,
-    pub admin: bool,
+    pub role: String,
 }
 
 #[derive(Deserialize)]
@@ -43,5 +43,16 @@ pub struct TokenRenewalResponse {
 pub struct TokenRenewalData {
     pub token: String,
     pub username: String,
-    pub admin: bool,
+    pub role: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct MyPermissionsResponse {
+    pub data: MyPermissionsData,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct MyPermissionsData {
+    pub role: String,
+    pub actions: Vec<String>,
 }

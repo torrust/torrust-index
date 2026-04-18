@@ -11,7 +11,7 @@ use crate::config::Configuration;
 use crate::config::validator::Validator;
 use crate::databases::database;
 use crate::services::authentication::{DbUserAuthenticationRepository, JsonWebToken, Service};
-use crate::services::authorization::{CasbinConfiguration, CasbinEnforcer};
+use crate::services::authorization::PermissionMatrix;
 use crate::services::category::{self, DbCategoryRepository};
 use crate::services::tag::{self, DbTagRepository};
 use crate::services::torrent::{
@@ -19,7 +19,7 @@ use crate::services::torrent::{
     DbTorrentListingGenerator, DbTorrentRepository, DbTorrentTagRepository,
 };
 use crate::services::user::{self, DbBannedUserList, DbUserProfileRepository, DbUserRepository, Repository};
-use crate::services::{about, authorization, proxy, settings, torrent};
+use crate::services::{about, proxy, settings, torrent};
 use crate::tracker::statistics_importer::StatisticsImporter;
 use crate::web::api::Version;
 use crate::web::api::server::signals::Halted;
@@ -63,8 +63,8 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     // From [net] config
     let config_bind_address = settings.net.bind_address;
     let opt_net_tsl = settings.net.tsl.clone();
-    // Unstable config
-    let unstable = settings.unstable.clone();
+    // From [permissions] config
+    let permission_overrides = settings.permissions.overrides.clone();
 
     // IMPORTANT: drop settings before starting server to avoid read locks that
     // leads to requests hanging.
@@ -90,40 +90,30 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let torrent_tag_repository = Arc::new(DbTorrentTagRepository::new(database.clone()));
     let torrent_listing_generator = Arc::new(DbTorrentListingGenerator::new(database.clone()));
     let banned_user_list = Arc::new(DbBannedUserList::new(database.clone()));
-    let casbin_enforcer = Arc::new(
-        if let Some(casbin) = unstable
-            .as_ref()
-            .and_then(|u| u.auth.as_ref())
-            .and_then(|auth| auth.casbin.as_ref())
-        {
-            CasbinEnforcer::with_configuration(CasbinConfiguration::new(&casbin.model, &casbin.policy)).await
-        } else {
-            CasbinEnforcer::with_default_configuration().await
-        },
-    );
+    let permissions: Arc<dyn crate::services::authorization::Permissions> = if permission_overrides.is_empty() {
+        Arc::new(PermissionMatrix::default_matrix())
+    } else {
+        info!(
+            count = permission_overrides.len(),
+            "applying permission overrides from config"
+        );
+        Arc::new(PermissionMatrix::with_overrides(&permission_overrides))
+    };
 
     // Services
-    let authorization_service = Arc::new(authorization::Service::new(user_repository.clone(), casbin_enforcer.clone()));
     let tracker_service = Arc::new(tracker::service::Service::new(configuration.clone(), database.clone()).await);
     let tracker_statistics_importer =
         Arc::new(StatisticsImporter::new(configuration.clone(), tracker_service.clone(), database.clone()).await);
     let mailer_service = Arc::new(mailer::Service::new(configuration.clone(), json_web_token.clone()).await);
     let image_cache_service: Arc<ImageCacheService> = Arc::new(ImageCacheService::new(configuration.clone()).await);
-    let category_service = Arc::new(category::Service::new(
-        category_repository.clone(),
-        authorization_service.clone(),
-    ));
-    let tag_service = Arc::new(tag::Service::new(tag_repository.clone(), authorization_service.clone()));
-    let proxy_service = Arc::new(proxy::Service::new(
-        image_cache_service.clone(),
-        authorization_service.clone(),
-    ));
-    let settings_service = Arc::new(settings::Service::new(configuration.clone(), authorization_service.clone()));
+    let category_service = Arc::new(category::Service::new(category_repository.clone()));
+    let tag_service = Arc::new(tag::Service::new(tag_repository.clone()));
+    let proxy_service = Arc::new(proxy::Service::new(image_cache_service.clone()));
+    let settings_service = Arc::new(settings::Service::new(configuration.clone()));
     let torrent_index = Arc::new(torrent::Index::new(
         configuration.clone(),
         tracker_statistics_importer.clone(),
         tracker_service.clone(),
-        user_repository.clone(),
         category_repository.clone(),
         torrent_repository.clone(),
         canonical_info_hash_group_repository.clone(),
@@ -132,7 +122,6 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         torrent_announce_url_repository.clone(),
         torrent_tag_repository.clone(),
         torrent_listing_generator.clone(),
-        authorization_service.clone(),
     ));
     let registration_service = Arc::new(user::RegistrationService::new(
         configuration.clone(),
@@ -144,12 +133,10 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let profile_service = Arc::new(user::ProfileService::new(
         configuration.clone(),
         user_authentication_repository.clone(),
-        authorization_service.clone(),
     ));
     let ban_service = Arc::new(user::BanService::new(
         user_profile_repository.clone(),
         banned_user_list.clone(),
-        authorization_service.clone(),
     ));
     let authentication_service = Arc::new(Service::new(
         configuration.clone(),
@@ -160,12 +147,11 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         user_authentication_repository.clone(),
     ));
 
-    let about_service = Arc::new(about::Service::new(authorization_service.clone()));
+    let about_service = Arc::new(about::Service::new());
 
     let listing_service = Arc::new(user::ListingService::new(
         configuration.clone(),
         user_profile_repository.clone(),
-        authorization_service.clone(),
     ));
 
     // Build app container
@@ -179,7 +165,8 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
         tracker_service.clone(),
         tracker_statistics_importer.clone(),
         mailer_service,
-        image_cache_service,
+        image_cache_service.clone(),
+        permissions,
         category_repository,
         tag_repository,
         user_repository,

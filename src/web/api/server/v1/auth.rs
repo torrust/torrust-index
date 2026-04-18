@@ -20,12 +20,11 @@
 //!   http://127.0.0.1:3001/v1/user/register
 //! ```
 //!
-//! **NOTICE**: The first user is automatically an administrator. Currently,
-//! there is no way to change this. There is one administrator per instance.
-//! And you cannot delete the administrator account or make another user an
-//! administrator. For testing purposes, you can create a new administrator
-//! account by creating a new user and then manually changing the `administrator`
-//! field in the `torrust_users` table to `1`.
+//! **NOTICE**: The first registered user is automatically granted the
+//! `admin` role. You can grant the admin role to additional users by
+//! setting the `role` column in the `torrust_users` table to `'admin'`.
+//! When doing so manually, also increment the user's `token_generation`
+//! column so that any existing tokens are revoked (see ADR-T-007).
 //!
 //! ## Login
 //!
@@ -44,7 +43,7 @@
 //!     "data":{
 //!       "token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImExYjJjM2Q0ZTVmNmE3YjgifQ.eyJzdWIiOjEsImlzcyI6InRvcnJ1c3QtaW5kZXgiLCJhdWQiOiJzZXNzaW9uIiwiaWF0IjoxNjg2MjE1Nzg4LCJleHAiOjE2ODc0MjUzODgsInJvbGUiOiJhZG1pbiIsInVzZXJuYW1lIjoiaW5kZXhhZG1pbiIsImdlbiI6MH0.RS256-SIGNATURE",
 //!       "username":"indexadmin",
-//!       "admin":true
+//!       "role":"admin"
 //!     }
 //!   }
 //! ```

@@ -26,6 +26,10 @@
 //!
 //! - [Ban a user](#ban-a-user)
 //!
+//! Permissions discovery:
+//!
+//! - [Get my permissions](#get-my-permissions)
+//!
 //! # Registration
 //!
 //! `POST /v1/user/register`
@@ -193,7 +197,7 @@
 //!   "data": {
 //!     "token": "<JWT_TOKEN>",
 //!     "username": "indexadmin",
-//!     "admin": true
+//!     "role": "admin"
 //!   }
 //! }
 //! ```
@@ -201,10 +205,14 @@
 //! You will get the same token. If a new token is generated, the response will
 //! be the same but with the new token.
 //!
-//! **WARNING**: The token is associated to the user's role. The application does not support
-//! changing the role of a user. If you change the user's role manually in the
-//! database, the token will still be valid but with the same role. That should
-//! only be done for testing purposes.
+//! **NOTICE**: The `role` field in the JWT is advisory only. The authoritative
+//! role is always re-checked from the database on each request. When the role
+//! is changed through the application (e.g. `grant_admin_role_and_revoke_tokens`),
+//! the `token_generation` counter is incremented and any existing token with an
+//! older `gen` claim is rejected — the user must re-login to get a token
+//! reflecting the new role (see ADR-T-007). A manual SQL update of
+//! `torrust_users.role` will **not** automatically bump `token_generation`;
+//! operators must also increment it explicitly.
 //!
 //! # Ban a user
 //!
@@ -243,6 +251,86 @@
 //! **WARNING**: The admin can ban themselves. If they do, they will not be able
 //! to unban themselves. The only way to unban themselves is to manually remove
 //! the user from the banned user list in the database.
+//!
+//! # Get my permissions
+//!
+//! `GET /v1/user/me/permissions`
+//!
+//! Returns the list of allowed actions for the authenticated user's role.
+//! Unauthenticated requests (no token) receive guest-level actions.
+//!
+//! **Example request** (authenticated)
+//!
+//! ```bash
+//! curl \
+//!   --header "Authorization: Bearer <JWT_TOKEN>" \
+//!   --request GET \
+//!   http://127.0.0.1:3001/v1/user/me/permissions
+//! ```
+//!
+//! **Example response** `200`
+//!
+//! ```json
+//! {
+//!   "data": {
+//!     "role": "admin",
+//!     "actions": [
+//!       "GetAboutPage",
+//!       "GetLicensePage",
+//!       "AddCategory",
+//!       "DeleteCategory",
+//!       "GetCategories",
+//!       "GetImageByUrl",
+//!       "GetSettingsSecret",
+//!       "GetPublicSettings",
+//!       "GetSiteName",
+//!       "AddTag",
+//!       "DeleteTag",
+//!       "GetTags",
+//!       "AddTorrent",
+//!       "GetTorrent",
+//!       "DeleteTorrent",
+//!       "GetTorrentInfo",
+//!       "GenerateTorrentInfoListing",
+//!       "ChangePassword",
+//!       "BanUser",
+//!       "GenerateUserProfileSpecification",
+//!       "UpdateTorrent",
+//!       "GetMyPermissions"
+//!     ]
+//!   }
+//! }
+//! ```
+//!
+//! **Example request** (unauthenticated — guest)
+//!
+//! ```bash
+//! curl \
+//!   --request GET \
+//!   http://127.0.0.1:3001/v1/user/me/permissions
+//! ```
+//!
+//! **Example response** `200`
+//!
+//! ```json
+//! {
+//!   "data": {
+//!     "role": "guest",
+//!     "actions": [
+//!       "GetAboutPage",
+//!       "GetLicensePage",
+//!       "GetCategories",
+//!       "GetPublicSettings",
+//!       "GetSiteName",
+//!       "GetTags",
+//!       "GetTorrent",
+//!       "GetTorrentInfo",
+//!       "GenerateTorrentInfoListing",
+//!       "GetMyPermissions"
+//!     ]
+//!   }
+//! }
+//! ```
 pub mod forms;
 pub mod handlers;
 pub mod responses;

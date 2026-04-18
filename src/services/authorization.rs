@@ -1,44 +1,103 @@
-//! Authorization service.
+//! Authorization module.
+//!
+//! Implements ADR-T-008: native Rust permission system.
+//!
+//! # Architecture
+//!
+//! - [`Role`] — the user's privilege level (`Guest`, `Registered`,
+//!   `Moderator`, `Admin`).
+//! - [`Action`] — an operation the user wants to perform.
+//! - [`PermissionMatrix`] — the default-deny policy table.
+//! - [`Permissions`] trait — abstraction consumed by the
+//!   `RequirePermission` extractor (see `extractors::require_permission`).
+//!
+//! # Compile-time guarantees
+//!
+//! - Adding a `Role` variant without updating `default_grant` is a
+//!   compile error (exhaustive top-level `match`).
+//! - Adding an `Action` variant without updating `default_grant` is a
+//!   compile error (exhaustive inner `match` for every role).
+//! - The `action_markers!` macro in `extractors::require_permission`
+//!   emits a `const` assertion that its marker count equals
+//!   `Action::ALL.len()`, catching marker/enum drift at compile time.
+use std::collections::HashSet;
 use std::fmt;
-use std::sync::Arc;
+use std::str::FromStr;
 
-use casbin::{CoreApi, DefaultModel, Enforcer, MgmtApi};
 use serde::{Deserialize, Serialize};
-use tokio::sync::RwLock;
-use tracing::error;
+use tracing::warn;
 
-use super::user::Repository;
-use crate::errors::AuthError;
-use crate::models::user::{UserCompact, UserId};
+// ── Role ─────────────────────────────────────────────────────────────
 
-#[derive(Debug, PartialEq, Serialize, Deserialize, Hash)]
+/// User privilege level.
+///
+/// Stored as a lowercase string in the `torrust_users.role` column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-enum UserRole {
-    Admin,
-    Registered,
+pub enum Role {
     Guest,
+    Registered,
+    Moderator,
+    Admin,
 }
 
-impl fmt::Display for UserRole {
+impl Role {
+    /// All variants (compile-time safe — see tests).
+    pub const ALL: &[Self] = &[Self::Guest, Self::Registered, Self::Moderator, Self::Admin];
+}
+
+impl fmt::Display for Role {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let role_str = match self {
-            Self::Admin => "admin",
-            Self::Registered => "registered",
+        let s = match self {
             Self::Guest => "guest",
+            Self::Registered => "registered",
+            Self::Moderator => "moderator",
+            Self::Admin => "admin",
         };
-        write!(f, "{role_str}")
+        write!(f, "{s}")
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
-pub enum ACTION {
+impl FromStr for Role {
+    type Err = RoleParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "guest" => Ok(Self::Guest),
+            "registered" => Ok(Self::Registered),
+            "moderator" => Ok(Self::Moderator),
+            "admin" => Ok(Self::Admin),
+            _ => Err(RoleParseError(s.to_owned())),
+        }
+    }
+}
+
+/// Error returned when a string cannot be parsed into a [`Role`].
+#[derive(Debug, Clone)]
+pub struct RoleParseError(pub String);
+
+impl fmt::Display for RoleParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unknown role: {:?}", self.0)
+    }
+}
+
+impl std::error::Error for RoleParseError {}
+
+// ── Action ───────────────────────────────────────────────────────────
+
+/// An operation that may be authorized.
+///
+/// Adding a variant without updating `PermissionMatrix::default_grant`
+/// is a compile error (the exhaustive `match` has no wildcard).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Action {
     GetAboutPage,
     GetLicensePage,
     AddCategory,
     DeleteCategory,
     GetCategories,
     GetImageByUrl,
-    GetSettings,
     GetSettingsSecret,
     GetPublicSettings,
     GetSiteName,
@@ -50,234 +109,287 @@ pub enum ACTION {
     DeleteTorrent,
     GetTorrentInfo,
     GenerateTorrentInfoListing,
-    GetCanonicalInfoHash,
     ChangePassword,
     BanUser,
+    /// Render a user profile as a PNG image (admin-only).
     GenerateUserProfileSpecification,
+    UpdateTorrent,
+    GetMyPermissions,
 }
 
-pub struct Service {
-    user_repository: Arc<Box<dyn Repository>>,
-    casbin_enforcer: Arc<CasbinEnforcer>,
+impl Action {
+    /// Every variant in declaration order.
+    pub const ALL: &[Self] = &[
+        Self::GetAboutPage,
+        Self::GetLicensePage,
+        Self::AddCategory,
+        Self::DeleteCategory,
+        Self::GetCategories,
+        Self::GetImageByUrl,
+        Self::GetSettingsSecret,
+        Self::GetPublicSettings,
+        Self::GetSiteName,
+        Self::AddTag,
+        Self::DeleteTag,
+        Self::GetTags,
+        Self::AddTorrent,
+        Self::GetTorrent,
+        Self::DeleteTorrent,
+        Self::GetTorrentInfo,
+        Self::GenerateTorrentInfoListing,
+        Self::ChangePassword,
+        Self::BanUser,
+        Self::GenerateUserProfileSpecification,
+        Self::UpdateTorrent,
+        Self::GetMyPermissions,
+    ];
 }
 
-impl Service {
+impl fmt::Display for Action {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
+}
+
+// ── Permissions trait ────────────────────────────────────────────────
+
+/// Abstraction over any permission-checking backend.
+pub trait Permissions: Send + Sync {
+    /// Returns `true` if `role` is allowed to perform `action`.
+    fn can(&self, role: &Role, action: Action) -> bool;
+
+    /// Returns `true` if `role` is allowed to perform `action` on a
+    /// resource, taking ownership into account.
+    ///
+    /// - `Admin` bypasses the ownership requirement (if the base
+    ///   matrix grants the action).
+    /// - Other roles must be the resource owner.
+    fn can_on_resource(&self, role: &Role, action: Action, is_owner: bool) -> bool {
+        if !self.can(role, action) {
+            return false;
+        }
+        matches!(role, Role::Admin) || is_owner
+    }
+
+    /// Returns the list of actions allowed for `role`.
+    fn allowed_actions(&self, role: &Role) -> Vec<Action> {
+        Action::ALL.iter().copied().filter(|&a| self.can(role, a)).collect()
+    }
+}
+
+// ── PermissionMatrix ─────────────────────────────────────────────────
+
+/// A set-based permission matrix: `(Role, Action)` pairs that are allowed.
+///
+/// Default-deny: any pair not in the set is denied.
+pub struct PermissionMatrix {
+    allowed: HashSet<(Role, Action)>,
+}
+
+impl PermissionMatrix {
+    /// Build the default permission matrix.
+    ///
+    /// Iterates every `(Role, Action)` pair and delegates to
+    /// `default_grant`, which uses exhaustive matches (no
+    /// wildcards for `Registered` and `Guest`) — adding a new `Action`
+    /// variant without deciding its permission is a compile error.
     #[must_use]
-    pub fn new(user_repository: Arc<Box<dyn Repository>>, casbin_enforcer: Arc<CasbinEnforcer>) -> Self {
-        Self {
-            user_repository,
-            casbin_enforcer,
-        }
-    }
+    pub fn default_matrix() -> Self {
+        let mut allowed = HashSet::new();
 
-    ///Allows or denies an user to perform an action based on the user's privileges
-    ///
-    /// # Errors
-    ///
-    /// Will return an error if:
-    /// - The user is not authorized to perform the action.
-    pub async fn authorize(&self, action: ACTION, maybe_user_id: Option<UserId>) -> std::result::Result<(), AuthError> {
-        let role = self.get_role(maybe_user_id).await;
-
-        let enforcer = self.casbin_enforcer.enforcer.read().await;
-
-        let authorize = enforcer.enforce((&role, action)).map_err(|e| {
-            error!(error = %e, "casbin enforcer error");
-            AuthError::InternalServerError
-        })?;
-        drop(enforcer);
-
-        if authorize {
-            Ok(())
-        } else if role == UserRole::Guest {
-            Err(AuthError::UnauthorizedActionForGuests)
-        } else {
-            Err(AuthError::UnauthorizedAction)
-        }
-    }
-
-    /// It returns the compact user.
-    ///
-    /// # Errors
-    ///
-    /// It returns an error if there is a database error.
-    async fn get_user(&self, user_id: UserId) -> std::result::Result<UserCompact, AuthError> {
-        self.user_repository.get_compact(&user_id).await.map_err(AuthError::from)
-    }
-
-    /// It returns the role of the user.
-    /// If the user found in the request does not exist in the database or there is no user id, a guest role is returned
-    async fn get_role(&self, maybe_user_id: Option<UserId>) -> UserRole {
-        match maybe_user_id {
-            Some(user_id) => {
-                // Checks if the user found in the request exists in the database
-                let user_guard = self.get_user(user_id).await;
-
-                match user_guard {
-                    Ok(user_data) => {
-                        if user_data.administrator {
-                            UserRole::Admin
-                        } else {
-                            UserRole::Registered
-                        }
-                    }
-                    Err(_) => UserRole::Guest,
+        for &role in Role::ALL {
+            for &action in Action::ALL {
+                if Self::default_grant(role, action) {
+                    allowed.insert((role, action));
                 }
             }
-            None => UserRole::Guest,
+        }
+
+        Self { allowed }
+    }
+
+    /// Default grant decision for a single `(role, action)` pair.
+    ///
+    /// # Compile-time guarantees
+    ///
+    /// - Adding a `Role` variant → the top-level `match role` becomes
+    ///   non-exhaustive → compile error.
+    /// - Adding an `Action` variant → the `match action` arms for
+    ///   `Registered` and `Guest` become non-exhaustive → compile error.
+    /// - `Admin` intentionally grants all actions by default.
+    const fn default_grant(role: Role, action: Action) -> bool {
+        match role {
+            Role::Admin => match action {
+                Action::GetAboutPage
+                | Action::GetLicensePage
+                | Action::AddCategory
+                | Action::DeleteCategory
+                | Action::GetCategories
+                | Action::GetImageByUrl
+                | Action::GetSettingsSecret
+                | Action::GetPublicSettings
+                | Action::GetSiteName
+                | Action::AddTag
+                | Action::DeleteTag
+                | Action::GetTags
+                | Action::AddTorrent
+                | Action::GetTorrent
+                | Action::DeleteTorrent
+                | Action::GetTorrentInfo
+                | Action::GenerateTorrentInfoListing
+                | Action::ChangePassword
+                | Action::BanUser
+                | Action::GenerateUserProfileSpecification
+                | Action::UpdateTorrent
+                | Action::GetMyPermissions => true,
+            },
+
+            // Moderator: everything Registered has, plus tag and
+            // torrent moderation actions.
+            Role::Moderator => match action {
+                Action::GetAboutPage
+                | Action::GetLicensePage
+                | Action::GetCategories
+                | Action::GetImageByUrl
+                | Action::GetPublicSettings
+                | Action::GetSiteName
+                | Action::GetTags
+                | Action::AddTorrent
+                | Action::GetTorrent
+                | Action::GetTorrentInfo
+                | Action::GenerateTorrentInfoListing
+                | Action::ChangePassword
+                | Action::UpdateTorrent
+                | Action::GetMyPermissions
+                | Action::AddTag
+                | Action::DeleteTag
+                | Action::DeleteTorrent => true,
+
+                Action::AddCategory
+                | Action::DeleteCategory
+                | Action::GetSettingsSecret
+                | Action::BanUser
+                | Action::GenerateUserProfileSpecification => false,
+            },
+
+            Role::Registered => match action {
+                Action::GetAboutPage
+                | Action::GetLicensePage
+                | Action::GetCategories
+                | Action::GetImageByUrl
+                | Action::GetPublicSettings
+                | Action::GetSiteName
+                | Action::GetTags
+                | Action::AddTorrent
+                | Action::GetTorrent
+                | Action::GetTorrentInfo
+                | Action::GenerateTorrentInfoListing
+                | Action::ChangePassword
+                | Action::UpdateTorrent
+                | Action::GetMyPermissions => true,
+
+                Action::AddCategory
+                | Action::DeleteCategory
+                | Action::GetSettingsSecret
+                | Action::AddTag
+                | Action::DeleteTag
+                | Action::DeleteTorrent
+                | Action::BanUser
+                | Action::GenerateUserProfileSpecification => false,
+            },
+
+            Role::Guest => match action {
+                Action::GetAboutPage
+                | Action::GetLicensePage
+                | Action::GetCategories
+                | Action::GetPublicSettings
+                | Action::GetSiteName
+                | Action::GetTags
+                | Action::GetTorrent
+                | Action::GetTorrentInfo
+                | Action::GenerateTorrentInfoListing
+                | Action::GetMyPermissions => true,
+
+                Action::AddCategory
+                | Action::DeleteCategory
+                | Action::GetImageByUrl
+                | Action::GetSettingsSecret
+                | Action::AddTag
+                | Action::DeleteTag
+                | Action::AddTorrent
+                | Action::DeleteTorrent
+                | Action::ChangePassword
+                | Action::BanUser
+                | Action::GenerateUserProfileSpecification
+                | Action::UpdateTorrent => false,
+            },
         }
     }
-}
 
-pub struct CasbinEnforcer {
-    enforcer: Arc<RwLock<Enforcer>>,
-}
+    /// Actions considered high-risk when granted to `Guest` or
+    /// `Registered` via a TOML override.  A `warn!` is emitted at
+    /// startup for each such grant so operators are alerted.
+    const HIGH_RISK_ACTIONS: &[Action] = &[
+        Action::DeleteTorrent,
+        Action::DeleteCategory,
+        Action::DeleteTag,
+        Action::BanUser,
+        Action::GetSettingsSecret,
+        Action::GenerateUserProfileSpecification,
+    ];
 
-impl CasbinEnforcer {
-    /// # Panics
+    /// Build a matrix from the defaults, then apply TOML overrides.
     ///
-    /// Will panic if:
-    ///
-    /// - The enforcer can't be created.
-    /// - The policies can't be loaded.
-    pub async fn with_default_configuration() -> Self {
-        let casbin_configuration = CasbinConfiguration::default();
-
-        let mut enforcer = Enforcer::new(casbin_configuration.default_model().await, ())
-            .await
-            .expect("Error creating the enforcer");
-
-        enforcer
-            .add_policies(casbin_configuration.policy_lines())
-            .await
-            .expect("Error loading the policy");
-
-        let enforcer = Arc::new(RwLock::new(enforcer));
-
-        Self { enforcer }
-    }
-
-    /// # Panics
-    ///
-    /// Will panic if:
-    ///
-    /// - The enforcer can't be created.
-    /// - The policies can't be loaded.
-    pub async fn with_configuration(casbin_configuration: CasbinConfiguration) -> Self {
-        let mut enforcer = Enforcer::new(casbin_configuration.default_model().await, ())
-            .await
-            .expect("Error creating the enforcer");
-
-        enforcer
-            .add_policies(casbin_configuration.policy_lines())
-            .await
-            .expect("Error loading the policy");
-
-        let enforcer = Arc::new(RwLock::new(enforcer));
-
-        Self { enforcer }
-    }
-}
-
-#[allow(dead_code)]
-pub struct CasbinConfiguration {
-    model: String,
-    policy: String,
-}
-
-impl CasbinConfiguration {
+    /// Each override inserts (allow) or removes (deny) a `(Role, Action)` pair.
+    /// A `warn!` is emitted for overrides that grant high-risk actions to
+    /// non-admin roles.
     #[must_use]
-    pub fn new(model: &str, policy: &str) -> Self {
-        Self {
-            model: model.to_owned(),
-            policy: policy.to_owned(),
+    pub fn with_overrides(overrides: &[PermissionOverride]) -> Self {
+        let mut matrix = Self::default_matrix();
+        for ov in overrides {
+            match ov.effect {
+                Effect::Allow => {
+                    if !matches!(ov.role, Role::Admin) && Self::HIGH_RISK_ACTIONS.contains(&ov.action) {
+                        warn!(
+                            role = %ov.role,
+                            action = %ov.action,
+                            "high-risk permission override: granting a destructive action to a non-admin role",
+                        );
+                    }
+                    matrix.allowed.insert((ov.role, ov.action));
+                }
+                Effect::Deny => {
+                    matrix.allowed.remove(&(ov.role, ov.action));
+                }
+            }
         }
-    }
-
-    /// # Panics
-    ///
-    /// It panics if the model cannot be loaded.
-    async fn default_model(&self) -> DefaultModel {
-        DefaultModel::from_str(&self.model).await.expect("Error loading the model")
-    }
-
-    /// Converts the policy from a string type to a vector.
-    fn policy_lines(&self) -> Vec<Vec<String>> {
-        self.policy
-            .lines()
-            .filter(|line| !line.trim().is_empty())
-            .map(|line| line.split(',').map(|s| s.trim().to_owned()).collect::<Vec<String>>())
-            .collect()
+        matrix
     }
 }
 
-impl Default for CasbinConfiguration {
-    fn default() -> Self {
-        Self {
-            model: String::from(
-                "
-                [request_definition]
-                r = role, action
-                
-                [policy_definition]
-                p = role, action
-                
-                [policy_effect]
-                e = some(where (p.eft == allow))
-                
-                [matchers]
-                m = r.role == p.role && r.action == p.action
-            ",
-            ),
-            policy: String::from(
-                "
-                admin, GetAboutPage
-                admin, GetLicensePage
-                admin, AddCategory
-                admin, DeleteCategory
-                admin, GetCategories
-                admin, GetImageByUrl
-                admin, GetSettings
-                admin, GetSettingsSecret
-                admin, GetPublicSettings
-                admin, GetSiteName
-                admin, AddTag
-                admin, DeleteTag
-                admin, GetTags
-                admin, AddTorrent
-                admin, GetTorrent
-                admin, DeleteTorrent
-                admin, GetTorrentInfo
-                admin, GenerateTorrentInfoListing
-                admin, GetCanonicalInfoHash
-                admin, ChangePassword
-                admin, BanUser
-                admin, GenerateUserProfileSpecification
-                registered, GetAboutPage
-                registered, GetLicensePage
-                registered, GetCategories
-                registered, GetImageByUrl
-                registered, GetPublicSettings
-                registered, GetSiteName
-                registered, GetTags
-                registered, AddTorrent
-                registered, GetTorrent
-                registered, GetTorrentInfo
-                registered, GenerateTorrentInfoListing
-                registered, GetCanonicalInfoHash
-                registered, ChangePassword
-                guest, GetAboutPage
-                guest, GetLicensePage
-                guest, GetCategories
-                guest, GetPublicSettings
-                guest, GetSiteName
-                guest, GetTags
-                guest, GetTorrent
-                guest, GetTorrentInfo
-                guest, GenerateTorrentInfoListing
-                guest, GetCanonicalInfoHash
-                ",
-            ),
-        }
+impl Permissions for PermissionMatrix {
+    fn can(&self, role: &Role, action: Action) -> bool {
+        self.allowed.contains(&(*role, action))
     }
+}
+
+// ── PermissionOverride ───────────────────────────────────────────────
+
+/// Effect of a permission override.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Effect {
+    Allow,
+    Deny,
+}
+
+/// A single operator-supplied permission override.
+///
+/// Loaded from the `[[permissions.overrides]]` TOML array and applied
+/// on top of the default matrix at startup.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PermissionOverride {
+    pub role: Role,
+    pub action: Action,
+    pub effect: Effect,
 }

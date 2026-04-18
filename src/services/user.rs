@@ -10,10 +10,9 @@ use chrono::NaiveDate;
 use mockall::automock;
 use pbkdf2::password_hash::rand_core::OsRng;
 use serde_derive::Deserialize;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use super::authentication::DbUserAuthenticationRepository;
-use super::authorization::{self, ACTION};
 use crate::config::{Configuration, PasswordConstraints};
 use crate::databases::database::{Database, Error, UsersFilters, UsersSorting};
 use crate::errors::UserError;
@@ -162,9 +161,12 @@ impl RegistrationService {
             )
             .await?;
 
-        // If this is the first created account, give administrator rights
+        // If this is the first created account, grant the admin role.
         if user_id == 1 {
-            drop(self.user_repository.grant_admin_role(&user_id).await);
+            info!(user_id, "first registered user — granting admin role");
+            if let Err(err) = self.user_repository.grant_admin_role(&user_id).await {
+                warn!(user_id, %err, "failed to grant admin role to first user");
+            }
         }
 
         if let Some(email) = &registration.email
@@ -212,20 +214,14 @@ impl RegistrationService {
 pub struct ProfileService {
     configuration: Arc<Configuration>,
     user_authentication_repository: Arc<DbUserAuthenticationRepository>,
-    authorization_service: Arc<authorization::Service>,
 }
 
 impl ProfileService {
     #[must_use]
-    pub const fn new(
-        configuration: Arc<Configuration>,
-        user_repository: Arc<DbUserAuthenticationRepository>,
-        authorization_service: Arc<authorization::Service>,
-    ) -> Self {
+    pub const fn new(configuration: Arc<Configuration>, user_repository: Arc<DbUserAuthenticationRepository>) -> Self {
         Self {
             configuration,
             user_authentication_repository: user_repository,
-            authorization_service,
         }
     }
 
@@ -242,19 +238,7 @@ impl ProfileService {
     /// * An error if unable to successfully hash the password.
     /// * An error if unable to change the password in the database.
     /// * An error if it is not possible to authorize the action
-    pub async fn change_password(
-        &self,
-        maybe_user_id: Option<UserId>,
-        change_password_form: &ChangePasswordForm,
-    ) -> Result<(), UserError> {
-        let Some(user_id) = maybe_user_id else {
-            return Err(UserError::UnauthorizedActionForGuests);
-        };
-
-        self.authorization_service
-            .authorize(ACTION::ChangePassword, maybe_user_id)
-            .await?;
-
+    pub async fn change_password(&self, user_id: UserId, change_password_form: &ChangePasswordForm) -> Result<(), UserError> {
         info!("changing user password for user ID: {}", user_id);
 
         let settings = self.configuration.settings.read().await;
@@ -292,20 +276,14 @@ impl ProfileService {
 pub struct BanService {
     user_profile_repository: Arc<DbUserProfileRepository>,
     banned_user_list: Arc<DbBannedUserList>,
-    authorization_service: Arc<authorization::Service>,
 }
 
 impl BanService {
     #[must_use]
-    pub const fn new(
-        user_profile_repository: Arc<DbUserProfileRepository>,
-        banned_user_list: Arc<DbBannedUserList>,
-        authorization_service: Arc<authorization::Service>,
-    ) -> Self {
+    pub const fn new(user_profile_repository: Arc<DbUserProfileRepository>, banned_user_list: Arc<DbBannedUserList>) -> Self {
         Self {
             user_profile_repository,
             banned_user_list,
-            authorization_service,
         }
     }
 
@@ -318,13 +296,7 @@ impl BanService {
     /// * `UserError::InternalServerError` if unable get user from the request.
     /// * An error if unable to get user profile from supplied username.
     /// * An error if unable to set the ban of the user in the database.
-    pub async fn ban_user(&self, username_to_be_banned: &str, maybe_user_id: Option<UserId>) -> Result<(), UserError> {
-        let Some(user_id) = maybe_user_id else {
-            return Err(UserError::UnauthorizedActionForGuests);
-        };
-
-        self.authorization_service.authorize(ACTION::BanUser, maybe_user_id).await?;
-
+    pub async fn ban_user(&self, username_to_be_banned: &str, user_id: UserId) -> Result<(), UserError> {
         debug!("user with ID {} banning username: {username_to_be_banned}", user_id);
 
         let user_profile = self
@@ -342,20 +314,14 @@ impl BanService {
 pub struct ListingService {
     configuration: Arc<Configuration>,
     user_profile_repository: Arc<DbUserProfileRepository>,
-    authorization_service: Arc<authorization::Service>,
 }
 
 impl ListingService {
     #[must_use]
-    pub const fn new(
-        configuration: Arc<Configuration>,
-        user_profile_repository: Arc<DbUserProfileRepository>,
-        authorization_service: Arc<authorization::Service>,
-    ) -> Self {
+    pub const fn new(configuration: Arc<Configuration>, user_profile_repository: Arc<DbUserProfileRepository>) -> Self {
         Self {
             configuration,
             user_profile_repository,
-            authorization_service,
         }
     }
 
@@ -366,13 +332,8 @@ impl ListingService {
     /// Returns a `UserError::InvalidUserListing` if there is an incorrect value in the url params for the listing request.
     pub async fn listing_specification_from_user_request(
         &self,
-        maybe_user_id: Option<UserId>,
         request: &ListingRequest,
     ) -> Result<ListingSpecification, UserError> {
-        self.authorization_service
-            .authorize(ACTION::GenerateUserProfileSpecification, maybe_user_id)
-            .await?;
-
         let settings = self.configuration.settings.read().await;
         let default_user_profile_page_size = settings.api.default_user_profile_page_size;
         let max_user_profile_page_size = settings.api.max_user_profile_page_size;
@@ -476,6 +437,7 @@ impl Repository for DbUserRepository {
     ///
     /// It returns an error if there is a database error.
     async fn grant_admin_role(&self, user_id: &UserId) -> Result<(), Error> {
+        info!(user_id = *user_id, "granting admin role");
         // Atomically grant admin and revoke tokens (ADR-T-007 §A-2b)
         self.database.grant_admin_role_and_revoke_tokens(*user_id).await
     }
