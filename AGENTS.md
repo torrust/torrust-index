@@ -35,11 +35,10 @@ are preferred over unit tests. Integration tests should test the public
 API, perhaps using `#[doc(hidden)]` helpers when appropriate.
 
 | Level       | Visibility   | Location      |
-|-------------|--------------|---------------|
+| ----------- | ------------ | ------------- |
 | Unit        | `private`    | inline        |
 | Crate       | `pub(crate)` | `/src/tests/` |
 | Integration | `pub`        | `/tests/`     |
-
 
 ## Test Doc-Headers
 
@@ -54,10 +53,11 @@ carries a **package qualifier** so the target document is never ambiguous.
 ADR references (`ADR-T-001`, `ADR-R-001`, …) are an exception — they
 use their own `ADR-<PREFIX>-<NNN>` form without the `§` prefix.
 
-| Prefix | Package              | Example document                     |
-|--------|----------------------|--------------------------------------|
-| `T-`   | Torrust (root crate) | *(none yet)*                         |
-| `R-`   | render-text-as-image | `packages/render-text-as-image/`     |
+| Prefix | Package              | Example document                 |
+| ------ | -------------------- | -------------------------------- |
+| `T-`   | Torrust (root crate) |                                  |
+| `M-`   | Mudlark              | `packages/mudlark/docs/idea.md`  |
+| `R-`   | render-text-as-image | `packages/render-text-as-image/` |
 
 ### General Rules
 
@@ -67,9 +67,10 @@ use their own `ADR-<PREFIX>-<NNN>` form without the `§` prefix.
   code and cross-package references always use the fully qualified
   `§BOOK PACKAGE_PREFIX-N` form.
 - Example: `§SPEC R-1.1` refers to §1.1 of `packages/render-text-as-image/docs/specification.md`.
-- ADRs live in an `adr/` directory per package (`/adr/` for the
+- Example: `§IDEA M-1.5` refers to §1.5 of `packages/mudlark/docs/idea.md`.
+- ADRs live in an `adr/` directory per package (`docs/adr/` for the
   root crate) and use sequential numbering: `NNN-slug.md`. Referenced
-  as `ADR-T-001`, `ADR-R-001`, `ADR-R-002`.
+  as `ADR-T-001`, `ADR-M-024`, `ADR-R-002`.
 
 ## Replacing a File
 
