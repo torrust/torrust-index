@@ -9,7 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- ADR-T-009: Container infrastructure hardening (Phases 1, 2, 3, 4, 5 & 6).
+- ADR-T-009: Container infrastructure refactor (Phases 1–9). Beyond
+  the tactical hardening already noted under Phase 3, the refactor:
+  - Splits the runtime image into a lean `release` (distroless
+    `cc-debian13`) and `debug` (`cc-debian13:debug`) target. The
+    `release` image keeps `/bin/busybox`, `/bin/su-exec`, and
+    `/usr/bin/jq` root-only (mode `0700`/`0500 root:root`); the
+    unprivileged `torrust` user gets `EACCES` on the entire toolset
+    after privilege drop. The `debug` target retains the upstream
+    `/busybox/` tree on `PATH` for interactive debugging.
+  - Extracts three helper binaries into their own workspace crates
+    with no transitive HTTP/TLS/async-runtime dependencies:
+    `torrust-index-health-check` (renamed from `health_check`),
+    `torrust-index-auth-keypair` (renamed from
+    `torrust-generate-auth-keypair`), and the new
+    `torrust-index-config-probe` (the same loader the application
+    uses, exposing the resolved schema/database/auth state as JSON).
+  - Splits Compose into a production-shaped
+    [`compose.yaml`](./compose.yaml) baseline (no `mailcatcher`, no
+    `tty`, dev ports bound to `127.0.0.1`, credentials referenced
+    as bare `${VAR}`) and an auto-loaded
+    [`compose.override.yaml`](./compose.override.yaml) supplying the
+    dev sandbox. Two `Makefile` targets (`make up-dev`, `make up-prod`)
+    wrap the documented invocation paths and validate required env
+    vars before any container starts.
+  - Adds `contrib/dev-tools/su-exec/AUDIT.md` recording provenance,
+    rationale, and a SHA-256-anchored append-only audit log for the
+    vendored `su-exec.c`. CI fails the build when the file changes
+    without a matching audit entry.
+
 - `torrust-index-config` workspace crate (`packages/index-config/`)
   containing the parsing surface of the configuration system: schema
   modules, validator, `load_settings`, `Info`, `Error`, the
@@ -188,6 +216,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING:** `database.connect_url` and `tracker.token` are now
+  mandatory schema fields (no defaults in shipped TOMLs). Operators
+  must supply both via env-var override
+  (`TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL`,
+  `TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN`) or by mounting a
+  populated `index.toml`. Missing values fail at config-parse time
+  with a precise serde `missing field` error rather than silently
+  falling back to a hidden default (ADR-T-009 §D2).
+- **BREAKING:** `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__*_PEM` and
+  `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__*_PATH` are mutually exclusive
+  within a single key, both keys must use the same delivery
+  mechanism, and the pair must either both be configured or both be
+  absent. Mixed/half-pair configurations are rejected by the entry
+  script before the application starts (ADR-T-009 §D3).
+- **BREAKING:** `TORRUST_INDEX_DATABASE_DRIVER` no longer dispatches
+  the application's runtime database driver — that is derived from
+  the URL scheme of `database.connect_url`. It is retained as an
+  input-validation gate at container start (`sqlite3` / `mysql`);
+  both values seed the same driver-agnostic `index.container.toml`
+  template into `/etc/torrust/index/` on first boot. Operators who
+  scripted around this env var to switch databases at runtime must
+  instead supply `TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL`
+  (ADR-T-009 §D2/§7.4).
 - `.containerignore` now excludes `/adr/` and `/docs/` from the build
   context (ADR-T-009 Phase 1).
 - Container `HEALTHCHECK` now invokes `torrust-index-health-check` (was

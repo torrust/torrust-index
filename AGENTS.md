@@ -80,8 +80,8 @@ use their own `ADR-<PREFIX>-<NNN>` form without the `§` prefix.
 | `M-`   | Mudlark              | `packages/mudlark/docs/idea.md`  |
 | `R-`   | render-text-as-image | `packages/render-text-as-image/` |
 
-Helper crates (`index-cli-common`, `index-health-check`,
-`index-auth-keypair`, `index-config`, `index-config-probe`,
+Helper crates (`index-health-check`, `index-auth-keypair`,
+`index-config`, `index-config-probe`, `index-cli-common`,
 `index-entry-script`) are internal implementation details of
 the root crate and do not own separate ADRs or specification
 docs. They share the `T-` prefix for any cross-references

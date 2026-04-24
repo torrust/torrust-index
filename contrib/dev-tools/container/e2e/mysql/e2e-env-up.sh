@@ -1,10 +1,10 @@
 #!/bin/bash
 
-TORRUST_INDEX_CONFIG=$(cat ./share/default/config/index.public.e2e.container.mysql.toml) \
+TORRUST_INDEX_CONFIG=$(cat ./share/default/config/index.public.e2e.container.toml) \
     docker compose build
 
 USER_ID=${USER_ID:-1000} \
-    TORRUST_INDEX_CONFIG_TOML=$(cat ./share/default/config/index.public.e2e.container.mysql.toml) \
+    TORRUST_INDEX_CONFIG_TOML=$(cat ./share/default/config/index.public.e2e.container.toml) \
     TORRUST_INDEX_DATABASE="torrust_index_e2e_testing" \
     TORRUST_INDEX_DATABASE_DRIVER="mysql" \
     TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MyAccessToken" \

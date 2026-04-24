@@ -15,8 +15,90 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  lints:
+    name: Lints (Container infra)
+    runs-on: ubuntu-latest
+
+    steps:
+      - id: checkout
+        name: Checkout Repository
+        uses: actions/checkout@v6
+
+      # Phase 9 §9.1.3 — guard against re-introducing the
+      # `mailcatcher` dev sidecar (or any SMTP/mail config)
+      # into the production-shaped baseline. The override
+      # file is *expected* to mention `mailcatcher` and is
+      # deliberately excluded from the audit. Comments are
+      # stripped before grepping so the explanatory header
+      # in `compose.yaml` (which legitimately references
+      # `mailcatcher` in prose) does not trip the audit;
+      # we are looking for live YAML config, not docs.
+      - id: compose-baseline-no-mailcatcher
+        name: compose.yaml has no mailcatcher / SMTP wiring
+        run: |
+          set -eu
+          # awk strips `# ...` comments while preserving line
+          # numbering 1:1 with the source file, so any error
+          # output points the reader at the real line.
+          if awk '{ sub(/#.*/, ""); print }' compose.yaml \
+              | grep -nE 'mailcatcher|MAILER|SMTP|smtp_'; then
+            echo "::error file=compose.yaml::dev mail sidecar / SMTP config present in production-shaped baseline (ADR-T-009 §8.1, §9.1.3)"
+            exit 1
+          fi
+          echo "compose.yaml clean."
+
+      # Phase 9 §9.2 — vendored `su-exec.c` must not change
+      # without a fresh audit entry recording the new SHA-256
+      # in contrib/dev-tools/su-exec/AUDIT.md.
+      - id: su-exec-audit
+        name: su-exec audit log matches vendored source
+        run: |
+          set -eu
+          audit=contrib/dev-tools/su-exec/AUDIT.md
+          test -s "$audit"
+          recorded=$(sed -n '/^## Audit Log/,$ { s/^SHA-256: \([0-9a-f]\{64\}\)$/\1/p; }' "$audit" | tail -1)
+          actual=$(sha256sum contrib/dev-tools/su-exec/su-exec.c | cut -d' ' -f1)
+          if [ -z "$recorded" ]; then
+            echo "::error file=$audit::no SHA-256 entry found in '## Audit Log' section (ADR-T-009 §9.2)"
+            exit 1
+          fi
+          if [ "$recorded" != "$actual" ]; then
+            echo "::error file=$audit::recorded SHA-256 ($recorded) does not match contrib/dev-tools/su-exec/su-exec.c ($actual). Append a new dated audit entry per ADR-T-009 §9.2."
+            exit 1
+          fi
+          echo "su-exec audit current ($actual)."
+
+      # Phase 9 §9 / Acceptance Criterion #7 — every env var
+      # listed in the entry script's manifest block must be
+      # documented in docs/containers.md.
+      - id: entry-env-docs
+        name: entry-script env vars documented
+        run: |
+          set -eu
+          script=share/container/entry_script_sh
+          vars=$(sed -n '/^# ENTRY_ENV_VARS:/,/^# END_ENTRY_ENV_VARS/p' "$script" \
+                  | grep -oE '[A-Z][A-Z0-9_]+' \
+                  | sort -u)
+          if [ -z "$vars" ]; then
+            echo "::error file=$script::ENTRY_ENV_VARS manifest block not found or empty (ADR-T-009 §9 Crit. #7)"
+            exit 1
+          fi
+          missing=0
+          for v in $vars; do
+            grep -q "$v" docs/containers.md || {
+              echo "::error file=docs/containers.md::env var '$v' is in the entry-script manifest but not documented"
+              missing=1
+            }
+          done
+          grep -q 'compose\.override\.yaml' docs/containers.md || {
+            echo "::error file=docs/containers.md::two-file Compose split (compose.override.yaml) is not documented"
+            missing=1
+          }
+          [ "$missing" -eq 0 ]
+
   test:
     name: Test (Docker)
+    needs: lints
     runs-on: ubuntu-latest
 
     strategy:

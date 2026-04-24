@@ -30,12 +30,8 @@ use torrust_index_config::{Error, Info, Threshold, load_settings};
 /// (e.g. tracker samples) are intentionally excluded.
 const SHIPPED_INDEX_SAMPLES: &[(&str, &str)] = &[
     (
-        "index.container.mysql.toml",
-        include_str!("../../../share/default/config/index.container.mysql.toml"),
-    ),
-    (
-        "index.container.sqlite3.toml",
-        include_str!("../../../share/default/config/index.container.sqlite3.toml"),
+        "index.container.toml",
+        include_str!("../../../share/default/config/index.container.toml"),
     ),
     (
         "index.development.sqlite3.toml",
@@ -46,12 +42,8 @@ const SHIPPED_INDEX_SAMPLES: &[(&str, &str)] = &[
         include_str!("../../../share/default/config/index.private.e2e.container.sqlite3.toml"),
     ),
     (
-        "index.public.e2e.container.mysql.toml",
-        include_str!("../../../share/default/config/index.public.e2e.container.mysql.toml"),
-    ),
-    (
-        "index.public.e2e.container.sqlite3.toml",
-        include_str!("../../../share/default/config/index.public.e2e.container.sqlite3.toml"),
+        "index.public.e2e.container.toml",
+        include_str!("../../../share/default/config/index.public.e2e.container.toml"),
     ),
 ];
 

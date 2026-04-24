@@ -43,7 +43,7 @@ docker ps
 # overrides; see ADR-T-009 §D2). Inject host-side overrides so the test
 # process can load the same config file the container uses.
 TORRUST_INDEX_E2E_SHARED=true \
-    TORRUST_INDEX_CONFIG_TOML_PATH="./share/default/config/index.public.e2e.container.mysql.toml" \
+    TORRUST_INDEX_CONFIG_TOML_PATH="./share/default/config/index.public.e2e.container.toml" \
     TORRUST_INDEX_E2E_DB_CONNECT_URL="mysql://root:root_secret_password@127.0.0.1:3306/torrust_index_e2e_testing" \
     TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MyAccessToken" \
     TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="mysql://root:root_secret_password@127.0.0.1:3306/torrust_index_e2e_testing" \

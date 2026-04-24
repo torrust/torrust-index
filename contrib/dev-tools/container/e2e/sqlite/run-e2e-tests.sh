@@ -44,7 +44,7 @@ docker ps
 # overrides; see ADR-T-009 §D2). Inject host-side overrides so the test
 # process can load the same config file the container uses.
 TORRUST_INDEX_E2E_SHARED=true \
-    TORRUST_INDEX_CONFIG_TOML_PATH="./share/default/config/index.public.e2e.container.sqlite3.toml" \
+    TORRUST_INDEX_CONFIG_TOML_PATH="./share/default/config/index.public.e2e.container.toml" \
     TORRUST_INDEX_E2E_DB_CONNECT_URL="sqlite://./storage/index/lib/database/e2e_testing_sqlite3.db?mode=rwc" \
     TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MyAccessToken" \
     TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite://./storage/index/lib/database/e2e_testing_sqlite3.db?mode=rwc" \

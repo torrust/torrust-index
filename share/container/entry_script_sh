@@ -1,6 +1,33 @@
 #!/bin/sh
 [ "${DEBUG:-}" = "1" ] && set -x
 
+# ── Canonical env-var manifest (ADR-T-009 §9, Crit. #7) ──
+# Single source of truth for every environment variable the
+# entry script consults — including dynamically constructed
+# names (e.g. AUTH__{PRIVATE,PUBLIC}_KEY_{PEM,PATH} built
+# via "${uc_pair}_PEM" / "${uc_pair}_PATH") that a naive
+# grep would miss. CI verifies that every name listed
+# between the sentinels appears somewhere in
+# docs/containers.md. Keep the block in sync when adding
+# or removing env vars.
+#
+# ENTRY_ENV_VARS:
+#   TORRUST_INDEX_CONFIG_TOML_PATH
+#   TORRUST_INDEX_DATABASE_DRIVER
+#   TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PEM
+#   TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PATH
+#   TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PEM
+#   TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PATH
+#   TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN
+#   TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL
+#   USER_ID
+#   API_PORT
+#   IMPORTER_API_PORT
+#   DEBUG
+#   TZ
+#   RUNTIME
+# END_ENTRY_ENV_VARS
+
 # ── Shell discipline (Phase 7, ADR-T-009 §7) ──────────────
 # `set -e` aborts on unchecked failures; `set -u` catches
 # typos in variable names. The `${var:-}` patterns below are
@@ -63,17 +90,20 @@ chown -R "${USER_ID}" /var/lib/torrust /var/log/torrust /etc/torrust
 chmod -R 2770 /var/lib/torrust /var/log/torrust /etc/torrust
 
 # ── Default TOML installation ─────────────────────────────
-# `TORRUST_INDEX_DATABASE_DRIVER` is now a Containerfile-
-# level selector for which default TOML to seed at first
-# boot; it no longer drives runtime database decisions
-# (those come from the config probe's database.driver field,
-# below). See ADR-T-009 §7.4.
+# Phase 5 made `database.connect_url` mandatory and Phase 9
+# consequently consolidated the two driver-suffixed shipped
+# samples into a single driver-agnostic
+# `index.container.toml` (the file no longer encodes a
+# driver choice). `TORRUST_INDEX_DATABASE_DRIVER` is kept
+# here as an input-validation gate — surfacing typos early
+# rather than letting an unrecognised driver name silently
+# propagate to the application — but both supported values
+# now seed the same template. Runtime database decisions
+# come from the config probe's `database.driver` field,
+# below. See ADR-T-009 §7.4 / §9 (Phase 9 consolidation).
 case ${TORRUST_INDEX_DATABASE_DRIVER:-} in
-    sqlite3|SQLITE3|Sqlite3)
-        default_config="/usr/share/torrust/default/config/index.container.sqlite3.toml"
-        ;;
-    mysql|MYSQL|MySQL|Mysql)
-        default_config="/usr/share/torrust/default/config/index.container.mysql.toml"
+    sqlite3|SQLITE3|Sqlite3|mysql|MYSQL|MySQL|Mysql)
+        default_config="/usr/share/torrust/default/config/index.container.toml"
         ;;
     '')
         echo "ERROR: \$TORRUST_INDEX_DATABASE_DRIVER was not set!" >&2

@@ -13,9 +13,9 @@ threshold = "info"
 
 [tracker]
 api_url = "http://tracker:1212"
+listed = false
+private = false
 url = "udp://tracker:6969"
-
-[auth]
 
 [database]
 

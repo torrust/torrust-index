@@ -1,6 +1,6 @@
 # ADR-T-009: Container Infrastructure Refactor
 
-**Status:** Proposed
+**Status:** Implemented (Phases 1–9 complete)
 **Date:** 2026-04-19
 **Supersedes:** Earlier `ADR-T-009` draft ("Container
 Infrastructure Hardening") whose tactical S-N items were

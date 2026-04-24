@@ -1,7 +1,7 @@
 # ADR-T-009 — Implementation Plan
 
 **Companion to:** [adr/009-container-infrastructure-refactor.md](009-container-infrastructure-refactor.md)
-**Status:** Tracking
+**Status:** Implemented (Phases 1–9 complete)
 **Date:** 2026-04-19
 
 This document captures the *how* of ADR-T-009. The ADR records
@@ -22,7 +22,7 @@ re-litigated here — when in doubt, defer to the ADR.
 | 6     | Config probe                       | Done        |
 | 7     | Entry-script contract              | Done        |
 | 8     | Compose split                      | Done        |
-| 9     | Documentation & audit (D8, D9)     | Not started |
+| 9     | Documentation & audit (D8, D9)     | Done        |
 
 ## Phase Dependency Graph
 
@@ -2661,12 +2661,15 @@ version section summarising the container infrastructure
 refactor: mandatory `connect_url` / `tracker.token`,
 compose split, runtime-base split, helper-crate
 extractions, the new `torrust-index-config-probe`
-entrypoint, the `[net.tsl]` → `[net.tls]` wire-key
-rename (breaking change for operator TOMLs and JSON API
-consumers), the PEM+PATH mutual-exclusion enforcement
+entrypoint, the PEM+PATH mutual-exclusion enforcement
 (D3), and the narrowed scope of
 `TORRUST_INDEX_DATABASE_DRIVER` (now a TOML-selection
 knob only, no longer a runtime database dispatcher).
+
+The `[net.tsl]` → `[net.tls]` wire-key rename is *not*
+re-stated in this Phase 9 entry — it was logged as its
+own breaking-change bullet at the time it landed (Phase 3
+config-crate extraction). Keep it there; do not duplicate.
 
 ### 9.1.3 Add `mailcatcher` CI lint on `compose.yaml`
 

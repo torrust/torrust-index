@@ -31,12 +31,21 @@ If you are using `Version 1` of `torrust-tracker-backend`, please view our [upgr
 
 ### Container Version
 
-The Torrust Index is [deployed to DockerHub][dockerhub], you can run a demo immediately with the following commands:
+The Torrust Index is [deployed to DockerHub][dockerhub], you can run a demo
+immediately with the following commands. Per
+[ADR-T-009 §D2](./adr/009-container-infrastructure-refactor.md), the image
+no longer ships a default tracker token or `database.connect_url`, so two
+overrides are mandatory at startup — a bare `docker run -it
+torrust/index:develop` now fails with a `missing field` error rather than
+booting against hidden defaults.
 
 #### Docker
 
 ```sh
-docker run -it torrust/index:develop
+docker run -it \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MyAccessToken" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc" \
+    torrust/index:develop
 ```
 
 > Please read our [container guide][containers.md] for more information.
@@ -44,10 +53,33 @@ docker run -it torrust/index:develop
 #### Podman
 
 ```sh
-podman run -it torrust/index:develop
+podman run -it \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MyAccessToken" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc" \
+    torrust/index:develop
 ```
 
 > Please read our [container guide][containers.md] for more information.
+
+#### Compose (development sandbox)
+
+For a complete local stack (index + tracker + MySQL + mailcatcher) the
+repository ships a Compose split: a production-shaped
+[`compose.yaml`](./compose.yaml) baseline plus an auto-loaded
+[`compose.override.yaml`](./compose.override.yaml) that supplies dev
+defaults. Two `Makefile` wrappers cover the documented invocation
+paths:
+
+```sh
+# Dev sandbox (auto-loads compose.override.yaml):
+make up-dev
+
+# Production-shaped (validates required credentials first):
+make up-prod
+```
+
+See [Compose Split](./docs/containers.md#compose-split) in the container
+guide for the required env vars and the validation contract.
 
 ### Development Version
 
@@ -144,7 +176,7 @@ The following services are provided by the default configuration:
 - [ADR-T-006: Refactor the Error System](adr/006-error-system-refactor.md) — Replace the 41-variant `ServiceError` god enum with domain-scoped error enums (`AuthError`, `UserError`, `TorrentError`, `CategoryTagError`) and a thin `ApiError` wrapper.
 - [ADR-T-007: Refactor the JWT System](adr/007-jwt-system-refactor.md) — Centralise JWT handling into `src/jwt.rs`, redesign claims to RFC 7519, move to RS256 asymmetric signing, and consolidate session validation into a single code path.
 - [ADR-T-008: Refactor the Roles and Permissions System](adr/008-roles-and-permissions-refactor.md) — Replace Casbin with a native Rust permission system (`PermissionMatrix` + `RequirePermission<A>` Axum extractors), migrate from `administrator: bool` to a `role` column, and add a `/me/permissions` discovery endpoint.
-- [ADR-T-009: Container Infrastructure Hardening](adr/009-container-infrastructure-refactor.md) — Split runtime bases (release/debug), extract the configuration parser into the `torrust-index-config` workspace crate, ship dedicated helper-binary crates (`torrust-index-health-check`, `torrust-index-auth-keypair`, `torrust-index-config-probe`), and tighten the entry script's invariants (mandatory `connect_url`/`tracker.token`, single source of truth for auth-key paths, refuse-if-root, refuse-if-stdout-is-a-TTY).
+- [ADR-T-009: Container Infrastructure Refactor](adr/009-container-infrastructure-refactor.md) — Split the runtime image into `release` (distroless, root-only toolset) and `debug` bases; extract three helper binaries (`torrust-index-health-check`, `torrust-index-auth-keypair`, `torrust-index-config-probe`) into their own workspace crates with no HTTP/TLS/async-runtime deps; strip credentials from shipped TOMLs and make `database.connect_url` / `tracker.token` mandatory schema fields; split Compose into a production-shaped `compose.yaml` baseline plus an auto-loaded `compose.override.yaml` dev sandbox; and add an internal audit record for vendored `su-exec`.
 
 ## Contributing
 

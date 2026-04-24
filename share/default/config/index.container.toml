@@ -12,10 +12,6 @@ threshold = "info"
 #threshold = "trace"
 
 [tracker]
-api_url = "http://tracker:1212"
-url = "udp://tracker:6969"
-
-[auth]
 
 [database]
 

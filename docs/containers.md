@@ -113,6 +113,39 @@ storage/index/
 
 ## Building the Container
 
+### Test-Stage Gate
+
+The image build is **gated on the workspace test suite passing**.
+The `Containerfile` defines intermediate `test` / `test_debug`
+stages that compile the workspace's test archive and run it
+with `cargo nextest run` before the runtime image stages
+(`runtime_release` / `runtime_debug`) are assembled. A red
+test run blocks image production until the underlying issue
+is fixed.
+
+This is a deliberate trade-off:
+
+- **What you get.** A red `develop`/`main` test run cannot
+  silently ship as a published image. There is no
+  build-time `--skip-tests` escape hatch — and that omission
+  is intentional. Any such hatch would, in time, end up wired
+  into a release pipeline "just for this one urgent fix" and
+  would defeat the gate's whole purpose.
+- **What it costs.** A flaky or environment-dependent test
+  blocks image production even when the application is
+  unaffected. Treat this as a forcing function, not as
+  collateral damage: stabilise or quarantine the test rather
+  than reaching for an opt-out.
+- **Escalation path.** When a known-flaky test blocks an
+  urgent build, the supported response is to `#[ignore]`
+  the specific test on a tracked branch with a linked
+  issue, rebuild, then follow up by fixing the test and
+  removing the `#[ignore]`. There is no privileged rebuild
+  path that bypasses the gate.
+
+See [ADR-T-009 §D9](../adr/009-container-infrastructure-refactor.md)
+for the design rationale.
+
 ### Clone and Change into Repository
 
 ```sh
@@ -222,11 +255,12 @@ The following environmental variables can be set:
 - `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PATH` - Path to an RSA public key PEM file for JWT verification. Required when `PRIVATE_KEY_PATH` is set.
 - `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PEM` - Inline RSA private key PEM string (alternative to file path). Optional: for persistent sessions.
 - `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PEM` - Inline RSA public key PEM string (alternative to file path). Required when `PRIVATE_KEY_PEM` is set.
-- `TORRUST_INDEX_DATABASE_DRIVER` - **First-boot TOML selector only** (options: `sqlite3`, `mysql`, default `sqlite3`). Per ADR-T-009 §7.4, this env var now selects which default `index.toml` is seeded into `/etc/torrust/index/` on first boot — it is read by the entry script at container start, not at image-build time. It no longer drives runtime database decisions: those are taken from the config probe's `database.driver` field, derived from `database.connect_url`'s URL scheme. Note the taxonomy difference — the env var uses `sqlite3` / `mysql`; the probe (and the application) emit `sqlite` / `mysql`. Operators who scripted around this env var expecting it to control runtime behaviour must update their scripts to supply `TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL` instead.
+- `TORRUST_INDEX_DATABASE_DRIVER` - **Input-validation gate only** (options: `sqlite3`, `mysql`, default `sqlite3`). Per ADR-T-009 §7.4, this env var was originally introduced to choose which driver-suffixed default TOML to seed into `/etc/torrust/index/` on first boot. Phase 9 then collapsed those two driver-suffixed defaults into a single driver-agnostic `index.container.toml` (Phase 5 had already made `database.connect_url` mandatory, so the file no longer encodes a driver choice). The env var is retained as an input-validation gate so a typo (`postgres`, `Sqlite`, …) fails fast at container start rather than silently propagating; both supported values now seed the same template. Runtime database decisions are taken from the config probe's `database.driver` field, derived from `database.connect_url`'s URL scheme. Note the taxonomy difference — the env var uses `sqlite3` / `mysql`; the probe (and the application) emit `sqlite` / `mysql`. Operators who scripted around this env var expecting it to control runtime behaviour must update their scripts to supply `TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL` instead.
 - `TORRUST_INDEX_CONFIG_TOML` - Load config from this environmental variable instead from a file, (i.e: `TORRUST_INDEX_CONFIG_TOML=$(cat index-index.toml)`).
 - `USER_ID` - The user id for the runtime-created `torrust` user. Must be a non-negative integer and must not be `0`. Should match the ownership of the host-mapped volumes (default `1000`).
 - `API_PORT` - The port for the index API. This should match the port used in the configuration, (default `3001`).
 - `IMPORTER_API_PORT` - The port for the importer API. This should match the port used in the configuration, (default `3002`).
+- `TZ` - Container time zone passed through to the runtime (default `Etc/UTC`). Set in the Containerfile `ENV` block; override at `docker run` time if you need wall-clock log timestamps in a specific zone.
 
 > NOTE: `API_PORT` and `IMPORTER_API_PORT` are runtime `ENV` values, not
 > build-time `ARG`s. Overriding them at `docker run` / `podman run` time
@@ -452,14 +486,29 @@ Per ADR-T-009 §7, the entry script reads its configuration in
 the following order. Each step depends on the values
 resolved by previous steps.
 
+The complete list of environment variables the entry script
+consults is maintained as a canonical manifest comment block
+in [`share/container/entry_script_sh`](../share/container/entry_script_sh),
+delimited by the `# ENTRY_ENV_VARS:` and
+`# END_ENTRY_ENV_VARS` sentinel lines. CI verifies that
+every variable named between those sentinels is documented
+in this file (see ADR-T-009 §9 / Acceptance Criterion #7);
+when adding or removing a variable from the entry script,
+update both the manifest block and the env-var section
+above.
+
 1. **`USER_ID`** — numeric, non-zero (refuses to run as
    root). Default `1000`. Used to create the unprivileged
    `torrust` user via `adduser` and to chown the volume
    directories.
-2. **`TORRUST_INDEX_DATABASE_DRIVER`** — selects which
-   default TOML is installed at `/etc/torrust/index/index.toml`
-   on first boot (see the env-var entry above for the
-   build-time-only scope).
+2. **`TORRUST_INDEX_DATABASE_DRIVER`** — validated as an
+   input-only gate (`sqlite3` or `mysql`); both values
+   now seed the same driver-agnostic
+   `index.container.toml` template into
+   `/etc/torrust/index/index.toml` on first boot. Unset
+   or unrecognised values abort startup with an explicit
+   error. See the env-var entry above for full scope and
+   migration notes.
 3. **`RUNTIME`** — selects the message-of-the-day banner
    (`runtime`, `debug`, or `release`). Set by the
    Containerfile per image variant.
@@ -502,9 +551,9 @@ resolved by previous steps.
 
 #### Required Overrides Between Phases
 
-The default TOMLs shipped at
-`/usr/share/torrust/default/config/index.container.{sqlite3,mysql}.toml`
-intentionally leave `[tracker]` and `[database]` empty so
+The default TOML shipped at
+`/usr/share/torrust/default/config/index.container.toml`
+intentionally leaves `[tracker]` and `[database]` empty so
 operators must supply real values. Per ADR-T-009 §D2 the
 schema requires `tracker.token` and
 `database.connect_url` — the config probe will exit non-zero

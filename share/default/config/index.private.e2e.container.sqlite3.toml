@@ -17,8 +17,6 @@ listed = false
 private = true
 url = "http://tracker:7070"
 
-[auth]
-
 [database]
 
 [registration]
