@@ -5,6 +5,7 @@
 /.github
 /.gitignore
 /.vscode
+/adr/
 /bin/
 /config-idx-back.local.toml
 /config-tracker.local.toml
@@ -15,6 +16,7 @@
 /data_v2.db*
 /data.db
 /data.db*
+/docs/
 /project-words.txt
 /README.md
 /rustfmt.toml

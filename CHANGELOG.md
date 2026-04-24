@@ -83,6 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `.containerignore` now excludes `/adr/` and `/docs/` from the build
+  context (ADR-T-009 Phase 1).
 - **BREAKING:** Raise MSRV from 1.85 to 1.88.
 - **BREAKING:** `administrator: bool` replaced by `role: String` in API
   responses (`TokenResponse`, `UserCompact`, etc.). The legacy `admin: bool`
@@ -171,6 +173,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Build-time `ARG API_PORT` / `ARG IMPORTER_API_PORT` from `Containerfile`
+  (ADR-T-009 Phase 1, D6). The runtime `ENV API_PORT=3001` /
+  `ENV IMPORTER_API_PORT=3002` defaults are retained so the listener and
+  `HEALTHCHECK` resolve correctly; runtime `--env` overrides continue to
+  work, but image metadata (`docker inspect`) now reflects the defaults
+  unconditionally.
 - `admin: bool` field from `TokenResponse`, `LoggedInUserData`, and
   `TokenRenewalData` — superseded by `role: String` (ADR-T-008).
 - `UserCompact::is_admin()` convenience method — no longer needed after

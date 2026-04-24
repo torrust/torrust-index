@@ -91,8 +91,10 @@ Phase 2.
 
 ## Phase 1 — Build Hygiene (D6, D9 build-context part)
 
+**Status:** Landed (2026-04-24).
 **Files.** `.containerignore`, `Containerfile` (ARG / ENV /
-EXPOSE block only).
+EXPOSE block only), `docs/containers.md` (operator-visible
+note), `CHANGELOG.md`.
 
 1. **Drop build-time port `ARG`s.** Remove `ARG API_PORT` /
    `ARG IMPORTER_API_PORT`. Keep `ENV API_PORT=3001` /
@@ -108,6 +110,13 @@ EXPOSE block only).
 2. **Tighten `.containerignore`.** Add `adr/` and `docs/`
    only. Verify with `docker build --no-cache` that nothing
    required is excluded.
+
+   *Landed:* `/adr/` and `/docs/` added; the file's missing
+   trailing newline was also fixed in the same change. The
+   `--no-cache` verification is deferred to the next
+   end-to-end image build (no container engine is available
+   in the agent's sandbox); the explicit "do not exclude"
+   list below was honoured.
 
    **Do not** exclude `packages/render-text-as-image/` — it is
    a workspace member and a path dependency of the root crate;

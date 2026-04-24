@@ -446,6 +446,8 @@ configuration the entry script needs to dispatch on.
 
 **Follows from:** P2.
 **Addresses:** [R5](#r5--build-time-arg-for-runtime-concerns).
+**Status:** Landed 2026-04-24 via
+[Phase 1](009-implementation-plan.md#phase-1--build-hygiene-d6-d9-build-context-part).
 
 `API_PORT` and `IMPORTER_API_PORT` lose their build-time
 `ARG` declarations and keep only their `ENV` defaults, which
@@ -502,6 +504,12 @@ unchanged ~105-line file would be high cost for zero value.
 **Follows from:** P2 (build hygiene).
 **Addresses:** [R8](#r8--containerignore-sends-excess-context-to-the-builder),
 [R9](#r9--test-stages-and-build-stages-are-entangled).
+**Status:** Build-context part (`.containerignore`) landed
+2026-04-24 via
+[Phase 1](009-implementation-plan.md#phase-1--build-hygiene-d6-d9-build-context-part);
+the test-stage coupling part is documentation-only and
+remains scheduled for
+[Phase 9](009-implementation-plan.md#phase-9--documentation--audit-d8-d9-docs-part).
 
 `.containerignore` adds `adr/` and `docs/` to the existing
 exclusions (and only those —

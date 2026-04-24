@@ -166,6 +166,17 @@ The following environmental variables can be set:
 - `TORRUST_INDEX_CONFIG_TOML` - Load config from this environmental variable instead from a file, (i.e: `TORRUST_INDEX_CONFIG_TOML=$(cat index-index.toml)`).
 - `USER_ID` - The user id for the runtime crated `torrust` user. Please Note: This user id should match the ownership of the host-mapped volumes, (default `1000`).
 - `API_PORT` - The port for the index API. This should match the port used in the configuration, (default `3001`).
+- `IMPORTER_API_PORT` - The port for the importer API. This should match the port used in the configuration, (default `3002`).
+
+> NOTE: `API_PORT` and `IMPORTER_API_PORT` are runtime `ENV` values, not
+> build-time `ARG`s. Overriding them at `docker run` / `podman run` time
+> with `--env API_PORT=…` correctly reaches the application listener and
+> the in-container `HEALTHCHECK`, but the `EXPOSE` directive in the
+> `Containerfile` is evaluated at build time and bakes the *defaults*
+> (`3001`, `3002`) into image metadata. Tools that read that metadata
+> (`docker inspect`, `docker port`) will continue to report the defaults
+> regardless of any `--env` override. Use `--publish host:container` to
+> map whichever container port the application is actually listening on.
 
 ### Sockets
 
