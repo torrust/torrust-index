@@ -20,7 +20,7 @@ re-litigated here — when in doubt, defer to the ADR.
 | 4     | Runtime base split (D4, D7)        | Done        |
 | 5     | Schema (D2)                        | Done        |
 | 6     | Config probe                       | Done        |
-| 7     | Entry-script contract              | Not started |
+| 7     | Entry-script contract              | Done        |
 | 8     | Compose split                      | Not started |
 | 9     | Documentation & audit (D8, D9)     | Not started |
 
@@ -2104,7 +2104,7 @@ The cost is a `jq` dependency in the runtime image (see
 #      database.path field.
 seed_sqlite() {
     _path=$1
-    _template=/usr/share/torrust/default/database/sqlite3.db
+    _template=/usr/share/torrust/default/database/index.sqlite3.db
 
     # Empty path: we only reach this function from the
     # sqlite) dispatch arm, so an empty path means the probe
@@ -2235,6 +2235,53 @@ control runtime behaviour must update their scripts to
 supply `connect_url` instead. Note the taxonomy difference:
 the env var uses `sqlite3` / `mysql`; the probe emits
 `sqlite` / `mysql` / `mariadb`.
+
+### 7.5 Implementation note — sourced shell library and host-side tests
+
+The snippets in §7.1 / §7.2 above present `inst`,
+`key_configured`, `validate_auth_keys`, and `seed_sqlite`
+as inline functions in the entry script. The landed
+implementation extracts them into a sourced library at
+[`share/container/entry_script_lib_sh`](../share/container/entry_script_lib_sh)
+and a new test-only workspace crate
+[`packages/index-entry-script/`](../packages/index-entry-script/)
+that drives the helpers via `sh` subprocess and asserts
+exit codes / stderr contents. The library has no top-level
+side effects (only function definitions), so sourcing is
+safe both inside the container and inside the host-side
+tests.
+
+This is a strict improvement on the inline-function form:
+the §7.1 "Verification" note explicitly asked for an
+integration test covering the auth-key invariants, and
+host-side coverage means CI catches regressions without
+spinning up a container. The crate ships **no runtime code**
+of its own; it is a `[lib]` whose `tests/` exercise the
+shell helpers end-to-end. Test coverage:
+
+- `validate_auth_keys` — every branch of §7.1's three
+  invariants (mutual exclusion within a key, pair
+  completeness across both keys, cross-pair source
+  consistency).
+- `seed_sqlite` — every §7.2 outcome that does not require
+  root or writing to a managed volume (`:memory:` skip,
+  relative-path warn, absolute-non-empty untouched,
+  outside-volumes error, empty-path probe-bug error).
+
+The "missing-under-volume seeded" outcome (`mkdir` +
+`inst()` into `/var/lib/torrust/index/…`) and the end-to-end
+§7.1 "case-3 export" of `..._AUTH__*_PATH` plus key
+materialisation against the real generator both require
+root and the container's `torrust` user; they belong in
+the container e2e suite (Phase 8 / 9).
+
+**Containerfile.** Both runtime stages (`runtime_assets`
+feeding the release base, and `runtime_debug` directly)
+copy the library to `/usr/local/lib/torrust/entry_script_lib_sh`
+with mode `0444 root:root` — world-readable, root-owned,
+not executable on its own (it is sourced, not exec'd). The
+entry script `. /usr/local/lib/torrust/entry_script_lib_sh`
+at the top, immediately after `set -eu`.
 
 ---
 

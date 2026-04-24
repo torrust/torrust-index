@@ -4362,6 +4362,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "torrust-index-entry-script"
+version = "4.0.0-develop"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
 name = "torrust-index-health-check"
 version = "4.0.0-develop"
 dependencies = [

@@ -271,12 +271,15 @@ unless the probe rejects it.)
 
 **Follows from:** P5.
 **Addresses:** [R3](#r3--entry-script-path-assumptions-conflict-with-config-overrides).
-**Status:** Partially landed 2026-04-24 via
-[Phase 6](009-implementation-plan.md#phase-6--config-probe-helper)
-— `torrust-index-config-probe` ships the JSON-shaped
-resolution surface the entry script will dispatch on. The
-script-side mutual-exclusion and override-export logic
-lands in [Phase 7](009-implementation-plan.md#phase-7--entry-script-contract-d3).
+**Status:** Landed 2026-04-24. Phase 6
+([`torrust-index-config-probe`](009-implementation-plan.md#phase-6--config-probe-helper))
+ships the JSON-shaped resolution surface and Phase 7
+([entry-script contract](009-implementation-plan.md#phase-7--entry-script-contract-d3))
+wires the script-side mutual-exclusion checks, the
+three-way auth-key dispatch (PEM / PATH / container
+default), and the
+`TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__*_PATH` export so the
+entry script is the sole owner of the default key paths.
 
 The `Auth` config struct exposes both `*_PEM` and `*_PATH`
 fields per key, and both
@@ -427,6 +430,7 @@ the workspace *paths* are `packages/index-*/`.
 | `torrust-index-health-check` | `packages/index-health-check/` | *(none — stdlib networking)* |
 | `torrust-index-auth-keypair` | `packages/index-auth-keypair/` | `rsa` (re-exports `pkcs8`) |
 | `torrust-index-config-probe` | `packages/index-config-probe/` | `torrust-index-config` (path dep; brings the full parsing surface: `figment`, `toml`, `serde_with`, `serde_json`, `url`, `camino`, `derive_more`, `thiserror`, `lettre` with `default-features = false`); plus direct `url` and `percent-encoding` deps for the sqlite-URL path-extraction logic |
+| `torrust-index-entry-script` | `packages/index-entry-script/` | *(test-only `[lib]` — no binary, no runtime code; ships host-side integration tests for the sourced shell library at [`share/container/entry_script_lib_sh`](../share/container/entry_script_lib_sh); `dev-dependencies` only: `tempfile`)* |
 
 Domain-specific deps are the *only* per-crate variation.
 The dep-closure exclusion check (Acceptance Criterion #5)

@@ -1,0 +1,20 @@
+[package]
+name = "torrust-index-entry-script"
+
+authors.workspace = true
+description = "Integration tests for the Torrust Index container entry script's pure shell helpers"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

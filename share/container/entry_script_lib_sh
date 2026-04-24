@@ -1,0 +1,153 @@
+# shellcheck shell=sh
+# Pure helper functions for share/container/entry_script_sh.
+#
+# Sourced by the entry script and by host-side tests under
+# share/container/tests/. Contains no top-level statements
+# beyond function definitions, so sourcing has no side
+# effects.
+#
+# Conventions:
+#   - All functions are POSIX sh; no bashisms.
+#   - Functions use only `[ ... ]` and `case` for tests.
+#   - Functions emit human-readable diagnostics on stderr
+#     and use `exit 1` for unrecoverable input violations
+#     (auth-key validation, seed_sqlite path errors). When
+#     sourced for tests, callers must invoke each function
+#     in a subshell to observe the exit status without
+#     terminating the test driver.
+
+# install -D wrapper: copy $1 to $2 only if $1 exists and $2
+# does not yet exist. Mode 0640, owner torrust:torrust.
+# The bare `if ... fi` (no `else`) is `set -e`-safe per
+# POSIX §2.9.4.1.
+inst() {
+    if [ -n "$1" ] && [ -n "$2" ] && [ -e "$1" ] && [ ! -e "$2" ]; then
+        install -D -m 0640 -o torrust -g torrust "$1" "$2"; fi; }
+
+# Returns 0 if $1 is one of the closed-set source values
+# {pem,path}; 1 otherwise. Tests positively against the
+# allow-list so a future probe value is rejected explicitly
+# instead of being treated as "configured". Only ever called
+# inside a conditional position (set -e safe).
+key_configured() {
+    case $1 in
+        pem|path) return 0 ;;
+        *)        return 1 ;;
+    esac
+}
+
+# Validate the resolved auth-key probe output from §7.1.
+# Enforces three invariants and exits 1 with a diagnostic on
+# the first violation:
+#
+#   1. Mutual exclusion: within one key, PEM and PATH cannot
+#      both be set (regardless of source).
+#   2. Pair completeness: both keys configured, or neither
+#      (no half-pair).
+#   3. Cross-pair source consistency: both keys must use the
+#      same delivery mechanism (no mixed PEM/PATH).
+#
+# Arguments (positional):
+#   $1 priv_pem_set    "true" / "false"
+#   $2 priv_path_set   "true" / "false"
+#   $3 priv_source     "pem" / "path" / "none"
+#   $4 pub_pem_set     "true" / "false"
+#   $5 pub_path_set    "true" / "false"
+#   $6 pub_source      "pem" / "path" / "none"
+validate_auth_keys() {
+    _priv_pem_set=$1; _priv_path_set=$2; _priv_src=$3
+    _pub_pem_set=$4;  _pub_path_set=$5;  _pub_src=$6
+
+    if [ "$_priv_pem_set" = true ] && [ "$_priv_path_set" = true ]; then
+        echo "ERROR: both PRIVATE_KEY_PEM and PRIVATE_KEY_PATH are set;" \
+             "these are mutually exclusive — pick one." >&2
+        exit 1
+    fi
+    if [ "$_pub_pem_set" = true ] && [ "$_pub_path_set" = true ]; then
+        echo "ERROR: both PUBLIC_KEY_PEM and PUBLIC_KEY_PATH are set;" \
+             "these are mutually exclusive — pick one." >&2
+        exit 1
+    fi
+
+    _priv_has=0; key_configured "$_priv_src" && _priv_has=1
+    _pub_has=0;  key_configured "$_pub_src"  && _pub_has=1
+    if [ "$_priv_has" -ne "$_pub_has" ]; then
+        echo "ERROR: auth keys must be configured as a complete pair;" \
+             "one key is configured but the other is not." >&2
+        exit 1
+    fi
+
+    if [ "$_priv_has" -eq 1 ] && [ "$_pub_has" -eq 1 ] \
+       && [ "$_priv_src" != "$_pub_src" ]; then
+        echo "ERROR: private key source is '$_priv_src'" \
+             "but public key source is '$_pub_src';" \
+             "mixed PEM/PATH across the key pair is not supported" \
+             "— use the same delivery mechanism for both keys." >&2
+        exit 1
+    fi
+}
+
+# Seed an empty SQLite database file at the resolved path.
+# $1 = absolute path from the probe's database.path field.
+# Handles five outcomes (see ADR-T-009 §7.2 seeding rules):
+#   - empty path        → probe bug, error
+#   - :memory:          → info, no-op
+#   - relative path     → warn, no-op
+#   - absolute, exists  → leave alone
+#   - absolute, missing → volumes-only mkdir + inst()
+seed_sqlite() {
+    _path=$1
+    _template=/usr/share/torrust/default/database/index.sqlite3.db
+
+    if [ -z "$_path" ]; then
+        echo "ERROR: probe reported sqlite driver but" \
+             "database.path is empty — possible probe bug" >&2
+        exit 1
+    fi
+
+    if [ "$_path" = ":memory:" ]; then
+        echo "INFO: SQLite :memory: — no database file to seed" >&2
+        return 0
+    fi
+
+    case $_path in
+        /*) ;;
+        *)
+            echo "WARN: relative SQLite path '$_path';" \
+                 "not seeding — application will create on" \
+                 "first connect if mode=rwc" >&2
+            return 0
+            ;;
+    esac
+
+    if [ -s "$_path" ]; then
+        return 0
+    fi
+
+    if [ -e "$_path" ] && [ ! -s "$_path" ]; then
+        rm -f "$_path"
+    fi
+
+    _dir=$(dirname "$_path")
+    if [ ! -d "$_dir" ]; then
+        case "$_dir" in
+            /etc/torrust/index|/etc/torrust/index/*|\
+            /var/lib/torrust/index|/var/lib/torrust/index/*|\
+            /var/log/torrust/index|/var/log/torrust/index/*)
+                mkdir -p "$_dir"
+                chown torrust:torrust "$_dir"
+                chmod 0750 "$_dir"
+                ;;
+            *)
+                echo "ERROR: database path $_dir is outside the" \
+                     "volumes the entry script manages." >&2
+                echo "       Pre-create it with appropriate" \
+                     "ownership, or use a path under" \
+                     "/var/lib/torrust/index/." >&2
+                exit 1
+                ;;
+        esac
+    fi
+
+    inst "$_template" "$_path"
+}

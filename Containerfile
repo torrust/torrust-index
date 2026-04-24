@@ -21,10 +21,25 @@ RUN mkdir -p /app/share/torrust/default/database/; \
     sqlite3 /app/share/torrust/default/database/index.sqlite3.db  "VACUUM;"
 
 ## jq donor (pristine base, no user code)
+#
+# Debian trixie's `jq` package is dynamically linked against
+# libjq and libonig. The distroless runtime does not ship
+# either, so we stage them here at deterministic paths
+# alongside the binary, and the runtime stages copy all
+# three artefacts (binary + two shared libs).
+#
+# The `*-linux-gnu` glob resolves to whichever multi-arch
+# tuple the donor was built for; we re-stage under stable
+# names (`/jq/...`) so the runtime COPY directives don't
+# need to know the tuple.
 FROM rust:slim-trixie AS jq_donor
 RUN apt-get update && \
     apt-get install -y --no-install-recommends jq && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /jq && \
+    cp /usr/bin/jq /jq/jq && \
+    cp -L /usr/lib/*-linux-gnu/libjq.so.1   /jq/libjq.so.1 && \
+    cp -L /usr/lib/*-linux-gnu/libonig.so.5 /jq/libonig.so.5
 
 ## Su Exe Compile
 FROM docker.io/library/gcc:trixie AS gcc
@@ -80,20 +95,25 @@ RUN cargo nextest run --workspace-remap /test/src/ --target-dir-remap /test/src/
 RUN mkdir -p /app/bin/; \
   cp -l /test/src/target/debug/torrust-index /app/bin/torrust-index; \
   cp -l /test/src/target/debug/torrust-index-health-check /app/bin/torrust-index-health-check; \
-  cp -l /test/src/target/debug/torrust-index-auth-keypair /app/bin/torrust-index-auth-keypair
+  cp -l /test/src/target/debug/torrust-index-auth-keypair /app/bin/torrust-index-auth-keypair; \
+  cp -l /test/src/target/debug/torrust-index-config-probe /app/bin/torrust-index-config-probe
 # Phase 4: per-binary modes. Application binary stays
 # world-executable; root-phase-only helpers (health-check,
-# auth-keypair, config-probe — added in Phase 6) tighten to
-# root-only (0500 root:root). Same posture as busybox,
-# su-exec, jq. The healthcheck binary is invoked from
-# HEALTHCHECK, which runs as root (no --user in the
-# directive), so 0500 is sufficient.
+# auth-keypair, config-probe) tighten to root-only
+# (0500 root:root) per ADR-T-009 §6 / §7.3 — same posture as
+# busybox, su-exec, jq. The healthcheck binary is invoked
+# from HEALTHCHECK, which runs as root (no --user in the
+# directive), so 0500 is sufficient. The config-probe is
+# invoked only from the entry script's pre-su-exec phase,
+# so it is also root-only.
 RUN chown -R root:root /app; chmod -R u=rw,go=r,a+X /app; \
     chmod 0755 /app/bin/torrust-index; \
     chown 0:0  /app/bin/torrust-index-health-check \
-               /app/bin/torrust-index-auth-keypair; \
+               /app/bin/torrust-index-auth-keypair \
+               /app/bin/torrust-index-config-probe; \
     chmod 0500 /app/bin/torrust-index-health-check \
-               /app/bin/torrust-index-auth-keypair
+               /app/bin/torrust-index-auth-keypair \
+               /app/bin/torrust-index-config-probe
 
 # Extract and Test (release)
 FROM tester AS test
@@ -108,17 +128,22 @@ RUN cargo nextest run --workspace-remap /test/src/ --target-dir-remap /test/src/
 RUN mkdir -p /app/bin/; \
   cp -l /test/src/target/release/torrust-index /app/bin/torrust-index; \
   cp -l /test/src/target/release/torrust-index-health-check /app/bin/torrust-index-health-check; \
-  cp -l /test/src/target/release/torrust-index-auth-keypair /app/bin/torrust-index-auth-keypair
+  cp -l /test/src/target/release/torrust-index-auth-keypair /app/bin/torrust-index-auth-keypair; \
+  cp -l /test/src/target/release/torrust-index-config-probe /app/bin/torrust-index-config-probe
 # Phase 4: per-binary modes (see test_debug above for rationale).
 # The healthcheck binary is invoked from HEALTHCHECK, which
 # runs as root (no --user in the directive), so 0500 is
-# sufficient.
+# sufficient. The config-probe (ADR-T-009 §6 / §7) is invoked
+# only from the entry script's pre-su-exec phase, so it is
+# also root-only.
 RUN chown -R root:root /app; chmod -R u=rw,go=r,a+X /app; \
     chmod 0755 /app/bin/torrust-index; \
     chown 0:0  /app/bin/torrust-index-health-check \
-               /app/bin/torrust-index-auth-keypair; \
+               /app/bin/torrust-index-auth-keypair \
+               /app/bin/torrust-index-config-probe; \
     chmod 0500 /app/bin/torrust-index-health-check \
-               /app/bin/torrust-index-auth-keypair
+               /app/bin/torrust-index-auth-keypair \
+               /app/bin/torrust-index-config-probe
 
 
 ## ── Runtime asset bundle (base-agnostic) ─────────────────────
@@ -185,6 +210,8 @@ COPY --from=gcc --chmod=0700 --chown=0:0 \
     /usr/local/bin/su-exec  /bin/su-exec
 COPY --chmod=0555 --chown=0:0 \
     ./share/container/entry_script_sh  /usr/local/bin/entry.sh
+COPY --chmod=0444 --chown=0:0 \
+    ./share/container/entry_script_lib_sh  /usr/local/lib/torrust/entry_script_lib_sh
 
 ## ── Preflight gate (aggregates all donor-validation stages) ──
 # Both runtime bases COPY from this stage, creating an
@@ -233,6 +260,8 @@ COPY --from=preflight_gate /tmp/.adduser-ok /tmp/.preflight-sentinel
 COPY --from=runtime_assets /bin/su-exec /bin/su-exec
 COPY --chmod=0555 --chown=0:0 \
     ./share/container/entry_script_sh  /usr/local/bin/entry.sh
+COPY --chmod=0444 --chown=0:0 \
+    ./share/container/entry_script_lib_sh  /usr/local/lib/torrust/entry_script_lib_sh
 # Materialise /bin/sh → /busybox/sh so root's recorded login
 # shell in /etc/passwd resolves correctly. The release base
 # creates the same symlink as part of its curated-applet
@@ -257,7 +286,12 @@ VOLUME ["/var/lib/torrust/index","/var/log/torrust/index","/etc/torrust/index"]
 COPY --from=test_debug /app/ /usr/
 # jq binary for entry-script JSON consumption (§2.2 step 4).
 # Root-only (0500) — same posture as busybox and su-exec.
-COPY --from=jq_donor --chmod=0500 --chown=0:0 /usr/bin/jq /usr/bin/jq
+# The two shared libraries (libjq, libonig) are required at
+# runtime; distroless cc-debian13's ld.so resolves them via
+# the multiarch dir registered in /etc/ld.so.conf.d/.
+COPY --from=jq_donor --chmod=0500 --chown=0:0 /jq/jq           /usr/bin/jq
+COPY --from=jq_donor --chmod=0444 --chown=0:0 /jq/libjq.so.1   /usr/lib/x86_64-linux-gnu/libjq.so.1
+COPY --from=jq_donor --chmod=0444 --chown=0:0 /jq/libonig.so.5 /usr/lib/x86_64-linux-gnu/libonig.so.5
 ENTRYPOINT ["/usr/local/bin/entry.sh"]
 HEALTHCHECK --interval=5s --timeout=5s --start-period=3s --retries=3 \
   CMD /usr/bin/torrust-index-health-check "http://localhost:${API_PORT}/health_check" \
@@ -281,7 +315,12 @@ VOLUME ["/var/lib/torrust/index","/var/log/torrust/index","/etc/torrust/index"]
 COPY --from=test /app/ /usr/
 # jq binary for entry-script JSON consumption (§2.2 step 4).
 # Root-only (0500) — same posture as busybox and su-exec.
-COPY --from=jq_donor --chmod=0500 --chown=0:0 /usr/bin/jq /usr/bin/jq
+# The two shared libraries (libjq, libonig) are required at
+# runtime; distroless cc-debian13's ld.so resolves them via
+# the multiarch dir registered in /etc/ld.so.conf.d/.
+COPY --from=jq_donor --chmod=0500 --chown=0:0 /jq/jq           /usr/bin/jq
+COPY --from=jq_donor --chmod=0444 --chown=0:0 /jq/libjq.so.1   /usr/lib/x86_64-linux-gnu/libjq.so.1
+COPY --from=jq_donor --chmod=0444 --chown=0:0 /jq/libonig.so.5 /usr/lib/x86_64-linux-gnu/libonig.so.5
 ENTRYPOINT ["/usr/local/bin/entry.sh"]
 HEALTHCHECK --interval=5s --timeout=5s --start-period=3s --retries=3 \
   CMD /usr/bin/torrust-index-health-check "http://localhost:${API_PORT}/health_check" \

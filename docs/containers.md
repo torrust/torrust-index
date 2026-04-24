@@ -81,7 +81,7 @@ Using the standard mapping defined above produces this following mapped tree:
 storage/index/
 ├── lib
 │   ├── database
-│   │   └── sqlite3.db     => /var/lib/torrust/index/database/sqlite3.db [auto populated]
+│   │   └── index.sqlite3.db => /var/lib/torrust/index/database/index.sqlite3.db [auto populated, sqlite3 only]
 │   └── tls
 │       ├── localhost.crt  => /var/lib/torrust/index/tls/localhost.crt [user supplied]
 │       └── localhost.key  => /var/lib/torrust/index/tls/localhost.key [user supplied]
@@ -99,7 +99,17 @@ storage/index/
 > container entry script. Sessions persist across restarts as long as the
 > `/etc/torrust/index` volume is retained. To use your own keys, either
 > pre-populate the volume before first boot or overwrite the generated files and
-> restart.
+> restart. Per ADR-T-009 §D3 the script is the single source of truth for the
+> auth-key paths: when neither `..._AUTH__*_PEM` nor `..._AUTH__*_PATH` is
+> configured, the script generates the pair at the locations above and exports
+> the corresponding `..._AUTH__*_PATH` overrides so the application sees the
+> same paths.
+>
+> The SQLite database file is only auto-populated when the resolved
+> `database.connect_url` (via `TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL`
+> or the mounted `index.toml`) names an absolute SQLite path under one of the
+> managed volumes. MySQL/MariaDB connections are not seeded — the application
+> connects directly. See [Entry Script Contract](#entry-script-contract).
 
 ## Building the Container
 
@@ -154,26 +164,43 @@ the format only matters for Docker-specific manifest extensions like
 
 ### Basic Run
 
-No arguments are needed for simply checking the container image works:
+The minimum invocation supplies the two mandatory overrides
+introduced by ADR-T-009 §D2 (`tracker.token` and
+`database.connect_url`). Without them, the config probe
+fails the schema check and the entry script aborts startup
+before privilege drop. See [Entry Script Contract](#entry-script-contract)
+for the full boot sequence.
 
 #### (Docker) Run Basic
 
 ```sh
 # Release Mode
-docker run -it torrust-index:release
+docker run -it \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MySecretToken" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/index.sqlite3.db?mode=rwc" \
+    torrust-index:release
 
 # Debug Mode
-docker run -it torrust-index:debug
+docker run -it \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MySecretToken" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/index.sqlite3.db?mode=rwc" \
+    torrust-index:debug
 ```
 
 #### (Podman) Run Basic
 
 ```sh
 # Release Mode
-podman run -it torrust-index:release
+podman run -it \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MySecretToken" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/index.sqlite3.db?mode=rwc" \
+    torrust-index:release
 
 # Debug Mode
-podman run -it torrust-index:debug
+podman run -it \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MySecretToken" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/index.sqlite3.db?mode=rwc" \
+    torrust-index:debug
 ```
 
 ### Arguments
@@ -190,12 +217,12 @@ The following environmental variables can be set:
 
 - `TORRUST_INDEX_CONFIG_TOML_PATH` - The in-container path to the index configuration file, (default: `"/etc/torrust/index/index.toml"`).
 - `TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN` - **Required.** Tracker admin token. Per ADR-T-009 §D2 the shipped TOMLs no longer carry a default value for this field, so the operator must supply it via this env var (or pre-populate the in-volume `index.toml`). Startup fails with `missing field 'token'` otherwise.
-- `TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL` - **Required.** Database connection URL (e.g. `sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc` or a `mysql://...` URL). Same rule as `TRACKER__TOKEN`: shipped TOMLs no longer carry a default, so absent both env var and operator-supplied TOML the application fails to start with `missing field 'connect_url'`.
+- `TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL` - **Required.** Database connection URL (e.g. `sqlite:///var/lib/torrust/index/database/index.sqlite3.db?mode=rwc` or a `mysql://...` URL). Same rule as `TRACKER__TOKEN`: shipped TOMLs no longer carry a default, so absent both env var and operator-supplied TOML the application fails to start with `missing field 'connect_url'`.
 - `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PATH` - Path to an RSA private key PEM file for JWT signing. Optional: without this, ephemeral auto-generated keys are used (sessions will not survive restarts).
 - `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PATH` - Path to an RSA public key PEM file for JWT verification. Required when `PRIVATE_KEY_PATH` is set.
 - `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PEM` - Inline RSA private key PEM string (alternative to file path). Optional: for persistent sessions.
 - `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PEM` - Inline RSA public key PEM string (alternative to file path). Required when `PRIVATE_KEY_PEM` is set.
-- `TORRUST_INDEX_DATABASE_DRIVER` - The database type used for the container, (options: `sqlite3`, `mysql`, default `sqlite3`). Please Note: This dose not override the database configuration within the `.toml` config file.
+- `TORRUST_INDEX_DATABASE_DRIVER` - **First-boot TOML selector only** (options: `sqlite3`, `mysql`, default `sqlite3`). Per ADR-T-009 §7.4, this env var now selects which default `index.toml` is seeded into `/etc/torrust/index/` on first boot — it is read by the entry script at container start, not at image-build time. It no longer drives runtime database decisions: those are taken from the config probe's `database.driver` field, derived from `database.connect_url`'s URL scheme. Note the taxonomy difference — the env var uses `sqlite3` / `mysql`; the probe (and the application) emit `sqlite` / `mysql`. Operators who scripted around this env var expecting it to control runtime behaviour must update their scripts to supply `TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL` instead.
 - `TORRUST_INDEX_CONFIG_TOML` - Load config from this environmental variable instead from a file, (i.e: `TORRUST_INDEX_CONFIG_TOML=$(cat index-index.toml)`).
 - `USER_ID` - The user id for the runtime-created `torrust` user. Must be a non-negative integer and must not be `0`. Should match the ownership of the host-mapped volumes (default `1000`).
 - `API_PORT` - The port for the index API. This should match the port used in the configuration, (default `3001`).
@@ -262,7 +289,7 @@ mkdir -p ./storage/index/lib/ ./storage/index/log/ ./storage/index/etc/
 ##   --env TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PATH="/var/lib/torrust/index/jwt/public.pem" \
 docker run -it \
     --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MySecretToken" \
-    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/index.sqlite3.db?mode=rwc" \
     --env USER_ID="$(id -u)" \
     --publish 0.0.0.0:3001:3001/tcp \
     --volume ./storage/index/lib:/var/lib/torrust/index:Z \
@@ -283,7 +310,7 @@ mkdir -p ./storage/index/lib/ ./storage/index/log/ ./storage/index/etc/
 ## Run Torrust Index Container Image
 podman run -it \
     --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MySecretToken" \
-    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/index.sqlite3.db?mode=rwc" \
     --env USER_ID="$(id -u)" \
     --publish 0.0.0.0:3001:3001/tcp \
     --volume ./storage/index/lib:/var/lib/torrust/index:Z \
@@ -362,3 +389,110 @@ To enable shell tracing (`set -x`) for startup troubleshooting, set the
 ```sh
 --env DEBUG=1
 ```
+
+The entry script also runs under `set -eu` (POSIX `errexit` +
+`nounset`): any unchecked command failure aborts startup
+immediately, and references to unset variables are treated as
+errors. This converts a class of silent-misconfiguration bugs
+into loud, actionable startup failures.
+
+### Entry Script Contract
+
+Per ADR-T-009 §7, the entry script reads its configuration in
+the following order. Each step depends on the values
+resolved by previous steps.
+
+1. **`USER_ID`** — numeric, non-zero (refuses to run as
+   root). Default `1000`. Used to create the unprivileged
+   `torrust` user via `adduser` and to chown the volume
+   directories.
+2. **`TORRUST_INDEX_DATABASE_DRIVER`** — selects which
+   default TOML is installed at `/etc/torrust/index/index.toml`
+   on first boot (see the env-var entry above for the
+   build-time-only scope).
+3. **`RUNTIME`** — selects the message-of-the-day banner
+   (`runtime`, `debug`, or `release`). Set by the
+   Containerfile per image variant.
+4. **Config probe (`/usr/bin/torrust-index-config-probe`)**
+   — invoked as root after the default TOML is in place.
+   The probe is the same loader the application uses, so it
+   sees the operator's full TOML + env-var stack. Its JSON
+   output is consumed by `jq` and drives the remaining
+   steps. The probe runs *before* the script exports any
+   `TORRUST_INDEX_CONFIG_OVERRIDE_*` of its own, so its
+   output reflects only operator-supplied values.
+5. **`TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__{PRIVATE,PUBLIC}_KEY_{PEM,PATH}`**
+   — the probe reports raw presence and resolved source for
+   each key. The script enforces three invariants post-probe:
+   PEM and PATH are mutually exclusive within a single key;
+   both keys must be configured or neither (no half-pair);
+   and both keys must use the same delivery mechanism (no
+   mixed PEM/PATH across the pair). When neither key is
+   configured anywhere (probe `source=none`), the script
+   applies the container defaults
+   (`/etc/torrust/index/auth/private.pem` and
+   `.../public.pem`) and **exports the corresponding
+   `..._AUTH__*_PATH` override env var** so the application
+   sees the same path the script materialises. The script
+   is the single source of truth for these defaults; there
+   is no constant duplicated between two files to drift
+   apart.
+6. **`database.connect_url`** (resolved by the probe) —
+   the probe's `database.driver` field selects the seeding
+   dispatch (`sqlite` seeds the default DB file; `mysql`
+   is a no-op since the application connects directly).
+   For SQLite the seed is materialised at the resolved path
+   only when the parent directory lives under one of the
+   managed volumes (`/etc/torrust/index/`,
+   `/var/lib/torrust/index/`, `/var/log/torrust/index/`);
+   paths outside those roots must be pre-created by the
+   operator.
+7. **`exec /bin/su-exec torrust ...`** — drops privileges
+   and execs the application (or the supplied `CMD`).
+
+#### Required Overrides Between Phases
+
+The default TOMLs shipped at
+`/usr/share/torrust/default/config/index.container.{sqlite3,mysql}.toml`
+intentionally leave `[tracker]` and `[database]` empty so
+operators must supply real values. Per ADR-T-009 §D2 the
+schema requires `tracker.token` and
+`database.connect_url` — the config probe will exit non-zero
+(codes 3/4) and the entry script will abort startup if
+either is missing. Supply them via:
+
+```sh
+--env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN=...
+--env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL=sqlite:///var/lib/torrust/index/database/index.sqlite3.db?mode=rwc
+```
+
+or by mounting a populated `index.toml` at
+`/etc/torrust/index/index.toml`. Phase 8's compose split
+will provide a turnkey `compose.override.yaml` that wires
+these for the local dev workflow.
+
+#### Runtime `jq` Dependency
+
+Both runtime images ship a root-only `/usr/bin/jq` (mode
+`0500 root:root`, sourced from a pristine `rust:slim-trixie`
+`jq_donor` build stage in the Containerfile). It is invoked
+only during the entry script's pre-`su-exec` phase to parse
+the config probe's JSON output and the auth-keypair helper's
+JSON output. The unprivileged `torrust` user has no access
+to `/usr/bin/jq` after privilege drop.
+
+#### Sourced Shell Library
+
+The entry script's pure helper functions (`inst`,
+`key_configured`, `validate_auth_keys`, `seed_sqlite`) live
+in a separate POSIX `sh` library shipped at
+`/usr/local/lib/torrust/entry_script_lib_sh` (mode
+`0444 root:root`, sourced — not exec'd). Splitting them
+out lets the workspace test crate
+[`packages/index-entry-script/`](../packages/index-entry-script/)
+drive each helper through a host `sh` subprocess and assert
+the exit-code / stderr contracts of every branch of
+ADR-T-009 §7.1's auth-key invariants and §7.2's seeding
+outcomes. The library has no top-level side effects, so
+sourcing it from either the entry script or a test harness
+is safe.
