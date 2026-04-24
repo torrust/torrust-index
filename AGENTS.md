@@ -104,5 +104,6 @@ prefix for any cross-references that target them.
 To avoid partial or corrupted writes, always replace files atomically:
 
 1. Read the file.
-2. Using the CLI, `rm` the file.
-3. Recreate the file.
+2. Write the new content to a temporary file
+3. Rename the temporary file to atomically overwrite the original file:
+   `mv file.tmp file`

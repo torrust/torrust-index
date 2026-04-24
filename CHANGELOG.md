@@ -9,7 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- ADR-T-009: Container infrastructure hardening (Phases 1 & 2).
+- ADR-T-009: Container infrastructure hardening (Phases 1, 2 & 3).
+- `torrust-index-config` workspace crate (`packages/index-config/`)
+  containing the parsing surface of the configuration system: schema
+  modules, validator, `load_settings`, `Info`, `Error`, the
+  `CONFIG_OVERRIDE_*` / `ENV_VAR_CONFIG_TOML*` constants, and the
+  permission value types (`Role`, `Action`, `Effect`,
+  `PermissionOverride`). Leaf crate \u2014 no `tokio`, `reqwest`,
+  `sqlx`, `hyper`, `rustls`, `native-tls`, or `openssl` in its dep
+  closure (ADR-T-009 Phase 3).
 - `EXPOSE ${IMPORTER_API_PORT}/tcp` in Containerfile; port 3002 mapped in
   compose.
 - `restart: unless-stopped` on index and tracker compose services.
@@ -111,6 +119,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Helper-binary TTY-refusal exit code unified on 2 (was 1 for the
   keypair helper) via the shared `refuse_if_stdout_is_tty` in
   `torrust-index-cli-common` (ADR-T-009 Phase 2).
+- **BREAKING:** TLS configuration renamed from `[net.tsl]` to `[net.tls]`
+  in operator TOMLs and from `"tsl"` to `"tls"` in the settings JSON
+  API response. The original spelling was a typo; corrected as a clean
+  break (no compatibility alias) alongside the Phase 3 config-crate
+  extraction (ADR-T-009 Phase 3).
+- Configuration parsing surface moved from `src/config/` into the new
+  `torrust-index-config` workspace crate. `src/config/mod.rs` is now a
+  thin re-export shim plus the runtime `Configuration` wrapper holding
+  `RwLock<Settings>`; existing `use crate::config::*;` call sites
+  continue to compile unchanged (ADR-T-009 Phase 3).
+- Permission value types (`Role`, `Action`, `Effect`,
+  `PermissionOverride`, `RoleParseError`) moved to
+  `torrust_index_config::permissions` and re-exported from
+  `crate::services::authorization` for backwards compatibility. The
+  `Permissions` trait and `PermissionMatrix` runtime policy stay in
+  the root crate (ADR-T-009 Phase 3).
 - **BREAKING:** Raise MSRV from 1.85 to 1.88.
 - **BREAKING:** `administrator: bool` replaced by `role: String` in API
   responses (`TokenResponse`, `UserCompact`, etc.). The legacy `admin: bool`

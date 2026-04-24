@@ -3,7 +3,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use super::{ValidationError, Validator};
+use crate::validator::{ValidationError, Validator};
 
 /// Configuration for the associated tracker.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

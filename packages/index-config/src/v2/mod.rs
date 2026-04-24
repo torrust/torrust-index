@@ -25,8 +25,8 @@ use self::permissions::Permissions;
 use self::tracker::{ApiToken, Tracker};
 use self::tracker_statistics_importer::TrackerStatisticsImporter;
 use self::website::Website;
-use super::Metadata;
-use super::validator::{ValidationError, Validator};
+use crate::Metadata;
+use crate::validator::{ValidationError, Validator};
 
 /// The whole configuration for the index.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

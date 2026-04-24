@@ -3,7 +3,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::config::Tsl;
+use crate::Tls;
 
 /// The the base URL for the API.
 ///
@@ -25,9 +25,9 @@ pub struct Network {
     #[serde(default = "Network::default_bind_address")]
     pub bind_address: SocketAddr,
 
-    /// TSL configuration.
-    #[serde(default = "Network::default_tsl")]
-    pub tsl: Option<Tsl>,
+    /// TLS configuration.
+    #[serde(default = "Network::default_tls")]
+    pub tls: Option<Tls>,
 }
 
 impl Default for Network {
@@ -35,7 +35,7 @@ impl Default for Network {
         Self {
             bind_address: Self::default_bind_address(),
             base_url: Self::default_base_url(),
-            tsl: Self::default_tsl(),
+            tls: Self::default_tls(),
         }
     }
 }
@@ -57,7 +57,7 @@ impl Network {
         None
     }
 
-    const fn default_tsl() -> Option<Tsl> {
+    const fn default_tls() -> Option<Tls> {
         None
     }
 }

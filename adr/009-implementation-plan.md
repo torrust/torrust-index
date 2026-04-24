@@ -10,6 +10,20 @@ lists, snippets, dependency ordering, and merge-conflict notes
 needed to land them. Decisions and rationale are not
 re-litigated here — when in doubt, defer to the ADR.
 
+## Phase Status
+
+| Phase | Title                              | Status      |
+|-------|------------------------------------|-------------|
+| 1     | Build hygiene                      | Done        |
+| 2     | Helper binaries (D5)               | Done        |
+| 3     | Extract `index-config` crate       | Done        |
+| 4     | Runtime base split (D4, D7)        | Not started |
+| 5     | Schema (D2)                        | Not started |
+| 6     | Config probe                       | Not started |
+| 7     | Entry-script contract              | Not started |
+| 8     | Compose split                      | Not started |
+| 9     | Documentation & audit (D8, D9)     | Not started |
+
 ## Phase Dependency Graph
 
 ```
@@ -372,11 +386,55 @@ health-check binary.
 
 ## Phase 3 — Extract `index-config` Crate (foundation for Phase 6)
 
+**Status:** Landed (2026-04-24).
 **Files.** New `packages/index-config/` crate (Cargo.toml +
 the moved sources); root `Cargo.toml` (workspace members and
 new path dependency); root `src/config/mod.rs` (shrinks to
 re-exports + the runtime `Configuration` wrapper); the small
 set of inward dependencies catalogued below.
+
+*Landed:* the parsing surface of `src/config/` was moved
+verbatim into the new `torrust-index-config` workspace crate
+under `packages/index-config/` (schema modules, validator,
+`load_settings`, `Info`, `Error`, the `CONFIG_OVERRIDE_*`
+and `ENV_VAR_CONFIG_TOML*` constants, plus a `pub type
+DynError` alias to break the inward dependency on the web
+layer). The runtime `Configuration` wrapper holding
+`tokio::sync::RwLock<Settings>` and its `async` accessors
+(`get_all`, `get_site_name`, `get_api_base_url`) stayed in
+the root crate and now sits beneath a `pub use
+torrust_index_config::*;` re-export shim in
+[`src/config/mod.rs`](../src/config/mod.rs), so every
+existing `use crate::config::Settings;` (and similar) call
+site continues to compile unchanged. The permission *value*
+types (`Role`, `Action`, `Effect`, `PermissionOverride`,
+`RoleParseError`) moved into
+[`packages/index-config/src/permissions.rs`](../packages/index-config/src/permissions.rs)
+and are re-exported from `crate::services::authorization`
+for backwards compatibility; the `Permissions` *trait* and
+`PermissionMatrix` runtime policy stayed in the root crate.
+The `Tsl` → `Tls` clean-break rename was performed in the
+same change — type, field, serde wire key, local variables,
+shipped TOML defaults, and the JSON example in
+`src/web/api/server/v1/contexts/settings/mod.rs` were all
+updated together; `grep -rE 'Tsl|\.tsl' src/ share/
+packages/` returns zero hits. Crate-level tests live in
+[`packages/index-config/src/tests/`](../packages/index-config/src/tests/mod.rs)
+and the public-API integration tests
+(`permission_overrides`, `round_trip`, `shipped_samples`)
+live in
+[`packages/index-config/tests/`](../packages/index-config/tests/round_trip.rs);
+all ~forty tests in the new crate pass alongside the
+existing workspace suite, and `cargo tree -p
+torrust-index-config -e normal` confirms `tokio`, `reqwest`,
+`sqlx`, `hyper`, `rustls`, `native-tls`, and `openssl` are
+all absent from the dep closure.
+
+The dep list in §3 below was amended in the same change to
+include `serde_json` and `lettre` — see the paragraph after
+this section's intro for the rationale. The §3.5 acceptance
+"forbidden crates" exclusion check still holds against the
+amended set.
 
 The `torrust-index-config-probe` helper introduced in Phase 6
 must call the same `figment` + `serde` parser the application
@@ -388,11 +446,24 @@ depends on the root crate would inherit that closure.
 
 This phase extracts the *parsing* surface of `src/config/`
 into a small workspace crate `torrust-index-config` whose
-non-stdlib deps are `serde`, `serde_with`, `figment`,
-`toml`, `url`, `camino`, `derive_more`, `thiserror`, and
-`tracing` — the things you need to deserialise the schema
-and not one crate more. Specifically `tokio`, `reqwest`,
-`sqlx`, and every TLS crate are absent by manifest.
+non-stdlib deps are `serde`, `serde_json`, `serde_with`,
+`figment`, `toml`, `url`, `camino`, `derive_more`,
+`thiserror`, `tracing`, and `lettre` — the things you need
+to deserialise the schema and not one crate more.
+Specifically `tokio`, `reqwest`, `sqlx`, and every TLS
+crate are absent by manifest.
+
+`lettre` enters the dep set because the schema parses
+`smtp.from` / `smtp.reply_to` directly into
+`lettre::message::Mailbox` (see
+`packages/index-config/src/v2/mail.rs`); it is pulled in
+with `default-features = false` and only the `builder` and
+`serde` features so none of its async / TLS / transport
+machinery leaks in. `serde_json` is used by
+`Settings::to_json` (the redaction-friendly debug rendering
+in `packages/index-config/src/v2/mod.rs`) and by the crate's
+own tests. Both are confirmed absent from the forbidden list
+by the `cargo tree` acceptance check in §3.5.
 
 ### 3.1 What moves
 

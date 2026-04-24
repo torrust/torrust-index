@@ -16,7 +16,7 @@ use tokio::task::JoinHandle;
 
 use self::server::signals::Halted;
 use crate::common::AppData;
-use crate::config::Tsl;
+use crate::config::Tls;
 use crate::web::api;
 
 /// API versions.
@@ -39,10 +39,10 @@ pub struct Running {
 pub async fn start(
     app_data: Arc<AppData>,
     config_bind_address: SocketAddr,
-    opt_tsl: Option<Tsl>,
+    opt_tls: Option<Tls>,
     implementation: &Version,
 ) -> api::Running {
     match implementation {
-        Version::V1 => server::start(app_data, config_bind_address, opt_tsl).await,
+        Version::V1 => server::start(app_data, config_bind_address, opt_tls).await,
     }
 }

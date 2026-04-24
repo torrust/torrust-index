@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::services::authorization::PermissionOverride;
+use crate::permissions::PermissionOverride;
 
 /// Operator-supplied permission overrides.
 ///

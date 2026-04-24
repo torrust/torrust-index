@@ -4258,7 +4258,6 @@ dependencies = [
  "axum-server",
  "bittorrent-primitives",
  "bytes",
- "camino",
  "chrono",
  "clap",
  "derive_more",
@@ -4287,7 +4286,6 @@ dependencies = [
  "serde_bytes",
  "serde_derive",
  "serde_json",
- "serde_with",
  "sha-1",
  "sha2 0.11.0",
  "sqlx",
@@ -4297,6 +4295,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "toml 1.1.2+spec-1.1.0",
+ "torrust-index-config",
  "torrust-index-render-text-as-image",
  "tower",
  "tower-http",
@@ -4329,6 +4328,23 @@ dependencies = [
  "serde_json",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "torrust-index-config"
+version = "4.0.0-develop"
+dependencies = [
+ "camino",
+ "derive_more",
+ "figment",
+ "lettre",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "thiserror 2.0.18",
+ "toml 1.1.2+spec-1.1.0",
+ "tracing",
+ "url",
 ]
 
 [[package]]

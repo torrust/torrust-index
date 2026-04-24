@@ -417,7 +417,7 @@ the workspace *paths* are `packages/index-*/`.
 | `torrust-index-cli-common` | `packages/index-cli-common/` | *(library — no binary)* |
 | `torrust-index-health-check` | `packages/index-health-check/` | *(none — stdlib networking)* |
 | `torrust-index-auth-keypair` | `packages/index-auth-keypair/` | `rsa` (re-exports `pkcs8`) |
-| `torrust-index-config-probe` | `packages/index-config-probe/` | `torrust-index-config` (path dep; brings the full parsing surface: `figment`, `toml`, `serde_with`, `url`, `camino`, `derive_more`, `thiserror`) |
+| `torrust-index-config-probe` | `packages/index-config-probe/` | `torrust-index-config` (path dep; brings the full parsing surface: `figment`, `toml`, `serde_with`, `serde_json`, `url`, `camino`, `derive_more`, `thiserror`, `lettre` with `default-features = false`) |
 
 Domain-specific deps are the *only* per-crate variation.
 The dep-closure exclusion check (Acceptance Criterion #5)
