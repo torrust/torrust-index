@@ -91,12 +91,12 @@ if [ ! -s "$private_key" ] || [ ! -s "$public_key" ]; then
     chown torrust:torrust "$auth_dir"
     chmod 0700 "$auth_dir"
 
-    if ! torrust-generate-auth-keypair > "$tmpfile"; then
+    if ! torrust-index-auth-keypair > "$tmpfile"; then
         echo "ERROR: Failed to generate auth keypair" >&2
         exit 1
     fi
-    sed -n '/BEGIN PRIVATE KEY/,/END PRIVATE KEY/p' "$tmpfile" > "$private_key"
-    sed -n '/BEGIN PUBLIC KEY/,/END PUBLIC KEY/p'   "$tmpfile" > "$public_key"
+    jq -r .private_key_pem "$tmpfile" > "$private_key"
+    jq -r .public_key_pem  "$tmpfile" > "$public_key"
     rm -f "$tmpfile"
     chown torrust:torrust "$private_key" "$public_key"
     chmod 0400 "$private_key"

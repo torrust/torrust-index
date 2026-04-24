@@ -369,6 +369,14 @@ configuration, and the property "this binary has no HTTP/TLS
 deps" is a build-time invariant), P8 (no stdout to TTY),
 P9 (universal helper conventions).
 **Addresses:** [R4](#r4--health_check-pulls-in-reqwest-for-a-localhost-get).
+**Status:** Partially landed 2026-04-24 via
+[Phase 2](009-implementation-plan.md#phase-2--health-check--auth-keypair-helpers-d5)
+— `torrust-index-health-check` and
+`torrust-index-auth-keypair` shipped alongside the shared
+`torrust-index-cli-common` scaffolding crate. The third
+helper `torrust-index-config-probe` lands in
+[Phase 6](009-implementation-plan.md#phase-6--config-resolution-helper-d3-supporting-piece)
+once Phase 3 has extracted the config crate it depends on.
 
 Every helper binary is extracted into its own workspace crate
 under `packages/index-*/` and follows P9's universal

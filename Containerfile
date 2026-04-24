@@ -20,6 +20,12 @@ COPY ./share/ /app/share/torrust
 RUN mkdir -p /app/share/torrust/default/database/; \
     sqlite3 /app/share/torrust/default/database/index.sqlite3.db  "VACUUM;"
 
+## jq donor (pristine base, no user code)
+FROM rust:slim-trixie AS jq_donor
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends jq && \
+    rm -rf /var/lib/apt/lists/*
+
 ## Su Exe Compile
 FROM docker.io/library/gcc:trixie AS gcc
 COPY ./contrib/dev-tools/su-exec/ /usr/local/src/su-exec/
@@ -71,10 +77,10 @@ COPY --from=build_debug \
 RUN cargo nextest run --workspace-remap /test/src/ --extract-to /test/src/ --no-run --archive-file /test/torrust-index-debug.tar.zst
 RUN cargo nextest run --workspace-remap /test/src/ --target-dir-remap /test/src/target/ --cargo-metadata /test/src/target/nextest/cargo-metadata.json --binaries-metadata /test/src/target/nextest/binaries-metadata.json
 
-# Note: health_check is intentionally omitted — the debug image has no HEALTHCHECK.
+# Note: health-check is intentionally omitted — the debug image has no HEALTHCHECK.
 RUN mkdir -p /app/bin/; \
   cp -l /test/src/target/debug/torrust-index /app/bin/torrust-index; \
-  cp -l /test/src/target/debug/torrust-generate-auth-keypair /app/bin/torrust-generate-auth-keypair
+  cp -l /test/src/target/debug/torrust-index-auth-keypair /app/bin/torrust-index-auth-keypair
 RUN chown -R root:root /app; chmod -R u=rw,go=r,a+X /app; chmod -R a+x /app/bin
 
 # Extract and Test (release)
@@ -89,8 +95,8 @@ RUN cargo nextest run --workspace-remap /test/src/ --target-dir-remap /test/src/
 
 RUN mkdir -p /app/bin/; \
   cp -l /test/src/target/release/torrust-index /app/bin/torrust-index; \
-  cp -l /test/src/target/release/health_check /app/bin/health_check; \
-  cp -l /test/src/target/release/torrust-generate-auth-keypair /app/bin/torrust-generate-auth-keypair
+  cp -l /test/src/target/release/torrust-index-health-check /app/bin/torrust-index-health-check; \
+  cp -l /test/src/target/release/torrust-index-auth-keypair /app/bin/torrust-index-auth-keypair
 RUN chown -R root:root /app; chmod -R u=rw,go=r,a+X /app; chmod -R a+x /app/bin
 
 
@@ -98,6 +104,7 @@ RUN chown -R root:root /app; chmod -R u=rw,go=r,a+X /app; chmod -R a+x /app/bin
 FROM gcr.io/distroless/cc-debian13:debug AS runtime
 RUN ["/busybox/cp", "-sp", "/busybox/sh","/busybox/cat","/busybox/ls","/busybox/env", "/bin/"]
 COPY --from=gcc --chmod=0555 /usr/local/bin/su-exec /bin/su-exec
+COPY --from=jq_donor --chmod=0500 --chown=0:0 /usr/bin/jq /usr/bin/jq
 
 ARG TORRUST_INDEX_CONFIG_TOML_PATH="/etc/torrust/index/index.toml"
 ARG TORRUST_INDEX_DATABASE_DRIVER="sqlite3"
@@ -136,5 +143,6 @@ FROM runtime AS release
 ENV RUNTIME="release"
 COPY --from=test /app/ /usr/
 HEALTHCHECK --interval=5s --timeout=5s --start-period=3s --retries=3 \
-  CMD /usr/bin/health_check http://localhost:${API_PORT}/health_check && /usr/bin/health_check http://localhost:${IMPORTER_API_PORT}/health_check || exit 1
+  CMD /usr/bin/torrust-index-health-check http://localhost:${API_PORT}/health_check \
+   && /usr/bin/torrust-index-health-check http://localhost:${IMPORTER_API_PORT}/health_check
 CMD ["/usr/bin/torrust-index"]

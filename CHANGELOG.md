@@ -56,12 +56,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ephemeral auto-generated RSA-2048 key pair when no keys are configured.
   Sessions do not survive server restarts with ephemeral keys. Deployers who
   want persistent sessions supply their own key pair via config.
-- `torrust-generate-auth-keypair` CLI binary for generating RSA-2048 key pairs.
-  Outputs both PEM blocks to stdout; refuses to run if stdout is a terminal.
+- `torrust-index-auth-keypair` CLI binary (initially shipped as
+  `torrust-generate-auth-keypair`) for generating RSA-2048 key pairs.
+  Emits a JSON object `{"private_key_pem": "...", "public_key_pem": "..."}`
+  on stdout; refuses to run if stdout is a terminal.
 - Container auto-generation of persistent auth keys on first boot. The entry
-  script runs `torrust-generate-auth-keypair` and writes the PEM files to
-  `/etc/torrust/index/auth/` on the volume. Sessions survive restarts with no
-  manual setup.
+  script runs `torrust-index-auth-keypair`, splits the JSON output with `jq`,
+  and writes the PEM files to `/etc/torrust/index/auth/` on the volume.
+  Sessions survive restarts with no manual setup.
+- `packages/index-cli-common/` library crate providing the shared P9
+  scaffolding (`refuse_if_stdout_is_tty`, `init_json_tracing`, `emit`,
+  `BaseArgs`) used by every Torrust Index helper binary (ADR-T-009 Phase 2).
+- `packages/index-health-check/` workspace crate hosting the
+  `torrust-index-health-check` binary, rewritten on top of `std::net::TcpStream`
+  with no `reqwest`/`tokio`/TLS dependencies and Happy Eyeballs
+  IPv6/IPv4 fallback (ADR-T-009 Phase 2).
+- `packages/index-auth-keypair/` workspace crate hosting the
+  `torrust-index-auth-keypair` binary; the previous `[[bin]]` entry on the
+  root crate was removed so the helper no longer inherits the application's
+  HTTP/TLS dep closure (ADR-T-009 Phase 2).
+- `jq_donor` build stage in `Containerfile` providing `jq` to the runtime
+  image so the entry script can extract PEM keys from the keypair helper's
+  JSON output (ADR-T-009 Phase 2).
 - `kid` (Key ID) header in every JWT for future key rotation support.
 - Configurable token lifetimes: `auth.session_token_lifetime_secs` (default:
   2 weeks) and `auth.email_verification_token_lifetime_secs` (default: ~10 years).
@@ -85,6 +101,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `.containerignore` now excludes `/adr/` and `/docs/` from the build
   context (ADR-T-009 Phase 1).
+- Container `HEALTHCHECK` now invokes `torrust-index-health-check` (was
+  `health_check`); the binary is rewritten in stdlib-only Rust with no
+  `reqwest`/`tokio`/TLS in its dep closure (ADR-T-009 Phase 2).
+- Container entry script now invokes `torrust-index-auth-keypair` (was
+  `torrust-generate-auth-keypair`) and consumes its JSON output via
+  `jq -r .private_key_pem` / `jq -r .public_key_pem` instead of `sed`
+  PEM-block extraction (ADR-T-009 Phase 2).
+- Helper-binary TTY-refusal exit code unified on 2 (was 1 for the
+  keypair helper) via the shared `refuse_if_stdout_is_tty` in
+  `torrust-index-cli-common` (ADR-T-009 Phase 2).
 - **BREAKING:** Raise MSRV from 1.85 to 1.88.
 - **BREAKING:** `administrator: bool` replaced by `role: String` in API
   responses (`TokenResponse`, `UserCompact`, etc.). The legacy `admin: bool`

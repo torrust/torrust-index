@@ -1,5 +1,12 @@
 [workspace]
-members = [".", "packages/render-text-as-image", "packages/mudlark"]
+members = [
+    ".",
+    "packages/index-auth-keypair",
+    "packages/index-cli-common",
+    "packages/index-health-check",
+    "packages/mudlark",
+    "packages/render-text-as-image",
+]
 
 [package]
 default-run = "torrust-index"
@@ -102,10 +109,6 @@ tracing-subscriber = { version = "0", features = ["json"] }
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
-
-[[bin]]
-name = "torrust-generate-auth-keypair"
-path = "src/bin/generate_auth_keypair.rs"
 
 [dev-dependencies]
 tempfile = "3"

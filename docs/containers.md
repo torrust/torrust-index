@@ -262,10 +262,10 @@ podman run -it \
 ### Debug Image Healthcheck
 
 The `debug` build target intentionally omits the `HEALTHCHECK` instruction
-and does not include the `health_check` binary. This keeps the debug image
-lightweight and avoids false-positive health signals during interactive
-debugging sessions. If you need health-checking for a debug image, use an
-external probe against the API port.
+and does not include the `torrust-index-health-check` binary. This keeps the
+debug image lightweight and avoids false-positive health signals during
+interactive debugging sessions. If you need health-checking for a debug
+image, use an external probe against the API port.
 
 ### Available Shell Commands (Busybox Subset)
 

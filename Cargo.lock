@@ -4309,6 +4309,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "torrust-index-auth-keypair"
+version = "4.0.0-develop"
+dependencies = [
+ "clap",
+ "rsa",
+ "serde",
+ "serde_json",
+ "torrust-index-cli-common",
+ "tracing",
+]
+
+[[package]]
+name = "torrust-index-cli-common"
+version = "4.0.0-develop"
+dependencies = [
+ "clap",
+ "serde",
+ "serde_json",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "torrust-index-health-check"
+version = "4.0.0-develop"
+dependencies = [
+ "clap",
+ "serde",
+ "serde_json",
+ "torrust-index-cli-common",
+ "tracing",
+]
+
+[[package]]
 name = "torrust-index-render-text-as-image"
 version = "0.1.0"
 dependencies = [

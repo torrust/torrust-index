@@ -141,15 +141,40 @@ note), `CHANGELOG.md`.
 
 ## Phase 2 — Health-check & Auth-keypair Helpers (D5)
 
+**Status:** Landed (2026-04-24).
 **Files.** New `packages/index-cli-common/` library crate;
 new `packages/index-health-check/` crate (`Cargo.toml`,
-`src/main.rs`, `src/tests/`); new
+`src/lib.rs`, `src/bin/torrust-index-health-check.rs`,
+`src/tests/`, `tests/health_check.rs`); new
 `packages/index-auth-keypair/` crate (`Cargo.toml`,
-`src/main.rs`, `src/tests/`); root `Cargo.toml` (workspace
-members, remove `[[bin]]` entry); `Containerfile`
-(`cp -l .../release/torrust-index-health-check` and
-`.../torrust-index-auth-keypair` lines, renamed from the
-current `health_check` and `torrust-generate-auth-keypair`).
+`src/lib.rs`, `src/bin/torrust-index-auth-keypair.rs`,
+`src/tests/`, `tests/keypair_generation.rs`); root
+`Cargo.toml` (workspace members, remove `[[bin]]` entry);
+`Containerfile` (`cp -l .../release/torrust-index-health-check`
+and `.../torrust-index-auth-keypair` lines, renamed from the
+former `health_check` and `torrust-generate-auth-keypair`).
+
+*Landed:* both helpers were extracted into separate workspace
+crates with a shared `torrust-index-cli-common` scaffolding
+crate. Each helper carries `src/lib.rs` (domain logic) and
+`src/bin/<binary>.rs` (the `main` shim) so that the public
+surface is reachable from integration tests in `tests/` —
+a deliberate refinement of the plan's `src/main.rs` layout
+that keeps the produced binary names unchanged. Both old
+`src/bin/*.rs` files were removed; the old `[[bin]]` entry
+for `torrust-generate-auth-keypair` was deleted from the
+root `Cargo.toml`. The `jq_donor` stage was added to the
+`Containerfile` and its binary copied into the (single,
+pre-Phase-4) `runtime` stage with `--chmod=0500 --chown=0:0`;
+when Phase 4 splits the runtime base, the `COPY --from=jq_donor`
+line must be re-added to both `runtime_release` and
+`runtime_debug`. The entry script's keygen consumer was
+migrated from `sed` PEM-block extraction to `jq -r
+.private_key_pem` / `jq -r .public_key_pem` in the same
+change. `cargo tree -e normal` confirms neither helper crate
+links `reqwest`, `tokio`, `hyper`, `rustls`, `native-tls`,
+or `openssl`. About twenty crate-level and integration tests
+in the new packages all pass.
 
 The third small helper (`torrust-index-config-probe`) lands
 in Phase 6 once Phase 3 has extracted the config crate it
