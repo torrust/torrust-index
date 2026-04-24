@@ -17,7 +17,7 @@ re-litigated here — when in doubt, defer to the ADR.
 | 1     | Build hygiene                      | Done        |
 | 2     | Helper binaries (D5)               | Done        |
 | 3     | Extract `index-config` crate       | Done        |
-| 4     | Runtime base split (D4, D7)        | Not started |
+| 4     | Runtime base split (D4, D7)        | Done        |
 | 5     | Schema (D2)                        | Not started |
 | 6     | Config probe                       | Not started |
 | 7     | Entry-script contract              | Not started |
@@ -621,11 +621,70 @@ crate's integration tests under `tests/` continue to use
 
 ## Phase 4 — Runtime Base Split (D4, D7)
 
+**Status:** Landed (2026-04-24).
 **Files.** `Containerfile` (multi-stage restructure),
 `share/container/entry_script_sh` (`adduser` line, `USER_ID`
 guard).
 
 The largest phase and the one the security story hangs on.
+
+*Landed:* the multi-stage restructure went in as designed —
+`busybox_donor` / `busybox_preflight` / `etc_seed` /
+`adduser_preflight` / `runtime_assets` / `preflight_gate` are
+all present, both runtime bases (`runtime_release` and
+`runtime_debug`) layer onto them, and the per-binary
+`0500 root:root` tightening for the helper binaries was
+applied in the producing `test` / `test_debug` stages so
+the runtime stages pick the bits up unchanged via
+`COPY --from=test /app/ /usr/`. A handful of practical
+deviations from the §4.2 sketch worth recording:
+
+- **usrmerge in the release base.** `gcr.io/distroless/cc-debian13`
+  ships `/bin` as a symlink to `/usr/bin`, so a recursive
+  `COPY --from=runtime_assets / /` fails with
+  *"cannot copy to non-directory"*. The release base
+  therefore copies each curated path explicitly (the
+  `etc_seed` triplet, busybox, su-exec, entry script) and
+  materialises the curated symlinks in `/usr/bin/<applet>`
+  rather than `/bin/<applet>`. Resolution at runtime is
+  identical because the base's `/bin → /usr/bin` symlink
+  forwards bare-name lookups, and the pinned `PATH` includes
+  both directories.
+- **`adduser_preflight` UID.** The original sketch used UID
+  `65534` (the conventional `nobody`); busybox `adduser`
+  rejects UIDs outside `0..60000` with
+  *"number 65534 is not in 0..60000 range"*. Lowered to
+  `59999` (well above any realistic `USER_ID=1000` and still
+  well below the cap) and the diff in [Containerfile](Containerfile)
+  matches the sketch above.
+- **`addgroup` and `grep` added to the curated symlink loop.**
+  See §4.4 for rationale; the table above was updated in
+  the same change so the three sources of truth (loop, table,
+  [docs/containers.md](docs/containers.md)) all agree.
+- **Debug image keeps `HEALTHCHECK`.** The pre-Phase-4
+  `runtime` stage shipped no `HEALTHCHECK` for the debug
+  variant. Phase 4 brings the debug final target in line with
+  release: the same two-probe `HEALTHCHECK` block now runs on
+  both, and the debug `test_debug` stage was extended to
+  ship `torrust-index-health-check` alongside `torrust-index`
+  and `torrust-index-auth-keypair` (also tightened to
+  `0500 root:root`). The default `CMD` was set to
+  `["/usr/bin/torrust-index"]` so the debug image is a
+  drop-in replacement for release; operators reach an
+  interactive shell with `docker run … sh` (or any other
+  curated applet) at run time.
+- **Entry script.** `mkdir -p` was extended to include
+  `/var/log/torrust/index/` because the new runtime stages
+  no longer pre-create the volume sub-directories the way
+  the old monolithic `runtime` stage did. Everything else in
+  §4.1 (busybox-`adduser` short options, numeric + `!= 0`
+  `USER_ID` guard) landed verbatim.
+
+The §4.5 acceptance script (full image build for both
+targets) is still pending — no container engine is available
+in the agent's sandbox. Run
+`podman build --target release .` and
+`podman build --target debug .` before publishing.
 
 ### 4.1 Entry-script changes
 
@@ -711,8 +770,11 @@ RUN ["/busybox/sh", "-c", \
 FROM busybox_donor AS adduser_preflight
 COPY --from=etc_seed /seed/etc/passwd /etc/passwd
 COPY --from=etc_seed /seed/etc/group  /etc/group
+# Busybox `adduser` rejects UIDs outside 0..60000 (below the
+# conventional `nobody` value of 65534). Use a value in range
+# that is still comfortably above `USER_ID=1000`.
 RUN ["/busybox/sh", "-c", \
-     "/busybox/adduser -D -s /bin/sh -u 65534 testuser \
+     "/busybox/adduser -D -s /bin/sh -u 59999 testuser \
       && /busybox/grep -q '^testuser:' /etc/passwd \
       && /busybox/test -d /home/testuser"]
 
@@ -1022,21 +1084,23 @@ Shell built-ins (`test`, `[`, `read`, `eval`, `case`,
 `cd`, `exec`, `set`, `trap`, `export`, `.`) do not need
 applet symlinks — busybox `sh` provides them internally.
 
-| Applet    | Used by                                             |
-|-----------|-----------------------------------------------------|
-| `sh`      | Entry script interpreter (`#!/bin/sh`)               |
-| `adduser` | §4.1 — create `torrust` user at first boot           |
-| `install` | `inst()` helper — seed config/database templates     |
-| `mkdir`   | Create volume subdirectories, auth-key dirs          |
-| `dirname` | §7.1 — resolve parent of auth-key and database paths |
-| `chown`   | Fix ownership on volumes, auth keys, seeded files    |
-| `chmod`   | Fix permissions on volumes, auth keys                |
-| `tr`      | §7.1 auth-key loops (`uc_pair` upper-case conversion) |
-| `mktemp`  | Temporary file for auth-key generation               |
-| `cat`     | MOTD assembly, profile sourcing                      |
-| `printf`  | MOTD lines                                           |
-| `rm`      | Clean up temp files                                  |
-| `echo`    | Error messages, MOTD profile hook                    |
+| Applet     | Used by                                              |
+|------------|------------------------------------------------------|
+| `sh`       | Entry script interpreter (`#!/bin/sh`)                |
+| `adduser`  | §4.1 — create `torrust` user at first boot            |
+| `addgroup` | Defensive: some busybox builds of `adduser` exec the matching `addgroup` applet rather than calling it as an internal function. Linking it costs nothing and avoids a first-boot regression on a future donor bump. |
+| `install`  | `inst()` helper — seed config/database templates      |
+| `mkdir`    | Create volume subdirectories, auth-key dirs           |
+| `dirname`  | §7.1 — resolve parent of auth-key and database paths  |
+| `chown`    | Fix ownership on volumes, auth keys, seeded files     |
+| `chmod`    | Fix permissions on volumes, auth keys                 |
+| `tr`       | `to_lc` / `clean` helpers (lower-casing, char-class strip); §7.1 auth-key loops |
+| `mktemp`   | Temporary file for auth-key generation                |
+| `cat`      | MOTD assembly, profile sourcing                       |
+| `printf`   | MOTD lines                                            |
+| `rm`       | Clean up temp files                                   |
+| `echo`     | Error messages, MOTD profile hook                     |
+| `grep`     | Reserved for §7.1 entry-script extensions and ad-hoc operator break-glass debugging via `docker exec -u root`. |
 
 `su-exec` is a standalone binary at `/bin/su-exec`, not a
 busybox applet — it is not part of this loop.

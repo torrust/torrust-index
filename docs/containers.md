@@ -53,6 +53,14 @@ It is important that the `torrust` user has the same uid `$(id -u)` as the host 
 
 When running the container, you may use the `--env USER_ID="$(id -u)"` argument that gets the current user-id and passes to the container.
 
+`USER_ID` must be a non-negative integer and must not be `0`
+(the entry script refuses to run as root). Any positive UID
+is accepted — including low-UID values produced by rootless
+Podman with subuid remapping, low-UID CI runners, or
+BSD-derived hosts. The previous `USER_ID >= 1000` rule was
+dropped because it rejected several of these legitimate
+configurations without stating its intent.
+
 ### Mapped Tree Structure
 
 Using the standard mapping defined above produces this following mapped tree:
@@ -110,13 +118,25 @@ docker build --target debug --tag torrust-index:debug --file Containerfile .
 
 ### (Podman) Build
 
+Podman defaults to writing OCI-format manifests. The OCI image-spec
+has no field for `HEALTHCHECK`, so building without `--format docker`
+drops the directive (and prints a `WARN[…] HEALTHCHECK is not
+supported for OCI image format` line). Pass `--format docker` so the
+healthcheck survives in the manifest:
+
 ```sh
 # Release Mode
-podman build --target release --tag torrust-index:release --file Containerfile .
+podman build --format docker --target release --tag torrust-index:release --file Containerfile .
 
 # Debug Mode
-podman build --target debug --tag torrust-index:debug --file Containerfile .
+podman build --format docker --target debug --tag torrust-index:debug --file Containerfile .
 ```
+
+`docker build` defaults to Docker-format manifests, so the flag is
+only needed for Podman / Buildah. Running OCI-format images on Docker
+or Podman works regardless of which format they were built with;
+the format only matters for Docker-specific manifest extensions like
+`HEALTHCHECK`.
 
 ## Running the Container
 
@@ -164,7 +184,7 @@ The following environmental variables can be set:
 - `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PEM` - Inline RSA public key PEM string (alternative to file path). Required when `PRIVATE_KEY_PEM` is set.
 - `TORRUST_INDEX_DATABASE_DRIVER` - The database type used for the container, (options: `sqlite3`, `mysql`, default `sqlite3`). Please Note: This dose not override the database configuration within the `.toml` config file.
 - `TORRUST_INDEX_CONFIG_TOML` - Load config from this environmental variable instead from a file, (i.e: `TORRUST_INDEX_CONFIG_TOML=$(cat index-index.toml)`).
-- `USER_ID` - The user id for the runtime crated `torrust` user. Please Note: This user id should match the ownership of the host-mapped volumes, (default `1000`).
+- `USER_ID` - The user id for the runtime-created `torrust` user. Must be a non-negative integer and must not be `0`. Should match the ownership of the host-mapped volumes (default `1000`).
 - `API_PORT` - The port for the index API. This should match the port used in the configuration, (default `3001`).
 - `IMPORTER_API_PORT` - The port for the importer API. This should match the port used in the configuration, (default `3002`).
 
@@ -241,7 +261,7 @@ docker run -it \
 
 ```sh
 ## Build Container Image
-podman build --target release --tag torrust-index:release --file Containerfile .
+podman build --format docker --target release --tag torrust-index:release --file Containerfile .
 
 ## Setup Mapped Volumes
 mkdir -p ./storage/index/lib/ ./storage/index/log/ ./storage/index/etc/
@@ -259,24 +279,64 @@ podman run -it \
 
 ## Runtime Image Notes
 
-### Debug Image Healthcheck
+### Healthcheck (both targets)
 
-The `debug` build target intentionally omits the `HEALTHCHECK` instruction
-and does not include the `torrust-index-health-check` binary. This keeps the
-debug image lightweight and avoids false-positive health signals during
-interactive debugging sessions. If you need health-checking for a debug
-image, use an external probe against the API port.
+Both `release` and `debug` ship the same two-probe `HEALTHCHECK`
+block, invoking `torrust-index-health-check` against the index API
+and the importer API in turn. The healthcheck binary is itself
+`0500 root:root`; the `HEALTHCHECK` directive runs as root (no
+`--user` flag in the directive), so the unprivileged `torrust` user
+cannot invoke it directly.
+
+If you build with Podman without `--format docker`, the directive is
+silently dropped at build time (see the build section above) and the
+image will report no health status. `docker build` is unaffected.
 
 ### Available Shell Commands (Busybox Subset)
 
-The distroless runtime base ships only a minimal set of busybox applets
-to reduce the attack surface:
+The two build targets ship deliberately different shell
+footprints.
 
-- `sh`, `cat`, `ls`, `env`
+**`release` target.** Built on the lean
+`gcr.io/distroless/cc-debian13` base. Ships a single
+`/bin/busybox` binary (mode `0700 root:root`) plus a curated
+set of applet symlinks pointing at it. The unprivileged
+`torrust` user that the application runs as gets `EACCES`
+on `/bin/busybox` (and therefore on every applet symlink)
+after privilege drop — the busybox tree is reachable only
+by root. The curated symlink set covers exactly the applets
+the entry script needs at first boot:
 
-Common utilities like `id`, `whoami`, `ps`, `grep`, and `wget` are **not**
-available. If you need additional tools for operational debugging, use the
-`debug` build target or exec into a sidecar container.
+- `sh`, `adduser`, `addgroup`, `install`, `mkdir`, `dirname`,
+  `chown`, `chmod`, `tr`, `mktemp`, `cat`, `printf`, `rm`,
+  `echo`, `grep`
+
+`su-exec` is a separate root-only binary at `/bin/su-exec`,
+not a busybox applet. `jq` is a separate root-only binary at
+`/usr/bin/jq` used by the entry script's auth-keypair
+bootstrap. None of these are reachable by the unprivileged
+`torrust` user.
+
+There is no `/busybox/` directory in the release image — the
+full busybox applet tree from the upstream `:debug`
+distroless image is deliberately not present, so absolute-path
+invocations like `/busybox/ls` cannot bypass the curated
+subset.
+
+For emergency operational debugging, `docker exec -u root …
+sh` still works on the release image (the curated `/bin/sh`
+resolves through PATH to `/bin/busybox`, and `0700 root:root`
+permits root invocation). This is the documented break-glass
+procedure.
+
+**`debug` target.** Built on `gcr.io/distroless/cc-debian13:debug`,
+which ships the upstream full busybox tree at `/busybox/`
+with default world-executable permissions. The debug image
+leaves that tree in place and puts `/busybox/` on `PATH` so
+the unprivileged user retains access to the complete applet
+set (`id`, `whoami`, `ps`, `grep`, `wget`, …). This is the
+debug image's purpose; use it whenever you need an
+interactive shell as the application user.
 
 ### Entry Script Debugging
 

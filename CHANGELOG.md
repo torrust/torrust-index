@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- ADR-T-009: Container infrastructure hardening (Phases 1, 2 & 3).
+- ADR-T-009: Container infrastructure hardening (Phases 1, 2, 3 & 4).
 - `torrust-index-config` workspace crate (`packages/index-config/`)
   containing the parsing surface of the configuration system: schema
   modules, validator, `load_settings`, `Info`, `Error`, the
@@ -22,8 +22,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   compose.
 - `restart: unless-stopped` on index and tracker compose services.
 - `DEBUG=1` env-var gate for entry-script shell tracing (`set -x`).
-- Runtime image notes in `docs/containers.md`: debug healthcheck omission,
-  busybox subset, and entry-script debugging.
+- Runtime image notes in `docs/containers.md`: healthcheck behaviour
+  on both targets, the curated busybox applet subset, the Podman
+  `--format docker` requirement for `HEALTHCHECK`, and entry-script
+  debugging.
+- Container runtime base split into two parallel stages
+  (`runtime_release` and `runtime_debug`) layered onto a shared
+  base-agnostic `runtime_assets` bundle, with `busybox_donor`,
+  `busybox_preflight`, `etc_seed`, `adduser_preflight`, and a
+  `preflight_gate` aggregator stage that wires donor-validation
+  into the build graph for both variants (ADR-T-009 Phase 4, D4).
+- Curated busybox applet subset in the release runtime base: a
+  single root-only `/bin/busybox` (mode `0700 root:root`) plus
+  symlinks for `sh`, `adduser`, `addgroup`, `install`, `mkdir`,
+  `dirname`, `chown`, `chmod`, `tr`, `mktemp`, `cat`, `printf`,
+  `rm`, `echo`, `grep`. The unprivileged `torrust` user gets
+  `EACCES` on the busybox binary (and therefore on every applet
+  symlink) after privilege drop (ADR-T-009 Phase 4, D4).
+- `HEALTHCHECK` directive on the `debug` build target (was
+  previously omitted), plus `torrust-index-health-check` in the
+  debug image so the directive resolves. The debug `CMD` is now
+  `["/usr/bin/torrust-index"]` so the debug image is a drop-in
+  replacement for release (ADR-T-009 Phase 4).
 - DEV-ONLY credential comments in `compose.yaml`.
 - ADR-T-008: Document rationale for roles and permissions refactor.
 - ADR-T-006: Document rationale for error system refactor.
@@ -135,6 +155,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `crate::services::authorization` for backwards compatibility. The
   `Permissions` trait and `PermissionMatrix` runtime policy stay in
   the root crate (ADR-T-009 Phase 3).
+- Container entry script now uses the busybox short-option form
+  for `adduser` (`adduser -D -s /bin/sh -u "$USER_ID" torrust`) so
+  the same invocation works on both runtime bases. Distroless
+  `cc-debian13` ships `/etc/passwd` and `/etc/group` but not
+  `/etc/shadow`; `-D` honours that (ADR-T-009 Phase 4).
+- Helper binaries (`torrust-index-health-check`,
+  `torrust-index-auth-keypair`) tightened from world-executable
+  to `0500 root:root` in both `release` and `debug` images. The
+  application binary (`torrust-index`) keeps `0755`. The
+  `HEALTHCHECK` directive runs as root, so the tightened mode is
+  sufficient (ADR-T-009 Phase 4, D4).
+- `PATH` is now pinned in both runtime bases
+  (`/usr/local/bin:/bin:/usr/bin:/sbin` for release;
+  `/usr/local/bin:/busybox:/bin:/usr/bin:/sbin` for debug) so the
+  entry script's bare-name lookups resolve deterministically
+  regardless of future base-image changes (ADR-T-009 Phase 4).
+- **BREAKING:** Container `USER_ID` validation rule changed from
+  `USER_ID >= 1000` to "non-negative integer, not `0`" (D7). The
+  previous rule rejected legitimate configurations (rootless
+  Podman with subuid remapping, low-UID CI runners, BSD-derived
+  hosts) without stating its intent. The property the entry
+  script actually enforces is "do not run as root"; that is now
+  what it checks (ADR-T-009 Phase 4, D7).
 - **BREAKING:** Raise MSRV from 1.85 to 1.88.
 - **BREAKING:** `administrator: bool` replaced by `role: String` in API
   responses (`TokenResponse`, `UserCompact`, etc.). The legacy `admin: bool`
@@ -260,6 +303,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   assumed a `Dockerfile` that no longer exists.
 - `contrib/dev-tools/container/run.sh` — stale; mounted wrong paths and read a
   removed config file name.
+- Monolithic `runtime` Containerfile stage and its ad-hoc
+  `cp -sp` busybox-applet copy (`sh`, `cat`, `ls`, `env`),
+  superseded by the curated symlink loop and the
+  `runtime_release` / `runtime_debug` split (ADR-T-009 Phase 4).
+- `RUN env` and `CMD ["sh"]` lines from the previous debug
+  target — debug now ships the same `ENTRYPOINT` /
+  `CMD ["/usr/bin/torrust-index"]` / `HEALTHCHECK` block as
+  release; operators reach a shell with `docker run … sh`
+  (ADR-T-009 Phase 4).
 
 ## [4.0.0] - 2026-03-23
 

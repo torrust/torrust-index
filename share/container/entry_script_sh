@@ -12,15 +12,34 @@ inst() {
 
 
 # Add torrust user, based upon supplied user-id.
-if [ -z "$USER_ID" ] || [ "$USER_ID" -lt 1000 ]; then
-    echo "ERROR: USER_ID is not set, or less than 1000"
+# D7: validate that USER_ID is numeric and is not 0 (root).
+# The previous "USER_ID >= 1000" rule rejected valid
+# configurations (rootless Podman with subuid remapping,
+# low-UID CI runners, BSD-derived hosts) without stating its
+# intent. The property we actually want to enforce is "do
+# not run as root".
+case ${USER_ID:-} in
+    ''|*[!0-9]*)
+        echo "ERROR: USER_ID is unset or not numeric" >&2
+        exit 1
+        ;;
+esac
+if [ "$USER_ID" -eq 0 ]; then
+    echo "ERROR: USER_ID is 0 (root) — refusing to run as root" >&2
     exit 1
 fi
 
-adduser --disabled-password --shell "/bin/sh" --uid "$USER_ID" "torrust"
+# Use the busybox `adduser` short-option form so the same
+# invocation works on both runtime bases (release uses the
+# lean distroless base + a single root-only busybox; debug
+# inherits the donor's full /busybox/ tree). Distroless
+# `cc-debian13` ships /etc/passwd and /etc/group but not
+# /etc/shadow; `-D` honours that. Busybox `adduser -s` does
+# not consult /etc/shells, which the lean base also lacks.
+adduser -D -s /bin/sh -u "$USER_ID" torrust
 
 # Configure Permissions for Torrust Folders
-mkdir -p /var/lib/torrust/index/database/ /etc/torrust/index/
+mkdir -p /var/lib/torrust/index/database/ /var/log/torrust/index/ /etc/torrust/index/
 chown -R "${USER_ID}" /var/lib/torrust /var/log/torrust /etc/torrust
 chmod -R 2770 /var/lib/torrust /var/log/torrust /etc/torrust
 
