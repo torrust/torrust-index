@@ -1,7 +1,7 @@
 //! Resolve the Torrust Index configuration and print the
 //! container-relevant subset as a single JSON object on stdout.
 //!
-//! See ADR-T-009 §D3 and implementation plan §6.1.
+//! See ADR-T-009 §D3.
 
 use std::process::ExitCode;
 
@@ -65,7 +65,7 @@ fn main() -> ExitCode {
 }
 
 /// Map any unhandled panic to exit code 1 so the contract in
-/// implementation plan §6.1 ("1 — Internal error (unhandled
+/// ADR-T-009 §D3 ("1 — Internal error (unhandled
 /// panic, unexpected I/O)") is honoured. Without this hook a
 /// panic would exit with Rust's default 101.
 fn install_panic_hook() {

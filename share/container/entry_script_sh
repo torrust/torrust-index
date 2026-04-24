@@ -1,7 +1,7 @@
 #!/bin/sh
 [ "${DEBUG:-}" = "1" ] && set -x
 
-# ── Canonical env-var manifest (ADR-T-009 §9, Crit. #7) ──
+# ── Canonical env-var manifest (ADR-T-009 Acceptance Criterion #7) ──
 # Single source of truth for every environment variable the
 # entry script consults — including dynamically constructed
 # names (e.g. AUTH__{PRIVATE,PUBLIC}_KEY_{PEM,PATH} built
@@ -28,13 +28,12 @@
 #   RUNTIME
 # END_ENTRY_ENV_VARS
 
-# ── Shell discipline (Phase 7, ADR-T-009 §7) ──────────────
+# ── Shell discipline (Phase 7, ADR-T-009 §D3) ────────────
 # `set -e` aborts on unchecked failures; `set -u` catches
 # typos in variable names. The `${var:-}` patterns below are
 # `set -u`-safe by construction. Helper functions defined
 # in this file are written to be `set -e`-safe (see the
-# §7 preamble of adr/009-implementation-plan.md for the
-# audit notes).
+# entry-script audit notes in ADR-T-009 §D3).
 set -eu
 
 # ── Helper functions (sourced) ────────────────────────────

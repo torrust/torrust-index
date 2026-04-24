@@ -42,12 +42,12 @@ jobs:
           # output points the reader at the real line.
           if awk '{ sub(/#.*/, ""); print }' compose.yaml \
               | grep -nE 'mailcatcher|MAILER|SMTP|smtp_'; then
-            echo "::error file=compose.yaml::dev mail sidecar / SMTP config present in production-shaped baseline (ADR-T-009 §8.1, §9.1.3)"
+            echo "::error file=compose.yaml::dev mail sidecar / SMTP config present in production-shaped baseline (ADR-T-009 §D1 / §8.1)"
             exit 1
           fi
           echo "compose.yaml clean."
 
-      # Phase 9 §9.2 — vendored `su-exec.c` must not change
+      # Phase 9 / ADR-T-009 §D8 — vendored `su-exec.c` must not change
       # without a fresh audit entry recording the new SHA-256
       # in contrib/dev-tools/su-exec/AUDIT.md.
       - id: su-exec-audit
@@ -59,17 +59,17 @@ jobs:
           recorded=$(sed -n '/^## Audit Log/,$ { s/^SHA-256: \([0-9a-f]\{64\}\)$/\1/p; }' "$audit" | tail -1)
           actual=$(sha256sum contrib/dev-tools/su-exec/su-exec.c | cut -d' ' -f1)
           if [ -z "$recorded" ]; then
-            echo "::error file=$audit::no SHA-256 entry found in '## Audit Log' section (ADR-T-009 §9.2)"
+            echo "::error file=$audit::no SHA-256 entry found in '## Audit Log' section (ADR-T-009 §D8)"
             exit 1
           fi
           if [ "$recorded" != "$actual" ]; then
-            echo "::error file=$audit::recorded SHA-256 ($recorded) does not match contrib/dev-tools/su-exec/su-exec.c ($actual). Append a new dated audit entry per ADR-T-009 §9.2."
+            echo "::error file=$audit::recorded SHA-256 ($recorded) does not match contrib/dev-tools/su-exec/su-exec.c ($actual). Append a new dated audit entry per ADR-T-009 §D8."
             exit 1
           fi
           echo "su-exec audit current ($actual)."
 
-      # Phase 9 §9 / Acceptance Criterion #7 — every env var
-      # listed in the entry script's manifest block must be
+      # Phase 9 / ADR-T-009 Acceptance Criterion #7 — every env
+      # var listed in the entry script's manifest block must be
       # documented in docs/containers.md.
       - id: entry-env-docs
         name: entry-script env vars documented
@@ -80,7 +80,7 @@ jobs:
                   | grep -oE '[A-Z][A-Z0-9_]+' \
                   | sort -u)
           if [ -z "$vars" ]; then
-            echo "::error file=$script::ENTRY_ENV_VARS manifest block not found or empty (ADR-T-009 §9 Crit. #7)"
+            echo "::error file=$script::ENTRY_ENV_VARS manifest block not found or empty (ADR-T-009 Acceptance Criterion #7)"
             exit 1
           fi
           missing=0

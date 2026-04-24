@@ -2,7 +2,7 @@
 
 This document records the provenance, rationale, and review
 history for the vendored copy of [`su-exec.c`](./su-exec.c).
-It is consumed by ADR-T-009 §9.2 / Acceptance Criterion #8 —
+It is consumed by ADR-T-009 §D8 / Acceptance Criterion #8 —
 the file-change CI guard parses the most recent `SHA-256:`
 line in the [Audit Log](#audit-log) section and fails the
 build when it disagrees with `sha256sum su-exec.c`.

@@ -123,7 +123,7 @@ RUN mkdir -p /app/bin/; \
 # Phase 4: per-binary modes. Application binary stays
 # world-executable; root-phase-only helpers (health-check,
 # auth-keypair, config-probe) tighten to root-only
-# (0500 root:root) per ADR-T-009 §6 / §7.3 — same posture as
+# (0500 root:root) per ADR-T-009 §D4 / §D5 — same posture as
 # busybox, su-exec, jq. The healthcheck binary is invoked
 # from HEALTHCHECK, which runs as root (no --user in the
 # directive), so 0500 is sufficient. The config-probe is
@@ -156,7 +156,7 @@ RUN mkdir -p /app/bin/; \
 # Phase 4: per-binary modes (see test_debug above for rationale).
 # The healthcheck binary is invoked from HEALTHCHECK, which
 # runs as root (no --user in the directive), so 0500 is
-# sufficient. The config-probe (ADR-T-009 §6 / §7) is invoked
+# sufficient. The config-probe (ADR-T-009 §D3) is invoked
 # only from the entry script's pre-su-exec phase, so it is
 # also root-only.
 RUN chown -R root:root /app; chmod -R u=rw,go=r,a+X /app; \

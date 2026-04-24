@@ -7,7 +7,7 @@
 //! the probe's stdout into `jq`; the future Rust entry binary
 //! will deserialise the same JSON via `serde_json`.
 //!
-//! ADR-T-009 §D3 / implementation plan §6.
+//! ADR-T-009 §D3 (config probe helper).
 
 use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ use url::Url;
 mod tests;
 
 /// Schema version of the JSON output. Incremented on breaking
-/// changes (per implementation plan §6.1).
+/// changes (per ADR-T-009 §D3).
 pub const SCHEMA: u32 = 1;
 
 /// Container-relevant resolved configuration.
@@ -152,7 +152,7 @@ fn probe_database(connect_url: &Url) -> Result<DatabaseProbe, ProbeError> {
 }
 
 /// Extract the file path from a `sqlite://` (or `sqlite::memory:`)
-/// URL. The shapes are spelled out in implementation plan §6.1.
+/// URL. The shapes are spelled out in ADR-T-009 §D3.
 fn extract_sqlite_path(url: &Url) -> String {
     // Opaque form (e.g. `sqlite::memory:`) — `cannot_be_a_base`
     // returns true and `path()` is the opaque body.

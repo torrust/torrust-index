@@ -125,7 +125,7 @@ _Optionally, you may choose to supply the entire configuration as an environment
 TORRUST_INDEX_CONFIG_TOML=$(cat "./storage/index/etc/index.toml") cargo run
 ```
 
-_For deployment, you __should__ override the `tracker_api_token`:_
+_For deployment, you __should__ override the `tracker.token` (per ADR-T-009 §D2 it is mandatory; the shipped TOMLs no longer carry a default):_
 
 ```sh
 # Override secrets in configuration using environmental variables

@@ -492,7 +492,7 @@ in [`share/container/entry_script_sh`](../share/container/entry_script_sh),
 delimited by the `# ENTRY_ENV_VARS:` and
 `# END_ENTRY_ENV_VARS` sentinel lines. CI verifies that
 every variable named between those sentinels is documented
-in this file (see ADR-T-009 §9 / Acceptance Criterion #7);
+in this file (see ADR-T-009 Acceptance Criterion #7);
 when adding or removing a variable from the entry script,
 update both the manifest block and the env-var section
 above.
