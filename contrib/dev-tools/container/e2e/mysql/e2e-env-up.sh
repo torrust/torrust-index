@@ -8,6 +8,7 @@ USER_ID=${USER_ID:-1000} \
     TORRUST_INDEX_DATABASE="torrust_index_e2e_testing" \
     TORRUST_INDEX_DATABASE_DRIVER="mysql" \
     TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MyAccessToken" \
+    TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="mysql://root:root_secret_password@mysql:3306/torrust_index_e2e_testing" \
     TORRUST_INDEX_MYSQL_DATABASE="torrust_index_e2e_testing" \
     TORRUST_TRACKER_CONFIG_TOML=$(cat ./share/default/config/tracker.public.e2e.container.sqlite3.toml) \
     TORRUST_TRACKER_DATABASE="e2e_testing_sqlite3" \

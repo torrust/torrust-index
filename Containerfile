@@ -35,8 +35,31 @@ RUN mkdir -p /app/share/torrust/default/database/; \
 FROM rust:slim-trixie AS jq_donor
 RUN apt-get update && \
     apt-get install -y --no-install-recommends jq && \
-    rm -rf /var/lib/apt/lists/* && \
-    mkdir -p /jq && \
+    rm -rf /var/lib/apt/lists/*
+# Pin jq's runtime shared-library set so a future donor-base
+# upgrade that drags in a new transitive dep fails the build
+# instead of producing a silently-broken runtime image. The
+# allow-list mirrors what the runtime stages COPY across
+# (libjq, libonig) plus libraries already present in the
+# `cc-debian13` runtime base (libc, libm, ld-linux, vdso).
+RUN set -eu; \
+    expected='libc.so.6 libjq.so.1 libm.so.6 libonig.so.5 ld-linux-x86-64.so.2 linux-vdso.so.1'; \
+    # ldd column 1 is sometimes a bare soname ("libc.so.6")
+    # and sometimes an absolute path ("/lib64/ld-linux-…").
+    # Reduce to basenames so the allow-list check is uniform.
+    actual="$(ldd /usr/bin/jq | awk '{print $1}' | sed 's|.*/||' | sort -u | tr '\n' ' ')"; \
+    for lib in $expected; do \
+      case " $actual " in *" $lib "*) ;; *) echo "ERROR: jq lost expected library: $lib" >&2; exit 1 ;; esac; \
+    done; \
+    for lib in $actual; do \
+      case " $expected " in *" $lib "*) ;; *) echo "ERROR: jq pulls unexpected library: $lib (allow-list: $expected)" >&2; exit 1 ;; esac; \
+    done
+# Stage jq + its two non-glibc shared libraries at
+# deterministic paths under `/jq/`. The `*-linux-gnu` glob
+# resolves to whichever multi-arch tuple the donor was
+# built for; re-staging under stable names lets the runtime
+# COPY directives stay tuple-agnostic.
+RUN mkdir -p /jq && \
     cp /usr/bin/jq /jq/jq && \
     cp -L /usr/lib/*-linux-gnu/libjq.so.1   /jq/libjq.so.1 && \
     cp -L /usr/lib/*-linux-gnu/libonig.so.5 /jq/libonig.so.5

@@ -88,8 +88,10 @@ pub fn lib_path() -> PathBuf {
 #[doc(hidden)]
 #[must_use]
 pub fn run_sh(snippet: &str) -> Output {
-    let lib = lib_path();
-    let lib = lib.to_str().expect("entry_script_lib_sh path must be UTF-8 for sh -c");
+    let path = lib_path();
+    let lib = path
+        .to_str()
+        .expect("entry_script_lib_sh tempfile path must be UTF-8 for sh -c");
 
     // The leading `set -eu` mirrors the discipline the entry
     // script itself runs under (see `share/container/entry_script_sh`,
@@ -134,8 +136,10 @@ pub fn run_sh(snippet: &str) -> Output {
 #[doc(hidden)]
 #[must_use]
 pub fn run_sh_with_args(snippet: &str, args: &[&str]) -> Output {
-    let lib = lib_path();
-    let lib = lib.to_str().expect("entry_script_lib_sh path must be UTF-8 for sh -c");
+    let path = lib_path();
+    let lib = path
+        .to_str()
+        .expect("entry_script_lib_sh tempfile path must be UTF-8 for sh -c");
 
     let script = format!(". \"{lib}\"\n{snippet}");
 

@@ -193,6 +193,8 @@ The decisions that constitute Option B follow.
 
 **Follows from:** P6.
 **Addresses:** [R1](#r1--composeyaml-conflates-dev-sandbox-and-deployment-template).
+**Status:** Landed 2026-04-24 via
+[Phase 8](009-implementation-plan.md#phase-8--compose-split-d1).
 
 `compose.yaml` is restructured as a production-shaped baseline
 (no `mailcatcher`, no `tty`, credentials referenced as bare

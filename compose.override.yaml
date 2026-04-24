@@ -1,0 +1,53 @@
+# Dev sandbox extras for `compose.yaml`. Auto-loaded by
+# Compose v2 when present (i.e. by `docker compose up` and
+# `make up-dev`). Excluded by `make up-prod` via explicit
+# `--file compose.yaml`. See ADR-T-009 §8.2.
+#
+# What this file adds:
+#
+# - The `mailcatcher` sidecar (re-attached to `index` via
+#   long-form `depends_on`, which Compose v2 merges
+#   additively — short-form would silently replace the
+#   base's tracker/mysql dependencies).
+# - `tty: true` on `index` and `tracker` so interactive
+#   `docker attach` sessions get a sensible terminal.
+# - Permissive `${VAR:-default}` credential defaults so a
+#   plain `docker compose up` works without operator
+#   intervention. Production paths (`make up-prod`) bypass
+#   this file and rely on the validated bare-`${VAR}` form
+#   in the base.
+
+services:
+
+  index:
+    tty: true
+    environment:
+      # DEV-ONLY defaults — change for any public or production deployment.
+      - TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN=${TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN:-MyAccessToken}
+      - TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL=${TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL:-sqlite:///var/lib/torrust/index/database/index.sqlite3.db?mode=rwc}
+    # Long-form merge — extends the base's `tracker` / `mysql`
+    # dependencies rather than replacing them. See ADR-T-009 §8.2.
+    depends_on:
+      mailcatcher:
+        condition: service_started
+
+  tracker:
+    tty: true
+    environment:
+      # DEV-ONLY default — change for any public or production deployment.
+      - TORRUST_TRACKER_CONFIG_OVERRIDE_HTTP_API__ACCESS_TOKENS__ADMIN=${TORRUST_TRACKER_CONFIG_OVERRIDE_HTTP_API__ACCESS_TOKENS__ADMIN:-MyAccessToken}
+
+  mysql:
+    environment:
+      # DEV-ONLY credentials — change for any public or production deployment.
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-root_secret_password}
+      - MYSQL_USER=${MYSQL_USER:-db_user}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-db_user_secret_password}
+
+  mailcatcher:
+    image: docker.io/dockage/mailcatcher:0.8.2
+    networks:
+      - server_side
+    ports:
+      - 127.0.0.1:1080:1080
+      - 127.0.0.1:1025:1025

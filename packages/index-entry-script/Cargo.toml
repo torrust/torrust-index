@@ -13,7 +13,7 @@ version.workspace = true
 [lib]
 path = "src/lib.rs"
 
-[dev-dependencies]
+[dependencies]
 tempfile = "3"
 
 [lints]

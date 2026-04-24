@@ -319,6 +319,56 @@ podman run -it \
     torrust-index:release
 ```
 
+## Compose Split
+
+Per ADR-T-009 §8, the repository ships two Compose files
+with a clear separation between *production-shaped baseline*
+and *dev sandbox*:
+
+- [`compose.yaml`](../compose.yaml) — **deployment template.**
+  Production-shaped: no `mailcatcher` sidecar, no `tty`,
+  external ports bound to `127.0.0.1` (except the index API
+  on `:3001`), and credentials referenced as bare `${VAR}`
+  with no defaults. This is the file operators copy as a
+  starting point for real deployments.
+- [`compose.override.yaml`](../compose.override.yaml) —
+  **for development.** Auto-loaded by Compose v2 (i.e. by a
+  plain `docker compose up` and by `make up-dev`). Adds the
+  `mailcatcher` sidecar, allocates TTYs on `index` /
+  `tracker`, and supplies permissive `${VAR:-default}`
+  defaults for the credentials the baseline leaves blank.
+
+Two top-level [`Makefile`](../Makefile) targets wrap the two
+documented invocation paths:
+
+```sh
+# Dev sandbox: auto-loads compose.override.yaml.
+make up-dev
+
+# Production-shaped: validates required credentials, then
+# runs `docker compose --file compose.yaml up -d --wait`
+# (override excluded). Required env vars:
+#
+#   USER_ID                                              (numeric host UID owning ./storage)
+#   TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN
+#   TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL
+#   TORRUST_TRACKER_CONFIG_OVERRIDE_HTTP_API__ACCESS_TOKENS__ADMIN
+#   MYSQL_ROOT_PASSWORD  (only if the local mysql sidecar is in use)
+make up-prod
+```
+
+`make up-prod` is fail-fast convenience — defence in depth,
+not the only line. The container's config probe (ADR-T-009
+§6) is the authoritative gate: it rejects empty
+`connect_url` (exit 3) and empty `tracker.token` (exit 4)
+regardless of how Compose was invoked.
+
+A developer running `docker compose -f compose.yaml up`
+(deliberately bypassing the override) gets bare `${VAR}`
+substitution to empty strings; the config probe catches this
+inside the container, so the worst case is a clear startup
+failure rather than silent misbehaviour.
+
 ## Runtime Image Notes
 
 ### Healthcheck (both targets)
@@ -467,9 +517,10 @@ either is missing. Supply them via:
 ```
 
 or by mounting a populated `index.toml` at
-`/etc/torrust/index/index.toml`. Phase 8's compose split
-will provide a turnkey `compose.override.yaml` that wires
-these for the local dev workflow.
+`/etc/torrust/index/index.toml`. The
+[`compose.override.yaml`](../compose.override.yaml) shipped
+in the repo wires both overrides for the local dev workflow
+(`make up-dev`); see [Compose Split](#compose-split).
 
 #### Runtime `jq` Dependency
 

@@ -21,7 +21,7 @@ re-litigated here — when in doubt, defer to the ADR.
 | 5     | Schema (D2)                        | Done        |
 | 6     | Config probe                       | Done        |
 | 7     | Entry-script contract              | Done        |
-| 8     | Compose split                      | Not started |
+| 8     | Compose split                      | Done        |
 | 9     | Documentation & audit (D8, D9)     | Not started |
 
 ## Phase Dependency Graph
@@ -835,7 +835,7 @@ ENV PATH=/usr/local/bin:/bin:/usr/bin:/sbin
 # preflight_gate carries for the BuildKit dependency edge;
 # it has no runtime purpose and should not ship.
 RUN ["/bin/busybox", "sh", "-c", \
-     "for a in sh adduser install mkdir dirname chown chmod tr mktemp cat printf rm echo; do \
+     "for a in sh adduser addgroup install mkdir dirname chown chmod tr mktemp cat printf rm echo; do \
         /bin/busybox ln -s busybox /bin/$a; \
       done && rm -f /tmp/.preflight-sentinel"]
 
@@ -1351,6 +1351,7 @@ if it swapped in the placeholder.
 
 ## Phase 6 — Config Probe Helper
 
+**Status:** Landed (2026-04-24).
 **Files.** New `packages/index-config-probe/` crate.
 
 The current entry script unconditionally seeds the empty
@@ -1597,6 +1598,7 @@ JSON/exit; testing is straightforward.
 
 ## Phase 7 — Entry-Script Contract (D3)
 
+**Status:** Landed (2026-04-24).
 **Files.** `share/container/entry_script_sh`,
 `docs/containers.md`.
 
@@ -2287,8 +2289,20 @@ at the top, immediately after `set -eu`.
 
 ## Phase 8 — Compose Split (D1)
 
+**Status:** Landed (2026-04-24). Includes the §8.6 bring-up
+addendum fixes, which retroactively touched Phases 2, 4, 6,
+and 7 in the same change so the documented `make up-dev`
+flow reaches a healthy `200 OK` on `:3001`.
 **Files.** `compose.yaml`, new `compose.override.yaml`,
-`contrib/dev-tools/container/e2e/`, `Makefile`.
+`contrib/dev-tools/container/e2e/`, new top-level `Makefile`,
+`docs/containers.md` (compose-split section), plus the
+§8.6 follow-on edits to `Containerfile` (jq allow-list,
+`addgroup` applet), `share/container/entry_script_sh`
+(group creation, idempotency guards),
+`packages/index-entry-script/` (`tempfile` promoted to
+runtime dep so the embedded shell-library survives nextest
+archive extraction), and `packages/index-config/src/lib.rs`
+(`Info::from_env` filters empty strings).
 
 ### 8.1 Restructure `compose.yaml` as production-shaped
 
@@ -2458,6 +2472,7 @@ dependency-free and shellcheck-clean.
 
   _validate-prod-env:
   	@sh -uc '\
+  	  : "$${USER_ID:?required (numeric host UID owning ./storage)}" && \
   	  : "$${TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN:?required}" && \
   	  : "$${TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL:?required}" && \
   	  : "$${TORRUST_TRACKER_CONFIG_OVERRIDE_HTTP_API__ACCESS_TOKENS__ADMIN:?required}" && \
@@ -2469,6 +2484,15 @@ dependency-free and shellcheck-clean.
   # defence-in-depth only — the config probe (exit 3 on
   # empty connect_url) and the MySQL entrypoint (rejects
   # empty root password) are the authoritative gates.
+  #
+  # NOTE: `USER_ID` is required because `compose.yaml`
+  # references `${USER_ID}` with no default (it is an
+  # operator-supplied numeric selector, not a credential
+  # and not an environment-coupled hostname). An empty
+  # value would propagate to the entry script's
+  # `adduser -u ""` call and fail loudly inside the
+  # container; failing earlier in the wrapper matches the
+  # spirit of the §8.1 defence-in-depth contract.
 
   up-prod: _validate-prod-env
   	docker compose --file $(COMPOSE_FILE) up -d --wait
@@ -2505,6 +2529,105 @@ compositions pass `--file compose.yaml` explicitly.
 
 Describe the two files with a clear "for development" / "for
 deployment template" distinction.
+
+### 8.6 Bring-up addendum (issues surfaced & fixed inline)
+
+Phase 8 was validated end-to-end against `podman-compose
+1.5.0` / `podman 5.8.2` (as the closest available stand-in
+for `docker compose v2`'s additive override merge). The
+bring-up exposed five latent bugs in earlier phases that
+only surface when the full stack actually starts. All five
+were fixed in the same PR rather than deferred, since each
+would block any operator following the documented workflow.
+
+1. **Test binaries baking compile-time paths** (Phases 6, 7).
+   `packages/index-config-probe/tests/binary.rs` and
+   `packages/index-entry-script/tests/seed_sqlite.rs`
+   resolved the binary / shell-library under test via
+   `env!("CARGO_BIN_EXE_…")` and `CARGO_MANIFEST_DIR`.
+   Both bake the build-time path into the test executable
+   and break under cargo-nextest's archive →
+   `--extract-to` → `--target-dir-remap` flow used in the
+   container `test` stage. **Fix:** drive the contracts
+   through the library API (probe) and embed the shell
+   library at compile time via `include_str!` materialised
+   to a `tempfile` at run time (entry-script). Same model
+   as `packages/index-config/tests/shipped_samples.rs`.
+2. **Missing `addgroup` in the curated busybox applets**
+   (Phase 4 / 7). Distroless `cc-debian13` ships
+   `/etc/passwd` and `/etc/group`, but busybox
+   `adduser -D -u UID NAME` writes only `/etc/passwd` —
+   `getgrnam("torrust")` then fails, breaking the entry
+   script's `install -g torrust …` step with `unknown
+   group torrust`. **Fix:** add `addgroup` to the curated
+   symlink loop in the release runtime base, change the
+   entry script to `addgroup -g "$USER_ID" torrust`
+   followed by `adduser -D -s /bin/sh -u "$USER_ID" -G
+   torrust torrust`, and guard both with idempotent
+   `grep`-of-`/etc/{passwd,group}` checks so a container
+   restart is a no-op rather than a fatal exit under
+   `set -e`.
+3. **`jq` shipped without its shared libs** (Phase 2). The
+   `jq_donor` stage installed jq via `apt-get` but the
+   runtime stages copied only `/usr/bin/jq`; the binary
+   then aborted with `libjq.so.1: cannot open shared
+   object file` inside the lean `cc-debian13` runtime base.
+   **Fix:** copy `libjq.so.1` and `libonig.so.5` from the
+   donor alongside the binary, and add an `ldd`-based
+   allow-list assertion to the `jq_donor` stage so a future
+   donor-base upgrade that drags in a new transitive dep
+   fails the build instead of silently producing a broken
+   image. The allow-list is `libc.so.6 libjq.so.1
+   libm.so.6 libonig.so.5 ld-linux-x86-64.so.2
+   linux-vdso.so.1`; the parser strips path prefixes from
+   `ldd`'s column 1 so absolute paths
+   (`/lib64/ld-linux-…`) and bare sonames are treated
+   identically.
+4. **Empty-string env vars treated as configuration TOML**
+   (Phases 3, 8). `Info::from_env` called `env::var(…).
+   ok()` directly, which returns `Some("")` for an
+   exported-but-unset variable. The compose baseline's
+   `TORRUST_INDEX_CONFIG_TOML=${TORRUST_INDEX_CONFIG_TOML}`
+   then propagated an empty string into the container,
+   which the loader treated as a zero-byte TOML and
+   rejected with "Missing mandatory option:
+   logging.threshold". **Fix:** `Info::from_env` now
+   filters empty strings out of both `TORRUST_INDEX_CONFIG_TOML`
+   and `TORRUST_INDEX_CONFIG_TOML_PATH`, and `compose.yaml`
+   uses Compose's bare-name pass-through form
+   (`- TORRUST_INDEX_CONFIG_TOML`, no `=`) for those two
+   optional inline-TOML envs so an unset host var is
+   omitted entirely rather than forwarded as empty.
+5. **Unqualified Docker Hub image names** (Phase 8).
+   `mysql:8.0.45`, `dockage/mailcatcher:0.8.2`, and
+   `torrust/tracker:develop` all relied on a
+   short-name-resolution prompt that podman cannot honour
+   without a TTY (and that operators should not be relying
+   on regardless). **Fix:** fully qualify all three as
+   `docker.io/...` in `compose.yaml` /
+   `compose.override.yaml`. This is portable across both
+   docker and podman and immune to per-host
+   `unqualified-search-registries` configuration.
+6. **`USER_ID` missing from `_validate-prod-env`** (Phase 8).
+   `compose.yaml` references `${USER_ID}` with no default
+   (it is an operator-supplied numeric selector, not a
+   credential and not an environment-coupled hostname, so
+   the §8.1 bare-`${VAR}` rule does not strictly apply —
+   but neither does the `${VAR:-default}` selector
+   convention, since there is no safe cross-environment
+   default). Without validation, an unset `USER_ID`
+   propagated to the entry script's `adduser -u ""` call
+   and failed deep inside container start. **Fix:** add
+   `USER_ID` to the `_validate-prod-env` required list so
+   the wrapper fails fast with a clear message before any
+   container starts. The entry-script-side failure remains
+   the authoritative gate; this is defence-in-depth in the
+   same spirit as the credential checks.
+
+These inline fixes preserve the Phase 8 deliverable's scope
+(the compose split itself) while ensuring the documented
+`make up-dev` / `podman-compose up` flows actually reach a
+healthy `200 OK` on `:3001`.
 
 ---
 
@@ -2544,6 +2667,19 @@ consumers), the PEM+PATH mutual-exclusion enforcement
 (D3), and the narrowed scope of
 `TORRUST_INDEX_DATABASE_DRIVER` (now a TOML-selection
 knob only, no longer a runtime database dispatcher).
+
+### 9.1.3 Add `mailcatcher` CI lint on `compose.yaml`
+
+Phase 8 §8.1 prescribed a CI lint that re-runs the
+`grep -nriE 'mailcatcher|MAILER|SMTP|smtp_'` audit against
+`compose.yaml` to catch accidental re-introduction of the
+dev sidecar into the production-shaped baseline. Land it
+as a workflow step (or a `make lint-compose` target wired
+into the existing CI pipeline) so the audit trail is
+enforced rather than reviewer-discretionary. The check
+must inspect `compose.yaml` only — the override file is
+*expected* to mention `mailcatcher` and matching it there
+would be a false positive.
 
 ### 9.2 Internal code audit for vendored `su-exec`
 

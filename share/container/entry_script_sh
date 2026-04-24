@@ -39,13 +39,22 @@ fi
 # /etc/shadow; `-D` honours that. Busybox `adduser -s` does
 # not consult /etc/shells, which the lean base also lacks.
 #
+# Busybox `adduser -D -u UID NAME` writes only `/etc/passwd`;
+# it does not synthesise a matching `/etc/group` entry, so a
+# downstream `install -g torrust …` would fail with
+# `unknown group torrust`. Create the group first with
+# `addgroup`, then attach the user to it via `-G`.
+#
 # Idempotency: container restarts (e.g. under a restart
 # policy) re-execute the entry script against the same
-# writable layer, so a previously created `torrust` user
-# already exists on subsequent boots. Skip the call rather
-# than letting `adduser` fail under `set -e`.
+# writable layer, so the `torrust` group/user already exist
+# on subsequent boots. Both steps are guarded so the restart
+# path is a no-op rather than a fatal exit under `set -e`.
+if ! grep -q '^torrust:' /etc/group; then
+    addgroup -g "$USER_ID" torrust
+fi
 if ! grep -q '^torrust:' /etc/passwd; then
-    adduser -D -s /bin/sh -u "$USER_ID" torrust
+    adduser -D -s /bin/sh -u "$USER_ID" -G torrust torrust
 fi
 
 # ── Volume directory ownership ────────────────────────────
