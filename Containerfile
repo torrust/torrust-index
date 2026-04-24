@@ -3,17 +3,17 @@
 # Torrust Index
 
 ## Builder Image
-FROM rust:bookworm AS chef
+FROM rust:trixie AS chef
 WORKDIR /tmp
-RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/v1.18.1/install-from-binstall-release.sh | bash
 RUN cargo binstall --no-confirm --locked cargo-chef cargo-nextest
 
 ## Tester Image
-FROM rust:slim-bookworm AS tester
+FROM rust:slim-trixie AS tester
 WORKDIR /tmp
 
 RUN apt-get update; apt-get install -y curl sqlite3; apt-get autoclean
-RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/v1.18.1/install-from-binstall-release.sh | bash
 RUN cargo binstall --no-confirm --locked cargo-nextest imdl
 
 COPY ./share/ /app/share/torrust
@@ -21,12 +21,12 @@ RUN mkdir -p /app/share/torrust/default/database/; \
     sqlite3 /app/share/torrust/default/database/index.sqlite3.db  "VACUUM;"
 
 ## Su Exe Compile
-FROM docker.io/library/gcc:bookworm AS gcc
+FROM docker.io/library/gcc:trixie AS gcc
 COPY ./contrib/dev-tools/su-exec/ /usr/local/src/su-exec/
 RUN cc -Wall -Werror -g /usr/local/src/su-exec/su-exec.c -o /usr/local/bin/su-exec; chmod +x /usr/local/bin/su-exec
 
 
-## Chef Prepare (look at project and see wat we need)
+## Chef Prepare (look at project and see what we need)
 FROM chef AS recipe
 WORKDIR /build/src
 COPY . /build/src
@@ -37,28 +37,28 @@ RUN cargo chef prepare --recipe-path /build/recipe.json
 FROM chef AS dependencies_debug
 WORKDIR /build/src
 COPY --from=recipe /build/recipe.json /build/recipe.json
-RUN cargo chef cook --tests --benches --examples --workspace --all-targets --all-features --recipe-path /build/recipe.json
-RUN cargo nextest archive --tests --benches --examples --workspace --all-targets --all-features --archive-file /build/temp.tar.zst ; rm -f /build/temp.tar.zst
+RUN cargo chef cook --workspace --all-targets --all-features --recipe-path /build/recipe.json
+RUN cargo nextest archive --workspace --all-targets --all-features --archive-file /build/temp.tar.zst ; rm -f /build/temp.tar.zst
 
 ## Cook (release)
 FROM chef AS dependencies
 WORKDIR /build/src
 COPY --from=recipe /build/recipe.json /build/recipe.json
-RUN cargo chef cook --tests --benches --examples --workspace --all-targets --all-features --recipe-path /build/recipe.json --release
-RUN cargo nextest archive --tests --benches --examples --workspace --all-targets --all-features --archive-file /build/temp.tar.zst --release  ; rm -f /build/temp.tar.zst
+RUN cargo chef cook --workspace --all-targets --all-features --recipe-path /build/recipe.json --release
+RUN cargo nextest archive --workspace --all-targets --all-features --archive-file /build/temp.tar.zst --release ; rm -f /build/temp.tar.zst
 
 
 ## Build Archive (debug)
 FROM dependencies_debug AS build_debug
 WORKDIR /build/src
 COPY . /build/src
-RUN cargo nextest archive --tests --benches --examples --workspace --all-targets --all-features --archive-file /build/torrust-index-debug.tar.zst
+RUN cargo nextest archive --workspace --all-targets --all-features --archive-file /build/torrust-index-debug.tar.zst
 
 ## Build Archive (release)
 FROM dependencies AS build
 WORKDIR /build/src
 COPY . /build/src
-RUN cargo nextest archive --tests --benches --examples --workspace --all-targets --all-features --archive-file /build/torrust-index.tar.zst --release
+RUN cargo nextest archive --workspace --all-targets --all-features --archive-file /build/torrust-index.tar.zst --release
 
 
 # Extract and Test (debug)
@@ -71,10 +71,10 @@ COPY --from=build_debug \
 RUN cargo nextest run --workspace-remap /test/src/ --extract-to /test/src/ --no-run --archive-file /test/torrust-index-debug.tar.zst
 RUN cargo nextest run --workspace-remap /test/src/ --target-dir-remap /test/src/target/ --cargo-metadata /test/src/target/nextest/cargo-metadata.json --binaries-metadata /test/src/target/nextest/binaries-metadata.json
 
+# Note: health_check is intentionally omitted — the debug image has no HEALTHCHECK.
 RUN mkdir -p /app/bin/; \
   cp -l /test/src/target/debug/torrust-index /app/bin/torrust-index; \
   cp -l /test/src/target/debug/torrust-generate-auth-keypair /app/bin/torrust-generate-auth-keypair
-# RUN mkdir /app/lib/; cp -l $(realpath $(ldd /app/bin/torrust-index | grep "libz\.so\.1" | awk '{print $3}')) /app/lib/libz.so.1
 RUN chown -R root:root /app; chmod -R u=rw,go=r,a+X /app; chmod -R a+x /app/bin
 
 # Extract and Test (release)
@@ -91,12 +91,11 @@ RUN mkdir -p /app/bin/; \
   cp -l /test/src/target/release/torrust-index /app/bin/torrust-index; \
   cp -l /test/src/target/release/health_check /app/bin/health_check; \
   cp -l /test/src/target/release/torrust-generate-auth-keypair /app/bin/torrust-generate-auth-keypair
-# RUN mkdir -p /app/lib/; cp -l $(realpath $(ldd /app/bin/torrust-index | grep "libz\.so\.1" | awk '{print $3}')) /app/lib/libz.so.1
 RUN chown -R root:root /app; chmod -R u=rw,go=r,a+X /app; chmod -R a+x /app/bin
 
 
 ## Runtime
-FROM gcr.io/distroless/cc-debian12:debug AS runtime
+FROM gcr.io/distroless/cc-debian13:debug AS runtime
 RUN ["/busybox/cp", "-sp", "/busybox/sh","/busybox/cat","/busybox/ls","/busybox/env", "/bin/"]
 COPY --from=gcc --chmod=0555 /usr/local/bin/su-exec /bin/su-exec
 
@@ -114,6 +113,7 @@ ENV IMPORTER_API_PORT=${IMPORTER_API_PORT}
 ENV TZ=Etc/UTC
 
 EXPOSE ${API_PORT}/tcp
+EXPOSE ${IMPORTER_API_PORT}/tcp
 
 RUN mkdir -p /var/lib/torrust/index /var/log/torrust/index /etc/torrust/index
 
@@ -137,6 +137,6 @@ CMD ["sh"]
 FROM runtime AS release
 ENV RUNTIME="release"
 COPY --from=test /app/ /usr/
-HEALTHCHECK --interval=5s --timeout=5s --start-period=3s --retries=3 \  
+HEALTHCHECK --interval=5s --timeout=5s --start-period=3s --retries=3 \
   CMD /usr/bin/health_check http://localhost:${API_PORT}/health_check && /usr/bin/health_check http://localhost:${IMPORTER_API_PORT}/health_check || exit 1
 CMD ["/usr/bin/torrust-index"]

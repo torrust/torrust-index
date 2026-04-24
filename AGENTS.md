@@ -17,6 +17,10 @@ When working inside a package, prefer running only the `--package` tests,
 as the whole-project tests are slow to run. (Occasionally run the whole
 suite, for example when finishing up.)
 
+## Commit Messages
+
+When writing a commit message, be sure to review the last few commit messages to compare the style.
+
 ## Running Tests
 
 When running tests, tee to a temp file (`/tmp/...`) and then grep that
@@ -43,6 +47,23 @@ API, perhaps using `#[doc(hidden)]` helpers when appropriate.
 ## Test Doc-Headers
 
 Every test file (module) should maintain an index of the tests contained in the module-doc. The primary purpose is to make it easy to scan the test files to detect duplicates or overlapping coverage. Please opportunistically create if missing.
+
+## POSIX Paths
+
+Treat paths as opaque byte sequences. POSIX permits any byte except
+`\0` (NUL) and `/` (the path separator) in a file or directory name,
+and there is no guarantee that the bytes are valid UTF-8. Concretely:
+
+- Prefer `OsStr` / `OsString` / `Path` / `PathBuf` (or `Utf8Path`
+  when UTF-8 really is a precondition you intend to enforce) over
+  ad-hoc `String` handling.
+- Do not assume any particular character class — names may contain
+  spaces, newlines, control bytes, leading dashes, or arbitrary
+  non-UTF-8 bytes.
+- NUL termination is only required when crossing a libc/FFI
+  boundary (e.g. `CString` for `open(2)`); interior NUL bytes are
+  invalid for those APIs and must be rejected, not silently
+  truncated.
 
 ## Cross-Reference Conventions
 

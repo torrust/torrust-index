@@ -6,9 +6,7 @@ echo "User name: $CURRENT_USER_NAME"
 echo "User   id: $CURRENT_USER_ID"
 
 USER_ID=$CURRENT_USER_ID
-TORRUST_TRACKER_USER_UID=$CURRENT_USER_ID
 export USER_ID
-export TORRUST_TRACKER_USER_UID
 
 export TORRUST_INDEX_DATABASE="torrust_index_e2e_testing"
 export TORRUST_TRACKER_DATABASE="e2e_testing_sqlite3"

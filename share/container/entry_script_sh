@@ -1,5 +1,5 @@
 #!/bin/sh
-set -x
+[ "${DEBUG:-}" = "1" ] && set -x
 
 to_lc() { echo "$1" | tr '[:upper:]' '[:lower:]'; }
 clean() { echo "$1" | tr -d -c 'a-zA-Z0-9-' ; }
@@ -12,7 +12,7 @@ inst() {
 
 
 # Add torrust user, based upon supplied user-id.
-if [ -z "$USER_ID" ] && [ "$USER_ID" -lt 1000 ]; then
+if [ -z "$USER_ID" ] || [ "$USER_ID" -lt 1000 ]; then
     echo "ERROR: USER_ID is not set, or less than 1000"
     exit 1
 fi

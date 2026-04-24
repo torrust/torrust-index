@@ -23,7 +23,7 @@ podman run -it torrust/index:latest
 
 ## Volumes
 
-The [Containerfile](../Containerfile) (i.e. the Dockerfile) Defines Three Volumes:
+The [Containerfile](../Containerfile) defines three volumes:
 
 ```Dockerfile
 VOLUME ["/var/lib/torrust/index","/var/log/torrust/index","/etc/torrust/index"]
@@ -49,7 +49,7 @@ mkdir -p ./storage/index/lib/ ./storage/index/log/ ./storage/index/etc/
 
 ### Matching Ownership ID's of Host Storage and Container Volumes
 
-It is important that the `torrust` user has the same uid `$(id -u)` as the host mapped folders. In our [entry script](../share/container/entry_script_sh), installed to `/usr/local/bin/entry.sh` inside the container, switches to the `torrust` user created based upon the `USER_UID` environmental variable.
+It is important that the `torrust` user has the same uid `$(id -u)` as the host mapped folders. In our [entry script](../share/container/entry_script_sh), installed to `/usr/local/bin/entry.sh` inside the container, switches to the `torrust` user created based upon the `USER_ID` environmental variable.
 
 When running the container, you may use the `--env USER_ID="$(id -u)"` argument that gets the current user-id and passes to the container.
 
@@ -244,4 +244,35 @@ podman run -it \
     --volume ./storage/index/log:/var/log/torrust/index:Z \
     --volume ./storage/index/etc:/etc/torrust/index:Z \
     torrust-index:release
+```
+
+## Runtime Image Notes
+
+### Debug Image Healthcheck
+
+The `debug` build target intentionally omits the `HEALTHCHECK` instruction
+and does not include the `health_check` binary. This keeps the debug image
+lightweight and avoids false-positive health signals during interactive
+debugging sessions. If you need health-checking for a debug image, use an
+external probe against the API port.
+
+### Available Shell Commands (Busybox Subset)
+
+The distroless runtime base ships only a minimal set of busybox applets
+to reduce the attack surface:
+
+- `sh`, `cat`, `ls`, `env`
+
+Common utilities like `id`, `whoami`, `ps`, `grep`, and `wget` are **not**
+available. If you need additional tools for operational debugging, use the
+`debug` build target or exec into a sidecar container.
+
+### Entry Script Debugging
+
+The container entry script does not produce verbose output by default.
+To enable shell tracing (`set -x`) for startup troubleshooting, set the
+`DEBUG` environment variable:
+
+```sh
+--env DEBUG=1
 ```

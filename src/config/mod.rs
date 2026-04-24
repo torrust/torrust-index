@@ -176,10 +176,13 @@ impl Info {
         let env_var_config_toml = ENV_VAR_CONFIG_TOML.to_string();
         let env_var_config_toml_path = ENV_VAR_CONFIG_TOML_PATH.to_string();
 
-        let config_toml = env::var(env_var_config_toml).ok().map(|config_toml| {
-            println!("Loading extra configuration from environment variable {config_toml} ...");
-            config_toml
-        });
+        let config_toml = env::var(env_var_config_toml)
+            .ok()
+            .filter(|config_toml| !config_toml.trim().is_empty())
+            .map(|config_toml| {
+                println!("Loading extra configuration from environment variable {config_toml} ...");
+                config_toml
+            });
 
         let config_toml_path = env::var(env_var_config_toml_path).map_or_else(
             |_| {

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- ADR-T-009: Container infrastructure hardening (Phases 1 & 2).
+- `EXPOSE ${IMPORTER_API_PORT}/tcp` in Containerfile; port 3002 mapped in
+  compose.
+- `restart: unless-stopped` on index and tracker compose services.
+- `DEBUG=1` env-var gate for entry-script shell tracing (`set -x`).
+- Runtime image notes in `docs/containers.md`: debug healthcheck omission,
+  busybox subset, and entry-script debugging.
+- DEV-ONLY credential comments in `compose.yaml`.
 - ADR-T-008: Document rationale for roles and permissions refactor.
 - ADR-T-006: Document rationale for error system refactor.
 - 188 crate-level tests for the domain error system (`src/tests/errors/`):
@@ -127,6 +135,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - v1→v2 upgrade path: `insert_imported_user` now writes the `role` column
   (`"admin"` / `"registered"`) instead of the removed `administrator` column.
 - Standardise all error derives on `thiserror`.
+- Container base images upgraded from Debian bookworm to trixie
+  (`rust:bookworm` → `rust:trixie`, `cc-debian12` → `cc-debian13`).
+- `cargo-binstall` bootstrap pinned to tag `v1.18.1` (was `main` branch).
+- MySQL compose image pinned to `8.0.45`; auth flag changed from
+  `--default-authentication-plugin` to `--authentication-policy`.
+- MySQL healthcheck uses `$$MYSQL_ROOT_PASSWORD` instead of broken
+  `/run/secrets/db-password` reference.
+- Dev-only compose ports (tracker, MySQL, mailcatcher) bound to `127.0.0.1`.
+- Entry script `set -x` gated behind `DEBUG=1` to avoid leaking env vars.
+- Entry script `USER_ID` guard: `&&` → `||` (was always-false when unset).
+- `.dockerignore` renamed to `.containerignore` for Podman compatibility.
+- Removed redundant `--tests --benches --examples` from Containerfile (covered
+  by `--all-targets`).
+- `docs/containers.md`: fixed `USER_UID` → `USER_ID` typo; removed
+  "(i.e. the Dockerfile)" phrasing.
+- Removed stale `TORRUST_TRACKER_USER_UID` export from E2E container scripts.
+
+### Fixed
+
+- MySQL compose healthcheck: was referencing a non-existent Docker secret
+  (`/run/secrets/db-password`), now uses `$$MYSQL_ROOT_PASSWORD`.
+- Entry script `USER_ID` validation: `-z "$USER_ID" && "$USER_ID" -lt 1000`
+  always short-circuited to an error when `USER_ID` was unset; corrected to
+  `||`.
+- Containerfile release `HEALTHCHECK` trailing whitespace removed.
+
+### Security
+
+- Dev-only ports (MySQL 3306, tracker 6969/7070/1212, mailcatcher 1025/1080)
+  no longer bind to `0.0.0.0`; bound to `127.0.0.1`.
+- Entry script no longer unconditionally traces commands containing credentials.
+- Compose credentials annotated as DEV-ONLY with TODO for Docker secrets
+  migration (ADR-T-009 §S1).
 
 ### Removed
 
@@ -157,6 +198,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (ADR-T-008 Phase 2).
 - Dead `Action` variants `GetSettings` and `GetCanonicalInfoHash` (no
   corresponding handlers existed).
+- `contrib/dev-tools/container/build.sh` — stale; passed wrong build-arg and
+  assumed a `Dockerfile` that no longer exists.
+- `contrib/dev-tools/container/run.sh` — stale; mounted wrong paths and read a
+  removed config file name.
 
 ## [4.0.0] - 2026-03-23
 

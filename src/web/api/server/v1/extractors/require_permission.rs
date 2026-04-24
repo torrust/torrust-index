@@ -189,6 +189,14 @@ where
                     }
                 }
                 Err(err) => {
+                    // Preserve the underlying error category: only the
+                    // genuine "user not found" case becomes a 404. DB
+                    // / IO failures must surface as `DatabaseError`
+                    // (500), not as a misleading 404 that masks the
+                    // outage from operators.
+                    if !matches!(err, crate::databases::database::Error::UserNotFound) {
+                        tracing::error!(user_id, %err, "failed to load user for permission check");
+                    }
                     return Err(AuthError::from(err).into_response());
                 }
             };
