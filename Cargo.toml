@@ -4,6 +4,7 @@ members = [
     "packages/index-auth-keypair",
     "packages/index-cli-common",
     "packages/index-config",
+    "packages/index-config-probe",
     "packages/index-health-check",
     "packages/mudlark",
     "packages/render-text-as-image",

@@ -144,6 +144,7 @@ The following services are provided by the default configuration:
 - [ADR-T-006: Refactor the Error System](adr/006-error-system-refactor.md) — Replace the 41-variant `ServiceError` god enum with domain-scoped error enums (`AuthError`, `UserError`, `TorrentError`, `CategoryTagError`) and a thin `ApiError` wrapper.
 - [ADR-T-007: Refactor the JWT System](adr/007-jwt-system-refactor.md) — Centralise JWT handling into `src/jwt.rs`, redesign claims to RFC 7519, move to RS256 asymmetric signing, and consolidate session validation into a single code path.
 - [ADR-T-008: Refactor the Roles and Permissions System](adr/008-roles-and-permissions-refactor.md) — Replace Casbin with a native Rust permission system (`PermissionMatrix` + `RequirePermission<A>` Axum extractors), migrate from `administrator: bool` to a `role` column, and add a `/me/permissions` discovery endpoint.
+- [ADR-T-009: Container Infrastructure Hardening](adr/009-container-infrastructure-refactor.md) — Split runtime bases (release/debug), extract the configuration parser into the `torrust-index-config` workspace crate, ship dedicated helper-binary crates (`torrust-index-health-check`, `torrust-index-auth-keypair`, `torrust-index-config-probe`), and tighten the entry script's invariants (mandatory `connect_url`/`tracker.token`, single source of truth for auth-key paths, refuse-if-root, refuse-if-stdout-is-a-TTY).
 
 ## Contributing
 

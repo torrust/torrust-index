@@ -4,10 +4,13 @@
 
 // Environment variables
 
-use crate::config::{Configuration, Info};
-
 // Default values
-pub const DEFAULT_PATH_CONFIG: &str = "./share/default/config/index.development.sqlite3.toml";
+/// Re-exported from `torrust-index-config` so the application,
+/// helper binaries, and integration tests share one source of
+/// truth for the default config-TOML location.
+pub use torrust_index_config::DEFAULT_CONFIG_TOML_PATH as DEFAULT_PATH_CONFIG;
+
+use crate::config::{Configuration, Info};
 
 /// If present, CORS will be permissive.
 pub const ENV_VAR_CORS_PERMISSIVE: &str = "TORRUST_INDEX_API_CORS_PERMISSIVE";

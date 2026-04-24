@@ -19,7 +19,7 @@ re-litigated here — when in doubt, defer to the ADR.
 | 3     | Extract `index-config` crate       | Done        |
 | 4     | Runtime base split (D4, D7)        | Done        |
 | 5     | Schema (D2)                        | Done        |
-| 6     | Config probe                       | Not started |
+| 6     | Config probe                       | Done        |
 | 7     | Entry-script contract              | Not started |
 | 8     | Compose split                      | Not started |
 | 9     | Documentation & audit (D8, D9)     | Not started |
@@ -1216,7 +1216,10 @@ remains as defence in depth — it covers a real gap because
 `ApiToken`'s `#[derive(Deserialize)]` constructs the inner
 `String` directly, bypassing the `assert!(!key.is_empty())`
 guard in `ApiToken::new`; `token = ""` in TOML would
-otherwise silently produce an empty token.
+otherwise silently produce an empty token. The probe calls
+the `ApiToken::is_empty()` helper added alongside the gate
+so the check does not reach into the type's byte
+representation.
 `impl Default for Tracker`
 cannot supply a `token` value any more, so drop the impl
 entirely. Also delete `Settings::default_tracker()` (which
@@ -1392,6 +1395,17 @@ an explicit feature allowlist (`toml`, `env`) in
 `torrust-index-config`'s `Cargo.toml` so a future feature
 flip cannot smuggle `tokio` in transitively.
 
+The probe's `Cargo.toml` also carries a few direct
+dependencies that are *not* parsing-surface re-exports:
+`clap` (P9 argv parsing), `serde` + `serde_json` (the wire
+format for stdout), `tracing` (stderr diagnostics), and
+`url` + `percent-encoding` (the sqlite-URL path-extraction
+logic in §6.1's spelling table). Listing them at the
+helper's manifest rather than re-exporting through
+`torrust-index-config` keeps the parsing crate binary-free
+(see "Why a separate crate" below) and matches the ADR's
+crate-dependency table verbatim.
+
 **Contract.**
 
 ```text
@@ -1439,15 +1453,29 @@ newline on stdout (P9):
 Field semantics:
 
   schema          Always 1. Incremented on breaking changes.
-  database.driver URL scheme extracted from connect_url
-                  (sqlite | mysql | mariadb). Not the
-                  Containerfile's TORRUST_INDEX_DATABASE_DRIVER
-                  env var (which takes sqlite3 / mysql).
+  database.driver URL scheme extracted from connect_url.
+                  One of `sqlite` or `mysql` — mirroring the
+                  schemes the application's own
+                  `databases::database::get_driver` recognises
+                  — modelled internally as the `Driver` enum so
+                  the dispatch table is enforced at the type
+                  level. Not the Containerfile's
+                  `TORRUST_INDEX_DATABASE_DRIVER` env var
+                  (which takes `sqlite3` / `mysql`).
   database.path   For sqlite: the file path (absolute,
                   relative, or ":memory:"). For non-sqlite:
                   null.
   auth.*.pem_set  Raw presence (non-empty after resolution)
                   before PEM-overrides-PATH precedence.
+                  Empty-string-equals-absent collapsing
+                  happens *here*, at the container boundary,
+                  not in the config-crate deserialiser:
+                  `Auth` stores the fields as `Option<String>`
+                  and accepts `Some("")`. The probe folds both
+                  `None` and `Some("")` into `false` because a
+                  bare `${VAR}` in compose that substitutes to
+                  an empty value is indistinguishable from
+                  "unset" by the time the container starts.
   auth.*.path_set Same for the path field.
   auth.*.source   Winner after precedence: "pem", "path",
                   or "none".
@@ -1457,15 +1485,18 @@ Field semantics:
 Exit codes:
 
   0  Recognised, well-formed configuration.
-  1  Internal error (unhandled panic, unexpected I/O).
+  1  Unhandled panic (mapped from Rust's default 101 by a
+     `std::panic::set_hook` installed in `main`) or
+     unexpected I/O on stdout.
   2  Stdout is a TTY (P8), or clap argv-parse failure.
   3  Config-load failure (missing field, parse error, IO
      error). The underlying error message is forwarded
      verbatim to stderr via tracing.
   4  Security-critical field present but empty. Currently:
-     tracker.token. The probe rejects it at the container
-     boundary so that a bare ${VAR} in compose that
-     substitutes to "" fails at startup.
+     `tracker.token`. The probe rejects it via
+     `ApiToken::is_empty()` at the container boundary so
+     that a bare `${VAR}` in compose that substitutes to
+     `""` fails at startup.
   5  Unrecognised database scheme.
 ```
 
@@ -1501,6 +1532,15 @@ pass-through of `.path()`. For non-`sqlite` schemes the
 helper emits `null` for `database.path` and lets the engine
 own the semantics entirely.
 
+**UTF-8 assumption.** The hierarchical-path branch percent-
+decodes via `decode_utf8_lossy`, so a non-UTF-8 byte sequence
+in a sqlite path would be replaced with `U+FFFD`. Container
+deployments overwhelmingly use UTF-8 paths declared in YAML/
+TOML, so this is acceptable as the v1-schema trade-off; if a
+future deployment needs raw-bytes fidelity, switch the wire
+format to a base64-encoded byte string and bump the schema
+number.
+
 The script does not enumerate spellings; the table below
 shows the helper's *dispatch* output, not a promise about
 what the database engine will accept:
@@ -1512,7 +1552,7 @@ what the database engine will accept:
 | `sqlite::memory:`                     | `"sqlite"`         | `":memory:"`                 |
 | `sqlite:///srv/My%20Data/x.db`        | `"sqlite"`         | `"/srv/My Data/x.db"`        |
 | `mysql://user:pass@host:3306/db`      | `"mysql"`          | `null`                       |
-| `mariadb://...`                       | `"mariadb"`        | `null`                       |
+| `mariadb://...`                       | exit 5             | (stderr: "unsupported scheme: mariadb") |
 | `postgres://...`                      | exit 5             | (stderr: "unsupported scheme: postgres") |
 | (`connect_url` missing — see §5.2)    | exit 3             | (stderr: serde "missing field" message) |
 
@@ -1530,11 +1570,28 @@ parser's tree), and lets a future contributor add another
 small probe binary alongside this one without polluting the
 config crate's manifest.
 
+**Default-config-path single source of truth.** The probe
+binary calls `Info::from_env(DEFAULT_CONFIG_TOML_PATH)` —
+the JSON-safe sibling of `Info::new` added to
+`torrust-index-config` in the same change. `Info::from_env`
+reads `TORRUST_INDEX_CONFIG_TOML[_PATH]` exactly like
+`Info::new` does but skips the diagnostic `println!`s that
+would corrupt the probe's stdout-only contract. The default
+path is the `pub const DEFAULT_CONFIG_TOML_PATH` re-exported
+from `torrust-index-config`; the application bootstrap
+(`src/bootstrap/config.rs`) re-exports it under its existing
+`DEFAULT_PATH_CONFIG` name so application, helpers, and
+integration tests share one constant.
+
 **Tests.** Unit tests cover every row of the spelling
 table, the auth-key matrix (PEM-only, PATH-only, none, both
 PEM+PATH), missing-`connect_url`, empty `tracker.token`,
-and the `postgres:` scheme. Helper is a pure function of
-`(env, files)` → JSON/exit; testing is straightforward.
+and the `postgres:` scheme. The wire format of both enums
+(`AuthKeySource`, `Driver`) is pinned by dedicated
+lowercase-serialisation tests. Binary integration tests
+exercise the compiled binary's exit codes and JSON shape
+end-to-end. Helper is a pure function of `(env, files)` →
+JSON/exit; testing is straightforward.
 
 ---
 

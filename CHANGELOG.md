@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- ADR-T-009: Container infrastructure hardening (Phases 1, 2, 3, 4 & 5).
+- ADR-T-009: Container infrastructure hardening (Phases 1, 2, 3, 4, 5 & 6).
 - `torrust-index-config` workspace crate (`packages/index-config/`)
   containing the parsing surface of the configuration system: schema
   modules, validator, `load_settings`, `Info`, `Error`, the
@@ -106,6 +106,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `jq_donor` build stage in `Containerfile` providing `jq` to the runtime
   image so the entry script can extract PEM keys from the keypair helper's
   JSON output (ADR-T-009 Phase 2).
+- `packages/index-config-probe/` workspace crate hosting the
+  `torrust-index-config-probe` binary. Loads the application's `Settings`
+  through `torrust-index-config` (no bespoke parsing) and emits the
+  container-relevant subset as one JSON object on stdout: `schema`,
+  `database.driver` (`sqlite`/`mysql`, modelled as a typed `Driver` enum),
+  `database.path` (sqlite path or `null`), and `auth.{private,public}_key`
+  (`pem_set`, `path_set`, `source` ∈ {`pem`,`path`,`none`}, resolved
+  `path`). Refuses to run on a TTY, never echoes PEM material, and exits
+  with documented codes: 0 success, 1 panic/I-O, 2 TTY/clap-parse,
+  3 loader failure, 4 empty `tracker.token`, 5 unsupported scheme. The
+  sqlite path-extraction logic handles the opaque (`sqlite::memory:`),
+  authority (`sqlite://data.db?mode=rwc`), and hierarchical
+  (`sqlite:///var/...`) URL shapes, percent-decoding the hierarchical
+  branch (ADR-T-009 Phase 6, §D3).
+- `Info::from_env` constructor on `torrust-index-config` — the
+  JSON-safe sibling of `Info::new` that reads
+  `TORRUST_INDEX_CONFIG_TOML[_PATH]` exactly the same way but skips
+  the diagnostic `println!`s, so helper binaries with a JSON-only
+  stdout contract (ADR-T-009 P9) can share the application loader
+  without corrupting their output stream (ADR-T-009 Phase 6).
+- `pub const DEFAULT_CONFIG_TOML_PATH` on `torrust-index-config`,
+  re-exported from the application as
+  `crate::bootstrap::config::DEFAULT_PATH_CONFIG`, so the
+  application, helper binaries, and integration tests share a single
+  source of truth for the default config-TOML location
+  (ADR-T-009 Phase 6).
+- `ApiToken::is_empty()` accessor on `torrust-index-config` so the
+  config-probe can reject `tracker.token = ""` at the container
+  boundary without reaching into the type's byte representation
+  (ADR-T-009 Phase 6).
 - `#[doc(hidden)] pub mod test_helpers` in `torrust-index-config` exposing
   `PLACEHOLDER_TOML` (the canonical "minimal but legal" TOML) and
   `placeholder_settings()` (loads it via `load_settings`, panicking on
@@ -241,6 +271,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   absence now surfaces through serde rather than the bespoke
   pre-flight check, giving a single consistent error shape for
   every missing mandatory field (ADR-T-009 Phase 5).
+- `Info::new` on `torrust-index-config` now routes its
+  "loading extra configuration from …" diagnostics through
+  `tracing` (stderr) instead of `println!` (stdout). Helper
+  binaries with a JSON-only stdout contract (ADR-T-009 P9) can
+  still call `Info::from_env` for a fully silent variant; the
+  application's existing `bootstrap::config` call site picks up
+  the stderr-routed messages transparently (ADR-T-009 Phase 6).
 - **BREAKING:** Raise MSRV from 1.85 to 1.88.
 - **BREAKING:** `administrator: bool` replaced by `role: String` in API
   responses (`TokenResponse`, `UserCompact`, etc.). The legacy `admin: bool`

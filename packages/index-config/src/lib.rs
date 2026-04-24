@@ -82,6 +82,14 @@ pub const ENV_VAR_CONFIG_TOML: &str = "TORRUST_INDEX_CONFIG_TOML";
 /// The `index.toml` file location.
 pub const ENV_VAR_CONFIG_TOML_PATH: &str = "TORRUST_INDEX_CONFIG_TOML_PATH";
 
+/// Default path for the configuration TOML when neither
+/// [`ENV_VAR_CONFIG_TOML`] nor [`ENV_VAR_CONFIG_TOML_PATH`] is set.
+///
+/// Both the application bootstrap and helper binaries (e.g.
+/// `torrust-index-config-probe`) refer to this constant so the
+/// default cannot drift between call sites.
+pub const DEFAULT_CONFIG_TOML_PATH: &str = "./share/default/config/index.development.sqlite3.toml";
+
 /// The latest (and currently only) supported configuration schema version.
 ///
 /// `load_settings` rejects any parsed `Settings` whose
@@ -192,35 +200,53 @@ impl Info {
     ///
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(default_config_toml_path: String) -> Result<Self, Error> {
-        let env_var_config_toml = ENV_VAR_CONFIG_TOML.to_string();
-        let env_var_config_toml_path = ENV_VAR_CONFIG_TOML_PATH.to_string();
+        let info = Self::from_env(&default_config_toml_path);
 
+        if info.config_toml.is_some() {
+            // The TOML body may contain secrets (DB connect URLs, API
+            // tokens, SMTP passwords, …) so log only the env-var name
+            // — never its value — and route through `tracing` (stderr)
+            // so we don't pollute the JSON-only stdout contract used
+            // by helper binaries (P9).
+            tracing::info!(
+                env_var = ENV_VAR_CONFIG_TOML,
+                "loading extra configuration from environment variable"
+            );
+        }
+
+        if env::var(ENV_VAR_CONFIG_TOML_PATH).ok().is_some_and(|s| !s.is_empty()) {
+            tracing::info!(path = %info.config_toml_path, "loading extra configuration from file");
+        } else {
+            tracing::info!(
+                path = %info.config_toml_path,
+                "loading extra configuration from default configuration file"
+            );
+        }
+
+        Ok(info)
+    }
+
+    /// Build [`Info`] from the same env vars [`Self::new`] reads,
+    /// without the diagnostic `println!`s.
+    ///
+    /// Helper binaries that own a JSON-only stdout contract (P9)
+    /// must use this constructor instead of [`Self::new`] to avoid
+    /// corrupting their output stream.
+    #[must_use]
+    pub fn from_env(default_config_toml_path: &str) -> Self {
         // Treat an empty value as unset so callers (e.g. `docker compose`/`podman-compose`)
         // can safely forward `KEY=${HOST_VAR}` without clobbering the file-based config
         // when `HOST_VAR` is not exported.
-        let config_toml = env::var(env_var_config_toml)
+        let config_toml = env::var(ENV_VAR_CONFIG_TOML).ok().filter(|s| !s.is_empty());
+        let config_toml_path = env::var(ENV_VAR_CONFIG_TOML_PATH)
             .ok()
             .filter(|s| !s.is_empty())
-            .map(|config_toml| {
-                println!("Loading extra configuration from environment variable {config_toml} ...");
-                config_toml
-            });
+            .unwrap_or_else(|| default_config_toml_path.to_string());
 
-        let config_toml_path = env::var(env_var_config_toml_path).ok().filter(|s| !s.is_empty()).map_or_else(
-            || {
-                println!("Loading extra configuration from default configuration file: `{default_config_toml_path}` ...");
-                default_config_toml_path
-            },
-            |config_toml_path| {
-                println!("Loading extra configuration from file: `{config_toml_path}` ...");
-                config_toml_path
-            },
-        );
-
-        Ok(Self {
+        Self {
             config_toml,
             config_toml_path,
-        })
+        }
     }
 
     #[must_use]

@@ -4348,6 +4348,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "torrust-index-config-probe"
+version = "4.0.0-develop"
+dependencies = [
+ "clap",
+ "percent-encoding",
+ "serde",
+ "serde_json",
+ "torrust-index-cli-common",
+ "torrust-index-config",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "torrust-index-health-check"
 version = "4.0.0-develop"
 dependencies = [

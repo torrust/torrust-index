@@ -91,6 +91,18 @@ impl ApiToken {
     pub const fn as_bytes(&self) -> &[u8] {
         self.0.as_bytes()
     }
+
+    /// Returns `true` if the underlying token string is empty.
+    ///
+    /// `ApiToken::new` rejects empty input via `assert!`, but
+    /// `#[derive(Deserialize)]` bypasses that guard. Container
+    /// boundaries (e.g. `torrust-index-config-probe`) call this
+    /// to refuse a `tracker.token = ""` deserialised through a
+    /// bare `${VAR}` substitution.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
 }
 
 impl fmt::Display for ApiToken {

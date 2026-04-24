@@ -271,6 +271,12 @@ unless the probe rejects it.)
 
 **Follows from:** P5.
 **Addresses:** [R3](#r3--entry-script-path-assumptions-conflict-with-config-overrides).
+**Status:** Partially landed 2026-04-24 via
+[Phase 6](009-implementation-plan.md#phase-6--config-probe-helper)
+— `torrust-index-config-probe` ships the JSON-shaped
+resolution surface the entry script will dispatch on. The
+script-side mutual-exclusion and override-export logic
+lands in [Phase 7](009-implementation-plan.md#phase-7--entry-script-contract-d3).
 
 The `Auth` config struct exposes both `*_PEM` and `*_PATH`
 fields per key, and both
@@ -371,14 +377,15 @@ configuration, and the property "this binary has no HTTP/TLS
 deps" is a build-time invariant), P8 (no stdout to TTY),
 P9 (universal helper conventions).
 **Addresses:** [R4](#r4--health_check-pulls-in-reqwest-for-a-localhost-get).
-**Status:** Partially landed 2026-04-24 via
-[Phase 2](009-implementation-plan.md#phase-2--health-check--auth-keypair-helpers-d5)
-— `torrust-index-health-check` and
-`torrust-index-auth-keypair` shipped alongside the shared
-`torrust-index-cli-common` scaffolding crate. The third
-helper `torrust-index-config-probe` lands in
-[Phase 6](009-implementation-plan.md#phase-6--config-resolution-helper-d3-supporting-piece)
-once Phase 3 has extracted the config crate it depends on.
+**Status:** Landed 2026-04-24. Phases
+[2](009-implementation-plan.md#phase-2--health-check--auth-keypair-helpers-d5)
+and
+[6](009-implementation-plan.md#phase-6--config-probe-helper)
+shipped all three helper crates (`torrust-index-health-check`,
+`torrust-index-auth-keypair`, `torrust-index-config-probe`)
+alongside the shared `torrust-index-cli-common` scaffolding
+crate. Wiring them into the entry script is
+[Phase 7](009-implementation-plan.md#phase-7--entry-script-contract-d3).
 
 Every helper binary is extracted into its own workspace crate
 under `packages/index-*/` and follows P9's universal
@@ -419,7 +426,7 @@ the workspace *paths* are `packages/index-*/`.
 | `torrust-index-cli-common` | `packages/index-cli-common/` | *(library — no binary)* |
 | `torrust-index-health-check` | `packages/index-health-check/` | *(none — stdlib networking)* |
 | `torrust-index-auth-keypair` | `packages/index-auth-keypair/` | `rsa` (re-exports `pkcs8`) |
-| `torrust-index-config-probe` | `packages/index-config-probe/` | `torrust-index-config` (path dep; brings the full parsing surface: `figment`, `toml`, `serde_with`, `serde_json`, `url`, `camino`, `derive_more`, `thiserror`, `lettre` with `default-features = false`) |
+| `torrust-index-config-probe` | `packages/index-config-probe/` | `torrust-index-config` (path dep; brings the full parsing surface: `figment`, `toml`, `serde_with`, `serde_json`, `url`, `camino`, `derive_more`, `thiserror`, `lettre` with `default-features = false`); plus direct `url` and `percent-encoding` deps for the sqlite-URL path-extraction logic |
 
 Domain-specific deps are the *only* per-crate variation.
 The dep-closure exclusion check (Acceptance Criterion #5)
