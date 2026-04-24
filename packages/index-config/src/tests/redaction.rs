@@ -18,11 +18,11 @@ use std::net::SocketAddr;
 
 use url::Url;
 
-use crate::Settings;
+use crate::tests::placeholder_settings;
 
 #[test]
 fn tracker_token_is_replaced_with_stars() {
-    let mut s = Settings::default();
+    let mut s = placeholder_settings();
     let mut redacted = s.clone();
     redacted.remove_secrets();
     assert_ne!(s.tracker.token.to_string(), redacted.tracker.token.to_string());
@@ -32,7 +32,7 @@ fn tracker_token_is_replaced_with_stars() {
 
 #[test]
 fn database_password_is_replaced_with_stars() {
-    let mut s = Settings::default();
+    let mut s = placeholder_settings();
     s.database.connect_url = Url::parse("mysql://root:hunter2@db:3306/idx").unwrap();
     s.remove_secrets();
     assert_eq!(s.database.connect_url.password(), Some("***"));
@@ -41,7 +41,7 @@ fn database_password_is_replaced_with_stars() {
 
 #[test]
 fn database_url_without_password_is_unchanged() {
-    let mut s = Settings::default();
+    let mut s = placeholder_settings();
     s.database.connect_url = Url::parse("sqlite://data.db?mode=rwc").unwrap();
     let before = s.database.connect_url.clone();
     s.remove_secrets();
@@ -50,7 +50,7 @@ fn database_url_without_password_is_unchanged() {
 
 #[test]
 fn smtp_password_is_replaced_with_stars() {
-    let mut s = Settings::default();
+    let mut s = placeholder_settings();
     s.mail.smtp.credentials.password = "super-secret".to_owned();
     s.remove_secrets();
     assert_eq!(s.mail.smtp.credentials.password, "***");
@@ -58,7 +58,7 @@ fn smtp_password_is_replaced_with_stars() {
 
 #[test]
 fn auth_keys_are_redacted_when_set() {
-    let mut s = Settings::default();
+    let mut s = placeholder_settings();
     s.auth.private_key_pem = Some("-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----".into());
     s.auth.public_key_pem = Some("-----BEGIN PUBLIC KEY-----\nBBBB\n-----END PUBLIC KEY-----".into());
     s.auth.private_key_path = Some("/etc/torrust/jwt.key".into());
@@ -74,7 +74,7 @@ fn auth_keys_are_redacted_when_set() {
 
 #[test]
 fn non_secret_fields_are_preserved() {
-    let mut s = Settings::default();
+    let mut s = placeholder_settings();
     let original_bind: SocketAddr = s.net.bind_address;
     let original_threshold = s.logging.threshold.clone();
     s.remove_secrets();

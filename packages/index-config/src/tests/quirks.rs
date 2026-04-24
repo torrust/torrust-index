@@ -27,10 +27,10 @@ use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use tracing::level_filters::LevelFilter;
 use url::Url;
 
-use crate::tests::{MINIMUM_VALID_TOML, info_from};
+use crate::tests::{MINIMUM_VALID_TOML, info_from, placeholder_settings};
 use crate::v2::tracker::{ApiToken, Tracker};
 use crate::validator::{ValidationError, Validator};
-use crate::{Settings, Threshold, load_settings};
+use crate::{Threshold, load_settings};
 
 #[test]
 fn tls_empty_string_paths_deserialise_to_none() {
@@ -56,7 +56,7 @@ fn tls_section_with_no_fields_deserialises_to_none() {
 
 #[test]
 fn ipv6_bind_address_round_trips() {
-    let mut s = Settings::default();
+    let mut s = placeholder_settings();
     s.net.bind_address = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 7000);
     let toml = s.to_toml();
     let reloaded = load_settings(&info_from(&toml)).expect("IPv6 bind address must round-trip");
@@ -74,9 +74,12 @@ fn tracker_token_accepts_unicode_grapheme_clusters() {
 #[test]
 fn tracker_validator_rejects_udp_private() {
     let t = Tracker {
+        api_url: Url::parse("http://localhost:1212/").unwrap(),
+        listed: false,
         private: true,
+        token: ApiToken::new("MyAccessToken"),
+        token_valid_seconds: 7_257_600,
         url: Url::parse("udp://localhost:6969").unwrap(),
-        ..Tracker::default()
     };
     match t.validate() {
         Err(ValidationError::UdpTrackersInPrivateModeNotSupported) => {}
@@ -87,9 +90,12 @@ fn tracker_validator_rejects_udp_private() {
 #[test]
 fn tracker_validator_accepts_https_private() {
     let t = Tracker {
+        api_url: Url::parse("http://localhost:1212/").unwrap(),
+        listed: false,
         private: true,
+        token: ApiToken::new("MyAccessToken"),
+        token_valid_seconds: 7_257_600,
         url: Url::parse("https://tracker.example.com/announce").unwrap(),
-        ..Tracker::default()
     };
     t.validate().expect("HTTPS private trackers are allowed");
 }
@@ -133,7 +139,7 @@ fn empty_api_token_panics() {
 
 #[test]
 fn to_json_is_pretty_printed() {
-    let json = Settings::default().to_json();
+    let json = placeholder_settings().to_json();
     assert!(json.contains('\n'), "to_json should be pretty-printed (multi-line)");
     assert!(json.starts_with('{'));
     assert!(json.trim_end().ends_with('}'));

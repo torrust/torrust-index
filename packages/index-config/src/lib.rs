@@ -10,6 +10,9 @@ pub mod permissions;
 pub mod v2;
 pub mod validator;
 
+#[doc(hidden)]
+pub mod test_helpers;
+
 #[cfg(test)]
 mod tests;
 
@@ -19,7 +22,7 @@ use std::sync::Arc;
 use camino::Utf8PathBuf;
 use derive_more::Display;
 use figment::Figment;
-use figment::providers::{Env, Format, Serialized, Toml};
+use figment::providers::{Env, Format, Toml};
 use serde::{Deserialize, Serialize};
 use serde_with::{NoneAsEmptyString, serde_as};
 use thiserror::Error;
@@ -316,10 +319,12 @@ pub fn load_settings(info: &Info) -> Result<Settings, Error> {
     // Make sure user has provided the mandatory options.
     check_mandatory_options(&figment)?;
 
-    // Fill missing options with default values.
-    let figment = figment.join(Serialized::defaults(Settings::default()));
-
-    // Build final configuration.
+    // Build final configuration. Per-field `#[serde(default = "...")]`
+    // attributes fill in defaults for absent optional sections; the
+    // mandatory `tracker.token` and `database.connect_url` (and the
+    // enclosing `[tracker]` / `[database]` sections themselves) carry
+    // no schema-level default, so an absent value fails here with a
+    // precise serde `missing field` error (ADR-T-009 §D2).
     let settings: Settings = figment.extract()?;
 
     if settings.metadata.schema_version != Version::new(LATEST_VERSION) {
@@ -339,7 +344,7 @@ pub fn load_settings(info: &Info) -> Result<Settings, Error> {
 /// Will return an error if a mandatory configuration option is only
 /// obtained by default value, meaning the user hasn't overridden it.
 fn check_mandatory_options(figment: &Figment) -> Result<(), Error> {
-    let mandatory_options = ["logging.threshold", "metadata.schema_version", "tracker.token"];
+    let mandatory_options = ["logging.threshold", "metadata.schema_version"];
 
     for mandatory_option in mandatory_options {
         let found = figment.find_value(mandatory_option).is_ok();

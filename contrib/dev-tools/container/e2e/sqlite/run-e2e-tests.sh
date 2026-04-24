@@ -38,9 +38,16 @@ echo "Running E2E tests with a public tracker ..."
 docker ps
 
 # Run E2E tests with shared app instance
+#
+# The e2e config TOML intentionally omits `tracker.token` and
+# `database.connect_url` (operators are expected to supply them via env
+# overrides; see ADR-T-009 §D2). Inject host-side overrides so the test
+# process can load the same config file the container uses.
 TORRUST_INDEX_E2E_SHARED=true \
     TORRUST_INDEX_CONFIG_TOML_PATH="./share/default/config/index.public.e2e.container.sqlite3.toml" \
     TORRUST_INDEX_E2E_DB_CONNECT_URL="sqlite://./storage/index/lib/database/e2e_testing_sqlite3.db?mode=rwc" \
+    TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MyAccessToken" \
+    TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite://./storage/index/lib/database/e2e_testing_sqlite3.db?mode=rwc" \
     cargo test ||
     {
         ./contrib/dev-tools/container/e2e/sqlite/mode/public/e2e-env-down.sh
@@ -65,9 +72,15 @@ echo "Running E2E tests with a private tracker ..."
 docker ps
 
 # Run E2E tests with shared app instance
+#
+# Same rationale as above — supply mandatory `tracker.token` and
+# `database.connect_url` via env overrides for the host-side test
+# process (ADR-T-009 §D2).
 TORRUST_INDEX_E2E_SHARED=true \
     TORRUST_INDEX_CONFIG_TOML_PATH="./share/default/config/index.private.e2e.container.sqlite3.toml" \
     TORRUST_INDEX_E2E_DB_CONNECT_URL="sqlite://./storage/index/lib/database/e2e_testing_sqlite3.db?mode=rwc" \
+    TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MyAccessToken" \
+    TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite://./storage/index/lib/database/e2e_testing_sqlite3.db?mode=rwc" \
     cargo test ||
     {
         ./contrib/dev-tools/container/e2e/sqlite/mode/private/e2e-env-down.sh

@@ -15,6 +15,12 @@ services:
       - TORRUST_INDEX_DATABASE_DRIVER=${TORRUST_INDEX_DATABASE_DRIVER:-sqlite3}
       # DEV-ONLY default — change for any public or production deployment.
       - TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN=${TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN:-MyAccessToken}
+      # Mandatory at the schema level (ADR-T-009 §D2): the shipped
+      # default TOMLs no longer carry a `database.connect_url`, so the
+      # operator must inject one. The defaults below match the SQLite
+      # path materialised by the entry script and the MySQL service in
+      # this compose file.
+      - TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL=${TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL:-sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc}
     networks:
       - server_side
     ports:

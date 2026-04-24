@@ -6,6 +6,11 @@ use url::Url;
 use crate::validator::{ValidationError, Validator};
 
 /// Configuration for the associated tracker.
+///
+/// `token` is mandatory: there is no schema-level default and no
+/// `impl Default for Tracker`. A missing value fails at
+/// deserialisation with a precise serde `missing field 'token'`
+/// error (ADR-T-009 §D2).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Tracker {
     /// The url of the tracker API. For example: `http://localhost:1212/`.
@@ -21,7 +26,6 @@ pub struct Tracker {
     pub private: bool,
 
     /// The token used to authenticate with the tracker API.
-    #[serde(default = "Tracker::default_token")]
     pub token: ApiToken,
 
     /// The amount of seconds the tracker API token is valid.
@@ -40,19 +44,6 @@ impl Validator for Tracker {
         }
 
         Ok(())
-    }
-}
-
-impl Default for Tracker {
-    fn default() -> Self {
-        Self {
-            url: Self::default_url(),
-            listed: Self::default_listed(),
-            private: Self::default_private(),
-            api_url: Self::default_api_url(),
-            token: Self::default_token(),
-            token_valid_seconds: Self::default_token_valid_seconds(),
-        }
     }
 }
 
@@ -75,10 +66,6 @@ impl Tracker {
 
     fn default_api_url() -> Url {
         Url::parse("http://localhost:1212/").unwrap()
-    }
-
-    fn default_token() -> ApiToken {
-        ApiToken::new("MyAccessToken")
     }
 
     const fn default_token_valid_seconds() -> u64 {

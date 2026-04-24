@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- ADR-T-009: Container infrastructure hardening (Phases 1, 2, 3 & 4).
+- ADR-T-009: Container infrastructure hardening (Phases 1, 2, 3, 4 & 5).
 - `torrust-index-config` workspace crate (`packages/index-config/`)
   containing the parsing surface of the configuration system: schema
   modules, validator, `load_settings`, `Info`, `Error`, the
@@ -106,6 +106,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `jq_donor` build stage in `Containerfile` providing `jq` to the runtime
   image so the entry script can extract PEM keys from the keypair helper's
   JSON output (ADR-T-009 Phase 2).
+- `#[doc(hidden)] pub mod test_helpers` in `torrust-index-config` exposing
+  `PLACEHOLDER_TOML` (the canonical "minimal but legal" TOML) and
+  `placeholder_settings()` (loads it via `load_settings`, panicking on
+  failure). Single source of truth for the ~40 tests across both crates
+  that previously relied on the now-removed ambient `Settings::default()`
+  fixture (ADR-T-009 Phase 5).
+- `Configuration::for_tests` (test-only, `pub(crate)`) on the root crate's
+  runtime `Configuration` wrapper, replacing the deleted
+  `impl Default for Configuration` and seeding from `placeholder_settings()`
+  (ADR-T-009 Phase 5).
+- `clear_inherited_config_env()` test helper in `src/tests/config/` that
+  strips `TORRUST_INDEX_CONFIG_OVERRIDE_*` and
+  `TORRUST_INDEX_CONFIG_TOML[_PATH]` inside a `figment::Jail` closure so
+  default-configuration assertions stay deterministic when the suite is
+  re-run after an e2e session (ADR-T-009 Phase 5).
+- New loader tests `missing_database_connect_url_is_rejected` and
+  `missing_database_section_is_rejected` covering the two new mandatory
+  failure paths (ADR-T-009 Phase 5).
+- Inverted shipped-sample test suite
+  (`packages/index-config/tests/shipped_samples.rs`):
+  `every_shipped_index_toml_omits_credentials` asserts no shipped sample
+  carries `connect_url`, `token =`, `[mail.smtp]`, `private_key_path`, or
+  `public_key_path`; `every_shipped_index_toml_demands_runtime_secrets`
+  asserts the schema rejects each sample with a missing-field error
+  mentioning `token` or `connect_url` (ADR-T-009 Phase 5, §D2).
+- Default `TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL` in
+  `compose.yaml` matching the SQLite path the entry script materialises,
+  alongside the existing `TRACKER__TOKEN` default (ADR-T-009 Phase 5).
+- `TRACKER__TOKEN` and `DATABASE__CONNECT_URL` exports in the mysql and
+  sqlite e2e runner scripts so the host-side `cargo test` process sees
+  the same overrides the container receives (ADR-T-009 Phase 5).
 - `kid` (Key ID) header in every JWT for future key rotation support.
 - Configurable token lifetimes: `auth.session_token_lifetime_secs` (default:
   2 weeks) and `auth.email_verification_token_lifetime_secs` (default: ~10 years).
@@ -178,6 +209,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hosts) without stating its intent. The property the entry
   script actually enforces is "do not run as root"; that is now
   what it checks (ADR-T-009 Phase 4, D7).
+- **BREAKING:** `database.connect_url` and `tracker.token` are now
+  mandatory in the parsed configuration; the schema-level
+  `#[serde(default = "...")]` attributes and the
+  `impl Default for Database` / `impl Default for Tracker` blocks
+  have been removed. Omitting either field (or its enclosing
+  `[database]` / `[tracker]` section) now fails configuration
+  loading with a precise serde `missing field` error pointing at
+  the exact section. Operators must supply both via env-var
+  override (`TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL`,
+  `..._TRACKER__TOKEN`) or a side-loaded TOML; zero-config startup
+  is intentionally rejected (ADR-T-009 Phase 5, §D2).
+- **BREAKING:** All shipped sample TOMLs under
+  `share/default/config/` no longer carry `connect_url`, `token`,
+  `[mail.smtp]` values, or `[auth]` key paths. The
+  container-oriented samples (`index.*.container.*.toml`,
+  `index.private.e2e.container.sqlite3.toml`,
+  `index.public.e2e.container.*.toml`) and the bare-metal
+  `index.development.sqlite3.toml` template are all affected;
+  the two `tracker.*.e2e.container.sqlite3.toml` files lose
+  their `[tracker].token` value as well. Bare-metal developers
+  who copy `index.development.sqlite3.toml` verbatim must now
+  supply `connect_url` and `token` themselves (ADR-T-009
+  Phase 5, §D2).
+- `load_settings` no longer terminates with
+  `figment.join(Serialized::defaults(Settings::default()))`.
+  Optional sub-sections still default through their per-field
+  `#[serde(default = "...")]` attributes; mandatory fields no
+  longer have anywhere to silently come from (ADR-T-009 Phase 5).
+- `check_mandatory_options` no longer covers `tracker.token`; its
+  absence now surfaces through serde rather than the bespoke
+  pre-flight check, giving a single consistent error shape for
+  every missing mandatory field (ADR-T-009 Phase 5).
 - **BREAKING:** Raise MSRV from 1.85 to 1.88.
 - **BREAKING:** `administrator: bool` replaced by `role: String` in API
   responses (`TokenResponse`, `UserCompact`, etc.). The legacy `admin: bool`
@@ -312,6 +375,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CMD ["/usr/bin/torrust-index"]` / `HEALTHCHECK` block as
   release; operators reach a shell with `docker run … sh`
   (ADR-T-009 Phase 4).
+- `impl Default for Settings`, `impl Default for Tracker`,
+  `impl Default for Database`, and the matching
+  `#[serde(default = "...")]` attributes on `Settings::tracker`,
+  `Settings::database`, `Tracker::token`, and
+  `Database::connect_url`. Also removed: `Tracker::default_token()`
+  and `Settings::default_tracker()` (now dead code) (ADR-T-009
+  Phase 5).
+- `impl Default for Configuration` on the runtime wrapper —
+  superseded by the test-only `Configuration::for_tests`
+  (ADR-T-009 Phase 5).
 
 ## [4.0.0] - 2026-03-23
 

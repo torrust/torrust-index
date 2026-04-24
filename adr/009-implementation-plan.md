@@ -18,7 +18,7 @@ re-litigated here — when in doubt, defer to the ADR.
 | 2     | Helper binaries (D5)               | Done        |
 | 3     | Extract `index-config` crate       | Done        |
 | 4     | Runtime base split (D4, D7)        | Done        |
-| 5     | Schema (D2)                        | Not started |
+| 5     | Schema (D2)                        | Done        |
 | 6     | Config probe                       | Not started |
 | 7     | Entry-script contract              | Not started |
 | 8     | Compose split                      | Not started |
@@ -1121,9 +1121,21 @@ surface *potential* drift, not to enforce an exact match.
 
 ## Phase 5 — Schema & Credential Strip (D2)
 
+**Status:** Landed (2026-04-24).
 **Files.** `share/default/config/*.toml`,
-`src/config/v2/database.rs`, `src/config/v2/mod.rs`,
-`src/config/v2/tracker.rs`.
+`packages/index-config/src/v2/database.rs`,
+`packages/index-config/src/v2/mod.rs`,
+`packages/index-config/src/v2/tracker.rs`,
+`packages/index-config/src/lib.rs` (mandatory-options array,
+default-join removal),
+`packages/index-config/src/test_helpers.rs` (new — §5.3),
+`src/config/mod.rs` (`Configuration::for_tests`),
+plus test-fixture rewires across both crates.
+
+> Path note. The plan was written before Phase 3 landed and
+> originally referenced `src/config/v2/...`; in the merged
+> tree those modules live under `packages/index-config/src/v2/`.
+> Phase 5 edits the post-Phase-3 locations.
 
 ### 5.1 Strip credentials and environment-coupled values
 
@@ -1290,6 +1302,47 @@ error pointing at the exact section. No
 - **(c)** Two-stage `RawDatabase` → `Database` validation.
   Adds a phantom type whose only job is to be unwrapped once.
   Rejected.
+
+### 5.3 Implementation note — test-fixture consolidation
+
+Removing `impl Default for Settings` (and the `Database`
+/ `Tracker` `Default` impls under it) deletes the single
+ambient fixture that tests across both crates relied on.
+A naive port copies a placeholder TOML into every call
+site that used to write `Settings::default()`; that quickly
+drifts out of sync with the schema.
+
+The implementation introduces a single `#[doc(hidden)]
+pub mod test_helpers` in `torrust-index-config` exposing
+two items:
+
+- `PLACEHOLDER_TOML` — the canonical "minimal but legal"
+  TOML (every mandatory field present, nothing more).
+- `placeholder_settings() -> Settings` — loads that TOML
+  through `load_settings`, panicking on failure.
+
+The module is `#[doc(hidden)]` (so it does not appear in
+the public API surface) but `pub` (so integration test
+binaries in either crate can reach it without re-declaring
+the fixture). Consumers:
+
+- `packages/index-config/src/tests/mod.rs` re-exports
+  `PLACEHOLDER_TOML` under its historical `MINIMUM_VALID_TOML`
+  alias for in-tree tests.
+- `packages/index-config/tests/round_trip.rs` and
+  `tests/permission_overrides.rs` import the helper directly.
+- The root crate's `Configuration::for_tests`
+  ([`src/config/mod.rs`](../src/config/mod.rs)) — the
+  test-only replacement for the deleted
+  `Configuration::default` — loads from the same constant.
+- `tests/environments/isolated.rs::ephemeral` calls
+  `placeholder_settings()` to seed its baseline.
+
+[`tests/e2e/config.rs`](../tests/e2e/config.rs) intentionally
+does *not* use the helper: it tests the real shipped sample
+plus env-var overrides (mirroring the production
+`initialize_configuration` flow) and would lose its purpose
+if it swapped in the placeholder.
 
 ---
 

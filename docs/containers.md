@@ -2,20 +2,32 @@
 
 ## Demo environment
 
-It is simple to setup the index with the default
-configuration and run it using the pre-built public docker image:
+The pre-built public image still runs with one command, but
+after ADR-T-009 §D2 it requires two operator-supplied
+secrets at startup:
 
 With Docker:
 
 ```sh
-docker run -it torrust/index:latest
+docker run -it \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MyAccessToken" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc" \
+    torrust/index:latest
 ```
 
 or with Podman:
 
 ```sh
-podman run -it torrust/index:latest
+podman run -it \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MyAccessToken" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc" \
+    torrust/index:latest
 ```
+
+A bare `docker run -it torrust/index:latest` (the
+zero-config invocation that worked in earlier releases) now
+fails to start with a serde `missing field` error — this is
+intentional, see [ADR-T-009 §D2](../adr/009-container-infrastructure-refactor.md).
 
 ## Requirements
 
@@ -177,7 +189,8 @@ Environmental variables are loaded through the `--env`, in the format `--env VAR
 The following environmental variables can be set:
 
 - `TORRUST_INDEX_CONFIG_TOML_PATH` - The in-container path to the index configuration file, (default: `"/etc/torrust/index/index.toml"`).
-- `TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN` - Override of the admin token. If set, this value overrides any value set in the config.
+- `TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN` - **Required.** Tracker admin token. Per ADR-T-009 §D2 the shipped TOMLs no longer carry a default value for this field, so the operator must supply it via this env var (or pre-populate the in-volume `index.toml`). Startup fails with `missing field 'token'` otherwise.
+- `TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL` - **Required.** Database connection URL (e.g. `sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc` or a `mysql://...` URL). Same rule as `TRACKER__TOKEN`: shipped TOMLs no longer carry a default, so absent both env var and operator-supplied TOML the application fails to start with `missing field 'connect_url'`.
 - `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PATH` - Path to an RSA private key PEM file for JWT signing. Optional: without this, ephemeral auto-generated keys are used (sessions will not survive restarts).
 - `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PATH` - Path to an RSA public key PEM file for JWT verification. Required when `PRIVATE_KEY_PATH` is set.
 - `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PEM` - Inline RSA private key PEM string (alternative to file path). Optional: for persistent sessions.
@@ -249,6 +262,7 @@ mkdir -p ./storage/index/lib/ ./storage/index/log/ ./storage/index/etc/
 ##   --env TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PATH="/var/lib/torrust/index/jwt/public.pem" \
 docker run -it \
     --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MySecretToken" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc" \
     --env USER_ID="$(id -u)" \
     --publish 0.0.0.0:3001:3001/tcp \
     --volume ./storage/index/lib:/var/lib/torrust/index:Z \
@@ -269,6 +283,7 @@ mkdir -p ./storage/index/lib/ ./storage/index/log/ ./storage/index/etc/
 ## Run Torrust Index Container Image
 podman run -it \
     --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MySecretToken" \
+    --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/sqlite3.db?mode=rwc" \
     --env USER_ID="$(id -u)" \
     --publish 0.0.0.0:3001:3001/tcp \
     --volume ./storage/index/lib:/var/lib/torrust/index:Z \

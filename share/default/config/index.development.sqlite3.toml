@@ -14,7 +14,6 @@ threshold = "info"
 #threshold = "trace"
 
 [tracker]
-token = "MyAccessToken"
 
 [auth]
 

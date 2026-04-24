@@ -3,7 +3,7 @@ use crate::services::settings::{ConfigurationPublic, EmailOnSignup, extract_publ
 
 #[tokio::test]
 async fn configuration_should_return_only_public_settings() {
-    let configuration = Configuration::default();
+    let configuration = Configuration::for_tests();
     let all_settings = configuration.get_all().await;
 
     let email_on_signup = all_settings

@@ -36,7 +36,7 @@ use crate::models::user::UserCompact;
 /// Build a `JsonWebToken` service using ephemeral auto-generated keys
 /// (the default when no key paths are configured).
 async fn jwt_service() -> JsonWebToken {
-    let cfg = Arc::new(Configuration::default());
+    let cfg = Arc::new(Configuration::for_tests());
     JsonWebToken::new(cfg).await
 }
 

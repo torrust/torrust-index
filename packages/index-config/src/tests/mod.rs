@@ -23,19 +23,7 @@ mod quirks;
 mod redaction;
 
 use crate::Info;
-
-/// The minimum legal TOML — every mandatory option present, nothing
-/// more. Used as a known-good baseline by many tests.
-pub const MINIMUM_VALID_TOML: &str = r#"
-[metadata]
-schema_version = "2.0.0"
-
-[logging]
-threshold = "info"
-
-[tracker]
-token = "MyAccessToken"
-"#;
+pub use crate::test_helpers::{PLACEHOLDER_TOML as MINIMUM_VALID_TOML, placeholder_settings};
 
 /// Convenience: build an [`Info`] that bypasses the filesystem and
 /// the environment so tests stay hermetic and parallel-safe.

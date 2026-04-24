@@ -29,6 +29,11 @@ use crate::Metadata;
 use crate::validator::{ValidationError, Validator};
 
 /// The whole configuration for the index.
+///
+/// `tracker` and `database` carry no schema-level defaults — they
+/// must appear in the parsed input. Their absence (or the absence
+/// of their mandatory inner fields) fails deserialisation with a
+/// precise serde `missing field` error (ADR-T-009 §D2).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Settings {
     /// Configuration metadata.
@@ -44,7 +49,6 @@ pub struct Settings {
     pub website: Website,
 
     /// The tracker configuration.
-    #[serde(default = "Settings::default_tracker")]
     pub tracker: Tracker,
 
     /// The network configuration.
@@ -56,7 +60,6 @@ pub struct Settings {
     pub auth: Auth,
 
     /// The database configuration.
-    #[serde(default = "Settings::default_database")]
     pub database: Database,
 
     /// The SMTP configuration.
@@ -82,26 +85,6 @@ pub struct Settings {
     /// The tracker statistics importer job configuration.
     #[serde(default = "Settings::default_tracker_statistics_importer")]
     pub tracker_statistics_importer: TrackerStatisticsImporter,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            metadata: Self::default_metadata(),
-            logging: Self::default_logging(),
-            website: Self::default_website(),
-            tracker: Self::default_tracker(),
-            net: Self::default_network(),
-            auth: Self::default_auth(),
-            database: Self::default_database(),
-            mail: Self::default_mail(),
-            image_cache: Self::default_image_cache(),
-            api: Self::default_api(),
-            registration: Self::default_registration(),
-            permissions: Self::default_permissions(),
-            tracker_statistics_importer: Self::default_tracker_statistics_importer(),
-        }
-    }
 }
 
 impl Settings {
@@ -157,20 +140,12 @@ impl Settings {
         Website::default()
     }
 
-    fn default_tracker() -> Tracker {
-        Tracker::default()
-    }
-
     fn default_network() -> Network {
         Network::default()
     }
 
     fn default_auth() -> Auth {
         Auth::default()
-    }
-
-    fn default_database() -> Database {
-        Database::default()
     }
 
     fn default_mail() -> Mail {

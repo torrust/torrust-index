@@ -10,18 +10,8 @@
 //! | `effect_must_be_lowercase`                    | `"Allow"` (capitalised) fails to deserialise.             |
 
 use torrust_index_config::permissions::{Action, Effect, Role};
+use torrust_index_config::test_helpers::PLACEHOLDER_TOML as BASE;
 use torrust_index_config::{Error, Info, load_settings};
-
-const BASE: &str = r#"
-[metadata]
-schema_version = "2.0.0"
-
-[logging]
-threshold = "info"
-
-[tracker]
-token = "MyAccessToken"
-"#;
 
 #[test]
 fn multiple_overrides_load_in_declared_order() {

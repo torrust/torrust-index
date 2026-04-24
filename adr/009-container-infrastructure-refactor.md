@@ -215,6 +215,8 @@ continues to work.
 
 **Follows from:** P1, P4.
 **Addresses:** [R2](#r2--credentials-embedded-in-shipped-default-configs).
+**Status:** Landed 2026-04-24 via
+[Phase 5](009-implementation-plan.md#phase-5--schema--credential-strip-d2).
 
 Every file under `share/default/config/` loses its literal
 `connect_url`, `token`, and `[mail.smtp]` values. The single
