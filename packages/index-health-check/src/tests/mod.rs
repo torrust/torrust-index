@@ -10,6 +10,9 @@
 //! | `localhost_falls_back_to_ipv4`      | `::1` refuses, `127.0.0.1` listens    |
 //! | `ipv6_literal_url_is_supported`     | `http://[::1]:port/` parses + connects |
 //! | `prefers_ipv6_when_both_listen`     | Dual-stack: IPv6 attempted first      |
+//! | `error_display_carries_message`     | `HealthCheckError: Display`           |
+//! | `unsupported_scheme_url_is_rejected` | `https://...` URL fails fast         |
+//! | `malformed_url_no_host_fails`       | Resolver-failure branch               |
 
 use std::io::{Read, Write};
 use std::net::{IpAddr, TcpListener, ToSocketAddrs};
@@ -190,4 +193,42 @@ fn prefers_ipv6_when_both_listen() {
     let result = handle.join().unwrap();
     drop(v4);
     assert!(result.is_ok(), "IPv6 should have won the connect race");
+}
+
+#[test]
+fn error_display_carries_message() {
+    let err = super::HealthCheckError("boom".to_string());
+    assert_eq!(err.to_string(), "boom");
+    // Smoke-check the `Debug` derive too \u2014 it surfaces the
+    // wrapped string in error reporters.
+    assert!(format!("{err:?}").contains("boom"));
+}
+
+#[test]
+fn unsupported_scheme_url_is_rejected() {
+    // The probe is HTTP-only on purpose (no TLS dependency).
+    // Anything else \u2014 `https`, `unix`, `\xe2\x80\xa6` \u2014 fails fast at the
+    // URL-parse stage.
+    let result = super::do_health_check("https://example.com/health_check");
+    let Err(err) = result else {
+        panic!("https must be rejected");
+    };
+    assert!(err.to_string().contains("unsupported URL scheme"));
+}
+
+#[test]
+fn unresolvable_host_surfaces_resolver_error() {
+    // `.invalid` is reserved by RFC 6761 to never resolve, so
+    // this exercises the `to_socket_addrs` error branch.
+    // Use a `localhost`-ish form that includes a port so we
+    // don't trip the URL parser before we reach the resolver.
+    let result = super::do_health_check("http://nonexistent.invalid:65535/x");
+    let Err(err) = result else {
+        panic!("unresolvable host must error");
+    };
+    let msg = err.to_string();
+    assert!(
+        msg.contains("resolve") || msg.contains("connect"),
+        "expected resolver/connect error, got: {msg}"
+    );
 }

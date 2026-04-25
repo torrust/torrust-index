@@ -10,17 +10,21 @@
 //!
 //! | Module        | Focus                                                |
 //! |---------------|------------------------------------------------------|
+//! | `info`        | `Info::new` / `Info::from_env` / `Tls::default`.     |
 //! | `loader`      | `load_settings` happy path + every `Error` variant.  |
 //! | `metadata`    | `Metadata` / `Version` / `App` / `Purpose` shape.    |
 //! | `redaction`   | `Settings::remove_secrets` covers every secret slot. |
 //! | `quirks`      | Unicode, IPv6, NoneAsEmptyString, validator quirks.  |
 //! | `permissions` | `Role` / `Action` / `Effect` round-trip & overrides. |
+//! | `tracker`     | `Tracker::override_*` + `ApiToken` accessors.        |
 
+mod info;
 mod loader;
 mod metadata;
 mod permissions;
 mod quirks;
 mod redaction;
+mod tracker;
 
 use crate::Info;
 pub use crate::test_helpers::{PLACEHOLDER_TOML as MINIMUM_VALID_TOML, placeholder_settings};

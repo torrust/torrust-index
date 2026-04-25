@@ -7,6 +7,9 @@
 
 use std::io::{self, IsTerminal, Write};
 
+#[cfg(test)]
+mod tests;
+
 /// Refuse to run if stdout is a terminal (P8).
 ///
 /// Emits a `tracing::error!` event (NDJSON on stderr, per P9)

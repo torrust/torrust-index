@@ -18,6 +18,8 @@
 //! | `auth_key_source_serialises_lowercase`            | enum wire format is stable                       |
 //! | `driver_serialises_lowercase`                     | `Driver` enum wire format is stable              |
 //! | `placeholder_settings_yield_known_shape`          | end-to-end shape via `settings_with_database`    |
+//! | `probe_error_display_messages`                    | `Display for ProbeError` is human-readable       |
+//! | `probe_error_implements_std_error`                | `ProbeError` is a real `std::error::Error`       |
 
 use serde_json::json;
 use torrust_index_config::test_helpers::placeholder_settings;
@@ -206,4 +208,25 @@ fn placeholder_settings_yield_known_shape() {
     );
     assert_eq!(out.auth.private_key.source, AuthKeySource::None);
     assert_eq!(out.auth.public_key.source, AuthKeySource::None);
+}
+
+#[test]
+fn probe_error_display_messages() {
+    // The binary logs `error = %e` (i.e. via `Display`), so
+    // the `Display` strings are the user-visible diagnostic.
+    assert_eq!(ProbeError::EmptyTrackerToken.to_string(), "tracker.token is empty");
+    assert_eq!(
+        ProbeError::UnsupportedScheme("postgres".to_string()).to_string(),
+        "unsupported scheme: postgres"
+    );
+}
+
+#[test]
+fn probe_error_implements_std_error() {
+    // `ProbeError: std::error::Error` lets callers compose it
+    // through `?` into bigger error enums. Pin the trait bound
+    // statically.
+    fn assert_error<E: std::error::Error>(_: &E) {}
+    assert_error(&ProbeError::EmptyTrackerToken);
+    assert_error(&ProbeError::UnsupportedScheme("x".into()));
 }
