@@ -258,6 +258,13 @@ COPY --from=runtime_assets /etc/profile /etc/profile
 COPY --from=runtime_assets /bin/busybox            /usr/bin/busybox
 COPY --from=runtime_assets /bin/su-exec            /usr/bin/su-exec
 COPY --from=runtime_assets /usr/local/bin/entry.sh /usr/local/bin/entry.sh
+# `entry.sh` sources its pure-function library from this path
+# at start-up; without it the container exits immediately with
+# "can't open /usr/local/lib/torrust/entry_script_lib_sh".
+# The debug runtime base copies the file directly from the
+# build context (see further down); the release base goes via
+# `runtime_assets` to keep the per-path copy list explicit.
+COPY --from=runtime_assets /usr/local/lib/torrust/entry_script_lib_sh /usr/local/lib/torrust/entry_script_lib_sh
 COPY --from=preflight_gate /tmp/.adduser-ok /tmp/.preflight-sentinel
 # Pin PATH so a future base-image change cannot silently break
 # the entry script's bare-name lookups.
