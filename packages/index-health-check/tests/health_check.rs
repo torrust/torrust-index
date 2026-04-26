@@ -24,8 +24,12 @@ fn ephemeral_server() -> (TcpListener, String) {
 /// Accept one connection, read the request, respond with `response`.
 fn serve_once(listener: &TcpListener, response: &[u8]) {
     let (mut stream, _) = listener.accept().unwrap();
+    // Drain a single read of the request line/headers. We don't
+    // care about the exact byte count — the test only needs to
+    // unblock the client so it sees our canned response — but we
+    // do want to surface unexpected IO errors loudly.
     let mut buf = [0u8; 1024];
-    let _n = stream.read(&mut buf);
+    let _bytes_read = stream.read(&mut buf).expect("failed to read request from test client");
     stream.write_all(response).unwrap();
     stream.flush().unwrap();
 }

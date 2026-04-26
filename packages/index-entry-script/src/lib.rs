@@ -141,7 +141,10 @@ pub fn run_sh_with_args(snippet: &str, args: &[&str]) -> Output {
         .to_str()
         .expect("entry_script_lib_sh tempfile path must be UTF-8 for sh -c");
 
-    let script = format!(". \"{lib}\"\n{snippet}");
+    // Mirror `run_sh`: run under `set -eu` so the args variant
+    // shares the same discipline as the entry script itself and
+    // cannot mask unbound variables or unchecked failures.
+    let script = format!("set -eu\n. \"{lib}\"\n{snippet}");
 
     let mut cmd = Command::new("sh");
     cmd.arg("-c")

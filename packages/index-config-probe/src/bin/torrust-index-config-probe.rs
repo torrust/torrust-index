@@ -25,12 +25,12 @@ fn main() -> ExitCode {
     install_panic_hook();
 
     let args = Args::parse();
-    refuse_if_stdout_is_tty("torrust-index-config-probe");
     init_json_tracing(if args.base.debug {
         tracing::Level::DEBUG
     } else {
         tracing::Level::INFO
     });
+    refuse_if_stdout_is_tty("torrust-index-config-probe");
 
     // `Info::from_env` is the JSON-safe sibling of `Info::new`:
     // it reads the same env vars but skips the diagnostic
