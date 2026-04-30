@@ -76,9 +76,28 @@ async fn it_should_allow_admins_to_get_all_the_settings() {
 
     let response = client.get_settings().await;
 
-    let res: AllSettingsResponse = serde_json::from_str(&response.body).unwrap();
+    let mut actual: AllSettingsResponse = serde_json::from_str(&response.body).unwrap();
+    let mut expected = env.server_settings_masking_secrets().unwrap();
 
-    assert_eq!(res.data, env.server_settings_masking_secrets().unwrap());
+    // Normalise environment-specific fields that legitimately differ
+    // between the host-side loader (which builds `expected` from the
+    // shipped TOML plus the host's env overrides) and the container's
+    // effective configuration (which the entry script may augment —
+    // e.g. defaulting `auth.{private,public}_key_path` to
+    // `/etc/torrust/index/auth/{private,public}.pem` when neither
+    // PEM nor path is supplied; ADR-T-009 §7). The DB connect URL
+    // similarly differs because the container path
+    // (`/var/lib/torrust/index/database/...`) is the bind-mount
+    // target of the host path the test runner uses
+    // (`./storage/index/lib/database/...`).
+    actual.data.auth.private_key_path = None;
+    actual.data.auth.public_key_path = None;
+    actual.data.database.connect_url.clear();
+    expected.auth.private_key_path = None;
+    expected.auth.public_key_path = None;
+    expected.database.connect_url.clear();
+
+    assert_eq!(actual.data, expected);
 
     assert_json_ok_response(&response);
 }

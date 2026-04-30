@@ -62,7 +62,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     let importer_port = settings.tracker_statistics_importer.port;
     // From [net] config
     let config_bind_address = settings.net.bind_address;
-    let opt_net_tsl = settings.net.tsl.clone();
+    let opt_net_tls = settings.net.tls.clone();
     // From [permissions] config
     let permission_overrides = settings.permissions.overrides.clone();
 
@@ -201,7 +201,7 @@ pub async fn run(configuration: Configuration, api_version: &Version) -> Running
     );
 
     // Start API server
-    let running_api = web::api::start(app_data, config_bind_address, opt_net_tsl, api_version).await;
+    let running_api = web::api::start(app_data, config_bind_address, opt_net_tls, api_version).await;
 
     // Full running application
     Running {

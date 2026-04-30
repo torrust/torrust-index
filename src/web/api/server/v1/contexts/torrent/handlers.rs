@@ -326,7 +326,7 @@ pub async fn create_random_torrent_handler(State(_app_data): State<Arc<AppData>>
     )
 }
 
-/// Extracts the [`TorrentRequest`] from the multipart form payload.
+/// Extracts the [`AddTorrentRequest`] from the multipart form payload.
 ///
 /// # Errors
 ///

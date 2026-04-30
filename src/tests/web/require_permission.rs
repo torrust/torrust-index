@@ -140,7 +140,7 @@ async fn jwt_service(cfg: Arc<Configuration>) -> JsonWebToken {
 /// are constructed with defaults to satisfy the `AppData` struct.
 #[allow(clippy::too_many_lines)]
 async fn test_app_data(db_path: &str) -> Arc<AppData> {
-    let cfg = Arc::new(Configuration::default());
+    let cfg = Arc::new(Configuration::for_tests());
 
     // Point config at the temp database.
     {

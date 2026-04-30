@@ -213,15 +213,22 @@ direct dependency along with `rand`. PEM export uses
 `EncodePublicKey::to_public_key_pem` from transitive `pkcs8`
 and `spki`.
 
-### Phase 6 — `generate-auth-keypair` CLI ✅
+### Phase 6 — `auth-keypair` CLI ✅
 
-A binary `torrust-generate-auth-keypair`
-(`src/bin/generate_auth_keypair.rs`) generates an RSA-2048 key
-pair to stdout. Design:
+A binary `torrust-index-auth-keypair` (initially shipped as
+`torrust-generate-auth-keypair`) generates an RSA-2048 key
+pair to stdout. As of ADR-T-009 Phase 2 the binary lives in
+its own workspace crate at
+[`packages/index-auth-keypair/`](../packages/index-auth-keypair/);
+the earlier `src/bin/generate_auth_keypair.rs` location no
+longer exists. Design:
 
-- Refuses to run if stdout is a terminal.
-- Private key first, then public key — self-delimiting PEM.
-- Diagnostics on stderr via `tracing`; `--debug` for verbose.
+- Refuses to run if stdout is a terminal (exit code 2).
+- Emits a single JSON object
+  `{"private_key_pem": "...", "public_key_pem": "..."}`
+  on stdout (P9 of ADR-T-009). The original raw-PEM
+  output was replaced in Phase 2.
+- Diagnostics on stderr via `tracing` (NDJSON); `--debug` for verbose.
 - Uses `clap` for CLI.
 
 #### Container integration
@@ -235,7 +242,10 @@ auto-generates persistent keys on first boot into
 - `[ ! -s … ]` (existence + non-empty) guards against
   zero-byte files from interrupted prior runs.
 - `trap … EXIT` ensures temp file cleanup.
-- `sed` matches exact PEM markers (PKCS#8 / SPKI).
+- `jq -r .private_key_pem` / `jq -r .public_key_pem` extract
+  the PEM blocks from the helper's JSON output (post
+  ADR-T-009 Phase 2; the original implementation used `sed`
+  against raw PEM markers).
 - Errors on stderr (visible in `docker logs`); non-zero exit
   on failure.
 - **TOCTOU note:** if two containers race against the same
@@ -249,9 +259,11 @@ via the `/etc/torrust/index` volume.
 
 #### Containerfile
 
-`torrust-generate-auth-keypair` is copied into `/usr/bin/` in
+`torrust-index-auth-keypair` is copied into `/usr/bin/` in
 both the debug and release runtime images alongside
-`torrust-index` and `health_check`.
+`torrust-index` and (release only) `torrust-index-health-check`.
+The debug image deliberately omits the health-check binary —
+see [`docs/containers.md`](../docs/containers.md#debug-image-healthcheck).
 
 #### Host-supplied keys
 
@@ -268,17 +280,17 @@ Two workflows:
 ```sh
 tmpfile=$(mktemp /tmp/auth_keys.XXXXXX)
 chmod 0600 "$tmpfile"
-cargo run --bin torrust-generate-auth-keypair > "$tmpfile"
-sed -n '/BEGIN PRIVATE KEY/,/END PRIVATE KEY/p' "$tmpfile" > private.pem
-sed -n '/BEGIN PUBLIC KEY/,/END PUBLIC KEY/p'   "$tmpfile" > public.pem
+cargo run -p torrust-index-auth-keypair > "$tmpfile"
+jq -r .private_key_pem "$tmpfile" > private.pem
+jq -r .public_key_pem  "$tmpfile" > public.pem
 rm -f "$tmpfile"
 ```
 
-> **Avoid** the Bash process-substitution form
-> (`tee >(sed …) >(sed …)`). The `>(…)` sub-processes run
-> asynchronously, so the `sed` writes may not have flushed
-> when the pipeline exits — producing truncated PEM files.
-> The POSIX version above is strictly correct.
+The helper emits a single JSON object on stdout, so any
+JSON-aware consumer (`jq`, `python -m json.tool`, a
+`serde_json::from_reader::<KeypairOutput>` in Rust) works.
+The earlier `sed` PEM-marker recipe is no longer applicable
+because newlines inside the PEM bodies are JSON-escaped.
 
 ### Phase 7 — Consolidate Session Validation ✅
 
@@ -436,7 +448,7 @@ pub async fn renew_token(
 Deployers upgrading across Phases 2–3 must:
 
 1. Generate an RSA key pair — via
-   `torrust-generate-auth-keypair` (Phase 6) or `openssl`.
+   `torrust-index-auth-keypair` (Phase 6) or `openssl`.
 2. Update config to reference key paths (or set env vars).
 3. Accept session invalidation (users re-login once).
 

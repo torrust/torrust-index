@@ -1,0 +1,25 @@
+[package]
+name = "torrust-index-auth-keypair"
+
+authors.workspace = true
+description = "RSA-2048 key pair generator for Torrust Index JWT authentication"
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+torrust-index-cli-common = { version = "4.0.0-develop", path = "../index-cli-common" }
+
+clap = { version = "4", features = ["derive"] }
+rsa = { version = "0.9", default-features = false, features = ["std", "pem"] }
+serde = { version = "1", features = ["derive"] }
+tracing = "0"
+
+[dev-dependencies]
+serde_json = "1"
+
+[lints]
+workspace = true

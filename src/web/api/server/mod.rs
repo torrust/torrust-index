@@ -15,19 +15,21 @@ use v1::routes::router;
 use self::signals::{Halted, Started};
 use super::Running;
 use crate::common::AppData;
-use crate::config::Tsl;
+// Re-export the type alias defined by the extracted config crate so
+// existing `crate::web::api::server::DynError` call sites keep working
+// without the root crate carrying its own duplicate definition.
+pub use crate::config::DynError;
+use crate::config::Tls;
 use crate::web::api::server::custom_axum::TimeoutAcceptor;
 use crate::web::api::server::signals::graceful_shutdown;
-
-pub type DynError = Arc<dyn std::error::Error + Send + Sync>;
 
 /// Starts the API server.
 ///
 /// # Panics
 ///
 /// Panics if the API server can't be started.
-pub async fn start(app_data: Arc<AppData>, config_bind_address: SocketAddr, opt_tsl: Option<Tsl>) -> Running {
-    let opt_rust_tls_config = make_rust_tls(&opt_tsl)
+pub async fn start(app_data: Arc<AppData>, config_bind_address: SocketAddr, opt_tls: Option<Tls>) -> Running {
+    let opt_rust_tls_config = make_rust_tls(&opt_tls)
         .await
         .map(|tls| tls.expect("it should have a valid net tls configuration"));
 
@@ -97,7 +99,7 @@ async fn start_server(
         Some(tls) => custom_axum::from_tcp_rustls_with_timeouts(socket, tls)
             .expect("Could not create rustls server from tcp listener")
             .handle(handle)
-            // The TimeoutAcceptor is commented because TSL does not work with it.
+            // The TimeoutAcceptor is commented because TLS does not work with it.
             // See: https://github.com/torrust/torrust-index/issues/204
             //.acceptor(TimeoutAcceptor)
             .serve(router.into_make_service_with_connect_info::<std::net::SocketAddr>())
@@ -128,9 +130,9 @@ pub enum Error {
     },
 }
 
-pub async fn make_rust_tls(tsl_config: &Option<Tsl>) -> Option<Result<RustlsConfig, Error>> {
-    if let Some(tsl) = tsl_config {
-        if let (Some(cert), Some(key)) = (tsl.ssl_cert_path.clone(), tsl.ssl_key_path.clone()) {
+pub async fn make_rust_tls(tls_config: &Option<Tls>) -> Option<Result<RustlsConfig, Error>> {
+    if let Some(tls) = tls_config {
+        if let (Some(cert), Some(key)) = (tls.ssl_cert_path.clone(), tls.ssl_key_path.clone()) {
             info!("Using https. Cert path: {cert}.");
             info!("Using https. Key path: {key}.");
 

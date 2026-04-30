@@ -1,75 +1,138 @@
 #!/bin/sh
-set -x
+[ "${DEBUG:-}" = "1" ] && set -x
 
-to_lc() { echo "$1" | tr '[:upper:]' '[:lower:]'; }
-clean() { echo "$1" | tr -d -c 'a-zA-Z0-9-' ; }
-cmp_lc() { [ "$(to_lc "$(clean "$1")")" = "$(to_lc "$(clean "$2")")" ]; }
+# ── Canonical env-var manifest (ADR-T-009 Acceptance Criterion #7) ──
+# Single source of truth for every environment variable the
+# entry script consults — including dynamically constructed
+# names (e.g. AUTH__{PRIVATE,PUBLIC}_KEY_{PEM,PATH} built
+# via "${uc_pair}_PEM" / "${uc_pair}_PATH") that a naive
+# grep would miss. CI verifies that every name listed
+# between the sentinels appears somewhere in
+# docs/containers.md. Keep the block in sync when adding
+# or removing env vars.
+#
+# ENTRY_ENV_VARS:
+#   TORRUST_INDEX_CONFIG_TOML_PATH
+#   TORRUST_INDEX_DATABASE_DRIVER
+#   TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PEM
+#   TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PRIVATE_KEY_PATH
+#   TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PEM
+#   TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__PUBLIC_KEY_PATH
+#   TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN
+#   TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL
+#   USER_ID
+#   API_PORT
+#   IMPORTER_API_PORT
+#   DEBUG
+#   TZ
+#   RUNTIME
+# END_ENTRY_ENV_VARS
 
+# ── Shell discipline (Phase 7, ADR-T-009 §D3) ────────────
+# `set -e` aborts on unchecked failures; `set -u` catches
+# typos in variable names. The `${var:-}` patterns below are
+# `set -u`-safe by construction. Helper functions defined
+# in this file are written to be `set -e`-safe (see the
+# entry-script audit notes in ADR-T-009 §D3).
+set -eu
 
-inst() {
-    if [ -n "$1" ] && [ -n "$2" ] && [ -e "$1" ] && [ ! -e "$2" ]; then
-        install -D -m 0640 -o torrust -g torrust "$1" "$2"; fi; }
+# ── Helper functions (sourced) ────────────────────────────
+# Pure functions live in entry_script_lib_sh so the
+# Rust integration tests in packages/index-entry-script/
+# can source them directly. The library has no top-level
+# side effects.
+# shellcheck disable=SC1091 # runtime path; not resolvable at lint time
+. /usr/local/lib/torrust/entry_script_lib_sh
 
-
-# Add torrust user, based upon supplied user-id.
-if [ -z "$USER_ID" ] && [ "$USER_ID" -lt 1000 ]; then
-    echo "ERROR: USER_ID is not set, or less than 1000"
+# ── User account setup ────────────────────────────────────
+# D7: validate that USER_ID is numeric and is not 0 (root).
+case ${USER_ID:-} in
+    ''|*[!0-9]*)
+        echo "ERROR: USER_ID is unset or not numeric" >&2
+        exit 1
+        ;;
+esac
+if [ "$USER_ID" -eq 0 ]; then
+    echo "ERROR: USER_ID is 0 (root) — refusing to run as root" >&2
     exit 1
 fi
 
-adduser --disabled-password --shell "/bin/sh" --uid "$USER_ID" "torrust"
+# Use the busybox `adduser` short-option form so the same
+# invocation works on both runtime bases (release uses the
+# lean distroless base + a single root-only busybox; debug
+# inherits the donor's full /busybox/ tree). Distroless
+# `cc-debian13` ships /etc/passwd and /etc/group but not
+# /etc/shadow; `-D` honours that. Busybox `adduser -s` does
+# not consult /etc/shells, which the lean base also lacks.
+#
+# Busybox `adduser -D -u UID NAME` writes only `/etc/passwd`;
+# it does not synthesise a matching `/etc/group` entry, so a
+# downstream `install -g torrust …` would fail with
+# `unknown group torrust`. Create the group first with
+# `addgroup`, then attach the user to it via `-G`.
+#
+# Idempotency: container restarts (e.g. under a restart
+# policy) re-execute the entry script against the same
+# writable layer, so the `torrust` group/user already exist
+# on subsequent boots. Both steps are guarded so the restart
+# path is a no-op rather than a fatal exit under `set -e`.
+if ! grep -q '^torrust:' /etc/group; then
+    addgroup -g "$USER_ID" torrust
+fi
+if ! grep -q '^torrust:' /etc/passwd; then
+    adduser -D -s /bin/sh -u "$USER_ID" -G torrust torrust
+fi
 
-# Configure Permissions for Torrust Folders
-mkdir -p /var/lib/torrust/index/database/ /etc/torrust/index/
+# ── Volume directory ownership ────────────────────────────
+mkdir -p /var/lib/torrust/index/database/ /var/log/torrust/index/ /etc/torrust/index/
 chown -R "${USER_ID}" /var/lib/torrust /var/log/torrust /etc/torrust
 chmod -R 2770 /var/lib/torrust /var/log/torrust /etc/torrust
 
-
-# Install the database and config:
-if [ -n "$TORRUST_INDEX_DATABASE_DRIVER" ]; then
-    if cmp_lc "$TORRUST_INDEX_DATABASE_DRIVER" "sqlite3"; then
-
-        # Select sqlite3 empty database
-        default_database="/usr/share/torrust/default/database/index.sqlite3.db"
-
-        # Select sqlite3 default configuration
-        default_config="/usr/share/torrust/default/config/index.container.sqlite3.toml"
-
-    elif cmp_lc "$TORRUST_INDEX_DATABASE_DRIVER" "mysql"; then
-
-        # (no database file needed for mysql)
-
-        # Select default mysql configuration
-        default_config="/usr/share/torrust/default/config/index.container.mysql.toml"
-
-    else 
-        echo "Error: Unsupported Database Type: \"$TORRUST_INDEX_DATABASE_DRIVER\"."
-        echo "Please Note: Supported Database Types: \"sqlite3\", \"mysql\"."
+# ── Default TOML installation ─────────────────────────────
+# Phase 5 made `database.connect_url` mandatory and Phase 9
+# consequently consolidated the two driver-suffixed shipped
+# samples into a single driver-agnostic
+# `index.container.toml` (the file no longer encodes a
+# driver choice). `TORRUST_INDEX_DATABASE_DRIVER` is kept
+# here as an input-validation gate — surfacing typos early
+# rather than letting an unrecognised driver name silently
+# propagate to the application — but both supported values
+# now seed the same template. Runtime database decisions
+# come from the config probe's `database.driver` field,
+# below. See ADR-T-009 §7.4 / §9 (Phase 9 consolidation).
+case ${TORRUST_INDEX_DATABASE_DRIVER:-} in
+    sqlite3|SQLITE3|Sqlite3|mysql|MYSQL|MySQL|Mysql)
+        default_config="/usr/share/torrust/default/config/index.container.toml"
+        ;;
+    '')
+        echo "ERROR: \$TORRUST_INDEX_DATABASE_DRIVER was not set!" >&2
         exit 1
-    fi
-else
-    echo "Error: \"\$TORRUST_INDEX_DATABASE_DRIVER\" was not set!"; exit 1;
-fi
+        ;;
+    *)
+        echo "ERROR: unsupported database driver:" \
+             "\"$TORRUST_INDEX_DATABASE_DRIVER\"" >&2
+        echo "       Supported values: sqlite3, mysql." >&2
+        exit 1
+        ;;
+esac
 
 install_config="/etc/torrust/index/index.toml"
-install_database="/var/lib/torrust/index/database/sqlite3.db"
-
 inst "$default_config" "$install_config"
-inst "$default_database" "$install_database"
 
-# Make Minimal Message of the Day
-if cmp_lc "$RUNTIME" "runtime"; then
-    printf '\n in runtime \n' >> /etc/motd;
-elif cmp_lc "$RUNTIME" "debug"; then
-    printf '\n in debug mode \n' >> /etc/motd;
-elif cmp_lc "$RUNTIME" "release"; then
-    printf '\n in release mode \n' >> /etc/motd;
-else
-    echo "ERROR: running in unknown mode: \"$RUNTIME\""; exit 1
-fi
+# ── Message of the day ────────────────────────────────────
+case ${RUNTIME:-} in
+    runtime) printf '\n in runtime \n' >> /etc/motd ;;
+    debug)   printf '\n in debug mode \n' >> /etc/motd ;;
+    release) printf '\n in release mode \n' >> /etc/motd ;;
+    *)
+        echo "ERROR: running in unknown mode: \"${RUNTIME:-}\"" >&2
+        exit 1
+        ;;
+esac
 
 if [ -e "/usr/share/torrust/container/message" ]; then
-    cat "/usr/share/torrust/container/message" >> /etc/motd; chmod 0644 /etc/motd
+    cat "/usr/share/torrust/container/message" >> /etc/motd
+    chmod 0644 /etc/motd
 fi
 
 # Load message of the day from Profile
@@ -78,30 +141,162 @@ echo '[ ! -z "$TERM" -a -r /etc/motd ] && cat /etc/motd' >> /etc/profile
 
 cd /home/torrust || exit 1
 
-# Generate auth keys if not already present on the volume.
-auth_dir="/etc/torrust/index/auth"
-private_key="$auth_dir/private.pem"
-public_key="$auth_dir/public.pem"
-tmpfile=$(mktemp /tmp/auth_keys.XXXXXX)
-chmod 0600 "$tmpfile"
-trap 'rm -f "$tmpfile"' EXIT
+# ── Config probe (ADR-T-009 §7.2) ─────────────────────────
+# Resolve the operator's true configuration (TOML + env var
+# overrides) via the same loader the application uses. The
+# probe runs *before* this script exports any
+# TORRUST_INDEX_CONFIG_OVERRIDE_* of its own, so its output
+# reflects only operator-supplied values. The probe emits
+# one JSON object on stdout (P9 contract).
+probe_json=$(/usr/bin/torrust-index-config-probe)
 
-if [ ! -s "$private_key" ] || [ ! -s "$public_key" ]; then
-    mkdir -p "$auth_dir"
-    chown torrust:torrust "$auth_dir"
-    chmod 0700 "$auth_dir"
-
-    if ! torrust-generate-auth-keypair > "$tmpfile"; then
-        echo "ERROR: Failed to generate auth keypair" >&2
-        exit 1
-    fi
-    sed -n '/BEGIN PRIVATE KEY/,/END PRIVATE KEY/p' "$tmpfile" > "$private_key"
-    sed -n '/BEGIN PUBLIC KEY/,/END PUBLIC KEY/p'   "$tmpfile" > "$public_key"
-    rm -f "$tmpfile"
-    chown torrust:torrust "$private_key" "$public_key"
-    chmod 0400 "$private_key"
-    chmod 0440 "$public_key"
+# Schema version gate — fail fast on probe/script mismatch.
+probe_schema=$(printf '%s' "$probe_json" | jq -r '.schema')
+if [ "$probe_schema" != "1" ]; then
+    echo "ERROR: config probe emitted schema=$probe_schema" \
+         "but this entry script expects schema=1" \
+         "— possible probe/script version mismatch" >&2
+    exit 1
 fi
 
-# Switch to torrust user
+# jq field extraction. Each variable is assigned directly
+# from a jq call. `// empty` yields the empty string for
+# absent/null fields. The `_pem_set` / `_path_set` /
+# `_source` variables are passed positionally to
+# `validate_auth_keys`; the `_source` / `_path` ones are
+# also dereferenced via `eval` in the dispatch and
+# materialisation loops below (computed variable names of
+# the form `auth_${pair}_source`).
+database_driver=$(printf '%s' "$probe_json" | jq -r '.database.driver')
+database_path=$(printf '%s' "$probe_json"   | jq -r '.database.path // empty')
+
+auth_private_key_pem_set=$(printf '%s' "$probe_json"  | jq -r '.auth.private_key.pem_set')
+auth_private_key_path_set=$(printf '%s' "$probe_json" | jq -r '.auth.private_key.path_set')
+auth_private_key_source=$(printf '%s' "$probe_json"   | jq -r '.auth.private_key.source')
+# shellcheck disable=SC2034 # dereferenced via eval in auth-key loops
+auth_private_key_path=$(printf '%s' "$probe_json"     | jq -r '.auth.private_key.path // empty')
+
+auth_public_key_pem_set=$(printf '%s' "$probe_json"   | jq -r '.auth.public_key.pem_set')
+auth_public_key_path_set=$(printf '%s' "$probe_json"  | jq -r '.auth.public_key.path_set')
+auth_public_key_source=$(printf '%s' "$probe_json"    | jq -r '.auth.public_key.source')
+# shellcheck disable=SC2034 # dereferenced via eval in auth-key loops
+auth_public_key_path=$(printf '%s' "$probe_json"      | jq -r '.auth.public_key.path // empty')
+
+# ── Auth-key validation (post-probe) ──────────────────────
+# Three invariants enforced together (see validate_auth_keys
+# in entry_script_lib_sh): mutual exclusion within each key,
+# pair-completeness across both keys, and cross-pair source
+# consistency.
+validate_auth_keys \
+    "$auth_private_key_pem_set" "$auth_private_key_path_set" "$auth_private_key_source" \
+    "$auth_public_key_pem_set"  "$auth_public_key_path_set"  "$auth_public_key_source"
+
+# ── Three-way auth-key path resolution (cases 1/2/3) ──────
+# After this loop, ${pair}_path is set for every non-PEM key.
+for pair in private_key public_key; do
+    src_var="auth_${pair}_source"
+    pth_var="auth_${pair}_path"
+    eval "src=\"\$$src_var\""
+    eval "pth=\"\$$pth_var\""
+    uc_pair=$(printf '%s' "$pair" | tr '[:lower:]' '[:upper:]')
+
+    # shellcheck disable=SC2154 # src assigned by eval above
+    case $src in
+        pem)
+            # Case 1: app loads from env var directly. Nothing to do.
+            continue
+            ;;
+        path)
+            # Case 2: operator (or TOML) configured a path.
+            eval "${pair}_path=\"\$pth\""
+            ;;
+        none)
+            # Case 3: no auth source configured — apply the
+            # container default and inform the application
+            # via the same override channel operators use.
+            case $pair in
+                private_key) default=/etc/torrust/index/auth/private.pem ;;
+                public_key)  default=/etc/torrust/index/auth/public.pem  ;;
+            esac
+            eval "${pair}_path=\"\$default\""
+            export "TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__${uc_pair}_PATH=$default"
+            ;;
+    esac
+done
+
+# ── Volumes-only directory guard for auth keys ────────────
+# Applies to cases 2 and 3. The script auto-creates parent
+# directories only inside the volumes it owns; anything
+# else is the operator's responsibility.
+for pair in private_key public_key; do
+    src_var="auth_${pair}_source"
+    eval "src=\"\$$src_var\""
+    # shellcheck disable=SC2154 # src assigned by eval above
+    [ "$src" = pem ] && continue
+
+    eval "keypath=\"\${${pair}_path}\""
+    # shellcheck disable=SC2154 # keypath assigned by eval above
+    d=$(dirname "$keypath")
+    [ -d "$d" ] && continue
+    case "$d" in
+        /etc/torrust/index|/etc/torrust/index/*|\
+        /var/lib/torrust/index|/var/lib/torrust/index/*|\
+        /var/log/torrust/index|/var/log/torrust/index/*)
+            mkdir -p "$d"
+            chown torrust:torrust "$d"
+            chmod 0700 "$d"
+            ;;
+        *)
+            echo "ERROR: auth key path $d is outside the volumes" \
+                 "the entry script manages." >&2
+            echo "       Pre-create it with appropriate ownership," \
+                 "or place keys under /etc/torrust/index/ or" \
+                 "/var/lib/torrust/index/." >&2
+            exit 1
+            ;;
+    esac
+done
+
+# ── Key materialisation (cases 2 and 3) ───────────────────
+# Both keys are generated together as a pair (the generator
+# emits a matched keypair in one invocation). If either file
+# is missing or empty, regenerate both — a half-pair is not
+# useful.
+if [ -n "${private_key_path:-}" ] && [ -n "${public_key_path:-}" ]; then
+    if [ ! -s "$private_key_path" ] || [ ! -s "$public_key_path" ]; then
+        keypair_json=$(/usr/bin/torrust-index-auth-keypair)
+        printf '%s' "$keypair_json" | jq -r .private_key_pem > "$private_key_path"
+        printf '%s' "$keypair_json" | jq -r .public_key_pem  > "$public_key_path"
+        chown torrust:torrust "$private_key_path" "$public_key_path"
+        chmod 0400 "$private_key_path"
+        chmod 0400 "$public_key_path"
+    fi
+fi
+
+# ── Database seeding dispatch (probe-driven) ──────────────
+# `database_driver` comes from the probe's
+# `.database.driver` field, derived from `connect_url`'s URL
+# scheme — not from `TORRUST_INDEX_DATABASE_DRIVER`.
+case $database_driver in
+    sqlite)
+        seed_sqlite "$database_path"
+        ;;
+    mysql)
+        # No file to seed; the application connects directly.
+        # Note: `mariadb` is rejected upstream by the probe
+        # (exit 5) because the application's loader does not
+        # recognise the scheme — no arm needed here.
+        :
+        ;;
+    *)
+        # The probe rejects unknown schemes before reaching
+        # this point, so this branch indicates a probe-vs-
+        # script version mismatch.
+        echo "ERROR: unexpected database.driver='$database_driver'" \
+             "from config probe — possible probe/script version mismatch" >&2
+        exit 1
+        ;;
+esac
+
+# ── Drop privileges and exec the application ──────────────
 exec /bin/su-exec torrust "$@"

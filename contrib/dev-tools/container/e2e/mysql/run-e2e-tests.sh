@@ -6,9 +6,7 @@ echo "User name: $CURRENT_USER_NAME"
 echo "User   id: $CURRENT_USER_ID"
 
 USER_ID=$CURRENT_USER_ID
-TORRUST_TRACKER_USER_UID=$CURRENT_USER_ID
 export USER_ID
-export TORRUST_TRACKER_USER_UID
 
 export TORRUST_INDEX_DATABASE="torrust_index_e2e_testing"
 export TORRUST_TRACKER_DATABASE="e2e_testing_sqlite3"
@@ -39,9 +37,16 @@ docker ps
 ./contrib/dev-tools/container/e2e/mysql/install.sh || exit 1
 
 # Run E2E tests with shared app instance
+#
+# The e2e config TOML intentionally omits `tracker.token` and
+# `database.connect_url` (operators are expected to supply them via env
+# overrides; see ADR-T-009 §D2). Inject host-side overrides so the test
+# process can load the same config file the container uses.
 TORRUST_INDEX_E2E_SHARED=true \
-    TORRUST_INDEX_CONFIG_TOML_PATH="./share/default/config/index.public.e2e.container.mysql.toml" \
+    TORRUST_INDEX_CONFIG_TOML_PATH="./share/default/config/index.public.e2e.container.toml" \
     TORRUST_INDEX_E2E_DB_CONNECT_URL="mysql://root:root_secret_password@127.0.0.1:3306/torrust_index_e2e_testing" \
+    TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MyAccessToken" \
+    TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="mysql://root:root_secret_password@127.0.0.1:3306/torrust_index_e2e_testing" \
     cargo test ||
     {
         ./contrib/dev-tools/container/e2e/mysql/e2e-env-down.sh

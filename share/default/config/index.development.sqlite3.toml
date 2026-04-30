@@ -13,15 +13,14 @@ threshold = "info"
 #threshold = "debug"
 #threshold = "trace"
 
-[tracker]
-token = "MyAccessToken"
-
-[auth]
-
-# Uncomment if you want to enable TSL for development
-#[net.tsl]
+# Uncomment if you want to enable TLS for development
+#[net.tls]
 #ssl_cert_path = "./storage/index/lib/tls/localhost.crt"
 #ssl_key_path = "./storage/index/lib/tls/localhost.key"
+
+[tracker]
+
+[database]
 
 [registration]
 [registration.email]

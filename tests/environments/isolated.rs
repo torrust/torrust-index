@@ -92,7 +92,11 @@ impl Default for TestEnv {
 
 /// Provides a configuration with ephemeral data for testing.
 fn ephemeral(temp_dir: &TempDir) -> config::Settings {
-    let mut configuration = config::Settings::default();
+    // After ADR-T-009 §D2, `tracker.token` and `database.connect_url`
+    // are mandatory at the schema level (no `Settings::default()`).
+    // Reuse the shared placeholder fixture so every crate-boundary
+    // test baseline stays in sync; per-test knobs are overridden below.
+    let mut configuration = config::test_helpers::placeholder_settings();
 
     configuration.logging.threshold = Threshold::Off; // Change to `debug` for tests debugging
 

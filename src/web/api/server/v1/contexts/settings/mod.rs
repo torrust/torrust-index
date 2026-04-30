@@ -51,7 +51,7 @@
 //!     "net": {
 //!       "base_url": null,
 //!       "bind_address": "0.0.0.0:3001",
-//!       "tsl": null
+//!       "tls": null
 //!     },
 //!     "auth": {
 //!       "private_key_pem": null,

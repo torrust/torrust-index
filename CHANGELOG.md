@@ -7,156 +7,404 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+**Highlights:** container infrastructure refactor (ADR-T-009),
+native role-based authorization replacing Casbin (ADR-T-008),
+RSA-signed JWTs with revocation support (ADR-T-007), domain-scoped
+error system (ADR-T-006), MSRV raised to 1.88.
 
-- ADR-T-008: Document rationale for roles and permissions refactor.
-- ADR-T-006: Document rationale for error system refactor.
-- 188 crate-level tests for the domain error system (`src/tests/errors/`):
-  status-code mapping, display messages, `From` impl coverage, and
-  `ApiError` delegation (ADR-T-006 §1–§4).
-- Native `PermissionMatrix` replacing Casbin: compile-time checked `Role` and
-  `Action` enums with an exhaustive default-deny policy table (ADR-T-008).
-- `Permissions` trait abstraction for the authorization backend, consumed by
-  the `RequirePermission<A>` extractor via `AppData.permissions`.
-- `role: TEXT` column on `torrust_users` (migration for SQLite and MySQL);
-  existing `administrator = true` rows migrated to `role = 'admin'`, others
-  to `role = 'registered'`.
-- `role: String` field on `TokenResponse`, `UserCompact`, `UserProfile`, and
-  `UserFull` API response models.
-- `RequirePermission<A>` Axum extractor enforcing role-based authorization at
-  the HTTP boundary before the handler runs (ADR-T-008 Phase 2).
-- `ActionMarker` trait and `action_markers!` macro mapping zero-sized types to
-  `Action` enum variants for compile-time handler–permission binding.
-- `Actor` struct yielded by `RequirePermission` carrying the resolved
-  `user_id` and `Role` for downstream handler use.
-- `Actor::try_user_id()` non-panicking accessor returning `Option<UserId>`,
-  safe for handlers that may serve guests (ADR-T-008).
-- `Actor::is_authenticated()` convenience predicate (ADR-T-008).
-- Compile-time `action_markers!` ↔ `Action::ALL` sync assertion: adding an
-  `Action` variant without a matching marker (or vice versa) is a compile
-  error (ADR-T-008).
-- E2E tests for non-owner update and delete denial (`and_non_owners` module
-  in `tests/e2e/web/api/v1/contexts/torrent/contract.rs`) (ADR-T-008 Phase 4).
-- ADR-T-007: Document rationale for JWT system refactor.
-- Centralised JWT module (`src/jwt.rs`) consolidating all `jsonwebtoken` usage:
-  key loading, signing, verification, and algorithm configuration.
-- `SessionClaims` with RFC 7519 registered claims (`sub`, `iss`, `aud`, `iat`,
-  `exp`) plus advisory `role`, `username`, and revocation `gen` fields.
-- `VerifyClaims` with `aud: "email-verification"` for purpose separation.
-- RSA key pair configuration: `auth.private_key_path` / `auth.public_key_path`
-  (or inline PEM via `auth.private_key_pem` / `auth.public_key_pem`).
-- Ephemeral auto-generated RSA-2048 key pair when no keys are configured.
-  Sessions do not survive server restarts with ephemeral keys. Deployers who
-  want persistent sessions supply their own key pair via config.
-- `torrust-generate-auth-keypair` CLI binary for generating RSA-2048 key pairs.
-  Outputs both PEM blocks to stdout; refuses to run if stdout is a terminal.
-- Container auto-generation of persistent auth keys on first boot. The entry
-  script runs `torrust-generate-auth-keypair` and writes the PEM files to
-  `/etc/torrust/index/auth/` on the volume. Sessions survive restarts with no
-  manual setup.
-- `kid` (Key ID) header in every JWT for future key rotation support.
-- Configurable token lifetimes: `auth.session_token_lifetime_secs` (default:
-  2 weeks) and `auth.email_verification_token_lifetime_secs` (default: ~10 years).
-- `token_generation` column on `torrust_users` (migration for SQLite and MySQL).
-- Token revocation: password changes, role changes (admin grant), and bans
-  increment `token_generation`; tokens with an older `gen` claim are rejected.
-- Consolidated session validation: `JsonWebToken::validate_session` is the
-  sole entry point for verifying a session JWT, checking the token-generation
-  counter, and rejecting banned users. All callers delegate here.
-- `BearerToken` extractor rejects missing/malformed `Authorization` headers at
-  the extraction boundary (`AuthError::TokenNotFound` / `AuthError::TokenInvalid`).
-- `ExtractOptionalLoggedInUser` catches extraction rejection and returns `None`
-  for anonymous requests.
-- `AuthError::TokenRevoked` variant for revoked-token responses.
-- Crate tests for the JWT module (session + email-verification round-trips,
-  audience cross-contamination, tampered/garbage tokens).
-- Crate tests for `parse_token` (valid extraction, whitespace trimming,
-  empty bearer, missing prefix, non-ASCII rejection).
+### Breaking changes
 
-### Changed
+- MSRV raised from 1.85 to 1.88.
+- `database.connect_url` and `tracker.token` are now mandatory
+  schema fields with no defaults. Supply them via env-var override
+  (`TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL`,
+  `..._TRACKER__TOKEN`) or a side-loaded `index.toml`. Missing values
+  fail at parse time with a precise `missing field` error
+  (ADR-T-009 §D2).
+- TLS configuration renamed from `[net.tsl]` to `[net.tls]` in
+  operator TOMLs and from `"tsl"` to `"tls"` in the settings JSON
+  API. Clean break, no compatibility alias (ADR-T-009 §D3).
+- `TORRUST_INDEX_DATABASE_DRIVER` no longer dispatches the
+  application's runtime driver — that is derived from the URL
+  scheme of `database.connect_url` (ADR-T-009 §D2). It is retained
+  as an input-validation gate at container start (`sqlite3` /
+  `mysql`); both values seed the same driver-agnostic
+  `index.container.toml` template into `/etc/torrust/index/` on
+  first boot.
+- `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__*_PEM` and `..._PATH` are
+  mutually exclusive within a single key, both keys must use the
+  same delivery mechanism, and the pair must either both be set or
+  both be absent (ADR-T-009 §D3).
+- Container `USER_ID` validation changed from `>= 1000` to
+  "non-negative integer, not `0`". The property the entry script
+  actually enforces is "do not run as root" (ADR-T-009 §D7).
+- JWT signing changed from HMAC-HS256 to RS256. Existing tokens are
+  invalidated; users must re-login (ADR-T-007).
+- JWT claims redesigned from `UserClaims { user, exp }` to
+  `SessionClaims { sub, iss, aud, iat, exp, role, username, gen }`
+  (ADR-T-007).
+- Auth config keys `auth.user_claim_token_pepper`,
+  `auth.session_signing_key`, and `auth.email_verification_signing_key`
+  replaced by `auth.private_key_path` / `auth.public_key_path` (or
+  inline PEM). Deployers must generate an RSA key pair (ADR-T-007).
+- `administrator: bool` replaced by `role: String` across the API
+  (`TokenResponse`, `UserCompact`, etc.); the legacy `admin: bool`
+  field is removed entirely (ADR-T-008).
+- `administrator` column dropped from `torrust_users`; `role: TEXT`
+  is now sole authority (ADR-T-008).
+- `ACTION` enum renamed to `Action` (variants unchanged) (ADR-T-008).
+- `ServiceError` (41 variants) and `ServiceResult` replaced by
+  domain-scoped enums: `AuthError`, `UserError`, `TorrentError`,
+  `CategoryTagError`, with a thin `ApiError` wrapper (ADR-T-006).
 
-- **BREAKING:** Raise MSRV from 1.85 to 1.88.
-- **BREAKING:** `administrator: bool` replaced by `role: String` in API
-  responses (`TokenResponse`, `UserCompact`, etc.). The legacy `admin: bool`
-  field has been removed entirely (ADR-T-008).
-- **BREAKING:** `administrator` column dropped from `torrust_users`; the
-  `role: TEXT` column is now the sole authority. Migration
-  `20260415000001_torrust_drop_administrator_column` handles both SQLite
-  (table-rebuild) and MySQL (`DROP COLUMN`).
-- **BREAKING:** `ACTION` enum renamed to `Action`; variants unchanged.
-- All HTTP handlers that require authorization now use
+### ADR-T-009 — Container infrastructure refactor
+
+#### Added
+
+- ADR-T-009 itself.
+- `torrust-index-config` workspace crate
+  (`packages/index-config/`) containing the parsing surface of the
+  configuration system. Leaf crate — no `tokio`, `reqwest`, `sqlx`,
+  `hyper`, `rustls`, `native-tls`, or `openssl` in its dep closure.
+- Helper-binary crates split into leaves with no HTTP/TLS in their
+  dep closure: `torrust-index-cli-common` (shared P9 scaffolding —
+  `refuse_if_stdout_is_tty`, `init_json_tracing`, `emit`, `BaseArgs`),
+  `torrust-index-health-check` (stdlib-only, Happy Eyeballs IPv6/IPv4
+  fallback), `torrust-index-auth-keypair` (RSA-2048 key generator),
+  `torrust-index-config-probe` (resolved-config JSON emitter), and
+  `torrust-index-entry-script` (test-only host-side driver).
+- Sourced POSIX `sh` library at `share/container/entry_script_lib_sh`
+  containing the entry script's pure helpers (`inst`,
+  `key_configured`, `validate_auth_keys`, `seed_sqlite`). Shipped as
+  `0444 root:root` and sourced — not exec'd — by both the entry
+  script and the host-side test crate (§D3).
+- Top-level `Makefile` with `make up-dev` (plain `docker compose up`)
+  and `make up-prod` (validates required credential env vars, runs
+  with the override excluded) (§D1).
+- `compose.override.yaml` auto-loaded by Compose v2, re-introducing
+  the `mailcatcher` sidecar, `tty: true`, and permissive
+  `${VAR:-default}` substitutions on top of the production-shaped
+  baseline (§D1).
+- `contrib/dev-tools/su-exec/AUDIT.md` recording provenance and a
+  SHA-256-anchored append-only audit log for the vendored
+  `su-exec.c`. CI fails the build when the file changes without a
+  matching audit entry (§D8).
+- `jq_donor` Containerfile stage providing `jq` (and required shared
+  libs) from a pristine `rust:slim-trixie` base; both runtime images
+  copy `/usr/bin/jq` as `0500 root:root`. Used during the
+  pre-`su-exec` phase to parse the config probe's and keypair
+  helper's JSON output. An `ldd`-based allow-list catches future
+  transitive-dep changes at build time (§D5).
+- Container runtime split into parallel `runtime_release` and
+  `runtime_debug` stages over a shared base-agnostic `runtime_assets`
+  bundle, with `busybox_donor`, `busybox_preflight`, `etc_seed`,
+  `adduser_preflight`, and a `preflight_gate` aggregator (§D4).
+- Curated busybox applet subset in the release runtime: a single
+  root-only `/bin/busybox` (`0700 root:root`) plus symlinks for `sh`,
+  `adduser`, `addgroup`, `install`, `mkdir`, `dirname`, `chown`,
+  `chmod`, `tr`, `mktemp`, `cat`, `printf`, `rm`, `echo`, `grep`.
+  The unprivileged `torrust` user gets `EACCES` on busybox after
+  privilege drop (§D4).
+- Container auto-generation of persistent auth keys on first boot:
+  the entry script runs `torrust-index-auth-keypair`, splits the
+  JSON output with `jq`, and writes PEMs to
+  `/etc/torrust/index/auth/` on the volume.
+- `HEALTHCHECK` directive on the `debug` build target (was
+  previously omitted); debug `CMD` is now
+  `["/usr/bin/torrust-index"]` so debug is a drop-in replacement for
+  release (Phase 4).
+- `Info::from_env` constructor on `torrust-index-config` — the
+  JSON-safe sibling of `Info::new` that skips diagnostic `println!`s
+  and filters empty-string env vars.
+- `pub const DEFAULT_CONFIG_TOML_PATH` shared between the
+  application, helper binaries, and integration tests.
+- `ApiToken::is_empty()` accessor so the config probe can reject
+  `tracker.token = ""` at the container boundary.
+- `# ENTRY_ENV_VARS:` / `# END_ENTRY_ENV_VARS` canonical manifest
+  block in the entry script; CI verifies every name is documented in
+  `docs/containers.md`.
+- `EXPOSE ${IMPORTER_API_PORT}/tcp` in Containerfile; port 3002
+  mapped in compose.
+- `restart: unless-stopped` on index and tracker compose services.
+- `DEBUG=1` env-var gate for entry-script shell tracing (`set -x`).
+- `#[doc(hidden)] pub mod test_helpers` in `torrust-index-config`
+  exposing `PLACEHOLDER_TOML` and `placeholder_settings()` — single
+  source of truth for the ~40 tests across both crates that
+  previously relied on the removed `Settings::default()` fixture
+  (Phase 5).
+- `Configuration::for_tests` (test-only, `pub(crate)`) replacing the
+  deleted `impl Default for Configuration` (Phase 5).
+- `clear_inherited_config_env()` test helper that strips
+  `TORRUST_INDEX_CONFIG_OVERRIDE_*` and
+  `TORRUST_INDEX_CONFIG_TOML[_PATH]` inside a `figment::Jail` so
+  default-configuration assertions stay deterministic (Phase 5).
+- Inverted shipped-sample test suite asserting no shipped TOML
+  carries `connect_url`, `token`, `[mail.smtp]`, or auth key paths,
+  and that the schema rejects each sample with a missing-field error
+  (Phase 5, §D2).
+- New loader tests `missing_database_connect_url_is_rejected` and
+  `missing_database_section_is_rejected` (Phase 5).
+- Default `TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL` in
+  `compose.yaml`, alongside the existing `TRACKER__TOKEN` default;
+  matching exports in the mysql and sqlite e2e runner scripts.
+
+#### Changed
+
+- Configuration parsing surface moved from `src/config/` into the new
+  `torrust-index-config` workspace crate. `src/config/mod.rs` is now
+  a thin re-export shim plus the runtime `Configuration` wrapper;
+  existing `use crate::config::*;` call sites compile unchanged.
+- Permission value types (`Role`, `Action`, `Effect`,
+  `PermissionOverride`, `RoleParseError`) moved to
+  `torrust_index_config::permissions` and re-exported from
+  `crate::services::authorization`. The `Permissions` trait and
+  `PermissionMatrix` runtime policy stay in the root crate.
+- `load_settings` no longer ends with
+  `figment.join(Serialized::defaults(Settings::default()))`. Optional
+  sub-sections still default through their per-field `#[serde(default)]`
+  attributes; mandatory fields no longer have a silent fallback.
+- `check_mandatory_options` no longer covers `tracker.token`; its
+  absence now surfaces through serde for a single consistent error
+  shape across all missing mandatory fields.
+- `Info::new` routes its "loading extra configuration from …"
+  diagnostics through `tracing` (stderr) instead of `println!`
+  (stdout).
+- Container `HEALTHCHECK` invokes `torrust-index-health-check` (was
+  `health_check`); the binary is rewritten in stdlib-only Rust.
+- Entry script invokes `torrust-index-auth-keypair` (was
+  `torrust-generate-auth-keypair`) and consumes its JSON output via
+  `jq -r .private_key_pem` instead of `sed` PEM-block extraction.
+- Entry script uses busybox short-option form for `adduser` so the
+  same invocation works on both runtime bases (distroless
+  `cc-debian13` ships `/etc/passwd` and `/etc/group` but not
+  `/etc/shadow`).
+- Helper binaries (`torrust-index-health-check`,
+  `torrust-index-auth-keypair`) tightened from world-executable to
+  `0500 root:root`. The application binary keeps `0755`.
+- `PATH` pinned in both runtime bases
+  (`/usr/local/bin:/bin:/usr/bin:/sbin` for release;
+  `/usr/local/bin:/busybox:/bin:/usr/bin:/sbin` for debug) so the
+  entry script's bare-name lookups resolve deterministically.
+- Helper-binary TTY-refusal exit code unified on `2` (was `1` for
+  the keypair helper) via the shared `refuse_if_stdout_is_tty`.
+- `.containerignore` now excludes `/adr/` and `/docs/` from the
+  build context.
+- Container base images upgraded from Debian bookworm to trixie
+  (`rust:bookworm` → `rust:trixie`, `cc-debian12` → `cc-debian13`).
+- `cargo-binstall` bootstrap pinned to tag `v1.18.1` (was `main`).
+- MySQL compose image pinned to `8.0.45`; auth flag changed from
+  `--default-authentication-plugin` to `--authentication-policy`.
+- Dev-only compose ports (tracker, MySQL, mailcatcher) bound to
+  `127.0.0.1`.
+- `.dockerignore` renamed to `.containerignore` for Podman
+  compatibility.
+- Removed redundant `--tests --benches --examples` from
+  Containerfile (covered by `--all-targets`).
+- All shipped sample TOMLs under `share/default/config/` no longer
+  carry `connect_url`, `token`, `[mail.smtp]` values, or `[auth]`
+  key paths. Bare-metal developers who copy
+  `index.development.sqlite3.toml` verbatim must now supply
+  `connect_url` and `token` themselves (Phase 5, §D2).
+- DEV-ONLY credential comments in `compose.yaml`.
+- `docs/containers.md`: documented healthcheck behaviour, busybox
+  applet subset, Podman `--format docker` requirement for
+  `HEALTHCHECK`, entry-script debugging; fixed `USER_UID` →
+  `USER_ID` typo.
+
+#### Removed
+
+- Build-time `ARG API_PORT` / `ARG IMPORTER_API_PORT`. The runtime
+  `ENV` defaults are retained so the listener and `HEALTHCHECK`
+  resolve correctly; runtime `--env` overrides continue to work
+  (§D6).
+- Monolithic `runtime` Containerfile stage and its ad-hoc `cp -sp`
+  busybox-applet copy, superseded by the curated symlink loop and
+  the release/debug split.
+- `RUN env` and `CMD ["sh"]` from the previous debug target — debug
+  now ships the same `ENTRYPOINT` / `CMD` / `HEALTHCHECK` as
+  release; operators reach a shell with `docker run … sh`.
+- `impl Default for Settings`, `impl Default for Tracker`,
+  `impl Default for Database`, the matching `#[serde(default = …)]`
+  attributes, and the now-dead `Tracker::default_token()` /
+  `Settings::default_tracker()` (Phase 5).
+- `impl Default for Configuration` — superseded by
+  `Configuration::for_tests` (Phase 5).
+- `contrib/dev-tools/container/build.sh` and `run.sh` — both stale,
+  passed wrong build-args and assumed a `Dockerfile` that no longer
+  exists.
+- Stale `TORRUST_TRACKER_USER_UID` export from E2E container
+  scripts.
+
+### ADR-T-008 — Roles & permissions
+
+#### Added
+
+- ADR-T-008 itself.
+- Native `PermissionMatrix` replacing Casbin: compile-time checked
+  `Role` and `Action` enums with an exhaustive default-deny policy
+  table.
+- `Permissions` trait abstraction for the authorization backend,
+  consumed by the `RequirePermission<A>` extractor via
+  `AppData.permissions`.
+- `role: TEXT` column on `torrust_users` (migration for SQLite and
+  MySQL); existing `administrator = true` rows migrated to
+  `role = 'admin'`, others to `role = 'registered'`.
+- `role: String` field on `TokenResponse`, `UserCompact`,
+  `UserProfile`, and `UserFull` API response models.
+- `RequirePermission<A>` Axum extractor enforcing role-based
+  authorization at the HTTP boundary before the handler runs.
+- `ActionMarker` trait and `action_markers!` macro mapping
+  zero-sized types to `Action` variants for compile-time
+  handler–permission binding. A compile-time sync assertion catches
+  divergence between `action_markers!` and `Action::ALL`.
+- `Actor` struct yielded by `RequirePermission` carrying the
+  resolved `user_id` and `Role`, with `try_user_id()` and
+  `is_authenticated()` helpers.
+- E2E tests for non-owner update and delete denial
+  (`and_non_owners` module under torrent contract tests).
+
+#### Changed
+
+- All HTTP handlers requiring authorization use
   `RequirePermission<A>` extractors instead of calling
-  `authorization::Service::authorize()` (ADR-T-008 Phase 2).
-- Service methods no longer receive `maybe_user_id` for authorization
-  purposes — they receive an already-authorized `Actor` or are called
-  unconditionally.
-- Unauthorized requests are rejected at the extractor boundary before
-  reaching the service layer (fail-fast).
-- First-user auto-admin grant in `RegistrationService::register` now logs
-  a `warn!` on failure instead of silently discarding the `Result` via
-  `drop()`.
-- **BREAKING:** JWT signing algorithm changed from HMAC-HS256 to RS256
-  (RSA + SHA-256). Existing HS256 tokens are invalidated; users must re-login.
-- **BREAKING:** JWT claims redesigned from `UserClaims { user, exp }` to
-  `SessionClaims { sub, iss, aud, iat, exp, role, username, gen }`. Existing
-  tokens without the new claims fail deserialization.
-- **BREAKING:** Configuration keys changed — `auth.user_claim_token_pepper` /
-  `auth.session_signing_key` / `auth.email_verification_signing_key` replaced
-  by `auth.private_key_path` and `auth.public_key_path` (or inline PEM).
-  Deployers must generate an RSA key pair.
-- **BREAKING:** Replace `ServiceError` (41 variants) and `ServiceResult` with
-  domain-scoped error enums: `AuthError`, `UserError`, `TorrentError`,
-  `CategoryTagError`, and a thin `ApiError` wrapper (ADR-T-006).
-- `Authentication::get_user_id_from_bearer_token` now takes `BearerToken`
-  directly instead of `Option<BearerToken>`.
-- `parse_token` returns `Result` instead of panicking on malformed headers.
-- JWT `exp` validation relies solely on the `jsonwebtoken` library; redundant
-  manual expiration check removed.
-- Token signing uses `Result` propagation instead of `.unwrap()` / `.expect()`.
-- `UserClaims` is now a type alias for `SessionClaims` (backward-compatible).
-- `VerifyClaims` moved from `mailer` into the `jwt` module (re-exported for
-  backward compatibility).
-- Service functions now return domain-specific `Result<T, DomainError>` instead
-  of `Result<T, ServiceError>`.
+  `authorization::Service::authorize()`.
+- Service methods no longer receive `maybe_user_id` for
+  authorization — they receive an already-authorized `Actor` or are
+  called unconditionally. Unauthorized requests are rejected at the
+  extractor boundary (fail-fast).
+- First-user auto-admin grant in `RegistrationService::register`
+  now logs a `warn!` on failure instead of silently discarding the
+  `Result` via `drop()`.
+- v1→v2 upgrade path: `insert_imported_user` writes the `role`
+  column instead of the removed `administrator` column.
+
+#### Removed
+
+- `admin: bool` from `TokenResponse`, `LoggedInUserData`, and
+  `TokenRenewalData` — superseded by `role: String`.
+- `UserCompact::is_admin()` — no longer needed.
+- `casbin` crate dependency and all Casbin-related code
+  (`CasbinConfiguration`, `CasbinEnforcer`, the SCREAMING_CASE
+  `ACTION` enum, `unstable.auth.casbin` config section).
+- `authorization::Service` struct — replaced by
+  `RequirePermission<A>` consulting `PermissionMatrix` directly.
+- `ExtractLoggedInUser` and `ExtractOptionalLoggedInUser`
+  extractors — replaced by `RequirePermission<A>`.
+- Dead `Action` variants `GetSettings` and `GetCanonicalInfoHash`.
+
+### ADR-T-007 — JWT refactor
+
+#### Added
+
+- ADR-T-007 itself.
+- Centralised JWT module (`src/jwt.rs`) consolidating all
+  `jsonwebtoken` usage: key loading, signing, verification,
+  algorithm configuration.
+- `SessionClaims` with RFC 7519 registered claims (`sub`, `iss`,
+  `aud`, `iat`, `exp`) plus advisory `role`, `username`, and
+  revocation `gen` fields.
+- `VerifyClaims` with `aud: "email-verification"` for purpose
+  separation.
+- RSA key pair configuration: `auth.private_key_path` /
+  `auth.public_key_path` (or inline PEM via `..._pem`).
+- Ephemeral auto-generated RSA-2048 key pair when no keys are
+  configured. Sessions do not survive server restarts with ephemeral
+  keys.
+- `kid` (Key ID) header in every JWT for future key rotation.
+- Configurable token lifetimes:
+  `auth.session_token_lifetime_secs` (default: 2 weeks) and
+  `auth.email_verification_token_lifetime_secs` (default: ~10 years).
+- `token_generation` column on `torrust_users` (SQLite + MySQL
+  migrations).
+- Token revocation: password changes, role changes (admin grant),
+  and bans increment `token_generation`; tokens with an older `gen`
+  claim are rejected.
+- `JsonWebToken::validate_session` as the sole entry point for
+  verifying a session JWT, the token-generation counter, and the
+  banned-user check. All callers delegate here.
+- `BearerToken` extractor rejects missing/malformed `Authorization`
+  headers at the extraction boundary
+  (`AuthError::TokenNotFound` / `AuthError::TokenInvalid`).
+- `ExtractOptionalLoggedInUser` returns `None` for anonymous
+  requests instead of erroring.
+- `AuthError::TokenRevoked` variant for revoked-token responses.
+- Crate tests for the JWT module (session +
+  email-verification round-trips, audience cross-contamination,
+  tampered/garbage tokens) and for `parse_token`.
+
+#### Changed
+
+- `Authentication::get_user_id_from_bearer_token` takes
+  `BearerToken` directly instead of `Option<BearerToken>`.
+- `parse_token` returns `Result` instead of panicking on malformed
+  headers.
+- JWT `exp` validation relies solely on the `jsonwebtoken` library;
+  the redundant manual expiration check is removed.
+- Token signing uses `Result` propagation instead of `.unwrap()` /
+  `.expect()`.
+- `UserClaims` is now a type alias for `SessionClaims`.
+- `VerifyClaims` moved from `mailer` into the `jwt` module
+  (re-exported for backward compatibility).
+- JWT session token `role` claim carries the database `role`
+  directly (`"registered"`, `"admin"`) instead of the previous
+  mapping (`"user"`, `"admin"`).
+
+#### Removed
+
+- `bearer_token::Extract` wrapper struct (replaced by `BearerToken`
+  directly).
+- `get_optional_logged_in_user` free function (logic moved into
+  extractors).
+- `get_claims_from_bearer_token` private method on `Authentication`
+  (inlined).
+- `ClaimTokenPepper` / `JwtSigningSecret` /
+  `user_claim_token_pepper` config keys.
+
+### ADR-T-006 — Error system
+
+#### Added
+
+- ADR-T-006 itself.
+- ~190 crate-level tests for the domain error system
+  (`src/tests/errors/`): status-code mapping, display messages,
+  `From` impl coverage, and `ApiError` delegation.
+
+#### Changed
+
+- Service functions return domain-specific
+  `Result<T, DomainError>` instead of `Result<T, ServiceError>`.
 - Each domain error co-locates its HTTP status-code mapping via a
   `status_code()` method.
 - Error `From` impls use `tracing::error!` instead of `eprintln!`.
-- JWT session token `role` claim now carries the database `role` value
-  directly (`"registered"`, `"admin"`) instead of the previous mapping
-  (`"user"`, `"admin"`).
-- v1→v2 upgrade path: `insert_imported_user` now writes the `role` column
-  (`"admin"` / `"registered"`) instead of the removed `administrator` column.
 - Standardise all error derives on `thiserror`.
 
-### Removed
+#### Removed
 
-- `admin: bool` field from `TokenResponse`, `LoggedInUserData`, and
-  `TokenRenewalData` — superseded by `role: String` (ADR-T-008).
-- `UserCompact::is_admin()` convenience method — no longer needed after
-  `admin: bool` removal.
-- `administrator` column from `torrust_users` schema (migration for both
-  SQLite and MySQL).
-- `casbin` crate dependency and all Casbin-related code
-  (`CasbinConfiguration`, `CasbinEnforcer`, the `ACTION` enum in
-  SCREAMING_CASE) — replaced by the native `PermissionMatrix` (ADR-T-008).
-- `unstable.auth.casbin` configuration section (`Unstable`, `Auth`, `Casbin`
-  config structs in `src/config/v2/unstable.rs`).
-- `bearer_token::Extract` wrapper struct (replaced by `BearerToken` directly).
-- `get_optional_logged_in_user` free function (logic moved into extractors).
-- `get_claims_from_bearer_token` private method on `Authentication` (inlined).
-- `ClaimTokenPepper` / `JwtSigningSecret` / `user_claim_token_pepper` config
-  keys (replaced by RSA key pair configuration).
-- `ServiceError` enum and `ServiceResult` type alias from `src/errors.rs`.
-- `http_status_code_for_service_error` and `map_database_error_to_service_error`
-  helper functions.
-- `IntoResponse` impl for `database::Error` (now handled by domain errors).
-- `authorization::Service` struct — replaced by `RequirePermission<A>`
-  extractors consulting `PermissionMatrix` directly (ADR-T-008 Phase 2).
-- `ExtractLoggedInUser` (`user_id.rs`) and `ExtractOptionalLoggedInUser`
-  (`optional_user_id.rs`) extractors — replaced by `RequirePermission<A>`
-  (ADR-T-008 Phase 2).
-- Dead `Action` variants `GetSettings` and `GetCanonicalInfoHash` (no
-  corresponding handlers existed).
+- `ServiceError` enum and `ServiceResult` type alias from
+  `src/errors.rs`.
+- `http_status_code_for_service_error` and
+  `map_database_error_to_service_error` helpers.
+- `IntoResponse` impl for `database::Error` (now handled by domain
+  errors).
+
+### Security
+
+- Dev-only ports (MySQL 3306, tracker 6969/7070/1212, mailcatcher
+  1025/1080) no longer bind to `0.0.0.0`; bound to `127.0.0.1`.
+- Entry script `set -x` gated behind `DEBUG=1` to avoid leaking
+  env vars into logs.
+- Compose credentials annotated as DEV-ONLY with TODO for Docker
+  secrets migration (ADR-T-009 §S1).
+
+### Fixed
+
+- MySQL compose healthcheck was referencing a non-existent Docker
+  secret (`/run/secrets/db-password`); now uses
+  `$$MYSQL_ROOT_PASSWORD`.
+- Entry script `USER_ID` validation:
+  `-z "$USER_ID" && "$USER_ID" -lt 1000` always short-circuited to
+  an error when `USER_ID` was unset; corrected to `||`.
+- Containerfile release `HEALTHCHECK` trailing whitespace removed.
 
 ## [4.0.0] - 2026-03-23
 

@@ -116,7 +116,12 @@
 //!
 //! ## Run with docker
 //!
-//! You can run the index with a pre-built docker image:
+//! You can run the index with a pre-built docker image. Per ADR-T-009 §D2
+//! the shipped TOMLs no longer carry default values for `tracker.token` or
+//! `database.connect_url`, so both must be supplied via env-var overrides
+//! (or a populated `index.toml`) at startup — a bare `docker run` without
+//! them now fails with a serde `missing field` error rather than booting
+//! against hidden defaults:
 //!
 //! ```text
 //! cd /tmp \
@@ -125,10 +130,11 @@
 //!   && mkdir -p ./storage/index/lib/database \
 //!   && mkdir -p ./storage/index/log \
 //!   && mkdir -p ./storage/index/etc \
-//!   && sqlite3 "./storage/index/lib/database/sqlite3.db" "VACUUM;" \
 //!   && export USER_ID=1000 \
 //!   && docker run -it \
 //!     --env USER_ID="$USER_ID" \
+//!     --env TORRUST_INDEX_CONFIG_OVERRIDE_TRACKER__TOKEN="MyAccessToken" \
+//!     --env TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL="sqlite:///var/lib/torrust/index/database/index.sqlite3.db?mode=rwc" \
 //!     --publish 3001:3001/tcp \
 //!     --volume "$(pwd)/storage/index/lib":"/var/lib/torrust/index" \
 //!     --volume "$(pwd)/storage/index/log":"/var/log/torrust/index" \
@@ -136,7 +142,11 @@
 //!     torrust/index:develop
 //! ```
 //!
-//! For more information about using docker visit the [tracker docker documentation](https://github.com/torrust/torrust-index/tree/develop/docker).
+//! For more information see the [container guide](https://github.com/torrust/torrust-index/blob/develop/docs/containers.md)
+//! and [ADR-T-009](https://github.com/torrust/torrust-index/blob/develop/adr/009-container-infrastructure-refactor.md).
+//! For local-stack development the repository ships a Compose split
+//! (`compose.yaml` baseline + auto-loaded `compose.override.yaml` dev
+//! sandbox) wrapped by `make up-dev` / `make up-prod`.
 //!
 //! ## Development
 //!
@@ -168,21 +178,31 @@
 //!
 //! # Configuration
 //!
-//! The index uses a TOML configuration file. If you run the index without
-//! providing a configuration, a default one is generated on first startup.
+//! The index uses a TOML configuration file. Per ADR-T-009 §D2 two fields
+//! are mandatory at the schema level — `tracker.token` and
+//! `database.connect_url`. They must be supplied either inline in the TOML
+//! or via the corresponding `TORRUST_INDEX_CONFIG_OVERRIDE_*` env vars; a
+//! missing value fails at deserialisation with a precise serde
+//! `missing field` error.
 //!
 //! See [`share/default/config/`](https://github.com/torrust/torrust-index/tree/develop/share/default/config)
 //! for example configuration files, or the [`config`] module documentation
-//! for the full schema reference.
+//! for the full schema reference. The parsing surface lives in the
+//! standalone `torrust-index-config` crate
+//! ([`packages/index-config/`](https://github.com/torrust/torrust-index/tree/develop/packages/index-config))
+//! so that helper binaries (notably `torrust-index-config-probe`) can load
+//! the same `Settings` the application loads, without pulling in the
+//! runtime stack.
 //!
 //! Key sections:
 //!
-//! - `[tracker]` — Tracker connection (API URL, token).
+//! - `[tracker]` — Tracker connection (API URL, **mandatory** `token`).
 //! - `[auth]` — Password constraints. Optionally supply RSA key paths
 //!   (`auth.private_key_path` / `auth.public_key_path`) for persistent
 //!   JWT sessions; otherwise an ephemeral key pair is auto-generated.
-//! - `[database]` — `SQLite` or `MySQL` connection URL.
-//! - `[net]` — Bind address (default: `0.0.0.0:3001`).
+//! - `[database]` — `SQLite` or `MySQL` **mandatory** `connect_url`.
+//! - `[net]` — Bind address (default: `0.0.0.0:3001`). Optional
+//!   `[net.tls]` block for TLS termination.
 //! - `[[permissions.overrides]]` — Optional TOML-based permission
 //!   overrides (see ADR-T-008).
 //!
@@ -201,7 +221,7 @@
 //!
 //! > **NOTICE**: The `TORRUST_INDEX_CONFIG_TOML` env var has priority over the `config.toml` file.
 //!
-//! > **NOTICE**: You can also change the location for the configuration file with the `TORRUST_INDEX_CONFIG_PATH` env var.
+//! > **NOTICE**: You can also change the location for the configuration file with the `TORRUST_INDEX_CONFIG_TOML_PATH` env var.
 //!
 //! # Usage
 //!

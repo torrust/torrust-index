@@ -1,5 +1,15 @@
 [workspace]
-members = [".", "packages/render-text-as-image", "packages/mudlark"]
+members = [
+    ".",
+    "packages/index-auth-keypair",
+    "packages/index-cli-common",
+    "packages/index-config",
+    "packages/index-config-probe",
+    "packages/index-entry-script",
+    "packages/index-health-check",
+    "packages/mudlark",
+    "packages/render-text-as-image",
+]
 
 [package]
 default-run = "torrust-index"
@@ -42,6 +52,7 @@ opt-level = 3
 opt-level = 3
 
 [dependencies]
+torrust-index-config = { version = "4.0.0-develop", path = "packages/index-config" }
 torrust-index-render-text-as-image = { version = "0.1.0", path = "packages/render-text-as-image" }
 
 argon2 = "0"
@@ -50,7 +61,6 @@ axum = { version = "0", features = ["multipart"] }
 axum-server = { version = "0", features = ["tls-rustls"] }
 bittorrent-primitives = "0.1.0"
 bytes = "1"
-camino = { version = "1", features = ["serde"] }
 chrono = { version = "0", default-features = false, features = ["clock"] }
 clap = { version = "4", features = ["derive", "env"] }
 derive_more = { version = "2", features = ["display"] }
@@ -86,7 +96,6 @@ serde_bencode = "0"
 serde_bytes = "0"
 serde_derive = "1"
 serde_json = "1"
-serde_with = "3"
 sha-1 = "0"
 sha2 = "0"
 sqlx = { version = "0", features = ["migrate", "mysql", "runtime-tokio-native-tls", "sqlite", "time"] }
@@ -102,10 +111,6 @@ tracing-subscriber = { version = "0", features = ["json"] }
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
-
-[[bin]]
-name = "torrust-generate-auth-keypair"
-path = "src/bin/generate_auth_keypair.rs"
 
 [dev-dependencies]
 tempfile = "3"
