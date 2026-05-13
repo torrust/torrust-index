@@ -41,7 +41,7 @@ impl SqliteDatabaseV1_0_0 {
         ];
 
         for migration_file_name in &migrations {
-            let migration_file_path = format!("{}{}", &migrations_dir, &migration_file_name);
+            let migration_file_path = format!("{migrations_dir}{migration_file_name}");
             self.run_migration_from_file(&migration_file_path).await;
         }
     }

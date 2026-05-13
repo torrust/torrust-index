@@ -99,7 +99,7 @@ impl TorrentTester {
     }
 
     pub fn torrent_file_path(upload_path: &str, torrent_id: i64) -> String {
-        format!("{}/{}.torrent", &upload_path, &torrent_id)
+        format!("{upload_path}/{torrent_id}.torrent")
     }
 
     /// Table `torrust_torrents`

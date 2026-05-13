@@ -29,7 +29,7 @@ pub async fn transfer_torrents(
     for torrent in &torrents {
         // [v2] table torrust_torrents
 
-        println!("[v2][torrust_torrents] adding the torrent: {:?} ...", &torrent.torrent_id);
+        println!("[v2][torrust_torrents] adding the torrent: {:?} ...", torrent.torrent_id);
 
         let uploader = source_database.get_user_by_username(&torrent.uploader).await.unwrap();
 
@@ -37,13 +37,13 @@ pub async fn transfer_torrents(
             uploader.username == torrent.uploader,
             "Error copying torrent with id {:?}.
                 Username (`uploader`) in `torrust_torrents` table does not match `username` in `torrust_users` table",
-            &torrent.torrent_id
+            torrent.torrent_id
         );
 
-        let filepath = format!("{}/{}.torrent", upload_path, &torrent.torrent_id);
+        let filepath = format!("{}/{}.torrent", upload_path, torrent.torrent_id);
 
         let torrent_from_file =
-            read_torrent_from_file(&filepath).unwrap_or_else(|_| panic!("Error torrent file not found: {:?}", &filepath));
+            read_torrent_from_file(&filepath).unwrap_or_else(|_| panic!("Error torrent file not found: {filepath:?}"));
 
         let id = target_database
             .insert_torrent(&TorrentRecordV2::from_v1_data(torrent, &torrent_from_file.info, &uploader))
@@ -53,10 +53,10 @@ pub async fn transfer_torrents(
         assert!(
             id == torrent.torrent_id,
             "Error copying torrent {:?} from source DB to the target DB",
-            &torrent.torrent_id
+            torrent.torrent_id
         );
 
-        println!("[v2][torrust_torrents] torrent with id {:?} added.", &torrent.torrent_id);
+        println!("[v2][torrust_torrents] torrent with id {:?} added.", torrent.torrent_id);
 
         // [v2] table torrust_torrent_files
 
@@ -69,7 +69,7 @@ pub async fn transfer_torrents(
 
             println!(
                 "[v2][torrust_torrent_files][single-file-torrent] adding torrent file {:?} with length {:?} ...",
-                &torrent_from_file.info.name, &torrent_from_file.info.length,
+                torrent_from_file.info.name, torrent_from_file.info.length,
             );
 
             let file_id = target_database
@@ -81,28 +81,19 @@ pub async fn transfer_torrents(
                 )
                 .await;
 
-            println!(
-                "[v2][torrust_torrent_files][single-file-torrent] torrent file insert result: {:?}",
-                &file_id
-            );
+            println!("[v2][torrust_torrent_files][single-file-torrent] torrent file insert result: {file_id:?}");
         } else {
             // Multiple files are being shared
             let files = torrent_from_file.info.files.as_ref().unwrap();
 
             for file in files {
-                println!(
-                    "[v2][torrust_torrent_files][multiple-file-torrent] adding torrent file: {:?} ...",
-                    &file
-                );
+                println!("[v2][torrust_torrent_files][multiple-file-torrent] adding torrent file: {file:?} ...");
 
                 let file_id = target_database
                     .insert_torrent_file_for_torrent_with_multiple_files(torrent, file)
                     .await;
 
-                println!(
-                    "[v2][torrust_torrent_files][multiple-file-torrent] torrent file insert result: {:?}",
-                    &file_id
-                );
+                println!("[v2][torrust_torrent_files][multiple-file-torrent] torrent file insert result: {file_id:?}");
             }
         }
 
@@ -110,18 +101,18 @@ pub async fn transfer_torrents(
 
         println!(
             "[v2][torrust_torrent_info] adding the torrent info for torrent id {:?} ...",
-            &torrent.torrent_id
+            torrent.torrent_id
         );
 
         let id = target_database.insert_torrent_info(torrent).await;
 
-        println!("[v2][torrust_torrents] torrent info insert result: {:?}.", &id);
+        println!("[v2][torrust_torrents] torrent info insert result: {id:?}.");
 
         // [v2] table torrust_torrent_announce_urls
 
         println!(
             "[v2][torrust_torrent_announce_urls] adding the torrent announce url for torrent id {:?} ...",
-            &torrent.torrent_id
+            torrent.torrent_id
         );
 
         if torrent_from_file.announce_list.is_some() {
@@ -129,7 +120,7 @@ pub async fn transfer_torrents(
 
             println!(
                 "[v2][torrust_torrent_announce_urls][announce-list] adding the torrent announce url for torrent id {:?} ...",
-                &torrent.torrent_id
+                torrent.torrent_id
             );
 
             // flatten the nested vec (this will however remove the)
@@ -144,7 +135,7 @@ pub async fn transfer_torrents(
             for tracker_url in &announce_urls {
                 println!(
                     "[v2][torrust_torrent_announce_urls][announce-list] adding the torrent announce url for torrent id {:?} ...",
-                    &torrent.torrent_id
+                    torrent.torrent_id
                 );
 
                 let announce_url_id = target_database
@@ -152,24 +143,20 @@ pub async fn transfer_torrents(
                     .await;
 
                 println!(
-                    "[v2][torrust_torrent_announce_urls][announce-list] torrent announce url insert result {:?} ...",
-                    &announce_url_id
+                    "[v2][torrust_torrent_announce_urls][announce-list] torrent announce url insert result {announce_url_id:?} ..."
                 );
             }
         } else if torrent_from_file.announce.is_some() {
             println!(
                 "[v2][torrust_torrent_announce_urls][announce] adding the torrent announce url for torrent id {:?} ...",
-                &torrent.torrent_id
+                torrent.torrent_id
             );
 
             let announce_url_id = target_database
                 .insert_torrent_announce_url(torrent.torrent_id, &torrent_from_file.announce.unwrap())
                 .await;
 
-            println!(
-                "[v2][torrust_torrent_announce_urls][announce] torrent announce url insert result {:?} ...",
-                &announce_url_id
-            );
+            println!("[v2][torrust_torrent_announce_urls][announce] torrent announce url insert result {announce_url_id:?} ...");
         }
     }
     println!("Torrents transferred");
