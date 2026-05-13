@@ -9,6 +9,24 @@ This is an implementation plan for ADR-T-010, not a separate ADR. Its job is to
 turn the decided repository-wide command-line output contract into concrete
 code, documentation, and regression tests.
 
+## Current Implementation Status
+
+Stages 1 through 3 have landed for the shared Rust helper path:
+
+- Stage 1 fixed the shared control-plane record shape, baseline exit classes,
+  helper stdout schemas, and redaction helpers.
+- Stage 2 expanded `torrust-index-cli-common` with JSON `clap` handling, direct
+  JSON stderr control-plane emission, the JSON panic hook, idempotent JSON
+  stderr tracing with `RUST_LOG` / `--debug` precedence, a non-interleaving
+  stderr writer, and command runners.
+- Stage 3 wired `torrust-index-auth-keypair`, `torrust-index-config-probe`, and
+  `torrust-index-health-check` to the expanded shared infrastructure. Their
+  help, version, argv errors, TTY refusal, and panic diagnostics are now JSON
+  control-plane records on stderr.
+
+The root server, root maintenance binaries, and container entry script remain
+future rollout stages unless their sections below say otherwise.
+
 ## Goal
 
 Bring every shipped, documented, or operator-facing first-party command-line
@@ -186,6 +204,12 @@ Commands with no stdout result data:
 Update `packages/index-cli-common` so every Rust binary can share the same
 contract implementation instead of open-coding it.
 
+Stage 2 status: implemented. The shared crate now owns the control-plane record
+writer, `parse_args_or_exit::<T>()`, the JSON panic hook, `RUST_LOG` / `--debug`
+tracing precedence, locked stderr JSON tracing, and stdout/no-stdout command
+runners. The helper binaries use these entrypoints; root binaries will migrate
+in later stages.
+
 Required changes:
 
 - Define the shared JSON control-plane record shape, including a schema/version
@@ -296,6 +320,12 @@ Required changes:
 ## Helper Binaries
 
 Update the helper binaries under `packages/index-*`.
+
+Stage 3 status: implemented for the three container helpers. They use the shared
+JSON clap parser, install the shared JSON panic hook, expose `--version` through
+clap metadata, keep their stdout result schemas unchanged, and preserve TTY
+refusal for stdout result data. `torrust-index-config-probe` no longer preserves
+Rust's default plain-text panic output.
 
 Required changes:
 
@@ -417,11 +447,12 @@ Required changes:
 
 Update operator documentation after the behavior changes.
 
-Stage 1 documentation status: the shared contract shape, helper stdout result
-schemas, and migration-status notes have been documented. Root maintenance
-commands and the container entry script are still legacy output gaps until their
-rollout stages land; their documentation should describe the ADR-T-010 target
-contract without promising behaviour the binaries do not yet implement.
+Current documentation status: the shared contract shape, helper stdout result
+schemas, expanded Rust CLI infrastructure, and helper-binary wiring state have
+been documented. Root maintenance commands and the container entry script are
+still legacy output gaps until their rollout stages land; their documentation
+should describe the ADR-T-010 target contract without promising behaviour the
+binaries do not yet implement.
 
 Required changes:
 
@@ -492,6 +523,11 @@ After each command completes, grep the temp log for failures or warnings before
 summarizing results, following the repository test-running convention.
 
 ## Rollout Order
+
+Current status: steps 1 through 3 have landed. The documentation for those
+stages has been updated as part of the stage-two/three rollout; the later
+operator-visible migrations still need their own documentation and changelog
+updates when they land.
 
 1. Finalize the shared control-plane record shape, command-specific result
     schema details, exit-code mapping, and redaction rules.

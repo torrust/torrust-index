@@ -35,8 +35,9 @@
 //!
 //! **Phase 6 — `torrust-index-auth-keypair` CLI.** A standalone binary
 //! (`torrust-index-auth-keypair`) generates an RSA-2048 key pair
-//! and writes a JSON object with both PEM blocks to stdout. The container
-//! entry script uses it to auto-generate persistent keys on first boot.
+//! and writes a schema-versioned JSON object with both PEM blocks to stdout.
+//! The container entry script uses it to auto-generate persistent keys on first
+//! boot.
 //! See `packages/index-auth-keypair/src/bin/torrust-index-auth-keypair.rs`
 //! for the binary and ADR-T-007 Phase 6 / ADR-T-009 Phase 2 / ADR-T-010
 //! for full context.

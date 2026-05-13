@@ -170,8 +170,9 @@ reserved for machine-readable result data, stderr is reserved for
 machine-readable diagnostics/control records, and commands that emit stdout
 result data refuse to write it directly to a terminal.
 
-The first implemented stage fixes the shared contract shape and the helper
-result schemas used by the container runtime. These helpers emit exactly one
+The shared helper infrastructure now wraps `clap` help, version, and usage
+errors as JSON control-plane records on stderr, installs a JSON-only panic hook,
+and uses JSON tracing on stderr. The container helper binaries emit exactly one
 JSON object on stdout when successful, include a top-level `schema` field, and
 should be inspected through a pipe or redirect:
 
@@ -180,6 +181,10 @@ torrust-index-auth-keypair | jq .
 torrust-index-config-probe | jq .
 torrust-index-health-check http://127.0.0.1:3001/health_check | jq .
 ```
+
+For helper diagnostics, a non-empty `RUST_LOG` environment variable takes
+precedence over `--debug`; otherwise `--debug` raises the default diagnostic
+filter to debug.
 
 The older root maintenance binaries (`parse_torrent`, `create_test_torrent`,
 `import_tracker_statistics`, `seeder`, and `upgrade`) are in ADR-T-010 scope but

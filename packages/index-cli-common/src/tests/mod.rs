@@ -10,9 +10,16 @@
 //! | `base_args_parses_long_flag`          | `--debug` flips `BaseArgs::debug` to `true`.     |
 //! | `command_exit_codes_match_contract`   | Baseline process statuses are fixed.             |
 //! | `control_record_serialises_shape`      | Shared stderr record shape is stable.            |
+//! | `json_line_writer_appends_newline`      | JSON record helper writes one complete line.     |
 //! | `usage_error_record_carries_fields`    | Usage records include exit code and clap kind.   |
 //! | `tty_refusal_record_carries_fields`    | TTY refusal records identify stdout and code 2.  |
 //! | `panic_record_omits_payload`           | Panic records avoid serialising panic payloads.  |
+//! | `parse_args_from_returns_help_record`  | Clap help becomes JSON stderr control data.      |
+//! | `parse_args_from_returns_version_record` | Clap version becomes JSON stderr control data. |
+//! | `parse_args_from_returns_usage_record` | Clap argv errors become JSON usage records.      |
+//! | `tracing_filter_prefers_rust_log`      | `RUST_LOG` wins over `--debug`.                  |
+//! | `tracing_filter_uses_debug_flag`       | `--debug` selects debug without `RUST_LOG`.      |
+//! | `tracing_filter_uses_default_level`    | Default level is used last.                      |
 //! | `redacts_sensitive_field_values`       | Secret-like field names are hidden.              |
 //! | `redacts_database_url_secrets`         | DB credentials and query secrets are removed.    |
 //! | `keeps_public_key_fields_visible`      | Public key metadata is not treated as secret.    |
@@ -26,6 +33,7 @@
 //! interferes with the rest of the test binary's output.
 
 use std::collections::BTreeMap;
+use std::ffi::OsStr;
 use std::io::{self, Write};
 
 use clap::Parser;
@@ -34,7 +42,8 @@ use serde_json::json;
 
 use crate::{
     BaseArgs, CONTROL_PLANE_SCHEMA, CommandExit, ControlPlaneFields, ControlPlaneRecord, ControlPlaneRecordKind, REDACTED,
-    StandardStream, redact_database_url, redact_field_value,
+    StandardStream, TracingFilterSource, parse_args_from, redact_database_url, redact_field_value, tracing_filter_from_rust_log,
+    write_json_line,
 };
 
 /// A `Write` that fails every call with `BrokenPipe`.
@@ -51,6 +60,17 @@ impl Write for FailingWriter {
     fn flush(&mut self) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::BrokenPipe, "test: pipe closed"))
     }
+}
+
+#[derive(Parser)]
+#[command(name = "fixture-helper", version = "1.2.3", about = "Fixture helper")]
+#[allow(dead_code)]
+struct FixtureCli {
+    #[arg(long)]
+    name: Option<String>,
+
+    #[command(flatten)]
+    base: BaseArgs,
 }
 
 /// Pure helper that mirrors `emit` but writes to an arbitrary
@@ -169,6 +189,20 @@ fn control_record_serialises_shape() {
 }
 
 #[test]
+fn json_line_writer_appends_newline() {
+    let record = ControlPlaneRecord::status("fixture", "ready");
+    let mut buf = Vec::new();
+
+    write_json_line(&mut buf, &record).expect("record should serialize");
+
+    assert!(buf.ends_with(b"\n"));
+    let line = std::str::from_utf8(&buf).expect("JSON must be UTF-8");
+    let value: serde_json::Value = serde_json::from_str(line).expect("record must be a JSON object");
+    assert_eq!(value["schema"], json!(CONTROL_PLANE_SCHEMA));
+    assert_eq!(value["kind"], json!("status"));
+}
+
+#[test]
 fn usage_error_record_carries_fields() {
     let record = ControlPlaneRecord::usage_error("fixture", "unknown argument", "unknown_argument");
 
@@ -210,6 +244,85 @@ fn panic_record_omits_payload() {
     assert_eq!(value["fields"]["exit_code"], json!(1));
     assert_eq!(value["fields"]["thread"], json!("main"));
     assert!(value["fields"].get("payload").is_none());
+}
+
+#[test]
+fn parse_args_from_returns_help_record() {
+    let Err(exit) = parse_args_from::<FixtureCli, _, _>(["fixture-helper", "--help"]) else {
+        panic!("help should stop parsing");
+    };
+
+    assert_eq!(exit.exit, CommandExit::Success);
+    assert_eq!(exit.record.command, "fixture-helper");
+    assert_eq!(exit.record.kind, ControlPlaneRecordKind::Help);
+
+    let Some(ControlPlaneFields::Help { text }) = exit.record.fields else {
+        panic!("help record should carry help text");
+    };
+    assert!(text.contains("Fixture helper"));
+    assert!(text.contains("--debug"));
+}
+
+#[test]
+fn parse_args_from_returns_version_record() {
+    let Err(exit) = parse_args_from::<FixtureCli, _, _>(["fixture-helper", "--version"]) else {
+        panic!("version should stop parsing");
+    };
+
+    assert_eq!(exit.exit, CommandExit::Success);
+    assert_eq!(exit.record.command, "fixture-helper");
+    assert_eq!(exit.record.kind, ControlPlaneRecordKind::Version);
+
+    let Some(ControlPlaneFields::Version { version }) = exit.record.fields else {
+        panic!("version record should carry version text");
+    };
+    assert_eq!(version, "fixture-helper 1.2.3");
+}
+
+#[test]
+fn parse_args_from_returns_usage_record() {
+    let Err(exit) = parse_args_from::<FixtureCli, _, _>(["fixture-helper", "--no-such-flag"]) else {
+        panic!("unknown flags should stop parsing");
+    };
+
+    assert_eq!(exit.exit, CommandExit::Usage);
+    assert_eq!(exit.record.command, "fixture-helper");
+    assert_eq!(exit.record.kind, ControlPlaneRecordKind::UsageError);
+    assert!(exit.record.message.contains("--no-such-flag"));
+
+    let Some(ControlPlaneFields::UsageError {
+        exit_code,
+        clap_error_kind,
+    }) = exit.record.fields
+    else {
+        panic!("usage record should carry usage fields");
+    };
+    assert_eq!(exit_code, CommandExit::Usage.code());
+    assert_eq!(clap_error_kind, "unknown_argument");
+}
+
+#[test]
+fn tracing_filter_prefers_rust_log() {
+    let filter = tracing_filter_from_rust_log(Some(OsStr::new("warn,tower_http=debug")), true, tracing::Level::INFO);
+
+    assert_eq!(filter.directive, "warn,tower_http=debug");
+    assert_eq!(filter.source, TracingFilterSource::RustLog);
+}
+
+#[test]
+fn tracing_filter_uses_debug_flag() {
+    let filter = tracing_filter_from_rust_log(Some(OsStr::new("   ")), true, tracing::Level::INFO);
+
+    assert_eq!(filter.directive, "debug");
+    assert_eq!(filter.source, TracingFilterSource::DebugFlag);
+}
+
+#[test]
+fn tracing_filter_uses_default_level() {
+    let filter = tracing_filter_from_rust_log(None, false, tracing::Level::WARN);
+
+    assert_eq!(filter.directive, "warn");
+    assert_eq!(filter.source, TracingFilterSource::DefaultLevel);
 }
 
 #[test]

@@ -50,7 +50,7 @@ The decisions below follow from a small set of invariants the container subsyste
 - **P6.** The compose baseline is production-shaped; dev affordances are an additive override layer, never a subtraction from the baseline.
 - **P7.** Vendored security-sensitive code is treated as code we own, with a current internal audit record.
 - **P8.** Helper binaries implement the TTY-refusal rule now defined globally by [ADR-T-010](010-global-command-line-output-contract.md): commands that emit stdout result data refuse to write it directly to a terminal.
-- **P9.** Helper binaries implement the stdout/stderr contract now defined globally by [ADR-T-010](010-global-command-line-output-contract.md). This ADR keeps one helper-specific dependency consequence: every helper binary links the same baseline crates without exception or per-crate justification: `clap` (argv), `tracing` + `tracing-subscriber` with `json` feature (stderr diagnostics), `serde` + `serde_json` (stdout wire format). These are not enumerated in per-crate allowlists. A shared `torrust-index-cli-common` library crate provides the scaffolding (`refuse_if_stdout_is_tty`, `init_json_tracing`, `emit<T: Serialize>`, and a common `BaseArgs` with `--debug`).
+- **P9.** Helper binaries implement the stdout/stderr contract now defined globally by [ADR-T-010](010-global-command-line-output-contract.md). This ADR keeps one helper-specific dependency consequence: every helper binary links the same baseline crates without exception or per-crate justification: `clap` (argv), `tracing` + `tracing-subscriber` with `env-filter` and `json` features (stderr diagnostics), `serde` + `serde_json` (stdout wire format). These are not enumerated in per-crate allowlists. A shared `torrust-index-cli-common` library crate provides the scaffolding: JSON `clap` wrapping, TTY refusal, JSON tracing, JSON panic diagnostics, stdout JSON emission, command runners, and a common `BaseArgs` with `--debug`.
 
 ---
 
@@ -276,6 +276,9 @@ TORRUST_INDEX_CONFIG_TOML_PATH in the environment before invoking the
 probe, the same mechanism the application uses.
 
 Refuses to run when stdout is a TTY (exit 2, per ADR-T-010).
+
+`--help`, `--version`, argv errors, TTY refusal, and panic diagnostics are JSON
+control-plane records on stderr. They do not emit stdout result data.
 
 On success (exit 0), emits one JSON object + trailing newline on stdout:
 
@@ -736,7 +739,7 @@ The release-base symlink loop covers every applet the entry script invokes by ba
 **Follows from:** P2, P8, P9, and the global command-line output contract later extracted as ADR-T-010.
 **Addresses:** [R4](#r4--health_check-pulls-in-reqwest-for-a-localhost-get).
 
-Every helper binary is extracted into its own workspace crate under `packages/index-*/` and follows the command-line output contract now defined globally by ADR-T-010. A shared `packages/index-cli-common/` library crate (`torrust-index-cli-common`) provides the scaffolding so each binary's `main` is only domain logic.
+Every helper binary is extracted into its own workspace crate under `packages/index-*/` and follows the command-line output contract now defined globally by ADR-T-010. A shared `packages/index-cli-common/` library crate (`torrust-index-cli-common`) provides the scaffolding so each binary's `main` is only domain logic and command-boundary wiring.
 
 The crate boundary makes the "no HTTP/TLS deps" property a manifest-level invariant: a future contributor cannot accidentally re-introduce `reqwest` because the crate's `Cargo.toml` simply does not list it. `reqwest` remains in the workspace for the importer and tracker clients; the goal is to prune it from the *helper binaries'* dep closures, not from the workspace.
 
@@ -757,15 +760,44 @@ The dep-closure exclusion check ([Acceptance Criterion #5](#5-helper-binary-dep-
 **Public API:**
 
 ```rust
+/// Parse argv with clap, emitting JSON help/version/usage records on stderr.
+pub fn parse_args_or_exit<T: clap::Parser>() -> T;
+
 /// Refuse to run if stdout is a terminal (ADR-T-010).
-/// Prints a diagnostic to stderr and exits with code 2.
+/// Emits a JSON control-plane record to stderr and exits with code 2.
 pub fn refuse_if_stdout_is_tty(binary_name: &str);
 
-/// Initialise `tracing-subscriber` with JSON output on stderr.
-pub fn init_json_tracing(level: tracing::Level);
+/// Initialise JSON stderr tracing with RUST_LOG / --debug precedence.
+pub fn init_json_tracing_with_debug(debug: bool, default_level: tracing::Level);
+
+/// Install the JSON-only panic hook.
+pub fn install_json_panic_hook(command_name: &str);
 
 /// Serialise `value` as one JSON object + trailing newline to stdout.
 pub fn emit<T: serde::Serialize>(value: &T) -> std::io::Result<()>;
+
+/// Run a stdout-producing single-JSON-object command.
+pub fn run_stdout_json_command<Output, CommandError, Run>(
+    command_name: &str,
+    debug: bool,
+    default_level: tracing::Level,
+    run: Run,
+) -> std::process::ExitCode
+where
+    Output: serde::Serialize,
+    CommandError: std::fmt::Display,
+    Run: FnOnce() -> Result<Output, CommandError>;
+
+/// Run a side-effect command that does not emit stdout result data.
+pub fn run_no_stdout_command<CommandError, Run>(
+    command_name: &str,
+    debug: bool,
+    default_level: tracing::Level,
+    run: Run,
+) -> std::process::ExitCode
+where
+    CommandError: std::fmt::Display,
+    Run: FnOnce() -> Result<(), CommandError>;
 
 /// Common `--debug` flag. Flatten into each binary's `Args` via `#[command(flatten)]`.
 #[derive(clap::Args)]
@@ -775,19 +807,16 @@ pub struct BaseArgs {
 }
 ```
 
-**Dependencies.** The ADR-T-010 helper baseline and nothing else: `clap`, `tracing`, `tracing-subscriber` (with `json` feature), `serde`, `serde_json`.
+**Dependencies.** The ADR-T-010 helper baseline and nothing else: `clap`, `tracing`, `tracing-subscriber` (with `env-filter` and `json` features), `serde`, `serde_json`.
 
-Every binary's `main` reduces to:
+For helpers whose errors map to ADR-T-010's baseline exit classes, `main`
+reduces to:
 
 ```rust
 fn main() -> std::process::ExitCode {
-    let args = Args::parse();
-    refuse_if_stdout_is_tty("torrust-index-<name>");
-    init_json_tracing(if args.base.debug { Level::DEBUG } else { Level::INFO });
-    match run(&args) {
-        Ok(out) => { emit(&out).unwrap(); ExitCode::SUCCESS }
-        Err(e)  => { error!(error = %e, "…"); ExitCode::from(e.exit_code()) }
-    }
+    install_json_panic_hook("torrust-index-<name>");
+    let args = parse_args_or_exit::<Args>();
+    run_stdout_json_command("torrust-index-<name>", args.base.debug, Level::INFO, || run(&args))
 }
 ```
 
@@ -797,7 +826,7 @@ Moved from `src/bin/health_check.rs` to `packages/index-health-check/`. Rewritte
 
 Stdout result JSON on success:
 ```json
-{"target": "http://localhost:3001/health_check", "status": 200, "elapsed_ms": 4}
+{"schema": 1, "target": "http://localhost:3001/health_check", "status": 200, "elapsed_ms": 4}
 ```
 
 On failure, stdout is empty; the exit code is the sole branch signal for callers (Docker, the entry script). Tests cover non-2xx response, connection refused, read timeout, and malformed status line using a `TcpListener` on an ephemeral port.
@@ -808,10 +837,10 @@ Moved from `src/bin/generate_auth_keypair.rs` to `packages/index-auth-keypair/`.
 
 Stdout result JSON:
 ```json
-{"private_key_pem": "-----BEGIN PRIVATE KEY-----\n...", "public_key_pem": "-----BEGIN PUBLIC KEY-----\n..."}
+{"schema": 1, "private_key_pem": "-----BEGIN PRIVATE KEY-----\n...", "public_key_pem": "-----BEGIN PUBLIC KEY-----\n..."}
 ```
 
-This eliminated the `sed` post-processing in the previous documented usage. Consumers use `jq -r .private_key_pem` (shell) or `serde_json::from_reader::<KeypairOutput>` (Rust). The existing TTY guard migrated to the shared `refuse_if_stdout_is_tty`, unifying on exit code 2 (was exit 1).
+This eliminated the `sed` post-processing in the previous documented usage. Consumers use `jq -r .private_key_pem` (shell) or `serde_json::from_reader::<KeypairOutput>` (Rust). The existing TTY guard migrated to the shared ADR-T-010 infrastructure, unifying on exit code 2 (was exit 1).
 
 The entry script's keygen invocation changed from `torrust-generate-auth-keypair` to `torrust-index-auth-keypair`, and the consumer migrated from `sed` PEM-block extraction to `jq` in the same change (`sed` cannot recover usable PEM from the new single-line JSON output).
 
@@ -1121,7 +1150,7 @@ exit 0
 
 ### 6. Helper JSON + TTY contract (ADR-T-010)
 
-Every helper binary, when invoked with stdout attached to a TTY, exits with code 2 before producing any output. When invoked with stdout piped, every helper emits exactly one JSON object followed by one trailing newline on stdout, and `tracing` NDJSON events on stderr. This is the helper-binary acceptance slice of the global contract later extracted as ADR-T-010.
+Every helper binary, when invoked with stdout attached to a TTY, exits with code 2 before producing any stdout. When invoked with stdout piped, every helper emits exactly one JSON object followed by one trailing newline on stdout, and JSON/NDJSON control-plane or tracing records on stderr. Help, version, argv errors, TTY refusal, and panic diagnostics are JSON control-plane records on stderr. This is the helper-binary acceptance slice of the global contract later extracted as ADR-T-010.
 
 ```sh
 set -eu

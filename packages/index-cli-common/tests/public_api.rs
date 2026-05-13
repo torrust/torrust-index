@@ -14,10 +14,11 @@
 //! | `base_args_flattens_into_clap_parser` | `BaseArgs` composes via `#[command(flatten)]`     |
 //! | `base_args_long_flag_toggles_debug`   | The `--debug` long flag flips the field           |
 //! | `base_args_rejects_unknown_short_flag` | clap rejects an unrelated flag at parse time     |
+//! | `parse_args_from_wraps_help_as_json_control_record` | shared parser returns JSON help metadata |
 
 use clap::Parser;
 use serde::Serialize;
-use torrust_index_cli_common::{BaseArgs, emit};
+use torrust_index_cli_common::{BaseArgs, CommandExit, ControlPlaneFields, ControlPlaneRecordKind, emit, parse_args_from};
 
 /// Minimal helper-binary-shaped CLI: every helper composes
 /// `BaseArgs` via `#[command(flatten)]`, so this fixture
@@ -27,6 +28,14 @@ use torrust_index_cli_common::{BaseArgs, emit};
 #[derive(Parser)]
 #[command(name = "fixture-helper")]
 struct FixtureCli {
+    #[command(flatten)]
+    base: BaseArgs,
+}
+
+#[derive(Parser)]
+#[command(name = "fixture-helper", version = "1.2.3", about = "Fixture helper")]
+#[allow(dead_code)]
+struct FixtureHelpCli {
     #[command(flatten)]
     base: BaseArgs,
 }
@@ -67,4 +76,19 @@ fn base_args_rejects_unknown_short_flag() {
         panic!("unknown flag must be rejected by clap");
     };
     assert_eq!(err.exit_code(), 2, "clap argv-parse failure exit code is 2");
+}
+
+#[test]
+fn parse_args_from_wraps_help_as_json_control_record() {
+    let Err(exit) = parse_args_from::<FixtureHelpCli, _, _>(["fixture-helper", "--help"]) else {
+        panic!("help should return a control-plane exit record");
+    };
+
+    assert_eq!(exit.exit, CommandExit::Success);
+    assert_eq!(exit.record.kind, ControlPlaneRecordKind::Help);
+
+    let Some(ControlPlaneFields::Help { text }) = exit.record.fields else {
+        panic!("help record should expose clap help text");
+    };
+    assert!(text.contains("Fixture helper"));
 }

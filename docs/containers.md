@@ -409,8 +409,8 @@ failure rather than silent misbehaviour.
 
 Container helper binaries follow the ADR-T-010 stdout/stderr split. When they
 emit result data, stdout is exactly one JSON object with a trailing newline and
-a top-level `schema` field. Diagnostics are emitted on stderr as JSON tracing
-records where the helper has already been migrated.
+a top-level `schema` field. Diagnostics, help, version output, argv errors, TTY
+refusal, and panic reports are emitted on stderr as JSON records.
 
 The stdout-producing helpers are:
 
@@ -426,6 +426,12 @@ torrust-index-auth-keypair | jq .
 torrust-index-config-probe | jq .
 torrust-index-health-check http://127.0.0.1:3001/health_check | jq .
 ```
+
+For helper diagnostics, a non-empty `RUST_LOG` environment variable takes
+precedence over `--debug`; otherwise `--debug` raises the helper's default
+diagnostic filter to debug. Help and version requests do not emit stdout result
+data and therefore do not trigger TTY refusal; they write JSON control-plane
+records to stderr and exit with code 0.
 
 The container entry script captures helper stdout internally and does not
 forward it to the terminal. Its own diagnostics are still part of the ADR-T-010

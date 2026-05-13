@@ -77,6 +77,11 @@ error system (ADR-T-006), MSRV raised to 1.88.
   `torrust-index-cli-common`: control-plane record schema, baseline exit-code
   classes, structured help/version/usage/TTY-refusal/panic record types, and
   diagnostic redaction helpers.
+- Stage-2 shared CLI infrastructure in `torrust-index-cli-common`: JSON
+  `clap` help/version/usage wrapping, direct JSON stderr control-plane writes,
+  a JSON-only panic hook, idempotent JSON stderr tracing with `RUST_LOG` /
+  `--debug` precedence, a non-interleaving stderr writer, and stdout/no-stdout
+  command runners.
 
 #### Changed
 
@@ -85,6 +90,11 @@ error system (ADR-T-006), MSRV raised to 1.88.
   `private_key_pem`, and `public_key_pem`; `torrust-index-config-probe` emits
   `schema`, `database`, and `auth`; `torrust-index-health-check` emits
   `schema`, `target`, `status`, and `elapsed_ms`.
+- `torrust-index-auth-keypair`, `torrust-index-config-probe`, and
+  `torrust-index-health-check` now use the shared JSON `clap` parser and JSON
+  panic hook. Their `--help`, `--version`, argv errors, TTY refusal, and panic
+  diagnostics are JSON control-plane records on stderr; stdout remains reserved
+  for successful result JSON.
 - Operator documentation now describes the ADR-T-010 migration state: helper
   binaries have the JSON stdout contract, while root maintenance binaries and
   the container entry script remain legacy output gaps until their rollout

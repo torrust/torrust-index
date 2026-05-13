@@ -75,7 +75,9 @@ Command-specific diagnostics should not use `println!` or `eprintln!` for progre
 
 ## Implementation Guidance
 
-Use `torrust-index-cli-common` for command-line tools that emit a single JSON object on stdout. It provides the current shared scaffolding for the global contract: TTY refusal for commands with stdout result data, JSON tracing on stderr, JSON emission on stdout, and the common `--debug` flag.
+Use `torrust-index-cli-common` for Rust command-line tools. It provides the shared scaffolding for the global contract: JSON wrapping for `clap` help, version, and argv errors; JSON control-plane records on stderr before tracing is installed; TTY refusal for commands with stdout result data; JSON-only panic diagnostics; JSON tracing on stderr; JSON emission on stdout; the common `--debug` flag; and runners for stdout-producing and no-stdout command classes.
+
+Tracing filter precedence is shared: a non-empty `RUST_LOG` environment variable wins, otherwise `--debug` selects debug-level diagnostics, otherwise the command's default level is used.
 
 Commands that do not emit stdout result data still follow the stream separation rule: diagnostics and logs go to stderr as JSON, preferably through `tracing`.
 
