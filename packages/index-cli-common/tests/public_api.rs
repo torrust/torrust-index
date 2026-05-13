@@ -62,7 +62,7 @@ fn base_args_rejects_unknown_short_flag() {
     // Pins clap's contract that unknown flags surface as a
     // parse error rather than being silently dropped — every
     // helper binary depends on this for the `unknown-flag →
-    // exit 2` mapping documented in ADR-T-009 §6.1.
+    // exit 2` mapping documented in ADR-T-010.
     let Err(err) = FixtureCli::try_parse_from(["fixture-helper", "--no-such-flag"]) else {
         panic!("unknown flag must be rejected by clap");
     };

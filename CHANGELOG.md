@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-**Highlights:** container infrastructure refactor (ADR-T-009),
+**Highlights:** global command-line output contract (ADR-T-010),
+container infrastructure refactor (ADR-T-009),
 native role-based authorization replacing Casbin (ADR-T-008),
 RSA-signed JWTs with revocation support (ADR-T-007), domain-scoped
 error system (ADR-T-006), MSRV raised to 1.88.
@@ -57,6 +58,13 @@ error system (ADR-T-006), MSRV raised to 1.88.
   domain-scoped enums: `AuthError`, `UserError`, `TorrentError`,
   `CategoryTagError`, with a thin `ApiError` wrapper (ADR-T-006).
 
+### ADR-T-010 — Global command-line output contract
+
+#### Added
+
+- ADR-T-010, extracting ADR-T-009's helper stdout/stderr convention into
+  a global command-line output contract for the application.
+
 ### ADR-T-009 — Container infrastructure refactor
 
 #### Added
@@ -67,7 +75,7 @@ error system (ADR-T-006), MSRV raised to 1.88.
   configuration system. Leaf crate — no `tokio`, `reqwest`, `sqlx`,
   `hyper`, `rustls`, `native-tls`, or `openssl` in its dep closure.
 - Helper-binary crates split into leaves with no HTTP/TLS in their
-  dep closure: `torrust-index-cli-common` (shared P9 scaffolding —
+  dep closure: `torrust-index-cli-common` (shared ADR-T-010 scaffolding —
   `refuse_if_stdout_is_tty`, `init_json_tracing`, `emit`, `BaseArgs`),
   `torrust-index-health-check` (stdlib-only, Happy Eyeballs IPv6/IPv4
   fallback), `torrust-index-auth-keypair` (RSA-2048 key generator),

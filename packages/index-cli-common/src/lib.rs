@@ -1,7 +1,7 @@
-//! Shared CLI scaffolding for Torrust Index helper binaries (P9).
+//! Shared CLI scaffolding for Torrust Index command-line tools (ADR-T-010).
 //!
 //! Every helper binary uses this crate for:
-//! - TTY refusal (P8)
+//! - TTY refusal for stdout result data
 //! - JSON tracing initialisation on stderr
 //! - JSON output on stdout
 
@@ -10,9 +10,9 @@ use std::io::{self, IsTerminal, Write};
 #[cfg(test)]
 mod tests;
 
-/// Refuse to run if stdout is a terminal (P8).
+/// Refuse to run if stdout is a terminal (ADR-T-010).
 ///
-/// Emits a `tracing::error!` event (NDJSON on stderr, per P9)
+/// Emits a `tracing::error!` event (NDJSON on stderr, per ADR-T-010)
 /// and exits with code 2. Call this **after** [`init_json_tracing`]
 /// so the diagnostic is structured rather than a bare `eprintln!`.
 pub fn refuse_if_stdout_is_tty(binary_name: &str) {

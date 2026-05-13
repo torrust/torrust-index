@@ -226,7 +226,7 @@ longer exists. Design:
 - Refuses to run if stdout is a terminal (exit code 2).
 - Emits a single JSON object
   `{"private_key_pem": "...", "public_key_pem": "..."}`
-  on stdout (P9 of ADR-T-009). The original raw-PEM
+  on stdout ([ADR-T-010](010-global-command-line-output-contract.md)). The original raw-PEM
   output was replaced in Phase 2.
 - Diagnostics on stderr via `tracing` (NDJSON); `--debug` for verbose.
 - Uses `clap` for CLI.

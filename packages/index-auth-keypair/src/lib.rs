@@ -1,7 +1,7 @@
 //! RSA-2048 key pair generator for Torrust Index JWT authentication.
 //!
 //! Outputs a JSON object with `private_key_pem` and `public_key_pem`
-//! fields to stdout (P9). Diagnostics go to stderr via `tracing`.
+//! fields to stdout per ADR-T-010. Diagnostics go to stderr via JSON `tracing`.
 
 use rsa::RsaPrivateKey;
 use rsa::pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding};

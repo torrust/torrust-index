@@ -3,7 +3,7 @@
 **Status:** Implemented
 **Date:** 2026-04-19
 **Supersedes:** Earlier `ADR-T-009` draft ("Container Infrastructure Hardening") whose tactical S-N items were merged without a written ADR file. Those items are summarised in [Prior Work](#prior-work) and are not re-litigated here.
-**Relates to:** [ADR-T-007](007-jwt-system-refactor.md) (auth key generation performed by the entry script).
+**Relates to:** [ADR-T-007](007-jwt-system-refactor.md) (auth key generation performed by the entry script), [ADR-T-010](010-global-command-line-output-contract.md) (global command-line output contract).
 
 ---
 
@@ -49,8 +49,8 @@ The decisions below follow from a small set of invariants the container subsyste
 - **P5.** Where two components must agree on a value (path, port, credential), exactly one of them owns it and tells the other; they do not independently maintain a shared constant.
 - **P6.** The compose baseline is production-shaped; dev affordances are an additive override layer, never a subtraction from the baseline.
 - **P7.** Vendored security-sensitive code is treated as code we own, with a current internal audit record.
-- **P8.** No machine-readable stdout to a TTY. Every helper binary that emits structured output (JSON, PEM) on stdout refuses to run when stdout is a terminal. The check is unconditional — it does not depend on whether the specific output is sensitive. Operators who want to see the output interactively pipe to `jq`, `less`, or `cat`.
-- **P9.** Universal helper conventions. Every helper binary links the same baseline crates without exception or per-crate justification: `clap` (argv), `tracing` + `tracing-subscriber` with `json` feature (stderr diagnostics), `serde` + `serde_json` (stdout wire format). These are not enumerated in per-crate allowlists. On success (exit 0), stdout is one JSON object followed by one trailing newline. On failure (exit ≠ 0), stdout is empty — the exit code is the sole branch signal for callers, and the diagnostic goes to stderr via `tracing`. Stderr is always NDJSON `tracing` events regardless of exit code. A shared `torrust-index-cli-common` library crate provides the scaffolding (`refuse_if_stdout_is_tty`, `init_json_tracing`, `emit<T: Serialize>`, and a common `BaseArgs` with `--debug`).
+- **P8.** Helper binaries implement the TTY-refusal rule now defined globally by [ADR-T-010](010-global-command-line-output-contract.md): commands that emit stdout result data refuse to write it directly to a terminal.
+- **P9.** Helper binaries implement the stdout/stderr contract now defined globally by [ADR-T-010](010-global-command-line-output-contract.md). This ADR keeps one helper-specific dependency consequence: every helper binary links the same baseline crates without exception or per-crate justification: `clap` (argv), `tracing` + `tracing-subscriber` with `json` feature (stderr diagnostics), `serde` + `serde_json` (stdout wire format). These are not enumerated in per-crate allowlists. A shared `torrust-index-cli-common` library crate provides the scaffolding (`refuse_if_stdout_is_tty`, `init_json_tracing`, `emit<T: Serialize>`, and a common `BaseArgs` with `--debug`).
 
 ---
 
@@ -261,7 +261,7 @@ The script does not poll env vars to discover the configuration. A small `torrus
 
 A workspace crate `packages/index-config-probe/` (binary `torrust-index-config-probe`) loads the same `Settings` the application loads and emits the container-relevant resolved values as a JSON object on stdout.
 
-**Dependencies.** `torrust-index-config` (path dependency) and `torrust-index-cli-common` (P9 scaffolding). The helper inherits the parsing surface (`figment`, `toml`, `serde`, `serde_with`, `url`, `camino`, `derive_more`, `thiserror`, `tracing`) via `torrust-index-config`; it adds direct `url` and `percent-encoding` deps for sqlite-URL path-extraction logic. `figment` is declared with `default-features = false` and an explicit feature allowlist (`toml`, `env`) in `torrust-index-config`'s `Cargo.toml` so a future feature flip cannot smuggle `tokio` in transitively.
+**Dependencies.** `torrust-index-config` (path dependency) and `torrust-index-cli-common` (ADR-T-010 scaffolding). The helper inherits the parsing surface (`figment`, `toml`, `serde`, `serde_with`, `url`, `camino`, `derive_more`, `thiserror`, `tracing`) via `torrust-index-config`; it adds direct `url` and `percent-encoding` deps for sqlite-URL path-extraction logic. `figment` is declared with `default-features = false` and an explicit feature allowlist (`toml`, `env`) in `torrust-index-config`'s `Cargo.toml` so a future feature flip cannot smuggle `tokio` in transitively.
 
 **Contract.**
 
@@ -275,7 +275,7 @@ env var. No CLI flags override the config-file path — callers set
 TORRUST_INDEX_CONFIG_TOML_PATH in the environment before invoking the
 probe, the same mechanism the application uses.
 
-Refuses to run when stdout is a TTY (exit 2, per P8).
+Refuses to run when stdout is a TTY (exit 2, per ADR-T-010).
 
 On success (exit 0), emits one JSON object + trailing newline on stdout:
 
@@ -322,7 +322,7 @@ PEM material is *never* emitted, only its presence (`"pem_set": true`). The prob
 |------|---------|
 | 0 | Recognised, well-formed configuration. |
 | 1 | Unhandled panic or unexpected I/O on stdout. |
-| 2 | Stdout is a TTY (P8), or clap argv-parse failure. |
+| 2 | Stdout is a TTY (ADR-T-010), or clap argv-parse failure. |
 | 3 | Config-load failure (missing field, parse error, IO error). The underlying error message is forwarded verbatim to stderr via tracing. |
 | 4 | Security-critical field present but empty. Currently: `tracker.token`. |
 | 5 | Unrecognised database scheme. |
@@ -733,16 +733,16 @@ The release-base symlink loop covers every applet the entry script invokes by ba
 
 ### D5 — Helper binaries as separate workspace crates
 
-**Follows from:** P2, P8, P9.
+**Follows from:** P2, P8, P9, and the global command-line output contract later extracted as ADR-T-010.
 **Addresses:** [R4](#r4--health_check-pulls-in-reqwest-for-a-localhost-get).
 
-Every helper binary is extracted into its own workspace crate under `packages/index-*/` and follows P9's universal conventions. A shared `packages/index-cli-common/` library crate (`torrust-index-cli-common`) provides the scaffolding so each binary's `main` is only domain logic.
+Every helper binary is extracted into its own workspace crate under `packages/index-*/` and follows the command-line output contract now defined globally by ADR-T-010. A shared `packages/index-cli-common/` library crate (`torrust-index-cli-common`) provides the scaffolding so each binary's `main` is only domain logic.
 
 The crate boundary makes the "no HTTP/TLS deps" property a manifest-level invariant: a future contributor cannot accidentally re-introduce `reqwest` because the crate's `Cargo.toml` simply does not list it. `reqwest` remains in the workspace for the importer and tracker clients; the goal is to prune it from the *helper binaries'* dep closures, not from the workspace.
 
 #### Helper crate roster
 
-| Crate | Path | Domain deps (beyond P9 baseline) |
+| Crate | Path | Domain deps (beyond ADR-T-010 helper baseline) |
 |---|---|---|
 | `torrust-index-cli-common` | `packages/index-cli-common/` | *(library — no binary)* |
 | `torrust-index-health-check` | `packages/index-health-check/` | *(none — stdlib networking)* |
@@ -757,7 +757,7 @@ The dep-closure exclusion check ([Acceptance Criterion #5](#5-helper-binary-dep-
 **Public API:**
 
 ```rust
-/// Refuse to run if stdout is a terminal (P8).
+/// Refuse to run if stdout is a terminal (ADR-T-010).
 /// Prints a diagnostic to stderr and exits with code 2.
 pub fn refuse_if_stdout_is_tty(binary_name: &str);
 
@@ -775,7 +775,7 @@ pub struct BaseArgs {
 }
 ```
 
-**Dependencies.** The P9 baseline and nothing else: `clap`, `tracing`, `tracing-subscriber` (with `json` feature), `serde`, `serde_json`.
+**Dependencies.** The ADR-T-010 helper baseline and nothing else: `clap`, `tracing`, `tracing-subscriber` (with `json` feature), `serde`, `serde_json`.
 
 Every binary's `main` reduces to:
 
@@ -795,7 +795,7 @@ fn main() -> std::process::ExitCode {
 
 Moved from `src/bin/health_check.rs` to `packages/index-health-check/`. Rewritten with `std::net::TcpStream` + minimal HTTP/1.1 GET (~30 lines), with `set_read_timeout` / `set_write_timeout` for a short connect/read window. No async runtime.
 
-JSON stdout on success:
+Stdout result JSON on success:
 ```json
 {"target": "http://localhost:3001/health_check", "status": 200, "elapsed_ms": 4}
 ```
@@ -806,7 +806,7 @@ On failure, stdout is empty; the exit code is the sole branch signal for callers
 
 Moved from `src/bin/generate_auth_keypair.rs` to `packages/index-auth-keypair/`. Domain dep is `rsa` (which re-exports `pkcs8`).
 
-JSON stdout:
+Stdout result JSON:
 ```json
 {"private_key_pem": "-----BEGIN PRIVATE KEY-----\n...", "public_key_pem": "-----BEGIN PUBLIC KEY-----\n..."}
 ```
@@ -1119,9 +1119,9 @@ done
 exit 0
 ```
 
-### 6. Helper JSON + TTY contract (P8, P9)
+### 6. Helper JSON + TTY contract (ADR-T-010)
 
-Every helper binary, when invoked with stdout attached to a TTY, exits with code 2 before producing any output. When invoked with stdout piped, every helper emits exactly one JSON object followed by one trailing newline on stdout, and `tracing` NDJSON events on stderr.
+Every helper binary, when invoked with stdout attached to a TTY, exits with code 2 before producing any output. When invoked with stdout piped, every helper emits exactly one JSON object followed by one trailing newline on stdout, and `tracing` NDJSON events on stderr. This is the helper-binary acceptance slice of the global contract later extracted as ADR-T-010.
 
 ```sh
 set -eu
@@ -1138,7 +1138,7 @@ for bin in torrust-index-health-check \
     [ "$rc" -eq 2 ] || { echo "FAIL: $bin did not exit 2 on TTY (got $rc)" >&2; exit 1; }
     [ -z "$tty_out" ] || { echo "FAIL: $bin emitted output before TTY refusal" >&2; exit 1; }
 
-    # JSON stdout
+    # stdout result JSON
     case $bin in
         *health-check)
             out=$(docker run --rm --entrypoint="/usr/bin/$bin" \
@@ -1237,7 +1237,7 @@ Tracked for visibility; not part of this refactor:
 - `docker buildx` multi-platform builds (`linux/arm64`).
 - Image signing with `cosign`.
 - Pin base images (`gcr.io/distroless/cc-debian13` and `:debug`) by digest rather than tag for reproducible builds and supply-chain integrity.
-- Reimplement the entry script's first-boot work as a small Rust binary (`torrust-index-entry`), eliminating vendored `su-exec` (privilege drop via direct `setgroups`/`setgid`/`setuid` syscalls), the shell-based IFS/heredoc parsing of probe output, and most of the curated busybox applet set. The `torrust-index-config` extraction, the P9 universal helper conventions, and the `torrust-index-config-probe` helper are deliberate stepping stones: they pull the parsing surface out of the root crate, establish the stderr-tracing / stdout-JSON contract all helpers share, and prove the script-↔-Rust integration shape before committing to the full rewrite. The entry binary would depend on `torrust-index-config` and `torrust-index-auth-keypair` directly, eliminating the serialisation boundary entirely.
+- Reimplement the entry script's first-boot work as a small Rust binary (`torrust-index-entry`), eliminating vendored `su-exec` (privilege drop via direct `setgroups`/`setgid`/`setuid` syscalls), the shell-based IFS/heredoc parsing of probe output, and most of the curated busybox applet set. The `torrust-index-config` extraction, the ADR-T-010 helper conventions, and the `torrust-index-config-probe` helper are deliberate stepping stones: they pull the parsing surface out of the root crate, establish the stderr-tracing / stdout-JSON contract all helpers share, and prove the script-↔-Rust integration shape before committing to the full rewrite. The entry binary would depend on `torrust-index-config` and `torrust-index-auth-keypair` directly, eliminating the serialisation boundary entirely.
 - Promote `packages/render-text-as-image/` to a published crate and drop the root crate's `path = "packages/..."` override; once that lands, the directory can safely be added to `.containerignore`.
 
 ---
