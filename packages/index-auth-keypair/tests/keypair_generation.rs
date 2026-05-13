@@ -3,19 +3,27 @@
 //! | Test                                    | What it covers                            |
 //! |-----------------------------------------|-------------------------------------------|
 //! | `generated_keypair_round_trips_as_json` | JSON output deserialises back correctly   |
+//! | `generated_keypair_carries_schema`      | JSON output schema field is stable        |
 //! | `output_contains_valid_pem_keys`        | PEM keys parse as RSA PKCS#8 / SPKI      |
 //! | `successive_calls_produce_distinct_keys` | No hardcoded/cached key material         |
 
 use rsa::pkcs8::{DecodePrivateKey, DecodePublicKey};
-use torrust_index_auth_keypair::{KeypairOutput, generate_keypair};
+use torrust_index_auth_keypair::{KeypairOutput, SCHEMA, generate_keypair};
 
 #[test]
 fn generated_keypair_round_trips_as_json() {
     let output = generate_keypair().unwrap();
     let json = serde_json::to_string(&output).unwrap();
     let parsed: KeypairOutput = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.schema, SCHEMA);
     assert!(!parsed.private_key_pem.is_empty());
     assert!(!parsed.public_key_pem.is_empty());
+}
+
+#[test]
+fn generated_keypair_carries_schema() {
+    let output = generate_keypair().unwrap();
+    assert_eq!(output.schema, SCHEMA);
 }
 
 #[test]

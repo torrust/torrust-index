@@ -1,7 +1,9 @@
 //! Minimal health-check binary for Torrust Index containers.
 //!
-//! On success (exit 0), emits a JSON object to stdout per ADR-T-010.
+//! On success (exit 0), emits one JSON object with `schema`, `target`, `status`,
+//! and `elapsed_ms` to stdout per ADR-T-010.
 //! On failure (exit ≠ 0), stdout is empty; diagnostics go to stderr as JSON.
+//! Direct terminal stdout is refused; pipe or redirect the result.
 
 use std::process::ExitCode;
 

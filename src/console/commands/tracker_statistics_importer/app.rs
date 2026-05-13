@@ -5,13 +5,10 @@
 //!
 //! You can execute it with: `cargo run --bin import_tracker_statistics`.
 //!
-//! After running it you will see the following output:
-//!
-//! ```text
-//! Importing statistics from linked tracker ...
-//! Loading configuration from config file `./config.toml`
-//! Tracker url: udp://localhost:6969
-//! ```
+//! ADR-T-010 classifies this as a side-effect command: the target contract is
+//! empty stdout and JSON diagnostics on stderr. The current implementation is a
+//! legacy output gap until the command is migrated, so do not parse its current
+//! plain-text diagnostics in automation.
 //!
 //! Statistics are also imported:
 //!

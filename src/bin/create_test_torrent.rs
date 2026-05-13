@@ -1,6 +1,8 @@
 //! Command line tool to create a test torrent file.
 //!
-//! It's only used for debugging purposes.
+//! It's only used for debugging purposes. ADR-T-010 classifies it as a
+//! side-effect command: the target contract is empty stdout and JSON diagnostics
+//! on stderr. The current implementation is a legacy output gap until migration.
 use std::env;
 use std::fs::File;
 use std::io::Write;

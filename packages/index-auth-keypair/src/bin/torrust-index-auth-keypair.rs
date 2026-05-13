@@ -1,5 +1,8 @@
 //! Generate an RSA-2048 key pair for JWT authentication.
 //!
+//! Emits one JSON object with `schema`, `private_key_pem`, and `public_key_pem`
+//! on stdout. Direct terminal stdout is refused; pipe or redirect the result.
+//!
 //! # Usage
 //!
 //! ```sh

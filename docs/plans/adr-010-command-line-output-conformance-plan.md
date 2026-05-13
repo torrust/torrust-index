@@ -85,6 +85,52 @@ All migrated commands must share these baseline behaviours:
 - Command-specific stdout result schemas should either include their own version
   field or be documented as stable command contracts.
 
+## Stage 1 Contract Decisions
+
+The first implementation stage fixes the shared contract details that later
+rollout stages wire into each binary.
+
+Shared stderr control-plane records use this top-level JSON shape:
+
+- `schema`: numeric shared control-plane record schema. The initial value is `1`.
+- `command`: binary or entrypoint name.
+- `kind`: one of `help`, `version`, `usage_error`, `tty_refusal`, `panic`,
+  `status`, or `diagnostic`.
+- `message`: short human-readable message carried inside the JSON record.
+- `fields`: optional kind-specific object tagged with `type`.
+
+The initial structured field variants are:
+
+- `help`: `text`.
+- `version`: `version`.
+- `usage_error`: `exit_code` and `clap_error_kind`.
+- `tty_refusal`: `exit_code` and `stream`.
+- `panic`: `exit_code`, `thread`, and `location`. Panic payloads are not part of
+  the shared record because they may contain secrets.
+
+The shared baseline exit-code classes are:
+
+- `success`: process status `0`.
+- `failure`: process status `1`.
+- `usage`: process status `2`.
+
+Command-specific non-usage exit codes may still be documented by the owning
+command contract. For example, `torrust-index-config-probe` keeps its existing
+configuration and probe failure codes until a command-specific contract changes
+them.
+
+Stdout-producing command result schemas use a numeric top-level `schema` field.
+The first-stage helper outputs are:
+
+- `torrust-index-auth-keypair`: `schema`, `private_key_pem`, and
+  `public_key_pem`.
+- `torrust-index-config-probe`: `schema`, `database`, and `auth`.
+- `torrust-index-health-check`: `schema`, `target`, `status`, and `elapsed_ms`.
+
+Shared redaction helpers apply the initial redaction policy for diagnostics:
+secret-like field names are replaced with `[redacted]`, and database URLs have
+userinfo plus secret-bearing query parameters removed before they are logged.
+
 ## Redaction Policy
 
 JSON diagnostics are easier for operators and scripts to consume, but they also
@@ -371,6 +417,12 @@ Required changes:
 
 Update operator documentation after the behavior changes.
 
+Stage 1 documentation status: the shared contract shape, helper stdout result
+schemas, and migration-status notes have been documented. Root maintenance
+commands and the container entry script are still legacy output gaps until their
+rollout stages land; their documentation should describe the ADR-T-010 target
+contract without promising behaviour the binaries do not yet implement.
+
 Required changes:
 
 - Update `README.md` command examples that currently imply human-readable output.
@@ -458,15 +510,9 @@ summarizing results, following the repository test-running convention.
 
 ## Open Decisions
 
-- The exact JSON field names for clap help, version, usage, TTY refusal, panic,
-  and status records. The shared records should be stable enough for scripts to
-  consume but small enough that command help text can evolve.
-- Whether every stdout-producing command should include a command-specific
-  result schema version immediately, or whether that is introduced only when the
-  command result is documented for external automation.
 - The exact exit-code taxonomy for root maintenance commands beyond the baseline
-  0, 1, and ADR-T-010 reserved code 2. Existing helper-specific exit codes should
-  remain stable unless a command-specific contract says otherwise.
+  `success`, `failure`, and `usage` classes. Existing helper-specific exit codes
+  should remain stable unless a command-specific contract says otherwise.
 - How strict the container entry script can be with external utility stderr. Full
   conformance requires expected failures to be captured and re-emitted as JSON;
   unexpected process crashes may still need a pragmatic trap-based fallback.

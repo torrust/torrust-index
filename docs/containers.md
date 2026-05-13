@@ -405,6 +405,33 @@ failure rather than silent misbehaviour.
 
 ## Runtime Image Notes
 
+### Command-Line Output Contract
+
+Container helper binaries follow the ADR-T-010 stdout/stderr split. When they
+emit result data, stdout is exactly one JSON object with a trailing newline and
+a top-level `schema` field. Diagnostics are emitted on stderr as JSON tracing
+records where the helper has already been migrated.
+
+The stdout-producing helpers are:
+
+- `torrust-index-auth-keypair`: `schema`, `private_key_pem`, `public_key_pem`.
+- `torrust-index-config-probe`: `schema`, `database`, `auth`.
+- `torrust-index-health-check`: `schema`, `target`, `status`, `elapsed_ms`.
+
+These helpers refuse to write stdout result data directly to a terminal. Pipe or
+redirect the result instead:
+
+```sh
+torrust-index-auth-keypair | jq .
+torrust-index-config-probe | jq .
+torrust-index-health-check http://127.0.0.1:3001/health_check | jq .
+```
+
+The container entry script captures helper stdout internally and does not
+forward it to the terminal. Its own diagnostics are still part of the ADR-T-010
+migration backlog; until that rollout stage lands, treat any plain-text entry
+script stderr as a legacy compatibility gap rather than a new output contract.
+
 ### Healthcheck (both targets)
 
 Both `release` and `debug` ship the same two-probe `HEALTHCHECK`
@@ -480,6 +507,9 @@ immediately, and references to unset variables are treated as
 errors. This converts a class of silent-misconfiguration bugs
 into loud, actionable startup failures.
 
+ADR-T-010 will replace this legacy shell tracing path with explicit JSON debug
+records in a later rollout stage. Do not parse `set -x` output in automation.
+
 ### Entry Script Contract
 
 Per ADR-T-009 §7, the entry script reads its configuration in
@@ -516,8 +546,8 @@ above.
    — invoked as root after the default TOML is in place.
    The probe is the same loader the application uses, so it
    sees the operator's full TOML + env-var stack. Its JSON
-   output is consumed by `jq` and drives the remaining
-   steps. The probe runs *before* the script exports any
+  output (`schema`, `database`, `auth`) is consumed by `jq`
+  and drives the remaining steps. The probe runs *before* the script exports any
    `TORRUST_INDEX_CONFIG_OVERRIDE_*` of its own, so its
    output reflects only operator-supplied values.
 5. **`TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__{PRIVATE,PUBLIC}_KEY_{PEM,PATH}`**
@@ -580,6 +610,10 @@ only during the entry script's pre-`su-exec` phase to parse
 the config probe's JSON output and the auth-keypair helper's
 JSON output. The unprivileged `torrust` user has no access
 to `/usr/bin/jq` after privilege drop.
+
+Operators who run the helpers manually should use the same pattern: pipe stdout
+result data to `jq`, redirect it to a file, or capture it from another process.
+Direct terminal stdout is refused by design.
 
 #### Sourced Shell Library
 

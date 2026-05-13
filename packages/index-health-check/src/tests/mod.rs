@@ -3,6 +3,7 @@
 //! | Test                               | What it covers                        |
 //! |------------------------------------|---------------------------------------|
 //! | `success_on_200`                   | Happy path: 200 OK response           |
+//! | `success_output_carries_schema`     | Output schema field is stable         |
 //! | `failure_on_non_2xx`               | Non-success HTTP status code          |
 //! | `failure_on_connection_refused`     | Target not listening                  |
 //! | `failure_on_read_timeout`            | Server accepts but never responds     |
@@ -42,7 +43,17 @@ fn success_on_200() {
     let result = handle.join().unwrap();
     assert!(result.is_ok());
     let output = result.unwrap();
+    assert_eq!(output.schema, super::SCHEMA);
     assert_eq!(output.status, 200);
+}
+
+#[test]
+fn success_output_carries_schema() {
+    let (listener, url) = ephemeral_server();
+    let handle = std::thread::spawn(move || super::do_health_check(&url));
+    serve_once(&listener, b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
+    let output = handle.join().unwrap().unwrap();
+    assert_eq!(output.schema, super::SCHEMA);
 }
 
 #[test]

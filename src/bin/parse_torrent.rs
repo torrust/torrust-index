@@ -1,6 +1,9 @@
 //! Command line tool to parse a torrent file and print the decoded torrent.
 //!
-//! It's only used for debugging purposes.
+//! It's only used for debugging purposes. ADR-T-010 classifies it as a stdout
+//! result-data command; after migration it will emit one JSON object on stdout,
+//! refuse direct terminal stdout, and report diagnostics on stderr as JSON. The
+//! current implementation is a legacy output gap until migration.
 use std::env;
 use std::fs::File;
 use std::io::{self, Read};

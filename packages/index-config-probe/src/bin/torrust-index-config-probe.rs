@@ -1,5 +1,7 @@
 //! Resolve the Torrust Index configuration and print the
 //! container-relevant subset as a single JSON object on stdout.
+//! The JSON object contains `schema`, `database`, and `auth`.
+//! Direct terminal stdout is refused; pipe or redirect the result.
 //!
 //! See ADR-T-009 §D3.
 

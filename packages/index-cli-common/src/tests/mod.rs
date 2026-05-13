@@ -8,6 +8,14 @@
 //! | `emit_to_real_stdout_succeeds`        | `emit` itself writes to the captured stdout.     |
 //! | `base_args_parses_default`            | `BaseArgs::debug` defaults to `false`.           |
 //! | `base_args_parses_long_flag`          | `--debug` flips `BaseArgs::debug` to `true`.     |
+//! | `command_exit_codes_match_contract`   | Baseline process statuses are fixed.             |
+//! | `control_record_serialises_shape`      | Shared stderr record shape is stable.            |
+//! | `usage_error_record_carries_fields`    | Usage records include exit code and clap kind.   |
+//! | `tty_refusal_record_carries_fields`    | TTY refusal records identify stdout and code 2.  |
+//! | `panic_record_omits_payload`           | Panic records avoid serialising panic payloads.  |
+//! | `redacts_sensitive_field_values`       | Secret-like field names are hidden.              |
+//! | `redacts_database_url_secrets`         | DB credentials and query secrets are removed.    |
+//! | `keeps_public_key_fields_visible`      | Public key metadata is not treated as secret.    |
 //!
 //! `refuse_if_stdout_is_tty` and `init_json_tracing` mutate
 //! global process state (the `process::exit` path and the
@@ -22,8 +30,12 @@ use std::io::{self, Write};
 
 use clap::Parser;
 use serde::Serialize;
+use serde_json::json;
 
-use crate::BaseArgs;
+use crate::{
+    BaseArgs, CONTROL_PLANE_SCHEMA, CommandExit, ControlPlaneFields, ControlPlaneRecord, ControlPlaneRecordKind, REDACTED,
+    StandardStream, redact_database_url, redact_field_value,
+};
 
 /// A `Write` that fails every call with `BrokenPipe`.
 ///
@@ -130,4 +142,94 @@ fn base_args_parses_long_flag() {
 
     let parsed = Cli::try_parse_from(["prog", "--debug"]).expect("--debug is valid");
     assert!(parsed.base.debug);
+}
+
+#[test]
+fn command_exit_codes_match_contract() {
+    assert_eq!(CommandExit::Success.code(), 0);
+    assert_eq!(CommandExit::Failure.code(), 1);
+    assert_eq!(CommandExit::Usage.code(), 2);
+
+    assert_eq!(CommandExit::from_code(0), Some(CommandExit::Success));
+    assert_eq!(CommandExit::from_code(1), Some(CommandExit::Failure));
+    assert_eq!(CommandExit::from_code(2), Some(CommandExit::Usage));
+    assert_eq!(CommandExit::from_code(3), None);
+}
+
+#[test]
+fn control_record_serialises_shape() {
+    let record = ControlPlaneRecord::new("fixture", ControlPlaneRecordKind::Status, "ready", None);
+    let value = serde_json::to_value(record).unwrap();
+
+    assert_eq!(value["schema"], json!(CONTROL_PLANE_SCHEMA));
+    assert_eq!(value["command"], json!("fixture"));
+    assert_eq!(value["kind"], json!("status"));
+    assert_eq!(value["message"], json!("ready"));
+    assert!(value.get("fields").is_none());
+}
+
+#[test]
+fn usage_error_record_carries_fields() {
+    let record = ControlPlaneRecord::usage_error("fixture", "unknown argument", "unknown_argument");
+
+    assert_eq!(record.kind, ControlPlaneRecordKind::UsageError);
+    assert_eq!(
+        record.fields,
+        Some(ControlPlaneFields::UsageError {
+            exit_code: CommandExit::Usage.code(),
+            clap_error_kind: "unknown_argument".to_string(),
+        })
+    );
+
+    let value = serde_json::to_value(record).unwrap();
+    assert_eq!(value["fields"]["type"], json!("usage_error"));
+    assert_eq!(value["fields"]["exit_code"], json!(2));
+}
+
+#[test]
+fn tty_refusal_record_carries_fields() {
+    let record = ControlPlaneRecord::tty_refusal("fixture");
+
+    assert_eq!(record.kind, ControlPlaneRecordKind::TtyRefusal);
+    assert_eq!(
+        record.fields,
+        Some(ControlPlaneFields::TtyRefusal {
+            exit_code: CommandExit::Usage.code(),
+            stream: StandardStream::Stdout,
+        })
+    );
+}
+
+#[test]
+fn panic_record_omits_payload() {
+    let record = ControlPlaneRecord::panic("fixture", Some("main"), Some("src/main.rs:12:34"));
+    let value = serde_json::to_value(record).unwrap();
+
+    assert_eq!(value["kind"], json!("panic"));
+    assert_eq!(value["fields"]["type"], json!("panic"));
+    assert_eq!(value["fields"]["exit_code"], json!(1));
+    assert_eq!(value["fields"]["thread"], json!("main"));
+    assert!(value["fields"].get("payload").is_none());
+}
+
+#[test]
+fn redacts_sensitive_field_values() {
+    assert_eq!(redact_field_value("tracker.token", "MyAccessToken"), REDACTED);
+    assert_eq!(redact_field_value("smtp_password", "secret"), REDACTED);
+    assert_eq!(redact_field_value("auth.private_key_pem", "PEM"), REDACTED);
+}
+
+#[test]
+fn redacts_database_url_secrets() {
+    let redacted = redact_database_url("mysql://user:pass@example.test/db?ssl-mode=required&token=abc&password=def");
+
+    assert_eq!(redacted, "mysql://example.test/db?ssl-mode=required");
+}
+
+#[test]
+fn keeps_public_key_fields_visible() {
+    assert_eq!(
+        redact_field_value("auth.public_key_path", "/etc/torrust/public.pem"),
+        "/etc/torrust/public.pem"
+    );
 }

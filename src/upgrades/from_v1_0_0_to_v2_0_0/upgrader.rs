@@ -18,6 +18,11 @@
 //! cargo run --bin upgrade ./data.db ./data_v2.db ./uploads
 //! ```
 //!
+//! ADR-T-010 classifies this as a side-effect command: the target contract is
+//! empty stdout and JSON diagnostics on stderr. The current implementation is a
+//! legacy output gap until migration, so automation should branch on exit status
+//! rather than parsing current plain text.
+//!
 //! This command was created to help users to migrate from version `v1.0.0` to
 //! `v2.0.0`. The main changes in version `v2.0.0` were:
 //!

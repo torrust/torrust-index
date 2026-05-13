@@ -1,5 +1,10 @@
 //! Console app to upload random torrents to a live Index API.
 //!
+//! ADR-T-010 classifies this as a side-effect command: the target contract is
+//! empty stdout and JSON diagnostics on stderr. The current implementation is a
+//! legacy output gap until the command is migrated, so do not parse its current
+//! human-formatted logs in automation.
+//!
 //! Run with:
 //!
 //! ```text

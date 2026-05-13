@@ -11,7 +11,7 @@
 use std::io::{Read, Write};
 use std::net::TcpListener;
 
-use torrust_index_health_check::do_health_check;
+use torrust_index_health_check::{SCHEMA, do_health_check};
 
 /// Bind an ephemeral-port listener and return (listener, url).
 fn ephemeral_server() -> (TcpListener, String) {
@@ -77,6 +77,7 @@ fn output_contains_expected_fields() {
     let output = handle.join().unwrap().unwrap();
 
     let json = serde_json::to_value(&output).unwrap();
+    assert_eq!(json["schema"], SCHEMA);
     assert!(json.get("target").is_some(), "missing 'target' field");
     assert!(json.get("status").is_some(), "missing 'status' field");
     assert!(json.get("elapsed_ms").is_some(), "missing 'elapsed_ms' field");

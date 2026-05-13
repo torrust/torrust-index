@@ -20,6 +20,17 @@ connect_url = "sqlite://data_v2.db?mode=rwc"
 - Perform some tests.
 - If all tests pass, stop the production service, replace the DB, and start it again.
 
+## Command Output
+
+`upgrade` is an ADR-T-010 side-effect command: its target contract is empty
+stdout, with status and error diagnostics emitted as JSON records on stderr.
+Automation should branch on the process exit code and must not parse plain text
+from stdout.
+
+The current binary is still a legacy output gap until its ADR-T-010 migration
+stage lands. Treat any current plain-text diagnostics as temporary and avoid
+building scripts around them.
+
 ## Tests
 
 Before replacing the DB in production you can make some tests like:

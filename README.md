@@ -162,6 +162,32 @@ The following services are provided by the default configuration:
 - API
   - `http://127.0.0.1:3001/`.
 
+### Command-Line Output
+
+First-party Torrust Index command-line entrypoints are governed by
+[ADR-T-010](./adr/010-global-command-line-output-contract.md): stdout is
+reserved for machine-readable result data, stderr is reserved for
+machine-readable diagnostics/control records, and commands that emit stdout
+result data refuse to write it directly to a terminal.
+
+The first implemented stage fixes the shared contract shape and the helper
+result schemas used by the container runtime. These helpers emit exactly one
+JSON object on stdout when successful, include a top-level `schema` field, and
+should be inspected through a pipe or redirect:
+
+```sh
+torrust-index-auth-keypair | jq .
+torrust-index-config-probe | jq .
+torrust-index-health-check http://127.0.0.1:3001/health_check | jq .
+```
+
+The older root maintenance binaries (`parse_torrent`, `create_test_torrent`,
+`import_tracker_statistics`, `seeder`, and `upgrade`) are in ADR-T-010 scope but
+are still migration targets. Do not build new automation around their current
+plain-text output; the target contract for side-effect commands is empty stdout
+and JSON diagnostics on stderr, while `parse_torrent` will become a JSON stdout
+result command.
+
 ## Documentation
 
 - [API (Version 1)][api]

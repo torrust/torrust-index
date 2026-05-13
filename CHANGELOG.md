@@ -16,6 +16,15 @@ error system (ADR-T-006), MSRV raised to 1.88.
 ### Breaking changes
 
 - MSRV raised from 1.85 to 1.88.
+- First-party command-line entrypoints are now governed by ADR-T-010's
+  JSON-only output contract. Stdout is reserved for machine-readable result
+  data, stderr is reserved for machine-readable diagnostics/control records, and
+  stdout-producing commands refuse direct terminal stdout. Existing plain-text
+  root maintenance commands are legacy gaps and will be migrated in later
+  stages.
+- `torrust-index-auth-keypair` and `torrust-index-health-check` stdout JSON now
+  includes a top-level `schema` field. Scripts that expected an exact object
+  shape must tolerate or consume the schema field.
 - `database.connect_url` and `tracker.token` are now mandatory
   schema fields with no defaults. Supply them via env-var override
   (`TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL`,
@@ -64,6 +73,22 @@ error system (ADR-T-006), MSRV raised to 1.88.
 
 - ADR-T-010, extracting ADR-T-009's helper stdout/stderr convention into
   a global command-line output contract for the application.
+- Shared stage-1 command-line contract primitives in
+  `torrust-index-cli-common`: control-plane record schema, baseline exit-code
+  classes, structured help/version/usage/TTY-refusal/panic record types, and
+  diagnostic redaction helpers.
+
+#### Changed
+
+- Helper stdout result schemas are explicitly versioned with top-level
+  `schema` fields. `torrust-index-auth-keypair` emits `schema`,
+  `private_key_pem`, and `public_key_pem`; `torrust-index-config-probe` emits
+  `schema`, `database`, and `auth`; `torrust-index-health-check` emits
+  `schema`, `target`, `status`, and `elapsed_ms`.
+- Operator documentation now describes the ADR-T-010 migration state: helper
+  binaries have the JSON stdout contract, while root maintenance binaries and
+  the container entry script remain legacy output gaps until their rollout
+  stages land.
 
 ### ADR-T-009 — Container infrastructure refactor
 
