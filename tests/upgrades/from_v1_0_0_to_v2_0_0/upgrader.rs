@@ -36,7 +36,7 @@ struct TestConfig {
 impl Default for TestConfig {
     fn default() -> Self {
         let fixtures_dir = "./tests/upgrades/from_v1_0_0_to_v2_0_0/fixtures/".to_string();
-        let upload_path = format!("{}uploads/", &fixtures_dir);
+        let upload_path = format!("{fixtures_dir}uploads/");
         let output_dir = "./tests/upgrades/from_v1_0_0_to_v2_0_0/output/".to_string();
         let source_database_file = format!("{output_dir}source.db");
         let target_database_file = format!("{output_dir}target.db");

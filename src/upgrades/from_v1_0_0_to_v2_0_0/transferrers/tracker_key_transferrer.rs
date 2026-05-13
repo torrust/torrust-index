@@ -16,7 +16,7 @@ pub async fn transfer_tracker_keys(source_database: Arc<SqliteDatabaseV1_0_0>, t
 
         println!(
             "[v2][torrust_users] adding the tracker key with id {:?} ...",
-            &tracker_key.key_id
+            tracker_key.key_id
         );
 
         let id = target_database
@@ -32,12 +32,12 @@ pub async fn transfer_tracker_keys(source_database: Arc<SqliteDatabaseV1_0_0>, t
         assert!(
             id == tracker_key.key_id,
             "Error copying tracker key {:?} from source DB to the target DB",
-            &tracker_key.key_id
+            tracker_key.key_id
         );
 
         println!(
             "[v2][torrust_tracker_keys] tracker key with id {:?} added.",
-            &tracker_key.key_id
+            tracker_key.key_id
         );
     }
 }

@@ -275,7 +275,7 @@ impl Client {
     /// Will return an error if the request fails.
     pub async fn ban_user(&self, username: Username) -> Result<TextResponse, Error> {
         self.http_client
-            .delete(&format!("/user/ban/{}", &username.value))
+            .delete(&format!("/user/ban/{}", username.value))
             .await
             .map_err(Error::from)
     }

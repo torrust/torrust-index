@@ -112,7 +112,7 @@ jobs:
 
       - id: build
         name: Build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           file: ./Containerfile
           push: false
@@ -190,7 +190,7 @@ jobs:
     steps:
       - id: meta
         name: Docker Meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             "${{ vars.DOCKER_HUB_USERNAME }}/${{vars.DOCKER_HUB_REPOSITORY_NAME }}"
@@ -209,7 +209,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           file: ./Containerfile
           push: true
@@ -228,7 +228,7 @@ jobs:
     steps:
       - id: meta
         name: Docker Meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: |
             "${{ vars.DOCKER_HUB_USERNAME }}/${{vars.DOCKER_HUB_REPOSITORY_NAME }}"
@@ -250,7 +250,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           file: ./Containerfile
           push: true

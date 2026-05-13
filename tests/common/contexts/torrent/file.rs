@@ -62,7 +62,7 @@ pub fn parse_torrent(torrent_file_path: &Path) -> TorrentFileInfo {
     let output = Command::new("imdl")
         .args(["torrent", "show", "--json", &torrent_file_path.to_string_lossy()])
         .output()
-        .unwrap_or_else(|_| panic!("failed to open torrent file: {:?}", &torrent_file_path.to_string_lossy()));
+        .unwrap_or_else(|_| panic!("failed to open torrent file: {:?}", torrent_file_path.to_string_lossy()));
 
     match std::str::from_utf8(&output.stdout) {
         Ok(parsed_torrent_json) => {

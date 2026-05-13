@@ -20,7 +20,7 @@ pub async fn transfer_users(
 
         println!(
             "[v2][torrust_users] adding user with username {:?} and id {:?} ...",
-            &user.username, &user.user_id
+            user.username, user.user_id
         );
 
         let id = target_database
@@ -31,16 +31,16 @@ pub async fn transfer_users(
         assert!(
             id == user.user_id,
             "Error copying user {:?} from source DB to the target DB",
-            &user.user_id
+            user.user_id
         );
 
-        println!("[v2][torrust_users] user: {:?} {:?} added.", &user.user_id, &user.username);
+        println!("[v2][torrust_users] user: {:?} {:?} added.", user.user_id, user.username);
 
         // [v2] table torrust_user_profiles
 
         println!(
             "[v2][torrust_user_profiles] adding user profile for user with username {:?} and id {:?} ...",
-            &user.username, &user.user_id
+            user.username, user.user_id
         );
 
         target_database
@@ -50,14 +50,14 @@ pub async fn transfer_users(
 
         println!(
             "[v2][torrust_user_profiles] user profile added for user with username {:?} and id {:?}.",
-            &user.username, &user.user_id
+            user.username, user.user_id
         );
 
         // [v2] table torrust_user_authentication
 
         println!(
             "[v2][torrust_user_authentication] adding password hash ({:?}) for user id ({:?}) ...",
-            &user.password, &user.user_id
+            user.password, user.user_id
         );
 
         target_database
@@ -67,7 +67,7 @@ pub async fn transfer_users(
 
         println!(
             "[v2][torrust_user_authentication] password hash ({:?}) added for user id ({:?}).",
-            &user.password, &user.user_id
+            user.password, user.user_id
         );
     }
 }

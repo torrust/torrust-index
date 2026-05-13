@@ -162,7 +162,7 @@ impl Client {
 
     pub async fn change_password(&self, username: Username, change_password_form: ChangePasswordForm) -> TextResponse {
         self.http_client
-            .post(&format!("/user/{}/change-password", &username.value), &change_password_form)
+            .post(&format!("/user/{}/change-password", username.value), &change_password_form)
             .await
     }
 
@@ -175,7 +175,7 @@ impl Client {
     }
 
     pub async fn ban_user(&self, username: Username) -> TextResponse {
-        self.http_client.delete(&format!("/user/ban/{}", &username.value)).await
+        self.http_client.delete(&format!("/user/ban/{}", username.value)).await
     }
 
     pub async fn get_my_permissions(&self) -> TextResponse {
@@ -365,7 +365,7 @@ impl Http {
     fn base_url(&self, path: &str) -> String {
         format!(
             "http://{}/{}{path}", // DevSkim: ignore DS137138
-            &self.connection_info.bind_address, &self.connection_info.base_path
+            self.connection_info.bind_address, self.connection_info.base_path
         )
     }
 }
