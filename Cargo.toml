@@ -59,7 +59,7 @@ argon2 = "0"
 async-trait = "0"
 axum = { version = "0", features = ["multipart"] }
 axum-server = { version = "0", features = ["tls-rustls"] }
-bittorrent-primitives = "0.1.0"
+bittorrent-primitives = "0.2"
 bytes = "1"
 chrono = { version = "0", default-features = false, features = ["clock"] }
 clap = { version = "4", features = ["derive", "env"] }
@@ -145,5 +145,3 @@ perf = { level = "deny", priority = -1 }
 style = { level = "deny", priority = -1 }
 suspicious = { level = "deny", priority = -1 }
 
-# temp allow this lint
-needless_return = "allow"
