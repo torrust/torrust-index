@@ -19,9 +19,11 @@ error system (ADR-T-006), MSRV raised to 1.88.
 - First-party command-line entrypoints are now governed by ADR-T-010's
   JSON-only output contract. Stdout is reserved for machine-readable result
   data, stderr is reserved for machine-readable diagnostics/control records, and
-  stdout-producing commands refuse direct terminal stdout. Existing plain-text
-  root maintenance commands are legacy gaps and will be migrated in later
-  stages.
+  stdout-producing commands refuse direct terminal stdout. `parse_torrent` now
+  emits JSON result data on stdout, and `create_test_torrent` now keeps stdout
+  empty while reporting status and diagnostics as JSON on stderr. Remaining
+  plain-text root maintenance command bodies are legacy gaps and will be
+  migrated in later stages.
 - The `torrust-index` server's application logs now use JSON records on stderr
   instead of the previous human-formatted tracing output. Log consumers should
   parse stderr as NDJSON or pipe it through a JSON viewer.
@@ -103,12 +105,23 @@ error system (ADR-T-006), MSRV raised to 1.88.
   operation, uses the configured logging threshold as its default filter, and
   lets a non-empty `RUST_LOG` override that default.
 - Root Rust binaries now return explicit `ExitCode` values at their `main`
-  boundaries and install the shared JSON panic hook. Their command internals may
-  still contain legacy plain-text output until later ADR-T-010 rollout stages
-  migrate each command body.
+  boundaries and install the shared JSON panic hook. `parse_torrent` and
+  `create_test_torrent` now use the shared JSON `clap` parser, JSON stderr
+  tracing runners, and focused CLI contract tests.
+- `parse_torrent` now emits one JSON stdout result object with `schema`,
+  `torrent`, `original_v1_info_hash`, and `input_byte_length`, leaves stdout
+  empty on failure, and refuses direct terminal stdout with a JSON stderr
+  control-plane record.
+- `create_test_torrent` now keeps stdout empty, reports the generated torrent
+  path as a JSON status record on stderr, and converts argument, encode, file
+  creation, and write failures into JSON diagnostics with explicit exit codes.
+- Remaining root maintenance command internals may still contain legacy
+  plain-text output until later ADR-T-010 rollout stages migrate each command
+  body.
 - Operator documentation now describes the ADR-T-010 migration state: helper
   binaries have the JSON stdout contract, the server emits JSON tracing on
-  stderr, and root maintenance binaries plus the container entry script remain
+  stderr, stage-five root commands have their JSON stream contract, and the
+  remaining root maintenance binaries plus the container entry script remain
   legacy output gaps until their rollout stages land.
 
 ### ADR-T-009 — Container infrastructure refactor

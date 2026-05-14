@@ -192,14 +192,31 @@ For helper diagnostics, a non-empty `RUST_LOG` environment variable takes
 precedence over `--debug`; otherwise `--debug` raises the default diagnostic
 filter to debug.
 
-The older root maintenance binaries (`parse_torrent`, `create_test_torrent`,
-`import_tracker_statistics`, `seeder`, and `upgrade`) are in ADR-T-010 scope but
-are still migration targets. Their `main` boundaries now use explicit exit codes
-and the shared JSON panic hook, but their command bodies may still emit legacy
-plain text until their later rollout stages land. Do not build new automation
-around their current plain-text output; the target contract for side-effect
-commands is empty stdout and JSON diagnostics on stderr, while `parse_torrent`
-will become a JSON stdout result command.
+Two root diagnostic commands have also been migrated. `parse_torrent` is a
+stdout-result command: it emits one JSON object containing `schema`, `torrent`,
+`original_v1_info_hash`, and `input_byte_length`, and it refuses direct terminal
+stdout. Pipe or redirect it before inspection:
+
+```sh
+fixture=./tests/fixtures/torrents/6c690018c5786dbbb00161f62b0712d69296df97_with_custom_info_dict_key.torrent
+cargo run --quiet --bin parse_torrent -- "$fixture" | jq .
+```
+
+`create_test_torrent` is a no-stdout side-effect command. It writes the torrent
+file into an existing destination directory, keeps stdout empty, and emits JSON
+status or diagnostic records on stderr:
+
+```sh
+mkdir -p ./output/test/torrents
+cargo run --quiet --bin create_test_torrent -- ./output/test/torrents 2>create-test-torrent.ndjson
+jq . create-test-torrent.ndjson
+```
+
+The remaining root maintenance binaries (`import_tracker_statistics`, `seeder`,
+and `upgrade`) are still ADR-T-010 migration targets. Their `main` boundaries
+use explicit exit codes and the shared JSON panic hook, but their command bodies
+may still emit legacy plain text until their later rollout stages land. Do not
+build new automation around their current plain-text output.
 
 ## Documentation
 

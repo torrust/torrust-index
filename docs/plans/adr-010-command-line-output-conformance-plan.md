@@ -11,8 +11,8 @@ code, documentation, and regression tests.
 
 ## Current Implementation Status
 
-Stages 1 through 4 have landed for the shared Rust helper path and root command
-boundaries:
+Stages 1 through 5 have landed for the shared Rust helper path and initial root
+command migrations:
 
 - Stage 1 fixed the shared control-plane record shape, baseline exit classes,
   helper stdout schemas, and redaction helpers.
@@ -27,11 +27,16 @@ boundaries:
 - Stage 4 switched central application logging to the shared JSON stderr
   tracing setup, added the shared CLI contract crate to the root package, and
   made root binaries return explicit `ExitCode` values at their `main`
-  boundaries. The maintenance-command internals remain legacy output gaps until
-  their later migration stages land.
+  boundaries. At that point, maintenance-command internals still remained
+  legacy output gaps pending their per-command migration stages.
+- Stage 5 migrated `parse_torrent` and `create_test_torrent` to the shared JSON
+  clap parser, JSON panic hook, JSON stderr tracing runners, and focused CLI
+  contract tests. `parse_torrent` now emits one JSON stdout result object and
+  refuses terminal stdout; `create_test_torrent` remains a no-stdout side-effect
+  command.
 
-The root maintenance command internals and container entry script remain future
-rollout stages unless their sections below say otherwise.
+The remaining root maintenance command internals and container entry script
+remain future rollout stages unless their sections below say otherwise.
 
 ## Goal
 
@@ -351,6 +356,10 @@ Required changes:
 
 Update every root maintenance and diagnostic binary.
 
+Stage 5 status: implemented for `src/bin/parse_torrent.rs` and
+`src/bin/create_test_torrent.rs`. The remaining root maintenance binaries are
+left for Stage 6.
+
 Required changes for `src/bin/parse_torrent.rs`:
 
 - Replace hand-rolled `std::env::args()` parsing with clap plus the shared JSON
@@ -456,10 +465,11 @@ Update operator documentation after the behavior changes.
 Current documentation status: the shared contract shape, helper stdout result
 schemas, expanded Rust CLI infrastructure, helper-binary wiring state, and
 stage-four server logging / root `ExitCode` boundary state have been documented.
-Root maintenance command internals and the container entry script are still
-legacy output gaps until their rollout stages land; their documentation should
-describe the ADR-T-010 target contract without promising behaviour the binaries
-do not yet implement.
+The stage-five `parse_torrent` and `create_test_torrent` migration has also been
+documented. Remaining root maintenance command internals and the container entry
+script are still legacy output gaps until their rollout stages land; their
+documentation should describe the ADR-T-010 target contract without promising
+behaviour the binaries do not yet implement.
 
 Required changes:
 
@@ -531,10 +541,11 @@ summarizing results, following the repository test-running convention.
 
 ## Rollout Order
 
-Current status: steps 1 through 4 have landed. The documentation for the
-shared-helper stages and the stage-four root logging / binary-boundary rollout
-has been updated; the later operator-visible migrations still need their own
-documentation and changelog updates when they land.
+Current status: steps 1 through 5 have landed. The documentation for the
+shared-helper stages, the stage-four root logging / binary-boundary rollout, and
+the initial stage-five root binary migration has been updated; the later
+operator-visible migrations still need their own documentation and changelog
+updates when they land.
 
 1. Finalize the shared control-plane record shape, command-specific result
     schema details, exit-code mapping, and redaction rules.

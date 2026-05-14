@@ -20,7 +20,7 @@ pub fn setup_level_filter(filter: LevelFilter) {
     info!("Logging initialized");
 }
 
-fn level_from_filter(filter: LevelFilter) -> Option<Level> {
+const fn level_from_filter(filter: LevelFilter) -> Option<Level> {
     match filter {
         LevelFilter::OFF => None,
         LevelFilter::ERROR => Some(Level::ERROR),
