@@ -79,73 +79,51 @@ error system (ADR-T-006), MSRV raised to 1.88.
 
 #### Added
 
-- ADR-T-010, extracting ADR-T-009's helper stdout/stderr convention into
-  a global command-line output contract for the application.
-- Shared stage-1 command-line contract primitives in
-  `torrust-index-cli-common`: control-plane record schema, baseline exit-code
-  classes, structured help/version/usage/TTY-refusal/panic record types, and
-  diagnostic redaction helpers.
-- Stage-2 shared CLI infrastructure in `torrust-index-cli-common`: JSON
-  `clap` help/version/usage wrapping, direct JSON stderr control-plane writes,
-  a JSON-only panic hook, idempotent JSON stderr tracing with `RUST_LOG` /
-  `--debug` precedence, a non-interleaving stderr writer, and stdout/no-stdout
-  command runners, including an async runner for no-stdout side-effect
-  commands.
-- Stage-10 regression guards for ADR-T-010: workspace Clippy lint levels now
-  deny raw Rust stdout/stderr print macros and direct `std::process::exit`
-  outside explicit local exceptions, and the `cli_contract` integration test
-  keeps in-scope binary `main` functions returning `ExitCode` instead of
-  `Result`.
+- ADR-T-010 establishes a repository-wide JSON-only output contract for
+  first-party command-line entrypoints. Stdout is reserved for result data;
+  stderr carries diagnostics and control records; commands that emit stdout
+  result data refuse direct terminal stdout.
+- `torrust-index-cli-common` provides the shared implementation for that
+  contract: JSON `clap` help/version/usage handling, JSON panic diagnostics,
+  JSON stderr tracing, TTY refusal, stdout JSON emission, command runners,
+  baseline exit-code classes, control-plane record types, and redaction
+  helpers.
+- Regression coverage now protects the contract with CLI behavior tests,
+  binary-boundary checks, and workspace lint rules denying accidental raw
+  stream output or direct process exits outside the shared CLI boundary.
 
 #### Changed
 
-- Helper stdout result schemas are explicitly versioned with top-level
-  `schema` fields. `torrust-index-auth-keypair` emits `schema`,
-  `private_key_pem`, and `public_key_pem`; `torrust-index-config-probe` emits
-  `schema`, `database`, and `auth`; `torrust-index-health-check` emits
-  `schema`, `target`, `status`, and `elapsed_ms`.
-- `torrust-index-auth-keypair`, `torrust-index-config-probe`, and
-  `torrust-index-health-check` now use the shared JSON `clap` parser and JSON
-  panic hook. Their `--help`, `--version`, argv errors, TTY refusal, and panic
-  diagnostics are JSON control-plane records on stderr; stdout remains reserved
-  for successful result JSON.
-- Central application logging now delegates to the shared ADR-T-010 JSON stderr
-  tracing setup. The `torrust-index` server keeps stdout empty for normal
-  operation, uses the configured logging threshold as its default filter, and
-  lets a non-empty `RUST_LOG` override that default.
-- Root Rust binaries now return explicit `ExitCode` values at their `main`
-  boundaries and install the shared JSON panic hook. `parse_torrent` and
-  `create_test_torrent` now use the shared JSON `clap` parser, JSON stderr
-  tracing runners, and focused CLI contract tests.
-- `parse_torrent` now emits one JSON stdout result object with `schema`,
-  `torrent`, `original_v1_info_hash`, and `input_byte_length`, leaves stdout
-  empty on failure, and refuses direct terminal stdout with a JSON stderr
-  control-plane record.
-- `create_test_torrent` now keeps stdout empty, reports the generated torrent
-  path as a JSON status record on stderr, and converts argument, encode, file
-  creation, and write failures into JSON diagnostics with explicit exit codes.
-- `import_tracker_statistics`, `seeder`, and `upgrade` now use the shared JSON
-  `clap` parser, JSON panic hook, JSON stderr tracing runner, and no-stdout
-  side-effect command contract. Their command-reachable tracker statistics,
-  seeder, and upgrade paths now emit structured tracing diagnostics and
-  propagate command failures instead of printing plain text or relying on panic
-  output.
-- Command-reachable shared libraries no longer emit raw stream output for
-  shutdown and mail-template diagnostics. Server shutdown notices now go through
-  structured tracing, and mail template initialization failures are propagated
-  to callers instead of printing or exiting from the mailer library.
-- The container entry script now follows ADR-T-010 during its pre-`su-exec`
-  orchestration phase. It keeps stdout empty except for helper stdout captured
-  internally in command substitutions, emits JSON control-plane records on
-  stderr, checks for `jq` before JSON-dependent helpers run, emits `DEBUG=1`
-  phase records instead of enabling `set -x`, and wraps controlled utility
+- Helper binaries (`torrust-index-auth-keypair`,
+  `torrust-index-config-probe`, and `torrust-index-health-check`) share the
+  JSON CLI boundary. Their successful stdout payloads remain single JSON
+  objects, now explicitly versioned with a top-level `schema` field, while
+  help, version, argv errors, TTY refusal, panic diagnostics, and tracing are
+  emitted as JSON records on stderr.
+- The `torrust-index` server and root Rust binaries return explicit
+  `ExitCode` values at their `main` boundaries and install the shared JSON
+  panic hook. Central application logging uses JSON tracing on stderr, with a
+  non-empty `RUST_LOG` taking precedence over the configured default filter.
+- `parse_torrent` is a stdout-result command. It emits one JSON object with
+  `schema`, `torrent`, `original_v1_info_hash`, and `input_byte_length`, leaves
+  stdout empty on failure, and refuses direct terminal stdout with a JSON
+  diagnostic record.
+- `create_test_torrent`, `import_tracker_statistics`, `seeder`, and `upgrade`
+  are no-stdout side-effect commands. They keep stdout empty, report status and
+  diagnostics as JSON/NDJSON on stderr, and propagate command failures instead
+  of printing plain text or relying on panic output.
+- Command-reachable shared libraries use the command diagnostic path instead of
+  raw stream output. Shutdown notices are structured tracing records, mail
+  template failures are returned to callers, terminal color formatting is
+  removed from command paths, and parsing helpers leave reporting decisions to
+  their command callers.
+- The container entry script follows the JSON stderr contract during startup:
+  it captures helper stdout internally, keeps its own stdout empty before
+  `su-exec`, checks for `jq` before JSON-dependent helpers run, emits explicit
+  `DEBUG=1` phase records instead of `set -x`, and wraps controlled utility
   failures with captured stderr fields.
-- Operator documentation now describes the ADR-T-010 migration state: helper
-  binaries have the JSON stdout contract, the server emits JSON tracing on
-  stderr, root Rust command migrations and shared-library cleanup have their
-  JSON stream contracts, and the container entry script has its stage-eight JSON
-  stderr contract documented. The conformance plan also records the stage-ten
-  regression guard implementation.
+- Operator documentation and command examples describe the completed contract
+  across the README, container guide, upgrade notes, and command module docs.
 
 ### ADR-T-009 — Container infrastructure refactor
 
