@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
+#![allow(clippy::print_stderr)]
+
 //! Unit tests for degenerate `SemiInternal` plateau shapes.
 //!
 //! These tests manually construct G-tree topologies with specific

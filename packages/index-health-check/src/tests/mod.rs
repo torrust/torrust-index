@@ -1,3 +1,5 @@
+#![allow(clippy::print_stderr)]
+
 //! # Health-check tests
 //!
 //! | Test                               | What it covers                        |

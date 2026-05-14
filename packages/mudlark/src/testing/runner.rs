@@ -7,6 +7,8 @@
 //  checking invariants or budget constraints at a configurable
 //  interval.
 
+#![allow(clippy::print_stderr)]
+
 use std::fmt::Display;
 
 use super::plan::Plan;

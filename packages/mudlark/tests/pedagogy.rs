@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
+#![allow(clippy::print_stdout)]
+
 //! # End-to-End Pedagogy Test for the Worked Example
 //!
 //! This test walks through the construction, observation, rebalancing,

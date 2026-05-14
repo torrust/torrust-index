@@ -540,6 +540,7 @@ pub fn install_json_panic_hook(command_name: &str) {
 }
 
 /// Exit the current process with an ADR-T-010 exit class.
+#[allow(clippy::exit)]
 pub fn exit_with(exit: CommandExit) -> ! {
     std::process::exit(i32::from(exit.code()));
 }

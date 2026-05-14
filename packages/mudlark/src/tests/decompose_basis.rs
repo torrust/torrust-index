@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
+#![allow(clippy::print_stderr)]
+
 //! Boundary tests for **basis decomposition** via `contour_range()`
 //! (ADR-M-039).
 //!

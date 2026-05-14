@@ -11,8 +11,9 @@ code, documentation, and regression tests.
 
 ## Current Implementation Status
 
-Stages 1 through 8 have landed for the shared Rust helper path, root command
-migrations, command-reachable shared-library cleanup, and container entry script:
+Stages 1 through 10 have landed for the shared Rust helper path, root command
+migrations, command-reachable shared-library cleanup, container entry script,
+documentation, and regression guards:
 
 - Stage 1 fixed the shared control-plane record shape, baseline exit classes,
   helper stdout schemas, and redaction helpers.
@@ -48,9 +49,13 @@ migrations, command-reachable shared-library cleanup, and container entry script
   explicit JSON phase records instead of `set -x`, expected validation failures
   are reported as JSON diagnostics, and utility failures controlled by the
   script are captured and re-emitted as JSON fields.
-
-Documentation updates and regression guards remain future rollout stages unless
-their sections below say otherwise.
+- Stage 9 updated the operator documentation and changelog entries for the
+  landed command-output migrations.
+- Stage 10 added workspace Clippy guards for raw Rust stream output and direct
+  process exits, explicit out-of-scope test/build/example exceptions, and a
+  binary-boundary regression test that keeps in-scope `main` functions returning
+  `ExitCode` instead of `Result`. The Clippy guard is configured through
+  workspace lint levels in `Cargo.toml`; no separate `clippy.toml` is used.
 
 ## Goal
 
@@ -497,9 +502,10 @@ stage-four server logging / root `ExitCode` boundary state, the stage-five
 `parse_torrent` / `create_test_torrent` migration, the stage-six root
 maintenance command migration, the stage-seven command-reachable shared-library
 cleanup, and the stage-eight container entry-script migration have been
-documented. Later documentation work should focus on regression guards or future
-command-specific contracts rather than re-describing the stage-eight rollout as
-pending.
+documented. The stage-nine documentation pass and stage-ten regression guard
+implementation have also been documented. Later documentation work should focus
+on future command-specific contracts rather than re-describing completed rollout
+stages as pending.
 
 Documentation maintenance requirements:
 
@@ -520,6 +526,15 @@ Documentation maintenance requirements:
 Add focused conformance tests near the command code and one broad guard to catch
 future regressions.
 
+Stage 10 status: implemented for the broad guard layer. Workspace Clippy now
+denies raw Rust stdout/stderr print macros and direct `std::process::exit`
+outside explicit exceptions; test-only, build-script protocol, developer-example,
+and shared CLI infrastructure exceptions are annotated locally. The guard is
+configured with workspace lint levels in `Cargo.toml`; no separate Clippy
+configuration file is used. The root `cli_contract` integration test scans all
+in-scope binaries and fails if a `main` boundary stops returning `ExitCode` or
+regresses to `Result` termination.
+
 Required tests:
 
 - `packages/index-cli-common` tests for JSON help records, JSON version records,
@@ -537,17 +552,17 @@ Required tests:
   and for no-stdout commands keeping stdout empty while logging JSON stderr.
 - Container entry-script tests in `packages/index-entry-script` for JSON stderr
   on each validation failure branch.
-- Workspace clippy guards for raw stream output in shipped command paths. Prefer
-  `clippy::print_stdout`, `clippy::print_stderr`, and `clippy.toml`
-  `disallowed-macros` entries for `println!`, `eprintln!`, `print!`, and
-  `eprint!`, with explicit allow-list entries or local `#[allow]` annotations
-  for Cargo build-script protocol output and tests.
+- Workspace clippy guards for raw stream output in shipped command paths. The
+  implemented guard denies `clippy::print_stdout` and `clippy::print_stderr`
+  from workspace lint levels in `Cargo.toml`, with local `#[allow]` annotations
+  for Cargo build-script protocol output, developer examples, and out-of-scope
+  test diagnostics.
 - A regression test for `main() -> Result` in in-scope binaries, because Rust's
   default `Result` termination writes raw text on failure.
 - A lint-backed guard for `std::process::exit` outside shared CLI infrastructure
-  and shell entry scripts. Prefer `clippy::exit` or a `clippy.toml`
-  `disallowed-methods` entry when supported, with explicit allow-list entries
-  for the shared CLI infrastructure and shell entry scripts.
+  and shell entry scripts. The implemented guard denies `clippy::exit` from
+  workspace lint levels in `Cargo.toml`, with a local exception for the shared
+  CLI infrastructure's `exit_with` helper.
 - TTY-refusal smoke tests for stdout-producing commands. Use a pseudo-terminal
   library or tool such as `rexpect` or `portable-pty` if in-process Rust tests
   cannot reliably allocate a TTY.
@@ -571,13 +586,13 @@ summarizing results, following the repository test-running convention.
 
 ## Rollout Order
 
-Current status: steps 1 through 9 have landed. Documentation and changelog
+Current status: steps 1 through 10 have landed. Documentation and changelog
 entries for the shared-helper stages, the stage-four root logging /
-binary-boundary rollout, the stage-five root binary migration, and the stage-six
-root maintenance command migration, and the stage-seven shared-library cleanup
-have been updated. The stage-eight container entry-script documentation and
-changelog entries have also been updated. Later operator-visible migrations
-still need their own documentation and changelog updates when they land.
+binary-boundary rollout, the stage-five root binary migration, the stage-six
+root maintenance command migration, the stage-seven shared-library cleanup, the
+stage-eight container entry-script migration, and the stage-ten regression
+guards have been updated. Later operator-visible migrations still need their own
+documentation and changelog updates when they land.
 
 1. Finalize the shared control-plane record shape, command-specific result
     schema details, exit-code mapping, and redaction rules.

@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)]
+
 use std::fs;
 
 use torrust_index_render_text_as_image::{RenderParams, Rgba, render_text_to_png};

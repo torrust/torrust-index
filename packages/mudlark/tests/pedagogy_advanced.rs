@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
+#![allow(clippy::print_stdout)]
+
 //! # Advanced Pedagogy Test — Companion to [`pedagogy.rs`]
 //!
 //! The basic pedagogy test walks through the **mutation surface** of the

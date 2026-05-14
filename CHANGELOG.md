@@ -91,6 +91,11 @@ error system (ADR-T-006), MSRV raised to 1.88.
   `--debug` precedence, a non-interleaving stderr writer, and stdout/no-stdout
   command runners, including an async runner for no-stdout side-effect
   commands.
+- Stage-10 regression guards for ADR-T-010: workspace Clippy lint levels now
+  deny raw Rust stdout/stderr print macros and direct `std::process::exit`
+  outside explicit local exceptions, and the `cli_contract` integration test
+  keeps in-scope binary `main` functions returning `ExitCode` instead of
+  `Result`.
 
 #### Changed
 
@@ -139,7 +144,8 @@ error system (ADR-T-006), MSRV raised to 1.88.
   binaries have the JSON stdout contract, the server emits JSON tracing on
   stderr, root Rust command migrations and shared-library cleanup have their
   JSON stream contracts, and the container entry script has its stage-eight JSON
-  stderr contract documented.
+  stderr contract documented. The conformance plan also records the stage-ten
+  regression guard implementation.
 
 ### ADR-T-009 — Container infrastructure refactor
 

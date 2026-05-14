@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
+#![allow(clippy::print_stderr)]
+
 //! Integration tests for negative `f64` observations.
 //!
 //! `f64` implements `Accumulator` with `zero() = 0.0`, which
