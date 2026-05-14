@@ -198,6 +198,13 @@ For helper diagnostics, a non-empty `RUST_LOG` environment variable takes
 precedence over `--debug`; otherwise `--debug` raises the default diagnostic
 filter to debug.
 
+The container entry script is also a no-stdout orchestration command. It captures
+helper stdout internally, keeps its own stdout empty before `su-exec`, and emits
+startup validation failures, status records, utility failures, and `DEBUG=1`
+phase diagnostics as JSON records on stderr. Use `docker logs ... 2>&1` or your
+runtime's stderr capture and parse those lines as NDJSON when automation needs
+startup diagnostics.
+
 Two root diagnostic commands have also been migrated. `parse_torrent` is a
 stdout-result command: it emits one JSON object containing `schema`, `torrent`,
 `original_v1_info_hash`, and `input_byte_length`, and it refuses direct terminal

@@ -4274,6 +4274,7 @@ dependencies = [
 name = "torrust-index-entry-script"
 version = "4.0.0-develop"
 dependencies = [
+ "serde_json",
  "tempfile",
 ]
 

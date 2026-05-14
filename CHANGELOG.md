@@ -22,9 +22,11 @@ error system (ADR-T-006), MSRV raised to 1.88.
   stdout-producing commands refuse direct terminal stdout. `parse_torrent` now
   emits JSON result data on stdout. `create_test_torrent`,
   `import_tracker_statistics`, `seeder`, and `upgrade` now keep stdout empty
-  while reporting status and diagnostics as JSON on stderr. Scripts that scraped
-  their previous plain-text output must switch to exit codes and JSON/NDJSON
-  stderr parsing.
+  while reporting status and diagnostics as JSON on stderr. The container entry
+  script also reports validation failures, status records, utility failures, and
+  debug phase records as JSON/NDJSON on stderr instead of plain text or shell
+  trace output. Scripts that scraped previous plain-text command or startup
+  output must switch to exit codes and JSON/NDJSON stderr parsing.
 - The `torrust-index` server's application logs now use JSON records on stderr
   instead of the previous human-formatted tracing output. Log consumers should
   parse stderr as NDJSON or pipe it through a JSON viewer.
@@ -127,11 +129,17 @@ error system (ADR-T-006), MSRV raised to 1.88.
   shutdown and mail-template diagnostics. Server shutdown notices now go through
   structured tracing, and mail template initialization failures are propagated
   to callers instead of printing or exiting from the mailer library.
+- The container entry script now follows ADR-T-010 during its pre-`su-exec`
+  orchestration phase. It keeps stdout empty except for helper stdout captured
+  internally in command substitutions, emits JSON control-plane records on
+  stderr, checks for `jq` before JSON-dependent helpers run, emits `DEBUG=1`
+  phase records instead of enabling `set -x`, and wraps controlled utility
+  failures with captured stderr fields.
 - Operator documentation now describes the ADR-T-010 migration state: helper
   binaries have the JSON stdout contract, the server emits JSON tracing on
-  stderr, root Rust command migrations and shared-library cleanup through stage
-  seven have their JSON stream contracts, and the container entry script remains
-  a legacy output gap until its rollout stage lands.
+  stderr, root Rust command migrations and shared-library cleanup have their
+  JSON stream contracts, and the container entry script has its stage-eight JSON
+  stderr contract documented.
 
 ### ADR-T-009 — Container infrastructure refactor
 
@@ -202,7 +210,7 @@ error system (ADR-T-006), MSRV raised to 1.88.
 - `EXPOSE ${IMPORTER_API_PORT}/tcp` in Containerfile; port 3002
   mapped in compose.
 - `restart: unless-stopped` on index and tracker compose services.
-- `DEBUG=1` env-var gate for entry-script shell tracing (`set -x`).
+- `DEBUG=1` env-var gate for entry-script JSON phase diagnostics.
 - `#[doc(hidden)] pub mod test_helpers` in `torrust-index-config`
   exposing `PLACEHOLDER_TOML` and `placeholder_settings()` — single
   source of truth for the ~40 tests across both crates that
@@ -467,8 +475,8 @@ error system (ADR-T-006), MSRV raised to 1.88.
 
 - Dev-only ports (MySQL 3306, tracker 6969/7070/1212, mailcatcher
   1025/1080) no longer bind to `0.0.0.0`; bound to `127.0.0.1`.
-- Entry script `set -x` gated behind `DEBUG=1` to avoid leaking
-  env vars into logs.
+- Entry script debug mode now emits structured JSON phase records instead of
+  enabling `set -x`, avoiding shell-trace leakage of env vars into logs.
 - Compose credentials annotated as DEV-ONLY with TODO for Docker
   secrets migration (ADR-T-009 §S1).
 

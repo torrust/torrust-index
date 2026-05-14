@@ -9,12 +9,234 @@
 # Conventions:
 #   - All functions are POSIX sh; no bashisms.
 #   - Functions use only `[ ... ]` and `case` for tests.
-#   - Functions emit human-readable diagnostics on stderr
-#     and use `exit 1` for unrecoverable input violations
-#     (auth-key validation, seed_sqlite path errors). When
-#     sourced for tests, callers must invoke each function
-#     in a subshell to observe the exit status without
-#     terminating the test driver.
+#   - Functions emit JSON diagnostics on stderr and use
+#     `exit 1` for unrecoverable input violations (auth-key
+#     validation, seed_sqlite path errors). When sourced for
+#     tests, callers must invoke each function in a subshell
+#     to observe the exit status without terminating the test
+#     driver.
+
+ENTRY_SCRIPT_JSON_SCHEMA=1
+
+json_command_name() {
+    printf '%s' "${ENTRY_SCRIPT_COMMAND_NAME:-torrust-index-entry-script}"
+}
+
+json_emit_failed_exit() {
+    ENTRY_SCRIPT_JSON_EXIT_HANDLED=1
+    printf '%s\n' '{"schema":1,"command":"torrust-index-entry-script","kind":"diagnostic","message":"failed to emit JSON diagnostic","fields":{"type":"entry_script","level":"error","exit_code":1}}' >&2
+    exit 1
+}
+
+json_require_jq() {
+    if command -v jq >/dev/null 2>&1; then
+        return 0
+    fi
+
+    ENTRY_SCRIPT_JSON_EXIT_HANDLED=1
+    printf '%s\n' '{"schema":1,"command":"torrust-index-entry-script","kind":"diagnostic","message":"jq is required for container entry-script JSON diagnostics","fields":{"type":"entry_script","level":"error","exit_code":1}}' >&2
+    exit 1
+}
+
+json_log() {
+    _json_kind=$1
+    _json_level=$2
+    _json_message=$3
+
+    json_require_jq
+    jq -cn \
+        --arg command "$(json_command_name)" \
+        --arg kind "$_json_kind" \
+        --arg message "$_json_message" \
+        --arg level "$_json_level" \
+        '{schema:1, command:$command, kind:$kind, message:$message, fields:{type:"entry_script", level:$level}}' >&2 \
+        || json_emit_failed_exit
+}
+
+json_error_exit() {
+    _json_message=$1
+    _json_exit_code=${2:-1}
+
+    json_require_jq
+    jq -cn \
+        --arg command "$(json_command_name)" \
+        --arg message "$_json_message" \
+        --argjson exit_code "$_json_exit_code" \
+        '{schema:1, command:$command, kind:"diagnostic", message:$message, fields:{type:"entry_script", level:"error", exit_code:$exit_code}}' >&2 \
+        || json_emit_failed_exit
+
+    ENTRY_SCRIPT_JSON_EXIT_HANDLED=1
+    exit "$_json_exit_code"
+}
+
+json_external_log() {
+    _json_kind=$1
+    _json_level=$2
+    _json_message=$3
+    _json_external_command=$4
+    _json_external_stderr=$5
+
+    json_require_jq
+    jq -cn \
+        --arg command "$(json_command_name)" \
+        --arg kind "$_json_kind" \
+        --arg level "$_json_level" \
+        --arg message "$_json_message" \
+        --arg external_command "$_json_external_command" \
+        --arg external_stderr "$_json_external_stderr" \
+        '{schema:1, command:$command, kind:$kind, message:$message, fields:{type:"external_command", level:$level, external_command:$external_command, external_stderr:$external_stderr}}' >&2 \
+        || json_emit_failed_exit
+}
+
+json_external_error_exit() {
+    _json_message=$1
+    _json_exit_code=$2
+    _json_external_command=$3
+    _json_external_stderr=$4
+
+    json_require_jq
+    jq -cn \
+        --arg command "$(json_command_name)" \
+        --arg message "$_json_message" \
+        --argjson exit_code "$_json_exit_code" \
+        --arg external_command "$_json_external_command" \
+        --arg external_stderr "$_json_external_stderr" \
+        '{schema:1, command:$command, kind:"diagnostic", message:$message, fields:{type:"external_command", level:"error", exit_code:$exit_code, external_command:$external_command, external_stderr:$external_stderr}}' >&2 \
+        || json_emit_failed_exit
+
+    ENTRY_SCRIPT_JSON_EXIT_HANDLED=1
+    exit "$_json_exit_code"
+}
+
+json_unexpected_exit() {
+    _json_status=$?
+
+    if [ "$_json_status" -eq 0 ]; then
+        return 0
+    fi
+    if [ "${ENTRY_SCRIPT_JSON_EXIT_HANDLED:-0}" = "1" ]; then
+        exit "$_json_status"
+    fi
+
+    ENTRY_SCRIPT_JSON_EXIT_HANDLED=1
+    json_require_jq
+    jq -cn \
+        --arg command "$(json_command_name)" \
+        --arg phase "${entry_script_phase:-unknown}" \
+        --argjson exit_code "$_json_status" \
+        '{schema:1, command:$command, kind:"diagnostic", message:"unexpected entry script failure", fields:{type:"entry_script", level:"error", exit_code:$exit_code, phase:$phase}}' >&2 \
+        || json_emit_failed_exit
+    exit "$_json_status"
+}
+
+entry_script_set_phase() {
+    entry_script_phase=$1
+    if [ "${DEBUG:-}" = "1" ]; then
+        json_log status debug "entry script phase: $entry_script_phase"
+    fi
+}
+
+run_checked() {
+    _run_phase=$1
+    shift
+    _run_command=$1
+    _run_stderr="${TMPDIR:-/tmp}/torrust-entry-script.$$.$_run_command.stderr"
+    rm -f "$_run_stderr"
+
+    if "$@" 2>"$_run_stderr"; then
+        _run_captured_stderr=$(cat "$_run_stderr" 2>/dev/null || true)
+        rm -f "$_run_stderr"
+        if [ -n "$_run_captured_stderr" ]; then
+            json_external_log status warn "$_run_phase wrote to stderr" "$_run_command" "$_run_captured_stderr"
+        fi
+        return 0
+    fi
+
+    _run_status=$?
+    _run_captured_stderr=$(cat "$_run_stderr" 2>/dev/null || true)
+    rm -f "$_run_stderr"
+    json_external_error_exit "$_run_phase failed" "$_run_status" "$_run_command" "$_run_captured_stderr"
+}
+
+jq_read() {
+    _jq_filter=$1
+    _jq_input=$2
+    _jq_stderr="${TMPDIR:-/tmp}/torrust-entry-script.$$.jq.stderr"
+    rm -f "$_jq_stderr"
+
+    if _jq_output=$(printf '%s' "$_jq_input" | jq -r "$_jq_filter" 2>"$_jq_stderr"); then
+        rm -f "$_jq_stderr"
+        printf '%s' "$_jq_output"
+        return 0
+    fi
+
+    _jq_status=$?
+    _jq_captured_stderr=$(cat "$_jq_stderr" 2>/dev/null || true)
+    rm -f "$_jq_stderr"
+    json_external_error_exit "jq failed while reading JSON input" "$_jq_status" jq "$_jq_captured_stderr"
+}
+
+jq_write_file() {
+    _jq_filter=$1
+    _jq_input=$2
+    _jq_output_path=$3
+    _jq_stderr="${TMPDIR:-/tmp}/torrust-entry-script.$$.jq.stderr"
+    rm -f "$_jq_stderr"
+
+    if printf '%s' "$_jq_input" | jq -r "$_jq_filter" 2>"$_jq_stderr" >"$_jq_output_path"; then
+        rm -f "$_jq_stderr"
+        return 0
+    fi
+
+    _jq_status=$?
+    _jq_captured_stderr=$(cat "$_jq_stderr" 2>/dev/null || true)
+    rm -f "$_jq_stderr"
+    json_external_error_exit "jq failed while writing JSON field" "$_jq_status" jq "$_jq_captured_stderr"
+}
+
+append_line_checked() {
+    _append_phase=$1
+    _append_line=$2
+    _append_path=$3
+    _append_stderr="${TMPDIR:-/tmp}/torrust-entry-script.$$.append.stderr"
+    rm -f "$_append_stderr"
+
+    if printf '%s\n' "$_append_line" 2>"$_append_stderr" >>"$_append_path"; then
+        _append_captured_stderr=$(cat "$_append_stderr" 2>/dev/null || true)
+        rm -f "$_append_stderr"
+        if [ -n "$_append_captured_stderr" ]; then
+            json_external_log status warn "$_append_phase wrote to stderr" shell "$_append_captured_stderr"
+        fi
+        return 0
+    fi
+
+    _append_status=$?
+    _append_captured_stderr=$(cat "$_append_stderr" 2>/dev/null || true)
+    rm -f "$_append_stderr"
+    json_external_error_exit "$_append_phase failed" "$_append_status" shell "$_append_captured_stderr"
+}
+
+append_file_checked() {
+    _append_phase=$1
+    _append_source=$2
+    _append_path=$3
+    _append_stderr="${TMPDIR:-/tmp}/torrust-entry-script.$$.append.stderr"
+    rm -f "$_append_stderr"
+
+    if cat "$_append_source" 2>"$_append_stderr" >>"$_append_path"; then
+        _append_captured_stderr=$(cat "$_append_stderr" 2>/dev/null || true)
+        rm -f "$_append_stderr"
+        if [ -n "$_append_captured_stderr" ]; then
+            json_external_log status warn "$_append_phase wrote to stderr" cat "$_append_captured_stderr"
+        fi
+        return 0
+    fi
+
+    _append_status=$?
+    _append_captured_stderr=$(cat "$_append_stderr" 2>/dev/null || true)
+    rm -f "$_append_stderr"
+    json_external_error_exit "$_append_phase failed" "$_append_status" cat "$_append_captured_stderr"
+}
 
 # install -D wrapper: copy $1 to $2 only if $1 exists and $2
 # does not yet exist. Mode 0640, owner torrust:torrust.
@@ -22,7 +244,7 @@
 # POSIX §2.9.4.1.
 inst() {
     if [ -n "$1" ] && [ -n "$2" ] && [ -e "$1" ] && [ ! -e "$2" ]; then
-        install -D -m 0640 -o torrust -g torrust "$1" "$2"; fi; }
+        run_checked "install $2" install -D -m 0640 -o torrust -g torrust "$1" "$2"; fi; }
 
 # Returns 0 if $1 is one of the closed-set source values
 # {pem,path}; 1 otherwise. Tests positively against the
@@ -59,31 +281,21 @@ validate_auth_keys() {
     _pub_pem_set=$4;  _pub_path_set=$5;  _pub_src=$6
 
     if [ "$_priv_pem_set" = true ] && [ "$_priv_path_set" = true ]; then
-        echo "ERROR: both PRIVATE_KEY_PEM and PRIVATE_KEY_PATH are set;" \
-             "these are mutually exclusive — pick one." >&2
-        exit 1
+        json_error_exit "both PRIVATE_KEY_PEM and PRIVATE_KEY_PATH are set; these are mutually exclusive - pick one."
     fi
     if [ "$_pub_pem_set" = true ] && [ "$_pub_path_set" = true ]; then
-        echo "ERROR: both PUBLIC_KEY_PEM and PUBLIC_KEY_PATH are set;" \
-             "these are mutually exclusive — pick one." >&2
-        exit 1
+        json_error_exit "both PUBLIC_KEY_PEM and PUBLIC_KEY_PATH are set; these are mutually exclusive - pick one."
     fi
 
     _priv_has=0; key_configured "$_priv_src" && _priv_has=1
     _pub_has=0;  key_configured "$_pub_src"  && _pub_has=1
     if [ "$_priv_has" -ne "$_pub_has" ]; then
-        echo "ERROR: auth keys must be configured as a complete pair;" \
-             "one key is configured but the other is not." >&2
-        exit 1
+        json_error_exit "auth keys must be configured as a complete pair; one key is configured but the other is not."
     fi
 
     if [ "$_priv_has" -eq 1 ] && [ "$_pub_has" -eq 1 ] \
        && [ "$_priv_src" != "$_pub_src" ]; then
-        echo "ERROR: private key source is '$_priv_src'" \
-             "but public key source is '$_pub_src';" \
-             "mixed PEM/PATH across the key pair is not supported" \
-             "— use the same delivery mechanism for both keys." >&2
-        exit 1
+        json_error_exit "private key source is '$_priv_src' but public key source is '$_pub_src'; mixed PEM/PATH across the key pair is not supported - use the same delivery mechanism for both keys."
     fi
 }
 
@@ -100,22 +312,18 @@ seed_sqlite() {
     _template=/usr/share/torrust/default/database/index.sqlite3.db
 
     if [ -z "$_path" ]; then
-        echo "ERROR: probe reported sqlite driver but" \
-             "database.path is empty — possible probe bug" >&2
-        exit 1
+        json_error_exit "probe reported sqlite driver but database.path is empty - possible probe bug"
     fi
 
     if [ "$_path" = ":memory:" ]; then
-        echo "INFO: SQLite :memory: — no database file to seed" >&2
+        json_log status info "SQLite :memory: - no database file to seed"
         return 0
     fi
 
     case $_path in
         /*) ;;
         *)
-            echo "WARN: relative SQLite path '$_path';" \
-                 "not seeding — application will create on" \
-                 "first connect if mode=rwc" >&2
+            json_log status warn "relative SQLite path '$_path'; not seeding - application will create on first connect if mode=rwc"
             return 0
             ;;
     esac
@@ -125,7 +333,7 @@ seed_sqlite() {
     fi
 
     if [ -e "$_path" ] && [ ! -s "$_path" ]; then
-        rm -f "$_path"
+        run_checked "remove empty SQLite database file" rm -f "$_path"
     fi
 
     _dir=$(dirname "$_path")
@@ -134,17 +342,12 @@ seed_sqlite() {
             /etc/torrust/index|/etc/torrust/index/*|\
             /var/lib/torrust/index|/var/lib/torrust/index/*|\
             /var/log/torrust/index|/var/log/torrust/index/*)
-                mkdir -p "$_dir"
-                chown torrust:torrust "$_dir"
-                chmod 0750 "$_dir"
+                run_checked "create SQLite database directory" mkdir -p "$_dir"
+                run_checked "set SQLite database directory owner" chown torrust:torrust "$_dir"
+                run_checked "set SQLite database directory mode" chmod 0750 "$_dir"
                 ;;
             *)
-                echo "ERROR: database path $_dir is outside the" \
-                     "volumes the entry script manages." >&2
-                echo "       Pre-create it with appropriate" \
-                     "ownership, or use a path under" \
-                     "/var/lib/torrust/index/." >&2
-                exit 1
+                json_error_exit "database path $_dir is outside the volumes the entry script manages. Pre-create it with appropriate ownership, or use a path under /var/lib/torrust/index/."
                 ;;
         esac
     fi

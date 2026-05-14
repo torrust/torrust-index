@@ -11,8 +11,8 @@ code, documentation, and regression tests.
 
 ## Current Implementation Status
 
-Stages 1 through 7 have landed for the shared Rust helper path, root command
-migrations, and command-reachable shared-library cleanup:
+Stages 1 through 8 have landed for the shared Rust helper path, root command
+migrations, command-reachable shared-library cleanup, and container entry script:
 
 - Stage 1 fixed the shared control-plane record shape, baseline exit classes,
   helper stdout schemas, and redaction helpers.
@@ -43,9 +43,14 @@ migrations, and command-reachable shared-library cleanup:
   libraries. Server shutdown notices now use structured tracing diagnostics,
   and mail template initialization errors are returned to callers for JSON
   diagnostic reporting instead of printing or exiting from the mailer library.
+- Stage 8 migrated the container entry script and its host-side helper tests.
+  Shell diagnostics now use JSON stderr control-plane records, debug mode emits
+  explicit JSON phase records instead of `set -x`, expected validation failures
+  are reported as JSON diagnostics, and utility failures controlled by the
+  script are captured and re-emitted as JSON fields.
 
-The container entry script and regression guards remain future rollout stages
-unless their sections below say otherwise.
+Documentation updates and regression guards remain future rollout stages unless
+their sections below say otherwise.
 
 ## Goal
 
@@ -446,6 +451,13 @@ Required changes for `src/bin/upgrade.rs` and the v1-to-v2 upgrade modules:
 
 Update `share/container/entry_script_sh` and `share/container/entry_script_lib_sh`.
 
+Stage 8 status: implemented. The shell entrypoint now checks for `jq`, emits
+JSON diagnostics and debug phase records on stderr, wraps validation failures in
+shared control-plane records, captures expected utility stderr where the script
+controls the utility invocation, and keeps helper stdout inside command
+substitutions. The `packages/index-entry-script` host-side tests now parse and
+assert JSON stderr records for validation failures and status branches.
+
 Required changes:
 
 - Add POSIX-shell JSON diagnostic helpers, for example `json_log` and
@@ -483,11 +495,11 @@ Current documentation status: the shared contract shape, helper stdout result
 schemas, expanded Rust CLI infrastructure, helper-binary wiring state,
 stage-four server logging / root `ExitCode` boundary state, the stage-five
 `parse_torrent` / `create_test_torrent` migration, the stage-six root
-maintenance command migration, and the stage-seven command-reachable
-shared-library cleanup have been documented. The container entry script is still
-a legacy output gap until its rollout stage lands; its documentation should
-describe the ADR-T-010 target contract without promising behaviour it does not
-yet implement.
+maintenance command migration, the stage-seven command-reachable shared-library
+cleanup, and the stage-eight container entry-script migration have been
+documented. Later documentation work should focus on regression guards or future
+command-specific contracts rather than re-describing the stage-eight rollout as
+pending.
 
 Documentation maintenance requirements:
 
@@ -559,13 +571,13 @@ summarizing results, following the repository test-running convention.
 
 ## Rollout Order
 
-Current status: steps 1 through 7 have landed. Documentation and changelog
+Current status: steps 1 through 9 have landed. Documentation and changelog
 entries for the shared-helper stages, the stage-four root logging /
 binary-boundary rollout, the stage-five root binary migration, and the stage-six
 root maintenance command migration, and the stage-seven shared-library cleanup
-have been updated. Later operator-visible
-migrations still need their own documentation and changelog updates when they
-land.
+have been updated. The stage-eight container entry-script documentation and
+changelog entries have also been updated. Later operator-visible migrations
+still need their own documentation and changelog updates when they land.
 
 1. Finalize the shared control-plane record shape, command-specific result
     schema details, exit-code mapping, and redaction rules.
@@ -587,6 +599,3 @@ land.
 - The exact exit-code taxonomy for root maintenance commands beyond the baseline
   `success`, `failure`, and `usage` classes. Existing helper-specific exit codes
   should remain stable unless a command-specific contract says otherwise.
-- How strict the container entry script can be with external utility stderr. Full
-  conformance requires expected failures to be captured and re-emitted as JSON;
-  unexpected process crashes may still need a pragmatic trap-based fallback.

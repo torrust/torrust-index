@@ -12,7 +12,7 @@ RUN cargo binstall --no-confirm --locked cargo-chef cargo-nextest
 FROM rust:slim-trixie AS tester
 WORKDIR /tmp
 
-RUN apt-get update; apt-get install -y curl sqlite3; apt-get autoclean
+RUN apt-get update; apt-get install -y curl jq sqlite3; apt-get autoclean
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/v1.18.1/install-from-binstall-release.sh | bash
 RUN cargo binstall --no-confirm --locked cargo-nextest imdl
 

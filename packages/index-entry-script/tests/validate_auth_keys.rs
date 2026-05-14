@@ -9,11 +9,11 @@
 //! | `both_none_passes`                | happy path — no config     |
 //! | `both_path_passes`                | happy path — both PATH     |
 //! | `both_pem_passes`                 | happy path — both PEM      |
-//! | `private_pem_and_path_errors`     | per-key mutual exclusion   |
-//! | `public_pem_and_path_errors`      | per-key mutual exclusion   |
-//! | `private_only_errors`             | pair completeness          |
-//! | `public_only_errors`              | pair completeness          |
-//! | `mixed_pem_path_errors`           | cross-pair source consistency |
+//! | `private_pem_and_path_errors`     | JSON diagnostic for per-key mutual exclusion |
+//! | `public_pem_and_path_errors`      | JSON diagnostic for per-key mutual exclusion |
+//! | `private_only_errors`             | JSON diagnostic for pair completeness |
+//! | `public_only_errors`              | JSON diagnostic for pair completeness |
+//! | `mixed_pem_path_errors`           | JSON diagnostic for cross-pair source consistency |
 //!
 //! Argument order to `validate_auth_keys`:
 //!
@@ -22,7 +22,7 @@
 //! pub_pem_set  pub_path_set  pub_source
 //! ```
 
-use torrust_index_entry_script::run_sh_with_args;
+use torrust_index_entry_script::{assert_entry_script_record, run_sh_with_args, single_stderr_json_record};
 
 const SNIPPET: &str = "validate_auth_keys \"$@\"";
 
@@ -53,10 +53,11 @@ fn assert_fail(args: &[&str], needle: &str) {
         out.status.code(),
         String::from_utf8_lossy(&out.stderr),
     );
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains(needle),
-        "expected diagnostic containing {needle:?} for args {args:?}; got: {stderr}",
+    let record = single_stderr_json_record(&out);
+    assert_entry_script_record(&record, "diagnostic", "error", needle);
+    assert_eq!(
+        record.pointer("/fields/exit_code").and_then(serde_json::Value::as_u64),
+        Some(1)
     );
 }
 
