@@ -5,10 +5,8 @@
 //!
 //! You can execute it with: `cargo run --bin import_tracker_statistics`.
 //!
-//! ADR-T-010 classifies this as a side-effect command: the target contract is
-//! empty stdout and JSON diagnostics on stderr. The current implementation is a
-//! legacy output gap until the command is migrated, so do not parse its current
-//! plain-text diagnostics in automation.
+//! ADR-T-010 classifies this as a side-effect command: stdout remains empty and
+//! diagnostics are JSON records on stderr.
 //!
 //! Statistics are also imported:
 //!
@@ -18,91 +16,66 @@
 //! - When a new torrent is added.
 //! - When the API returns data about a torrent statistics are collected from
 //!   the tracker in real time.
-use std::env;
 use std::sync::Arc;
 
-use text_colorizer::Colorize;
 use thiserror::Error;
+use tracing::info;
 
-use crate::bootstrap::config::initialize_configuration;
-use crate::bootstrap::logging;
+use crate::bootstrap::config::DEFAULT_PATH_CONFIG;
+use crate::config::{Configuration, Error as ConfigError, Info};
 use crate::databases::database;
 use crate::tracker::service::Service;
 use crate::tracker::statistics_importer::StatisticsImporter;
 
-const NUMBER_OF_ARGUMENTS: usize = 0;
-
-#[derive(Debug, PartialEq, Eq, Error)]
-#[allow(dead_code)]
+#[derive(Debug, Error)]
 pub enum ImportError {
-    #[error("internal server error")]
-    WrongNumberOfArgumentsError,
-}
+    #[error("failed to build configuration lookup: {source}")]
+    BuildConfigurationInfo { source: ConfigError },
 
-fn parse_args() -> Result<(), ImportError> {
-    let args: Vec<String> = env::args().skip(1).collect();
+    #[error("failed to load configuration: {source}")]
+    LoadConfiguration { source: ConfigError },
 
-    if args.len() != NUMBER_OF_ARGUMENTS {
-        eprintln!(
-            "{} wrong number of arguments: expected {}, got {}",
-            "Error".red().bold(),
-            NUMBER_OF_ARGUMENTS,
-            args.len()
-        );
-        print_usage();
-        return Err(ImportError::WrongNumberOfArgumentsError);
-    }
+    #[error("failed to connect to database: {source}")]
+    ConnectDatabase { source: database::Error },
 
-    Ok(())
-}
-
-fn print_usage() {
-    eprintln!(
-        "{} - imports torrents statistics from linked tracker.
-
-        cargo run --bin import_tracker_statistics
-
-        ",
-        "Tracker Statistics Importer".green()
-    );
+    #[error("failed to import tracker statistics: {source}")]
+    ImportStatistics { source: database::Error },
 }
 
 /// Import Tracker Statistics Command
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if arguments cannot be parsed.
-pub async fn run() {
-    parse_args().expect("unable to parse command arguments");
-    import().await;
+/// Returns an error if configuration loading, database connection, or the
+/// statistics import fails.
+pub async fn run() -> Result<(), ImportError> {
+    import().await
 }
 
 /// Import Command Arguments
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if it can't connect to the database.
-pub async fn import() {
-    println!("Importing statistics from linked tracker ...");
+/// Returns an error if configuration loading, database connection, or the
+/// statistics import fails.
+pub async fn import() -> Result<(), ImportError> {
+    info!("importing statistics from linked tracker");
 
-    let configuration = initialize_configuration();
-
-    let threshold = configuration.settings.read().await.logging.threshold.clone();
-
-    logging::setup(&threshold);
+    let config_info =
+        Info::new(DEFAULT_PATH_CONFIG.to_string()).map_err(|source| ImportError::BuildConfigurationInfo { source })?;
+    let configuration = Configuration::load(&config_info).map_err(|source| ImportError::LoadConfiguration { source })?;
 
     let cfg = Arc::new(configuration);
 
     let settings = cfg.settings.read().await;
 
     let tracker_url = settings.tracker.url.clone();
-
-    eprintln!("Tracker url: {}", tracker_url.to_string().green());
+    info!(tracker_url = %tracker_url, "loaded tracker configuration");
 
     let database = Arc::new(
         database::connect(settings.database.connect_url.as_ref())
             .await
-            .expect("unable to connect to db"),
+            .map_err(|source| ImportError::ConnectDatabase { source })?,
     );
     drop(settings);
 
@@ -113,5 +86,9 @@ pub async fn import() {
     tracker_statistics_importer
         .import_all_torrents_statistics()
         .await
-        .expect("should import all torrents statistics");
+        .map_err(|source| ImportError::ImportStatistics { source })?;
+
+    info!("imported statistics from linked tracker");
+
+    Ok(())
 }

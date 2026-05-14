@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
-use text_colorizer::Colorize;
 use tracing::{debug, error, info};
 use url::Url;
 
@@ -42,13 +41,13 @@ impl StatisticsImporter {
             return Ok(());
         }
 
-        info!(target: LOG_TARGET, "Importing {} torrents statistics from tracker {} ...", torrents.len().to_string().yellow(), self.tracker_url.to_string().yellow());
+        info!(target: LOG_TARGET, torrent_count = torrents.len(), tracker_url = %self.tracker_url, "importing torrents statistics from tracker");
 
         // Start the timer before the loop
         let start_time = Instant::now();
 
         for torrent in torrents {
-            info!(target: LOG_TARGET, "Importing torrent #{} statistics ...", torrent.torrent_id.to_string().yellow());
+            info!(target: LOG_TARGET, torrent_id = torrent.torrent_id, "importing torrent statistics");
 
             let ret = self.import_torrent_statistics(torrent.torrent_id, &torrent.info_hash).await;
 
@@ -81,7 +80,7 @@ impl StatisticsImporter {
         datetime: DateTime<Utc>,
         limit: i64,
     ) -> Result<(), database::Error> {
-        debug!(target: LOG_TARGET, "Importing torrents statistics not updated since {} limited to a maximum of {} torrents ...", datetime.to_string().yellow(), limit.to_string().yellow());
+        debug!(target: LOG_TARGET, since = %datetime, limit, "importing torrents statistics not updated since threshold");
 
         let torrents = self
             .database
@@ -92,7 +91,7 @@ impl StatisticsImporter {
             return Ok(());
         }
 
-        info!(target: LOG_TARGET, "Importing {} torrents statistics from tracker {} ...", torrents.len().to_string().yellow(), self.tracker_url.to_string().yellow());
+        info!(target: LOG_TARGET, torrent_count = torrents.len(), tracker_url = %self.tracker_url, "importing torrents statistics from tracker");
 
         // Import stats for all torrents in one request
 

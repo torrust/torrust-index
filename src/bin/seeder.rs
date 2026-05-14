@@ -1,13 +1,11 @@
 //! Program to upload random torrents to a live Index API.
 //!
-//! ADR-T-010 classifies this as a side-effect command: the target contract is
-//! empty stdout and JSON diagnostics on stderr. The current implementation is a
-//! legacy output gap until migration.
+//! ADR-T-010 classifies this as a side-effect command: stdout remains empty and
+//! diagnostics are JSON records on stderr.
 use std::process::ExitCode;
 
-use torrust_index::console::commands::seeder::app;
-use torrust_index_cli_common::{CommandExit, install_json_panic_hook};
-use tracing::error;
+use torrust_index::console::commands::seeder::app::{self, Args};
+use torrust_index_cli_common::{install_json_panic_hook, parse_args_or_exit, run_no_stdout_command_async};
 
 const COMMAND_NAME: &str = "seeder";
 
@@ -15,11 +13,8 @@ const COMMAND_NAME: &str = "seeder";
 async fn main() -> ExitCode {
     install_json_panic_hook(COMMAND_NAME);
 
-    match app::run().await {
-        Ok(()) => CommandExit::Success.exit_code(),
-        Err(error) => {
-            error!(%error, "command failed");
-            CommandExit::Failure.exit_code()
-        }
-    }
+    let args = parse_args_or_exit::<Args>();
+    let debug = args.base.debug;
+
+    run_no_stdout_command_async(COMMAND_NAME, debug, tracing::Level::INFO, || app::run(args)).await
 }

@@ -101,7 +101,6 @@ sha-1 = "0"
 sha2 = "0"
 sqlx = { version = "0", features = ["migrate", "mysql", "runtime-tokio-native-tls", "sqlite", "time"] }
 tera = { version = "1", default-features = false }
-text-colorizer = "1"
 thiserror = "2"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "1"

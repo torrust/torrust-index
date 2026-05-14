@@ -232,10 +232,9 @@
 //! ## Tracker Statistics Importer
 //!
 //! This console command allows you to manually import the tracker statistics.
-//! ADR-T-010 classifies it as a side-effect command: the target contract is
-//! empty stdout and JSON diagnostics on stderr. The current implementation is a
-//! legacy output gap until the command is migrated, so scripts should not parse
-//! its plain-text diagnostics.
+//! ADR-T-010 classifies it as a side-effect command: stdout remains empty and
+//! diagnostics are JSON records on stderr. Scripts should branch on the process
+//! exit code and parse stderr as NDJSON when they need diagnostics.
 //!
 //! For more information about this command you can visit the documentation for
 //! the [`Import tracker statistics`](crate::console::commands::tracker_statistics_importer) module.
@@ -244,10 +243,9 @@
 //!
 //! This console command allows you to manually upgrade the application from one
 //! version to another.
-//! ADR-T-010 classifies it as a side-effect command: the target contract is
-//! empty stdout and JSON diagnostics on stderr. The current implementation is a
-//! legacy output gap until the command is migrated, so scripts should branch on
-//! exit status rather than parsing current plain text.
+//! ADR-T-010 classifies it as a side-effect command: stdout remains empty and
+//! diagnostics are JSON records on stderr. Scripts should branch on the process
+//! exit code and parse stderr as NDJSON when they need diagnostics.
 //!
 //! For more information about this command you can visit the documentation for
 //! the [`Upgrade app from version 1.0.0 to 2.0.0`](crate::upgrades::from_v1_0_0_to_v2_0_0::upgrader) module.

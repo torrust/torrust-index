@@ -7,7 +7,7 @@ To upgrade from version `v1.0.0` to `v2.0.0` you have to follow these steps:
 - Back up your current database and the `uploads` folder. You can find which database and upload folder are you using in the `Config.toml` file in the root folder of your installation.
 - Set up a local environment exactly as you have it in production with your production data (DB and torrents folder).
 - Run the application locally with: `cargo run`.
-- Execute the upgrader command: `cargo run --bin upgrade ./data.db ./data_v2.db ./uploads`
+- Execute the upgrader command: `cargo run --bin upgrade -- ./data.db ./data_v2.db ./uploads`
 - A new SQLite file should have been created in the root folder: `data_v2.db`
 - Stop the running application and change the DB configuration to use the newly generated configuration:
 
@@ -22,14 +22,19 @@ connect_url = "sqlite://data_v2.db?mode=rwc"
 
 ## Command Output
 
-`upgrade` is an ADR-T-010 side-effect command: its target contract is empty
-stdout, with status and error diagnostics emitted as JSON records on stderr.
-Automation should branch on the process exit code and must not parse plain text
-from stdout.
+`upgrade` is an ADR-T-010 side-effect command: stdout is empty on success and on
+failure. Status, help, version, usage errors, migration failures, and panic
+diagnostics are emitted as JSON records on stderr. Stderr is NDJSON when the
+command emits more than one record.
 
-The current binary is still a legacy output gap until its ADR-T-010 migration
-stage lands. Treat any current plain-text diagnostics as temporary and avoid
-building scripts around them.
+Automation should branch on the process exit code and parse stderr as JSON when
+it needs diagnostics. Usage failures, including invalid argv, exit with code 2;
+runtime upgrade failures exit with code 1.
+
+```sh
+cargo run --bin upgrade -- ./data.db ./data_v2.db ./uploads 2>upgrade.ndjson
+jq . upgrade.ndjson
+```
 
 ## Tests
 

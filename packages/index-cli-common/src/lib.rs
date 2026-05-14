@@ -11,6 +11,7 @@
 
 use std::borrow::Cow;
 use std::ffi::{OsStr, OsString};
+use std::future::Future;
 use std::io::{self, IsTerminal, Write};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -673,6 +674,34 @@ where
     init_json_tracing_with_debug(debug, default_level);
 
     match run() {
+        Ok(()) => CommandExit::Success.exit_code(),
+        Err(error) => {
+            tracing::error!(error = %error, "command failed");
+            CommandExit::Failure.exit_code()
+        }
+    }
+}
+
+/// Run an async side-effect command that does not emit stdout result data.
+///
+/// The runner installs the JSON panic hook, initialises JSON stderr tracing, and
+/// maps failures to ADR-T-010 baseline exit classes. It deliberately does not
+/// perform stdout TTY refusal because the command has no stdout result data.
+pub async fn run_no_stdout_command_async<CommandError, Run, RunFuture>(
+    command_name: &str,
+    debug: bool,
+    default_level: tracing::Level,
+    run: Run,
+) -> ExitCode
+where
+    CommandError: std::fmt::Display,
+    Run: FnOnce() -> RunFuture,
+    RunFuture: Future<Output = Result<(), CommandError>>,
+{
+    install_json_panic_hook(command_name);
+    init_json_tracing_with_debug(debug, default_level);
+
+    match run().await {
         Ok(()) => CommandExit::Success.exit_code(),
         Err(error) => {
             tracing::error!(error = %error, "command failed");

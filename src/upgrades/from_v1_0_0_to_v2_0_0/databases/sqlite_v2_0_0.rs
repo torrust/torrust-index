@@ -8,6 +8,7 @@ use sqlx::{SqlitePool, query, query_as};
 use super::sqlite_v1_0_0::{TorrentRecordV1, UserRecordV1};
 use crate::databases::database::{self, TABLES_TO_TRUNCATE};
 use crate::models::torrent_file::{TorrentFile, TorrentInfoDictionary};
+use crate::upgrades::from_v1_0_0_to_v2_0_0::error::UpgradeError;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct CategoryRecordV2 {
@@ -32,9 +33,12 @@ pub struct TorrentRecordV2 {
 }
 
 impl TorrentRecordV2 {
-    #[must_use]
-    pub fn from_v1_data(torrent: &TorrentRecordV1, torrent_info: &TorrentInfoDictionary, uploader: &UserRecordV1) -> Self {
-        Self {
+    pub fn from_v1_data(
+        torrent: &TorrentRecordV1,
+        torrent_info: &TorrentInfoDictionary,
+        uploader: &UserRecordV1,
+    ) -> Result<Self, UpgradeError> {
+        Ok(Self {
             torrent_id: torrent.torrent_id,
             uploader_id: uploader.user_id,
             category_id: torrent.category_id,
@@ -46,25 +50,26 @@ impl TorrentRecordV2 {
             piece_length: torrent_info.piece_length,
             private: torrent_info.private,
             is_bep_30: i64::from(torrent_info.is_bep_30()),
-            date_uploaded: convert_timestamp_to_datetime(torrent.upload_date),
-        }
+            date_uploaded: convert_timestamp_to_datetime(torrent.upload_date)?,
+        })
     }
 }
 
 /// It converts a timestamp in seconds to a datetime string.
 ///
-/// # Panics
+/// # Errors
 ///
-/// It panics if the timestamp is too big and it overflows i64. Very future!
-#[must_use]
-pub fn convert_timestamp_to_datetime(timestamp: i64) -> String {
+/// Returns an error if the timestamp is outside the supported range.
+pub fn convert_timestamp_to_datetime(timestamp: i64) -> Result<String, UpgradeError> {
     // The expected format in database is: 2022-11-04 09:53:57
     // MySQL uses a DATETIME column and SQLite uses a TEXT column.
 
-    let datetime = DateTime::from_timestamp(timestamp, 0).expect("Overflow of i64 seconds, very future!");
+    let Some(datetime) = DateTime::from_timestamp(timestamp, 0) else {
+        return Err(UpgradeError::InvalidTimestamp { timestamp });
+    };
 
     // Format without timezone
-    datetime.format("%Y-%m-%d %H:%M:%S").to_string()
+    Ok(datetime.format("%Y-%m-%d %H:%M:%S").to_string())
 }
 
 pub struct SqliteDatabaseV2_0_0 {
@@ -74,27 +79,21 @@ pub struct SqliteDatabaseV2_0_0 {
 impl SqliteDatabaseV2_0_0 {
     /// Creates a new instance of the database.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// It panics if it cannot create the database pool.
-    pub async fn new(database_url: &str) -> Self {
-        let db = SqlitePoolOptions::new()
-            .connect(database_url)
-            .await
-            .expect("Unable to create database pool.");
-        Self { pool: db }
+    /// Returns an error if it cannot create the database pool.
+    pub async fn new(database_url: &str) -> Result<Self, sqlx::Error> {
+        let db = SqlitePoolOptions::new().connect(database_url).await?;
+        Ok(Self { pool: db })
     }
 
     /// It migrates the database to the latest version.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// It panics if it cannot run the migrations.
-    pub async fn migrate(&self) {
-        sqlx::migrate!("migrations/sqlite3")
-            .run(&self.pool)
-            .await
-            .expect("Could not run database migrations.");
+    /// Returns an error if it cannot run the migrations.
+    pub async fn migrate(&self) -> Result<(), sqlx::migrate::MigrateError> {
+        sqlx::migrate!("migrations/sqlite3").run(&self.pool).await
     }
 
     pub async fn reset_categories_sequence(&self) -> Result<SqliteQueryResult, database::Error> {
@@ -267,13 +266,12 @@ impl SqliteDatabaseV2_0_0 {
             .map(|v| v.last_insert_rowid())
     }
 
-    #[allow(clippy::missing_panics_doc)]
     pub async fn delete_all_database_rows(&self) -> Result<(), database::Error> {
         for table in TABLES_TO_TRUNCATE {
             query(&format!("DELETE FROM {table};"))
                 .execute(&self.pool)
                 .await
-                .unwrap_or_else(|_| panic!("table {table} should be deleted"));
+                .map_err(|_| database::Error::Error)?;
         }
 
         Ok(())

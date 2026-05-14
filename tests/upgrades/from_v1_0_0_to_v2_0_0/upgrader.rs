@@ -83,7 +83,8 @@ async fn upgrades_data_from_version_v1_0_0_to_v2_0_0() {
         },
         &execution_time,
     )
-    .await;
+    .await
+    .expect("upgrade must succeed for fixture data");
 
     // Assertions for data transferred to the new database in version v2.0.0
     category_tester.assert_data_in_target_db().await;

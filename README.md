@@ -212,11 +212,26 @@ cargo run --quiet --bin create_test_torrent -- ./output/test/torrents 2>create-t
 jq . create-test-torrent.ndjson
 ```
 
-The remaining root maintenance binaries (`import_tracker_statistics`, `seeder`,
-and `upgrade`) are still ADR-T-010 migration targets. Their `main` boundaries
-use explicit exit codes and the shared JSON panic hook, but their command bodies
-may still emit legacy plain text until their later rollout stages land. Do not
-build new automation around their current plain-text output.
+The root maintenance binaries `import_tracker_statistics`, `seeder`, and
+`upgrade` are no-stdout side-effect commands. They keep stdout empty, use the
+shared JSON `clap` wrapper for help, version, and argv errors, and emit status
+or diagnostic records as JSON/NDJSON on stderr. Automation should branch on the
+process exit code and parse stderr as JSON when it needs diagnostics:
+
+```sh
+cargo run --quiet --bin import_tracker_statistics -- 2>import-tracker-statistics.ndjson
+
+cargo run --quiet --bin seeder -- \
+  --api-base-url "http://localhost:3001" \
+  --number-of-torrents 10 \
+  --user admin \
+  --password "$TORRUST_INDEX_ADMIN_PASSWORD" \
+  --interval 0 \
+  2>seeder.ndjson
+
+cargo run --quiet --bin upgrade -- ./data.db ./data_v2.db ./uploads 2>upgrade.ndjson
+jq . upgrade.ndjson
+```
 
 ## Documentation
 

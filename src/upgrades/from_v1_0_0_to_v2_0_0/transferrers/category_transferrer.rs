@@ -1,37 +1,73 @@
 use std::sync::Arc;
 
+use tracing::{debug, info};
+
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::{CategoryRecordV2, SqliteDatabaseV2_0_0};
+use crate::upgrades::from_v1_0_0_to_v2_0_0::error::UpgradeError;
 
-#[allow(clippy::missing_panics_doc)]
-pub async fn transfer_categories(source_database: Arc<SqliteDatabaseV1_0_0>, target_database: Arc<SqliteDatabaseV2_0_0>) {
-    println!("Transferring categories ...");
+/// Transfer categories from the source database to the target database.
+///
+/// # Errors
+///
+/// Returns an error if reading, inserting, or validating copied category data
+/// fails.
+pub async fn transfer_categories(
+    source_database: Arc<SqliteDatabaseV1_0_0>,
+    target_database: Arc<SqliteDatabaseV2_0_0>,
+) -> Result<(), UpgradeError> {
+    info!("transferring categories");
 
-    let source_categories = source_database.get_categories_order_by_id().await.unwrap();
-    println!("[v1] categories: {source_categories:?}");
+    let source_categories = source_database
+        .get_categories_order_by_id()
+        .await
+        .map_err(|source| UpgradeError::Database {
+            context: "failed to read source categories",
+            source,
+        })?;
+    debug!(?source_categories, "read source categories");
 
-    let result = target_database.reset_categories_sequence().await.unwrap();
-    println!("[v2] reset categories sequence result: {result:?}");
+    let result = target_database
+        .reset_categories_sequence()
+        .await
+        .map_err(|source| UpgradeError::Database {
+            context: "failed to reset target category sequence",
+            source,
+        })?;
+    debug!(?result, "reset target category sequence");
 
-    for cat in &source_categories {
-        println!("[v2] adding category {:?} with id {:?} ...", cat.name, cat.category_id);
+    for category in &source_categories {
+        info!(category_id = category.category_id, name = %category.name, "adding category");
         let id = target_database
             .insert_category(&CategoryRecordV2 {
-                category_id: cat.category_id,
-                name: cat.name.clone(),
+                category_id: category.category_id,
+                name: category.name.clone(),
             })
             .await
-            .unwrap();
+            .map_err(|source| UpgradeError::Sqlx {
+                context: "failed to insert target category",
+                source,
+            })?;
 
-        assert!(
-            id == cat.category_id,
-            "Error copying category {:?} from source DB to the target DB",
-            cat.category_id
-        );
+        if id != category.category_id {
+            return Err(UpgradeError::IdMismatch {
+                entity: "category",
+                expected: category.category_id,
+                actual: id,
+            });
+        }
 
-        println!("[v2] category: {:?} {:?} added.", id, cat.name);
+        info!(category_id = id, name = %category.name, "category added");
     }
 
-    let target_categories = target_database.get_categories().await.unwrap();
-    println!("[v2] categories: {target_categories:?}");
+    let target_categories = target_database
+        .get_categories()
+        .await
+        .map_err(|source| UpgradeError::Database {
+            context: "failed to read target categories",
+            source,
+        })?;
+    debug!(?target_categories, "read target categories");
+
+    Ok(())
 }

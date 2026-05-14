@@ -11,8 +11,8 @@ code, documentation, and regression tests.
 
 ## Current Implementation Status
 
-Stages 1 through 5 have landed for the shared Rust helper path and initial root
-command migrations:
+Stages 1 through 6 have landed for the shared Rust helper path and root command
+migrations:
 
 - Stage 1 fixed the shared control-plane record shape, baseline exit classes,
   helper stdout schemas, and redaction helpers.
@@ -34,9 +34,14 @@ command migrations:
   contract tests. `parse_torrent` now emits one JSON stdout result object and
   refuses terminal stdout; `create_test_torrent` remains a no-stdout side-effect
   command.
+- Stage 6 migrated `import_tracker_statistics`, `seeder`, and `upgrade` to the
+  shared JSON clap parser, JSON panic hook, JSON stderr tracing runner, empty
+  stdout side-effect contract, structured tracing diagnostics, and propagated
+  command errors. The command-reachable tracker statistics and upgrade modules
+  no longer emit raw stream output or terminal color formatting.
 
-The remaining root maintenance command internals and container entry script
-remain future rollout stages unless their sections below say otherwise.
+The container entry script, remaining shared-library cleanup, and regression
+guards remain future rollout stages unless their sections below say otherwise.
 
 ## Goal
 
@@ -357,8 +362,11 @@ Required changes:
 Update every root maintenance and diagnostic binary.
 
 Stage 5 status: implemented for `src/bin/parse_torrent.rs` and
-`src/bin/create_test_torrent.rs`. The remaining root maintenance binaries are
-left for Stage 6.
+`src/bin/create_test_torrent.rs`.
+
+Stage 6 status: implemented for `src/bin/import_tracker_statistics.rs`,
+`src/bin/seeder.rs`, `src/bin/upgrade.rs`, and their command-reachable tracker
+statistics, seeder, and upgrade modules.
 
 Required changes for `src/bin/parse_torrent.rs`:
 
@@ -463,27 +471,27 @@ Required changes:
 Update operator documentation after the behavior changes.
 
 Current documentation status: the shared contract shape, helper stdout result
-schemas, expanded Rust CLI infrastructure, helper-binary wiring state, and
-stage-four server logging / root `ExitCode` boundary state have been documented.
-The stage-five `parse_torrent` and `create_test_torrent` migration has also been
-documented. Remaining root maintenance command internals and the container entry
-script are still legacy output gaps until their rollout stages land; their
-documentation should describe the ADR-T-010 target contract without promising
-behaviour the binaries do not yet implement.
+schemas, expanded Rust CLI infrastructure, helper-binary wiring state,
+stage-four server logging / root `ExitCode` boundary state, the stage-five
+`parse_torrent` / `create_test_torrent` migration, and the stage-six root
+maintenance command migration have been documented. The container entry script
+is still a legacy output gap until its rollout stage lands; its documentation
+should describe the ADR-T-010 target contract without promising behaviour it
+does not yet implement.
 
-Required changes:
+Documentation maintenance requirements:
 
-- Update `README.md` command examples that currently imply human-readable output.
-- Update `docs/containers.md` for JSON stderr diagnostics, stdout result data,
-  helper TTY refusal, and recommended inspection patterns such as piping stdout
-  result data to `jq`.
-- Update `upgrades/from_v1_0_0_to_v2_0_0/README.md` so upgrade examples describe
-  JSON stderr diagnostics and empty stdout.
-- Update command module docs that currently show plain text output, especially
-  tracker statistics importer and upgrade docs.
-- Add a `CHANGELOG.md` entry describing the operator-visible CLI output contract
-  change, marked as breaking for scripts that consumed the previous plain-text
-  command output.
+- Keep `README.md` command examples aligned with each command's current
+  stdout/stderr class.
+- Keep `docs/containers.md` aligned with JSON stderr diagnostics, stdout result
+  data, helper TTY refusal, and recommended inspection patterns such as piping
+  stdout result data to `jq`.
+- Keep `upgrades/from_v1_0_0_to_v2_0_0/README.md` aligned with `upgrade`'s JSON
+  stderr diagnostics and empty stdout contract.
+- Keep command module docs aligned with the migrated command behavior,
+  especially tracker statistics importer and upgrade docs.
+- Keep `CHANGELOG.md` entries marked as breaking when command output changes can
+  affect scripts that consumed previous plain-text output.
 
 ## Tests And Guards
 
@@ -541,11 +549,12 @@ summarizing results, following the repository test-running convention.
 
 ## Rollout Order
 
-Current status: steps 1 through 5 have landed. The documentation for the
-shared-helper stages, the stage-four root logging / binary-boundary rollout, and
-the initial stage-five root binary migration has been updated; the later
-operator-visible migrations still need their own documentation and changelog
-updates when they land.
+Current status: steps 1 through 6 have landed. Documentation and changelog
+entries for the shared-helper stages, the stage-four root logging /
+binary-boundary rollout, the stage-five root binary migration, and the stage-six
+root maintenance command migration have been updated. Later operator-visible
+migrations still need their own documentation and changelog updates when they
+land.
 
 1. Finalize the shared control-plane record shape, command-specific result
     schema details, exit-code mapping, and redaction rules.
