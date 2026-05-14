@@ -31,6 +31,7 @@ pub const CONTROL_PLANE_SCHEMA: u32 = 1;
 pub const REDACTED: &str = "[redacted]";
 
 static PANIC_REPORTED: AtomicBool = AtomicBool::new(false);
+static PANIC_PAYLOAD_REPORTING_ENABLED: AtomicBool = AtomicBool::new(true);
 static STDERR_WRITE_LOCK: Mutex<()> = Mutex::new(());
 
 /// Baseline exit-code classes shared by ADR-T-010 command-line tools.
@@ -116,11 +117,13 @@ pub enum ControlPlaneFields {
     UsageError { exit_code: u8, clap_error_kind: String },
     /// Details for stdout TTY refusal.
     TtyRefusal { exit_code: u8, stream: StandardStream },
-    /// Details for a panic diagnostic. The panic payload is deliberately omitted.
+    /// Details for a panic diagnostic. The panic payload is only exposed when debug diagnostics are enabled.
     Panic {
         exit_code: u8,
         thread: Option<String>,
         location: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        payload: Option<String>,
     },
 }
 
@@ -207,7 +210,7 @@ impl ControlPlaneRecord {
 
     /// Build a panic diagnostic record.
     #[must_use]
-    pub fn panic(command: &str, thread: Option<&str>, location: Option<&str>) -> Self {
+    pub fn panic(command: &str, thread: Option<&str>, location: Option<&str>, payload: Option<&str>) -> Self {
         Self::new(
             command,
             ControlPlaneRecordKind::Panic,
@@ -216,6 +219,7 @@ impl ControlPlaneRecord {
                 exit_code: CommandExit::Failure.code(),
                 thread: thread.map(str::to_string),
                 location: location.map(str::to_string),
+                payload: payload.map(str::to_string),
             }),
         )
     }
@@ -421,6 +425,9 @@ fn level_directive(level: tracing::Level) -> String {
 ///
 /// Returns [`CliExit`] when parsing should stop and the caller should write the
 /// enclosed record to stderr before exiting with the enclosed exit class.
+/// The error value is intentionally returned by value because this path is only
+/// used when parsing stops, and boxing it would complicate the public helper API.
+#[allow(clippy::result_large_err)]
 pub fn parse_args_from<T, I, A>(args: I) -> Result<T, CliExit>
 where
     T: Parser,
@@ -531,12 +538,39 @@ pub fn install_json_panic_hook(command_name: &str) {
             let location = panic_info
                 .location()
                 .map(|location| format!("{}:{}:{}", location.file(), location.line(), location.column()));
-            let record = ControlPlaneRecord::panic(&command_name, thread_name, location.as_deref());
+            let payload = panic_payload_reporting_enabled()
+                .then(|| panic_payload_message(panic_info))
+                .flatten();
+            let record = ControlPlaneRecord::panic(&command_name, thread_name, location.as_deref(), payload);
             let _ignored = try_emit_control_plane_record(&record);
         }
 
         exit_with(CommandExit::Failure);
     }));
+}
+
+/// Enable or disable string panic payloads in JSON panic diagnostics.
+///
+/// Payload reporting starts enabled so panics before argument parsing still
+/// include their string payload. Call this with the parsed `--debug` value once
+/// arguments are available.
+pub fn set_panic_payload_reporting_enabled(enabled: bool) {
+    PANIC_PAYLOAD_REPORTING_ENABLED.store(enabled, Ordering::SeqCst);
+}
+
+fn panic_payload_reporting_enabled() -> bool {
+    PANIC_PAYLOAD_REPORTING_ENABLED.load(Ordering::SeqCst)
+}
+
+fn panic_payload_message<'a>(info: &'a std::panic::PanicHookInfo<'_>) -> Option<&'a str> {
+    panic_payload_message_from_payload(info.payload())
+}
+
+fn panic_payload_message_from_payload(payload: &(dyn std::any::Any + Send)) -> Option<&str> {
+    payload
+        .downcast_ref::<&str>()
+        .copied()
+        .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
 }
 
 /// Exit the current process with an ADR-T-010 exit class.
@@ -633,6 +667,7 @@ where
     CommandError: std::fmt::Display,
     Run: FnOnce() -> Result<Output, CommandError>,
 {
+    set_panic_payload_reporting_enabled(debug);
     install_json_panic_hook(command_name);
     init_json_tracing_with_debug(debug, default_level);
 
@@ -671,6 +706,7 @@ where
     CommandError: std::fmt::Display,
     Run: FnOnce() -> Result<(), CommandError>,
 {
+    set_panic_payload_reporting_enabled(debug);
     install_json_panic_hook(command_name);
     init_json_tracing_with_debug(debug, default_level);
 
@@ -699,6 +735,7 @@ where
     Run: FnOnce() -> RunFuture,
     RunFuture: Future<Output = Result<(), CommandError>>,
 {
+    set_panic_payload_reporting_enabled(debug);
     install_json_panic_hook(command_name);
     init_json_tracing_with_debug(debug, default_level);
 

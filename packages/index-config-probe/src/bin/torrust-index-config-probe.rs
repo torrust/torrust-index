@@ -10,6 +10,7 @@ use std::process::ExitCode;
 use clap::Parser;
 use torrust_index_cli_common::{
     BaseArgs, emit, init_json_tracing_with_debug, install_json_panic_hook, parse_args_or_exit, refuse_if_stdout_is_tty,
+    set_panic_payload_reporting_enabled,
 };
 use torrust_index_config::{DEFAULT_CONFIG_TOML_PATH, Info, load_settings};
 use torrust_index_config_probe::{ProbeError, probe};
@@ -32,6 +33,7 @@ fn main() -> ExitCode {
     install_json_panic_hook(COMMAND_NAME);
 
     let args = parse_args_or_exit::<Args>();
+    set_panic_payload_reporting_enabled(args.base.debug);
     init_json_tracing_with_debug(args.base.debug, tracing::Level::INFO);
     refuse_if_stdout_is_tty(COMMAND_NAME);
 

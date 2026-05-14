@@ -13,7 +13,10 @@
 //! | `json_line_writer_appends_newline`      | JSON record helper writes one complete line.     |
 //! | `usage_error_record_carries_fields`    | Usage records include exit code and clap kind.   |
 //! | `tty_refusal_record_carries_fields`    | TTY refusal records identify stdout and code 2.  |
-//! | `panic_record_omits_payload`           | Panic records avoid serialising panic payloads.  |
+//! | `panic_record_omits_payload_without_debug` | Panic records hide payloads without debug.    |
+//! | `panic_record_carries_debug_payload`    | Panic records can expose string payloads.        |
+//! | `panic_payload_reporting_defaults_enabled_then_follows_debug_flag` | Startup payload gate behavior. |
+//! | `panic_payload_message_extracts_string_payloads` | String panic payloads are downcast.     |
 //! | `parse_args_from_returns_help_record`  | Clap help becomes JSON stderr control data.      |
 //! | `parse_args_from_returns_version_record` | Clap version becomes JSON stderr control data. |
 //! | `parse_args_from_returns_usage_record` | Clap argv errors become JSON usage records.      |
@@ -42,8 +45,8 @@ use serde_json::json;
 
 use crate::{
     BaseArgs, CONTROL_PLANE_SCHEMA, CommandExit, ControlPlaneFields, ControlPlaneRecord, ControlPlaneRecordKind, REDACTED,
-    StandardStream, TracingFilterSource, parse_args_from, redact_database_url, redact_field_value, tracing_filter_from_rust_log,
-    write_json_line,
+    StandardStream, TracingFilterSource, panic_payload_message_from_payload, panic_payload_reporting_enabled, parse_args_from,
+    redact_database_url, redact_field_value, set_panic_payload_reporting_enabled, tracing_filter_from_rust_log, write_json_line,
 };
 
 /// A `Write` that fails every call with `BrokenPipe`.
@@ -235,8 +238,8 @@ fn tty_refusal_record_carries_fields() {
 }
 
 #[test]
-fn panic_record_omits_payload() {
-    let record = ControlPlaneRecord::panic("fixture", Some("main"), Some("src/main.rs:12:34"));
+fn panic_record_omits_payload_without_debug() {
+    let record = ControlPlaneRecord::panic("fixture", Some("main"), Some("src/main.rs:12:34"), None);
     let value = serde_json::to_value(record).unwrap();
 
     assert_eq!(value["kind"], json!("panic"));
@@ -244,6 +247,44 @@ fn panic_record_omits_payload() {
     assert_eq!(value["fields"]["exit_code"], json!(1));
     assert_eq!(value["fields"]["thread"], json!("main"));
     assert!(value["fields"].get("payload").is_none());
+}
+
+#[test]
+fn panic_record_carries_debug_payload() {
+    let record = ControlPlaneRecord::panic(
+        "fixture",
+        Some("main"),
+        Some("src/main.rs:12:34"),
+        Some("panic with \"quoted\" detail"),
+    );
+    let line = serde_json::to_string(&record).unwrap();
+
+    assert!(line.contains(r#""payload":"panic with \"quoted\" detail""#));
+
+    let value: serde_json::Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(value["fields"]["payload"], json!("panic with \"quoted\" detail"));
+}
+
+#[test]
+fn panic_payload_reporting_defaults_enabled_then_follows_debug_flag() {
+    assert!(panic_payload_reporting_enabled());
+
+    set_panic_payload_reporting_enabled(false);
+    assert!(!panic_payload_reporting_enabled());
+
+    set_panic_payload_reporting_enabled(true);
+    assert!(panic_payload_reporting_enabled());
+}
+
+#[test]
+fn panic_payload_message_extracts_string_payloads() {
+    let borrowed_payload: &(dyn std::any::Any + Send) = &"borrowed panic";
+    let owned_payload: &(dyn std::any::Any + Send) = &String::from("owned panic");
+    let numeric_payload: &(dyn std::any::Any + Send) = &1_u8;
+
+    assert_eq!(panic_payload_message_from_payload(borrowed_payload), Some("borrowed panic"));
+    assert_eq!(panic_payload_message_from_payload(owned_payload), Some("owned panic"));
+    assert_eq!(panic_payload_message_from_payload(numeric_payload), None);
 }
 
 #[test]
