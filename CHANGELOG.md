@@ -22,6 +22,9 @@ error system (ADR-T-006), MSRV raised to 1.88.
   stdout-producing commands refuse direct terminal stdout. Existing plain-text
   root maintenance commands are legacy gaps and will be migrated in later
   stages.
+- The `torrust-index` server's application logs now use JSON records on stderr
+  instead of the previous human-formatted tracing output. Log consumers should
+  parse stderr as NDJSON or pipe it through a JSON viewer.
 - `torrust-index-auth-keypair` and `torrust-index-health-check` stdout JSON now
   includes a top-level `schema` field. Scripts that expected an exact object
   shape must tolerate or consume the schema field.
@@ -95,10 +98,18 @@ error system (ADR-T-006), MSRV raised to 1.88.
   panic hook. Their `--help`, `--version`, argv errors, TTY refusal, and panic
   diagnostics are JSON control-plane records on stderr; stdout remains reserved
   for successful result JSON.
+- Central application logging now delegates to the shared ADR-T-010 JSON stderr
+  tracing setup. The `torrust-index` server keeps stdout empty for normal
+  operation, uses the configured logging threshold as its default filter, and
+  lets a non-empty `RUST_LOG` override that default.
+- Root Rust binaries now return explicit `ExitCode` values at their `main`
+  boundaries and install the shared JSON panic hook. Their command internals may
+  still contain legacy plain-text output until later ADR-T-010 rollout stages
+  migrate each command body.
 - Operator documentation now describes the ADR-T-010 migration state: helper
-  binaries have the JSON stdout contract, while root maintenance binaries and
-  the container entry script remain legacy output gaps until their rollout
-  stages land.
+  binaries have the JSON stdout contract, the server emits JSON tracing on
+  stderr, and root maintenance binaries plus the container entry script remain
+  legacy output gaps until their rollout stages land.
 
 ### ADR-T-009 — Container infrastructure refactor
 

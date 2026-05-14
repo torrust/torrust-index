@@ -52,6 +52,7 @@ opt-level = 3
 opt-level = 3
 
 [dependencies]
+torrust-index-cli-common = { version = "4.0.0-develop", path = "packages/index-cli-common" }
 torrust-index-config = { version = "4.0.0-develop", path = "packages/index-config" }
 torrust-index-render-text-as-image = { version = "0.1.0", path = "packages/render-text-as-image" }
 
@@ -107,7 +108,6 @@ toml = "1"
 tower = { version = "0", features = ["timeout"] }
 tower-http = { version = "0", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
 tracing = "0"
-tracing-subscriber = { version = "0", features = ["json"] }
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }

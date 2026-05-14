@@ -11,7 +11,8 @@ code, documentation, and regression tests.
 
 ## Current Implementation Status
 
-Stages 1 through 3 have landed for the shared Rust helper path:
+Stages 1 through 4 have landed for the shared Rust helper path and root command
+boundaries:
 
 - Stage 1 fixed the shared control-plane record shape, baseline exit classes,
   helper stdout schemas, and redaction helpers.
@@ -23,9 +24,14 @@ Stages 1 through 3 have landed for the shared Rust helper path:
   `torrust-index-health-check` to the expanded shared infrastructure. Their
   help, version, argv errors, TTY refusal, and panic diagnostics are now JSON
   control-plane records on stderr.
+- Stage 4 switched central application logging to the shared JSON stderr
+  tracing setup, added the shared CLI contract crate to the root package, and
+  made root binaries return explicit `ExitCode` values at their `main`
+  boundaries. The maintenance-command internals remain legacy output gaps until
+  their later migration stages land.
 
-The root server, root maintenance binaries, and container entry script remain
-future rollout stages unless their sections below say otherwise.
+The root maintenance command internals and container entry script remain future
+rollout stages unless their sections below say otherwise.
 
 ## Goal
 
@@ -448,11 +454,12 @@ Required changes:
 Update operator documentation after the behavior changes.
 
 Current documentation status: the shared contract shape, helper stdout result
-schemas, expanded Rust CLI infrastructure, and helper-binary wiring state have
-been documented. Root maintenance commands and the container entry script are
-still legacy output gaps until their rollout stages land; their documentation
-should describe the ADR-T-010 target contract without promising behaviour the
-binaries do not yet implement.
+schemas, expanded Rust CLI infrastructure, helper-binary wiring state, and
+stage-four server logging / root `ExitCode` boundary state have been documented.
+Root maintenance command internals and the container entry script are still
+legacy output gaps until their rollout stages land; their documentation should
+describe the ADR-T-010 target contract without promising behaviour the binaries
+do not yet implement.
 
 Required changes:
 
@@ -524,10 +531,10 @@ summarizing results, following the repository test-running convention.
 
 ## Rollout Order
 
-Current status: steps 1 through 3 have landed. The documentation for those
-stages has been updated as part of the stage-two/three rollout; the later
-operator-visible migrations still need their own documentation and changelog
-updates when they land.
+Current status: steps 1 through 4 have landed. The documentation for the
+shared-helper stages and the stage-four root logging / binary-boundary rollout
+has been updated; the later operator-visible migrations still need their own
+documentation and changelog updates when they land.
 
 1. Finalize the shared control-plane record shape, command-specific result
     schema details, exit-code mapping, and redaction rules.

@@ -407,6 +407,12 @@ failure rather than silent misbehaviour.
 
 ### Command-Line Output Contract
 
+The `torrust-index` server process is a no-stdout command. Once the Rust
+application starts, its tracing diagnostics are JSON records on stderr. The
+configured `[logging].threshold` selects the default filter, and a non-empty
+`RUST_LOG` environment variable overrides that default. The server does not
+refuse terminal stdout, because it does not emit stdout result data.
+
 Container helper binaries follow the ADR-T-010 stdout/stderr split. When they
 emit result data, stdout is exactly one JSON object with a trailing newline and
 a top-level `schema` field. Diagnostics, help, version output, argv errors, TTY
@@ -437,6 +443,8 @@ The container entry script captures helper stdout internally and does not
 forward it to the terminal. Its own diagnostics are still part of the ADR-T-010
 migration backlog; until that rollout stage lands, treat any plain-text entry
 script stderr as a legacy compatibility gap rather than a new output contract.
+Container startup logs may therefore contain legacy entry-script lines before
+the Rust server begins emitting JSON tracing records.
 
 ### Healthcheck (both targets)
 

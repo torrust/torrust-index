@@ -170,6 +170,12 @@ reserved for machine-readable result data, stderr is reserved for
 machine-readable diagnostics/control records, and commands that emit stdout
 result data refuse to write it directly to a terminal.
 
+The `torrust-index` server binary is a no-stdout command. Application tracing is
+emitted as JSON records on stderr; the configured `[logging].threshold` selects
+the default filter, and a non-empty `RUST_LOG` environment variable overrides
+that default. Panics that cross the binary boundary are reported as ADR-T-010
+JSON control-plane records on stderr.
+
 The shared helper infrastructure now wraps `clap` help, version, and usage
 errors as JSON control-plane records on stderr, installs a JSON-only panic hook,
 and uses JSON tracing on stderr. The container helper binaries emit exactly one
@@ -188,10 +194,12 @@ filter to debug.
 
 The older root maintenance binaries (`parse_torrent`, `create_test_torrent`,
 `import_tracker_statistics`, `seeder`, and `upgrade`) are in ADR-T-010 scope but
-are still migration targets. Do not build new automation around their current
-plain-text output; the target contract for side-effect commands is empty stdout
-and JSON diagnostics on stderr, while `parse_torrent` will become a JSON stdout
-result command.
+are still migration targets. Their `main` boundaries now use explicit exit codes
+and the shared JSON panic hook, but their command bodies may still emit legacy
+plain text until their later rollout stages land. Do not build new automation
+around their current plain-text output; the target contract for side-effect
+commands is empty stdout and JSON diagnostics on stderr, while `parse_torrent`
+will become a JSON stdout result command.
 
 ## Documentation
 

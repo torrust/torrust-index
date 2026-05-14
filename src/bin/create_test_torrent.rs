@@ -7,19 +7,25 @@ use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
+use std::process::ExitCode;
 
 use torrust_index::models::torrent_file::{Torrent, TorrentFile, TorrentInfoDictionary};
 use torrust_index::services::hasher::sha1; // DevSkim: ignore DS126858
 use torrust_index::utils::parse_torrent;
+use torrust_index_cli_common::{CommandExit, install_json_panic_hook};
 use uuid::Uuid;
 
-fn main() {
+const COMMAND_NAME: &str = "create_test_torrent";
+
+fn main() -> ExitCode {
+    install_json_panic_hook(COMMAND_NAME);
+
     let args: Vec<String> = env::args().collect();
 
     if args.len() != 2 {
         eprintln!("Usage:   cargo run --bin create_test_torrent <destination_folder>");
         eprintln!("Example: cargo run --bin create_test_torrent ./output/test/torrents");
-        std::process::exit(1);
+        return CommandExit::Usage.exit_code();
     }
 
     let destination_folder = &args[1];
@@ -71,4 +77,6 @@ fn main() {
         }
         Err(e) => panic!("Error encoding torrent: {e}"),
     }
+
+    CommandExit::Success.exit_code()
 }
