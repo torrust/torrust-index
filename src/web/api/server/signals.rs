@@ -26,10 +26,15 @@ pub async fn graceful_shutdown(
 ) {
     shutdown_signal_with_message(rx_halt, message).await;
 
-    info!("Sending graceful shutdown signal");
-    handle.graceful_shutdown(Some(Duration::from_secs(90)));
+    let graceful_shutdown_timeout = Duration::from_secs(90);
 
-    println!("!! shuting down in 90 seconds !!");
+    info!("Sending graceful shutdown signal");
+    handle.graceful_shutdown(Some(graceful_shutdown_timeout));
+
+    info!(
+        grace_period_seconds = graceful_shutdown_timeout.as_secs(),
+        "shutting down gracefully"
+    );
 
     loop {
         sleep(Duration::from_secs(1)).await;
@@ -38,7 +43,7 @@ pub async fn graceful_shutdown(
     }
 }
 
-/// Same as `shutdown_signal()`, but shows a message when it resolves.
+/// Same as `shutdown_signal()`, but logs a message when it resolves.
 pub async fn shutdown_signal_with_message(rx_halt: tokio::sync::oneshot::Receiver<Halted>, message: String) {
     shutdown_signal(rx_halt).await;
 

@@ -11,8 +11,8 @@ code, documentation, and regression tests.
 
 ## Current Implementation Status
 
-Stages 1 through 6 have landed for the shared Rust helper path and root command
-migrations:
+Stages 1 through 7 have landed for the shared Rust helper path, root command
+migrations, and command-reachable shared-library cleanup:
 
 - Stage 1 fixed the shared control-plane record shape, baseline exit classes,
   helper stdout schemas, and redaction helpers.
@@ -39,9 +39,13 @@ migrations:
   stdout side-effect contract, structured tracing diagnostics, and propagated
   command errors. The command-reachable tracker statistics and upgrade modules
   no longer emit raw stream output or terminal color formatting.
+- Stage 7 removed the remaining raw stream output from command-reachable shared
+  libraries. Server shutdown notices now use structured tracing diagnostics,
+  and mail template initialization errors are returned to callers for JSON
+  diagnostic reporting instead of printing or exiting from the mailer library.
 
-The container entry script, remaining shared-library cleanup, and regression
-guards remain future rollout stages unless their sections below say otherwise.
+The container entry script and regression guards remain future rollout stages
+unless their sections below say otherwise.
 
 ## Goal
 
@@ -314,6 +318,11 @@ Required changes:
 
 Update `src/main.rs` and the startup path used by `torrust-index`.
 
+Stage 7 status: implemented for command-reachable shared-library output cleanup.
+`src/web/api/server/signals.rs` now reports shutdown notices through structured
+tracing, and `src/mailer.rs` returns template initialization errors to callers
+instead of printing or exiting from the library.
+
 Required changes:
 
 - Install the JSON panic hook at process start.
@@ -473,11 +482,12 @@ Update operator documentation after the behavior changes.
 Current documentation status: the shared contract shape, helper stdout result
 schemas, expanded Rust CLI infrastructure, helper-binary wiring state,
 stage-four server logging / root `ExitCode` boundary state, the stage-five
-`parse_torrent` / `create_test_torrent` migration, and the stage-six root
-maintenance command migration have been documented. The container entry script
-is still a legacy output gap until its rollout stage lands; its documentation
-should describe the ADR-T-010 target contract without promising behaviour it
-does not yet implement.
+`parse_torrent` / `create_test_torrent` migration, the stage-six root
+maintenance command migration, and the stage-seven command-reachable
+shared-library cleanup have been documented. The container entry script is still
+a legacy output gap until its rollout stage lands; its documentation should
+describe the ADR-T-010 target contract without promising behaviour it does not
+yet implement.
 
 Documentation maintenance requirements:
 
@@ -549,10 +559,11 @@ summarizing results, following the repository test-running convention.
 
 ## Rollout Order
 
-Current status: steps 1 through 6 have landed. Documentation and changelog
+Current status: steps 1 through 7 have landed. Documentation and changelog
 entries for the shared-helper stages, the stage-four root logging /
 binary-boundary rollout, the stage-five root binary migration, and the stage-six
-root maintenance command migration have been updated. Later operator-visible
+root maintenance command migration, and the stage-seven shared-library cleanup
+have been updated. Later operator-visible
 migrations still need their own documentation and changelog updates when they
 land.
 

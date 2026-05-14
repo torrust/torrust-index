@@ -20,6 +20,7 @@
 //!     - [Development](#development)
 //! - [Configuration](#configuration)
 //! - [Usage](#usage)
+//!     - [Command-Line Output](#command-line-output)
 //!     - [API](#api)
 //!     - [Tracker Statistics Importer](#tracker-statistics-importer)
 //!     - [Upgrader](#upgrader)
@@ -224,6 +225,15 @@
 //! > **NOTICE**: You can also change the location for the configuration file with the `TORRUST_INDEX_CONFIG_TOML_PATH` env var.
 //!
 //! # Usage
+//!
+//! ## Command-Line Output
+//!
+//! ADR-T-010 classifies the `torrust-index` server as a no-stdout command:
+//! stdout remains empty, and server diagnostics are JSON records on stderr.
+//! Command-reachable libraries use the same path for operator-facing messages;
+//! shutdown notices are structured tracing records, and mail-template failures
+//! are propagated to callers for JSON diagnostic reporting instead of being
+//! printed or handled by exiting from the mailer library.
 //!
 //! ## API
 //!

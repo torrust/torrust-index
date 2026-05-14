@@ -123,11 +123,15 @@ error system (ADR-T-006), MSRV raised to 1.88.
   seeder, and upgrade paths now emit structured tracing diagnostics and
   propagate command failures instead of printing plain text or relying on panic
   output.
+- Command-reachable shared libraries no longer emit raw stream output for
+  shutdown and mail-template diagnostics. Server shutdown notices now go through
+  structured tracing, and mail template initialization failures are propagated
+  to callers instead of printing or exiting from the mailer library.
 - Operator documentation now describes the ADR-T-010 migration state: helper
   binaries have the JSON stdout contract, the server emits JSON tracing on
-  stderr, root Rust command migrations through stage six have their JSON stream
-  contracts, and the container entry script remains a legacy output gap until
-  its rollout stage lands.
+  stderr, root Rust command migrations and shared-library cleanup through stage
+  seven have their JSON stream contracts, and the container entry script remains
+  a legacy output gap until its rollout stage lands.
 
 ### ADR-T-009 — Container infrastructure refactor
 

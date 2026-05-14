@@ -413,6 +413,11 @@ configured `[logging].threshold` selects the default filter, and a non-empty
 `RUST_LOG` environment variable overrides that default. The server does not
 refuse terminal stdout, because it does not emit stdout result data.
 
+Command-reachable server libraries follow that same stream contract. Shutdown
+grace-period notices are structured tracing records, and mail-template
+initialization or rendering failures are returned to callers for JSON diagnostic
+reporting rather than printed or handled by exiting from the mailer library.
+
 Container helper binaries follow the ADR-T-010 stdout/stderr split. When they
 emit result data, stdout is exactly one JSON object with a trailing newline and
 a top-level `schema` field. Diagnostics, help, version output, argv errors, TTY

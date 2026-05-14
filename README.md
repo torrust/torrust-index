@@ -176,6 +176,12 @@ the default filter, and a non-empty `RUST_LOG` environment variable overrides
 that default. Panics that cross the binary boundary are reported as ADR-T-010
 JSON control-plane records on stderr.
 
+Command-reachable server libraries use the same diagnostic path. Shutdown
+grace-period notices are structured tracing records, and mail-template
+initialization or rendering failures are propagated to callers for JSON
+diagnostic reporting instead of being printed or exiting from the mailer
+library.
+
 The shared helper infrastructure now wraps `clap` help, version, and usage
 errors as JSON control-plane records on stderr, installs a JSON-only panic hook,
 and uses JSON tracing on stderr. The container helper binaries emit exactly one
