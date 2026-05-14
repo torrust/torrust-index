@@ -1,4 +1,13 @@
 //! Command line tool to parse a torrent file and emit the decoded torrent.
+//!
+//! ADR-T-010 classifies this as a stdout-result command: success emits one JSON
+//! object with `schema`, `torrent`, `original_v1_info_hash`, and
+//! `input_byte_length`; failures leave stdout empty and report JSON diagnostics
+//! on stderr. Direct terminal stdout is refused, so pipe or redirect the result.
+//!
+//! ```text
+//! cargo run --quiet --bin parse_torrent -- ./path/to/file.torrent | jq .
+//! ```
 
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;

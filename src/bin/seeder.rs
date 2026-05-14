@@ -1,7 +1,8 @@
 //! Program to upload random torrents to a live Index API.
 //!
 //! ADR-T-010 classifies this as a side-effect command: stdout remains empty and
-//! diagnostics are JSON records on stderr.
+//! diagnostics are JSON records on stderr. Scripts should branch on the process
+//! exit code and parse stderr as NDJSON when they need diagnostics.
 use std::process::ExitCode;
 
 use torrust_index::console::commands::seeder::app::{self, Args};

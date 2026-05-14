@@ -1,4 +1,13 @@
 //! Command line tool to create a test torrent file.
+//!
+//! ADR-T-010 classifies this as a no-stdout side-effect command: stdout remains
+//! empty, and status or diagnostic records are emitted as JSON/NDJSON on stderr.
+//! Capture stderr when automation needs the generated path or failure details.
+//!
+//! ```text
+//! cargo run --quiet --bin create_test_torrent -- ./output/test/torrents 2>create-test-torrent.ndjson
+//! jq . create-test-torrent.ndjson
+//! ```
 
 use std::fs::File;
 use std::io::Write;

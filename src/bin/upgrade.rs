@@ -1,9 +1,15 @@
 //! Upgrade command.
 //! It updates the application from version v1.0.0 to v2.0.0.
-//! You can execute it with: `cargo run --bin upgrade ./data.db ./data_v2.db ./uploads`.
+//! You can execute it with:
+//!
+//! ```text
+//! cargo run --quiet --bin upgrade -- ./data.db ./data_v2.db ./uploads 2>upgrade.ndjson
+//! jq . upgrade.ndjson
+//! ```
 //!
 //! ADR-T-010 classifies this as a side-effect command: stdout remains empty and
-//! diagnostics are JSON records on stderr.
+//! diagnostics are JSON records on stderr. Scripts should branch on the process
+//! exit code and parse stderr as NDJSON when they need diagnostics.
 use std::process::ExitCode;
 
 use clap::Parser;

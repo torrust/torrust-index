@@ -3,7 +3,8 @@
 //! # Usage
 //!
 //! ```bash
-//! cargo run --bin upgrade SOURCE_DB_FILE TARGET_DB_FILE TORRENT_UPLOAD_DIR
+//! cargo run --quiet --bin upgrade -- SOURCE_DB_FILE TARGET_DB_FILE TORRENT_UPLOAD_DIR 2>upgrade.ndjson
+//! jq . upgrade.ndjson
 //! ```
 //!
 //! Where:
@@ -15,11 +16,13 @@
 //! For example:
 //!
 //! ```bash
-//! cargo run --bin upgrade ./data.db ./data_v2.db ./uploads
+//! cargo run --quiet --bin upgrade -- ./data.db ./data_v2.db ./uploads 2>upgrade.ndjson
+//! jq . upgrade.ndjson
 //! ```
 //!
 //! ADR-T-010 classifies this as a side-effect command: stdout remains empty and
-//! diagnostics are JSON records on stderr.
+//! diagnostics are JSON records on stderr. Scripts should branch on the process
+//! exit code and parse stderr as NDJSON when they need diagnostics.
 //!
 //! This command was created to help users to migrate from version `v1.0.0` to
 //! `v2.0.0`. The main changes in version `v2.0.0` were:
@@ -108,7 +111,7 @@ pub async fn upgrade(args: &Arguments, date_imported: &str) -> Result<(), Upgrad
     info!("upgrade data from version v1.0.0 to v2.0.0 finished");
 
     info!(
-        command = "cargo run --bin import_tracker_statistics",
+        command = "cargo run --quiet --bin import_tracker_statistics -- 2>import-tracker-statistics.ndjson",
         "run the tracker statistics importer manually if you want all torrent statistics imported before normal execution"
     );
 

@@ -3,10 +3,16 @@
 //! It imports the number of seeders and leechers for all torrents from the
 //! associated tracker.
 //!
-//! You can execute it with: `cargo run --bin import_tracker_statistics`.
+//! You can execute it with:
+//!
+//! ```text
+//! cargo run --quiet --bin import_tracker_statistics -- 2>import-tracker-statistics.ndjson
+//! jq . import-tracker-statistics.ndjson
+//! ```
 //!
 //! ADR-T-010 classifies this as a side-effect command: stdout remains empty and
-//! diagnostics are JSON records on stderr.
+//! diagnostics are JSON records on stderr. Scripts should branch on the process
+//! exit code and parse stderr as NDJSON when they need diagnostics.
 //!
 //! Statistics are also imported:
 //!

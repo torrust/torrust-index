@@ -6,23 +6,27 @@
 //! Run with:
 //!
 //! ```text
-//! cargo run --bin seeder -- \
+//! cargo run --quiet --bin seeder -- \
 //!   --api-base-url <API_BASE_URL> \
 //!   --number-of-torrents <NUMBER_OF_TORRENTS> \
 //!   --user <USER> \
 //!   --password <PASSWORD> \
-//!   --interval <INTERVAL>
+//!   --interval <INTERVAL> \
+//!   2>seeder.ndjson
+//! jq . seeder.ndjson
 //! ```
 //!
 //! For example:
 //!
 //! ```text
-//! cargo run --bin seeder -- \
+//! cargo run --quiet --bin seeder -- \
 //!   --api-base-url "http://localhost:3001" \
 //!   --number-of-torrents 1000 \
 //!   --user admin \
 //!   --password 12345678 \
-//!   --interval 0
+//!   --interval 0 \
+//!   2>seeder.ndjson
+//! jq . seeder.ndjson
 //! ```
 //!
 //! That command would upload 1000 random torrents to the Index using the user

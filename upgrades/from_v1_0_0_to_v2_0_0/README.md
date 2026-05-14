@@ -7,7 +7,13 @@ To upgrade from version `v1.0.0` to `v2.0.0` you have to follow these steps:
 - Back up your current database and the `uploads` folder. You can find which database and upload folder are you using in the `Config.toml` file in the root folder of your installation.
 - Set up a local environment exactly as you have it in production with your production data (DB and torrents folder).
 - Run the application locally with: `cargo run`.
-- Execute the upgrader command: `cargo run --bin upgrade -- ./data.db ./data_v2.db ./uploads`
+- Execute the upgrader command and capture its JSON stderr diagnostics:
+
+```sh
+cargo run --quiet --bin upgrade -- ./data.db ./data_v2.db ./uploads 2>upgrade.ndjson
+jq . upgrade.ndjson
+```
+
 - A new SQLite file should have been created in the root folder: `data_v2.db`
 - Stop the running application and change the DB configuration to use the newly generated configuration:
 
@@ -32,7 +38,7 @@ it needs diagnostics. Usage failures, including invalid argv, exit with code 2;
 runtime upgrade failures exit with code 1.
 
 ```sh
-cargo run --bin upgrade -- ./data.db ./data_v2.db ./uploads 2>upgrade.ndjson
+cargo run --quiet --bin upgrade -- ./data.db ./data_v2.db ./uploads 2>upgrade.ndjson
 jq . upgrade.ndjson
 ```
 
