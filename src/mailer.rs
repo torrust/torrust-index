@@ -7,6 +7,7 @@ use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 use serde_json::value::{Value, to_value};
 use tera::{Context, Tera, try_get_value};
+use thiserror::Error;
 use tracing::error;
 
 use crate::config::Configuration;
@@ -19,7 +20,24 @@ use crate::web::api::server::v1::routes::API_VERSION_URL_PREFIX;
 /// Default verify-email template, compiled into the binary.
 const VERIFY_EMAIL_DEFAULT: &str = include_str!("../templates/verify.html");
 
-pub static TEMPLATES: LazyLock<Tera> = LazyLock::new(|| {
+pub(crate) static TEMPLATES: LazyLock<Result<Tera, MailTemplateError>> = LazyLock::new(build_templates);
+
+#[derive(Debug, Error)]
+pub(crate) enum MailTemplateError {
+    #[error("failed to read templates/verify.html: {source}")]
+    ReadOverride { source: std::io::Error },
+
+    #[error("failed to register email template: {source}")]
+    RegisterTemplate { source: tera::Error },
+
+    #[error("failed to initialize email templates: {message}")]
+    Initialize { message: String },
+
+    #[error("failed to render email template: {source}")]
+    Render { source: tera::Error },
+}
+
+fn build_templates() -> Result<Tera, MailTemplateError> {
     let mut tera = Tera::default();
 
     // Allow deployers to override the template by placing a file at
@@ -28,24 +46,16 @@ pub static TEMPLATES: LazyLock<Tera> = LazyLock::new(|| {
     let template = match std::fs::read_to_string("templates/verify.html") {
         Ok(contents) => contents,
         Err(err) if err.kind() == ErrorKind::NotFound => VERIFY_EMAIL_DEFAULT.to_string(),
-        Err(err) => {
-            error!(error = %err, "Failed to read templates/verify.html");
-            ::std::process::exit(1);
-        }
+        Err(source) => return Err(MailTemplateError::ReadOverride { source }),
     };
 
-    match tera.add_raw_template("html_verify_email", &template) {
-        Ok(()) => {}
-        Err(e) => {
-            println!("Parsing error(s): {e}");
-            ::std::process::exit(1);
-        }
-    }
+    tera.add_raw_template("html_verify_email", &template)
+        .map_err(|source| MailTemplateError::RegisterTemplate { source })?;
 
     tera.autoescape_on(vec![".html", ".sql"]);
     tera.register_filter("do_nothing", do_nothing_filter);
-    tera
-});
+    Ok(tera)
+}
 
 /// This function is a dummy filter for tera.
 ///
@@ -155,8 +165,8 @@ impl Service {
 }
 
 pub(crate) fn build_letter(verification_url: &str, username: &str, builder: MessageBuilder) -> Result<Message, UserError> {
-    let (plain_body, html_body) = build_content(verification_url, username).map_err(|e| {
-        tracing::error!("{e}");
+    let (plain_body, html_body) = build_content(verification_url, username).map_err(|error| {
+        error!(%error, "failed to build verification email content");
         UserError::InternalServerError
     })?;
 
@@ -178,7 +188,7 @@ pub(crate) fn build_letter(verification_url: &str, username: &str, builder: Mess
         .expect("the `multipart` builder had an error"))
 }
 
-pub(crate) fn build_content(verification_url: &str, username: &str) -> Result<(String, String), tera::Error> {
+pub(crate) fn build_content(verification_url: &str, username: &str) -> Result<(String, String), MailTemplateError> {
     let plain_body = format!(
         "
                 Welcome to Torrust, {username}!
@@ -192,7 +202,12 @@ pub(crate) fn build_content(verification_url: &str, username: &str) -> Result<(S
     let mut context = Context::new();
     context.insert("verification", &verification_url);
     context.insert("username", &username);
-    let html_body = TEMPLATES.render("html_verify_email", &context)?;
+    let templates = TEMPLATES.as_ref().map_err(|error| MailTemplateError::Initialize {
+        message: error.to_string(),
+    })?;
+    let html_body = templates
+        .render("html_verify_email", &context)
+        .map_err(|source| MailTemplateError::Render { source })?;
     Ok((plain_body, html_body))
 }
 

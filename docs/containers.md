@@ -405,6 +405,58 @@ failure rather than silent misbehaviour.
 
 ## Runtime Image Notes
 
+### Command-Line Output Contract
+
+The `torrust-index` server process is a no-stdout command. Once the Rust
+application starts, its tracing diagnostics are JSON records on stderr. The
+configured `[logging].threshold` selects the default filter, and a non-empty
+`RUST_LOG` environment variable overrides that default. The server does not
+refuse terminal stdout, because it does not emit stdout result data.
+
+Command-reachable server libraries follow that same stream contract. Shutdown
+grace-period notices are structured tracing records, and mail-template
+initialization or rendering failures are returned to callers for JSON diagnostic
+reporting rather than printed or handled by exiting from the mailer library.
+
+Container helper binaries follow the ADR-T-010 stdout/stderr split. When they
+emit result data, stdout is exactly one JSON object with a trailing newline and
+a top-level `schema` field. Diagnostics, help, version output, argv errors, TTY
+refusal, and panic reports are emitted on stderr as JSON records.
+
+The stdout-producing helpers are:
+
+- `torrust-index-auth-keypair`: `schema`, `private_key_pem`, `public_key_pem`.
+- `torrust-index-config-probe`: `schema`, `database`, `auth`.
+- `torrust-index-health-check`: `schema`, `target`, `status`, `elapsed_ms`.
+
+These helpers refuse to write stdout result data directly to a terminal. Pipe or
+redirect the result instead:
+
+```sh
+torrust-index-auth-keypair | jq .
+torrust-index-config-probe | jq .
+torrust-index-health-check http://127.0.0.1:3001/health_check | jq .
+```
+
+For helper diagnostics, a non-empty `RUST_LOG` environment variable takes
+precedence over `--debug`; otherwise `--debug` raises the helper's default
+diagnostic filter to debug. Help and version requests do not emit stdout result
+data and therefore do not trigger TTY refusal; they write JSON control-plane
+records to stderr and exit with code 0.
+
+The container entry script captures helper stdout internally and does not
+forward it to the terminal. Before it execs the application, the entry script is
+a no-stdout orchestration command: validation failures, status notices, expected
+utility failures, `jq` parsing failures, unexpected shell exits, and `DEBUG=1`
+phase records are emitted on stderr as one JSON object per line. The records use
+the shared `schema`, `command`, `kind`, `message`, and `fields` shape; the
+entry-script command name is `torrust-index-entry-script`.
+
+Expected utility stderr captured by the script is carried inside JSON fields
+instead of being forwarded as top-level stream text. Helper stdout remains inside
+command substitutions. File writes to `/etc/motd` and `/etc/profile` are not
+stream output.
+
 ### Healthcheck (both targets)
 
 Both `release` and `debug` ship the same two-probe `HEALTHCHECK`
@@ -439,9 +491,9 @@ the entry script needs at first boot:
 
 `su-exec` is a separate root-only binary at `/bin/su-exec`,
 not a busybox applet. `jq` is a separate root-only binary at
-`/usr/bin/jq` used by the entry script's auth-keypair
-bootstrap. None of these are reachable by the unprivileged
-`torrust` user.
+`/usr/bin/jq` used by the entry script's JSON diagnostics,
+config-probe parsing, and auth-keypair bootstrap. None of
+these are reachable by the unprivileged `torrust` user.
 
 There is no `/busybox/` directory in the release image — the
 full busybox applet tree from the upstream `:debug`
@@ -467,12 +519,17 @@ interactive shell as the application user.
 ### Entry Script Debugging
 
 The container entry script does not produce verbose output by default.
-To enable shell tracing (`set -x`) for startup troubleshooting, set the
-`DEBUG` environment variable:
+To emit JSON phase records for startup troubleshooting, set the `DEBUG`
+environment variable:
 
 ```sh
 --env DEBUG=1
 ```
+
+Debug records are written to stderr as ADR-T-010 JSON status records with
+`fields.level = "debug"`. The script no longer enables shell tracing with
+`set -x`, so automation should parse stderr as NDJSON rather than scrape shell
+trace lines.
 
 The entry script also runs under `set -eu` (POSIX `errexit` +
 `nounset`): any unchecked command failure aborts startup
@@ -516,8 +573,8 @@ above.
    — invoked as root after the default TOML is in place.
    The probe is the same loader the application uses, so it
    sees the operator's full TOML + env-var stack. Its JSON
-   output is consumed by `jq` and drives the remaining
-   steps. The probe runs *before* the script exports any
+  output (`schema`, `database`, `auth`) is consumed by `jq`
+  and drives the remaining steps. The probe runs *before* the script exports any
    `TORRUST_INDEX_CONFIG_OVERRIDE_*` of its own, so its
    output reflects only operator-supplied values.
 5. **`TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__{PRIVATE,PUBLIC}_KEY_{PEM,PATH}`**
@@ -576,23 +633,29 @@ in the repo wires both overrides for the local dev workflow
 Both runtime images ship a root-only `/usr/bin/jq` (mode
 `0500 root:root`, sourced from a pristine `rust:slim-trixie`
 `jq_donor` build stage in the Containerfile). It is invoked
-only during the entry script's pre-`su-exec` phase to parse
-the config probe's JSON output and the auth-keypair helper's
-JSON output. The unprivileged `torrust` user has no access
-to `/usr/bin/jq` after privilege drop.
+only during the entry script's pre-`su-exec` phase to emit
+properly escaped JSON diagnostics, parse the config probe's
+JSON output, and split the auth-keypair helper's JSON output.
+If `jq` is unavailable, the script emits a fixed minimal JSON
+diagnostic before exiting. The unprivileged `torrust` user has
+no access to `/usr/bin/jq` after privilege drop.
+
+Operators who run the helpers manually should use the same pattern: pipe stdout
+result data to `jq`, redirect it to a file, or capture it from another process.
+Direct terminal stdout is refused by design.
 
 #### Sourced Shell Library
 
-The entry script's pure helper functions (`inst`,
-`key_configured`, `validate_auth_keys`, `seed_sqlite`) live
-in a separate POSIX `sh` library shipped at
+The entry script's reusable POSIX `sh` helpers live in a
+separate library shipped at
 `/usr/local/lib/torrust/entry_script_lib_sh` (mode
 `0444 root:root`, sourced — not exec'd). Splitting them
 out lets the workspace test crate
 [`packages/index-entry-script/`](../packages/index-entry-script/)
-drive each helper through a host `sh` subprocess and assert
-the exit-code / stderr contracts of every branch of
-ADR-T-009 §7.1's auth-key invariants and §7.2's seeding
-outcomes. The library has no top-level side effects, so
-sourcing it from either the entry script or a test harness
-is safe.
+drive helpers such as `validate_auth_keys` and `seed_sqlite`
+through a host `sh` subprocess and assert their exit-code and
+JSON stderr contracts. The same library owns the entry script's
+JSON control-plane emitters, checked utility wrappers, `jq`
+read/write helpers, and unexpected-exit trap. It has no top-level
+side effects, so sourcing it from either the entry script or a test
+harness is safe.

@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)]
+
 //! API contract for `torrent` context.
 //!
 //! # Test modules

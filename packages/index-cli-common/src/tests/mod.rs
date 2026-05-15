@@ -8,6 +8,24 @@
 //! | `emit_to_real_stdout_succeeds`        | `emit` itself writes to the captured stdout.     |
 //! | `base_args_parses_default`            | `BaseArgs::debug` defaults to `false`.           |
 //! | `base_args_parses_long_flag`          | `--debug` flips `BaseArgs::debug` to `true`.     |
+//! | `command_exit_codes_match_contract`   | Baseline process statuses are fixed.             |
+//! | `control_record_serialises_shape`      | Shared stderr record shape is stable.            |
+//! | `json_line_writer_appends_newline`      | JSON record helper writes one complete line.     |
+//! | `usage_error_record_carries_fields`    | Usage records include exit code and clap kind.   |
+//! | `tty_refusal_record_carries_fields`    | TTY refusal records identify stdout and code 2.  |
+//! | `panic_record_omits_payload_without_debug` | Panic records hide payloads without debug.    |
+//! | `panic_record_carries_debug_payload`    | Panic records can expose string payloads.        |
+//! | `panic_payload_reporting_defaults_enabled_then_follows_debug_flag` | Startup payload gate behavior. |
+//! | `panic_payload_message_extracts_string_payloads` | String panic payloads are downcast.     |
+//! | `parse_args_from_returns_help_record`  | Clap help becomes JSON stderr control data.      |
+//! | `parse_args_from_returns_version_record` | Clap version becomes JSON stderr control data. |
+//! | `parse_args_from_returns_usage_record` | Clap argv errors become JSON usage records.      |
+//! | `tracing_filter_prefers_rust_log`      | `RUST_LOG` wins over `--debug`.                  |
+//! | `tracing_filter_uses_debug_flag`       | `--debug` selects debug without `RUST_LOG`.      |
+//! | `tracing_filter_uses_default_level`    | Default level is used last.                      |
+//! | `redacts_sensitive_field_values`       | Secret-like field names are hidden.              |
+//! | `redacts_database_url_secrets`         | DB credentials and query secrets are removed.    |
+//! | `keeps_public_key_fields_visible`      | Public key metadata is not treated as secret.    |
 //!
 //! `refuse_if_stdout_is_tty` and `init_json_tracing` mutate
 //! global process state (the `process::exit` path and the
@@ -18,12 +36,18 @@
 //! interferes with the rest of the test binary's output.
 
 use std::collections::BTreeMap;
+use std::ffi::OsStr;
 use std::io::{self, Write};
 
 use clap::Parser;
 use serde::Serialize;
+use serde_json::json;
 
-use crate::BaseArgs;
+use crate::{
+    BaseArgs, CONTROL_PLANE_SCHEMA, CommandExit, ControlPlaneFields, ControlPlaneRecord, ControlPlaneRecordKind, REDACTED,
+    StandardStream, TracingFilterSource, panic_payload_message_from_payload, panic_payload_reporting_enabled, parse_args_from,
+    redact_database_url, redact_field_value, set_panic_payload_reporting_enabled, tracing_filter_from_rust_log, write_json_line,
+};
 
 /// A `Write` that fails every call with `BrokenPipe`.
 ///
@@ -39,6 +63,17 @@ impl Write for FailingWriter {
     fn flush(&mut self) -> io::Result<()> {
         Err(io::Error::new(io::ErrorKind::BrokenPipe, "test: pipe closed"))
     }
+}
+
+#[derive(Parser)]
+#[command(name = "fixture-helper", version = "1.2.3", about = "Fixture helper")]
+#[allow(dead_code)]
+struct FixtureCli {
+    #[arg(long)]
+    name: Option<String>,
+
+    #[command(flatten)]
+    base: BaseArgs,
 }
 
 /// Pure helper that mirrors `emit` but writes to an arbitrary
@@ -130,4 +165,225 @@ fn base_args_parses_long_flag() {
 
     let parsed = Cli::try_parse_from(["prog", "--debug"]).expect("--debug is valid");
     assert!(parsed.base.debug);
+}
+
+#[test]
+fn command_exit_codes_match_contract() {
+    assert_eq!(CommandExit::Success.code(), 0);
+    assert_eq!(CommandExit::Failure.code(), 1);
+    assert_eq!(CommandExit::Usage.code(), 2);
+
+    assert_eq!(CommandExit::from_code(0), Some(CommandExit::Success));
+    assert_eq!(CommandExit::from_code(1), Some(CommandExit::Failure));
+    assert_eq!(CommandExit::from_code(2), Some(CommandExit::Usage));
+    assert_eq!(CommandExit::from_code(3), None);
+}
+
+#[test]
+fn control_record_serialises_shape() {
+    let record = ControlPlaneRecord::new("fixture", ControlPlaneRecordKind::Status, "ready", None);
+    let value = serde_json::to_value(record).unwrap();
+
+    assert_eq!(value["schema"], json!(CONTROL_PLANE_SCHEMA));
+    assert_eq!(value["command"], json!("fixture"));
+    assert_eq!(value["kind"], json!("status"));
+    assert_eq!(value["message"], json!("ready"));
+    assert!(value.get("fields").is_none());
+}
+
+#[test]
+fn json_line_writer_appends_newline() {
+    let record = ControlPlaneRecord::status("fixture", "ready");
+    let mut buf = Vec::new();
+
+    write_json_line(&mut buf, &record).expect("record should serialize");
+
+    assert!(buf.ends_with(b"\n"));
+    let line = std::str::from_utf8(&buf).expect("JSON must be UTF-8");
+    let value: serde_json::Value = serde_json::from_str(line).expect("record must be a JSON object");
+    assert_eq!(value["schema"], json!(CONTROL_PLANE_SCHEMA));
+    assert_eq!(value["kind"], json!("status"));
+}
+
+#[test]
+fn usage_error_record_carries_fields() {
+    let record = ControlPlaneRecord::usage_error("fixture", "unknown argument", "unknown_argument");
+
+    assert_eq!(record.kind, ControlPlaneRecordKind::UsageError);
+    assert_eq!(
+        record.fields,
+        Some(ControlPlaneFields::UsageError {
+            exit_code: CommandExit::Usage.code(),
+            clap_error_kind: "unknown_argument".to_string(),
+        })
+    );
+
+    let value = serde_json::to_value(record).unwrap();
+    assert_eq!(value["fields"]["type"], json!("usage_error"));
+    assert_eq!(value["fields"]["exit_code"], json!(2));
+}
+
+#[test]
+fn tty_refusal_record_carries_fields() {
+    let record = ControlPlaneRecord::tty_refusal("fixture");
+
+    assert_eq!(record.kind, ControlPlaneRecordKind::TtyRefusal);
+    assert_eq!(
+        record.fields,
+        Some(ControlPlaneFields::TtyRefusal {
+            exit_code: CommandExit::Usage.code(),
+            stream: StandardStream::Stdout,
+        })
+    );
+}
+
+#[test]
+fn panic_record_omits_payload_without_debug() {
+    let record = ControlPlaneRecord::panic("fixture", Some("main"), Some("src/main.rs:12:34"), None);
+    let value = serde_json::to_value(record).unwrap();
+
+    assert_eq!(value["kind"], json!("panic"));
+    assert_eq!(value["fields"]["type"], json!("panic"));
+    assert_eq!(value["fields"]["exit_code"], json!(1));
+    assert_eq!(value["fields"]["thread"], json!("main"));
+    assert!(value["fields"].get("payload").is_none());
+}
+
+#[test]
+fn panic_record_carries_debug_payload() {
+    let record = ControlPlaneRecord::panic(
+        "fixture",
+        Some("main"),
+        Some("src/main.rs:12:34"),
+        Some("panic with \"quoted\" detail"),
+    );
+    let line = serde_json::to_string(&record).unwrap();
+
+    assert!(line.contains(r#""payload":"panic with \"quoted\" detail""#));
+
+    let value: serde_json::Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(value["fields"]["payload"], json!("panic with \"quoted\" detail"));
+}
+
+#[test]
+fn panic_payload_reporting_defaults_enabled_then_follows_debug_flag() {
+    assert!(panic_payload_reporting_enabled());
+
+    set_panic_payload_reporting_enabled(false);
+    assert!(!panic_payload_reporting_enabled());
+
+    set_panic_payload_reporting_enabled(true);
+    assert!(panic_payload_reporting_enabled());
+}
+
+#[test]
+fn panic_payload_message_extracts_string_payloads() {
+    let borrowed_payload: &(dyn std::any::Any + Send) = &"borrowed panic";
+    let owned_payload: &(dyn std::any::Any + Send) = &String::from("owned panic");
+    let numeric_payload: &(dyn std::any::Any + Send) = &1_u8;
+
+    assert_eq!(panic_payload_message_from_payload(borrowed_payload), Some("borrowed panic"));
+    assert_eq!(panic_payload_message_from_payload(owned_payload), Some("owned panic"));
+    assert_eq!(panic_payload_message_from_payload(numeric_payload), None);
+}
+
+#[test]
+fn parse_args_from_returns_help_record() {
+    let Err(exit) = parse_args_from::<FixtureCli, _, _>(["fixture-helper", "--help"]) else {
+        panic!("help should stop parsing");
+    };
+
+    assert_eq!(exit.exit, CommandExit::Success);
+    assert_eq!(exit.record.command, "fixture-helper");
+    assert_eq!(exit.record.kind, ControlPlaneRecordKind::Help);
+
+    let Some(ControlPlaneFields::Help { text }) = exit.record.fields else {
+        panic!("help record should carry help text");
+    };
+    assert!(text.contains("Fixture helper"));
+    assert!(text.contains("--debug"));
+}
+
+#[test]
+fn parse_args_from_returns_version_record() {
+    let Err(exit) = parse_args_from::<FixtureCli, _, _>(["fixture-helper", "--version"]) else {
+        panic!("version should stop parsing");
+    };
+
+    assert_eq!(exit.exit, CommandExit::Success);
+    assert_eq!(exit.record.command, "fixture-helper");
+    assert_eq!(exit.record.kind, ControlPlaneRecordKind::Version);
+
+    let Some(ControlPlaneFields::Version { version }) = exit.record.fields else {
+        panic!("version record should carry version text");
+    };
+    assert_eq!(version, "fixture-helper 1.2.3");
+}
+
+#[test]
+fn parse_args_from_returns_usage_record() {
+    let Err(exit) = parse_args_from::<FixtureCli, _, _>(["fixture-helper", "--no-such-flag"]) else {
+        panic!("unknown flags should stop parsing");
+    };
+
+    assert_eq!(exit.exit, CommandExit::Usage);
+    assert_eq!(exit.record.command, "fixture-helper");
+    assert_eq!(exit.record.kind, ControlPlaneRecordKind::UsageError);
+    assert!(exit.record.message.contains("--no-such-flag"));
+
+    let Some(ControlPlaneFields::UsageError {
+        exit_code,
+        clap_error_kind,
+    }) = exit.record.fields
+    else {
+        panic!("usage record should carry usage fields");
+    };
+    assert_eq!(exit_code, CommandExit::Usage.code());
+    assert_eq!(clap_error_kind, "unknown_argument");
+}
+
+#[test]
+fn tracing_filter_prefers_rust_log() {
+    let filter = tracing_filter_from_rust_log(Some(OsStr::new("warn,tower_http=debug")), true, tracing::Level::INFO);
+
+    assert_eq!(filter.directive, "warn,tower_http=debug");
+    assert_eq!(filter.source, TracingFilterSource::RustLog);
+}
+
+#[test]
+fn tracing_filter_uses_debug_flag() {
+    let filter = tracing_filter_from_rust_log(Some(OsStr::new("   ")), true, tracing::Level::INFO);
+
+    assert_eq!(filter.directive, "debug");
+    assert_eq!(filter.source, TracingFilterSource::DebugFlag);
+}
+
+#[test]
+fn tracing_filter_uses_default_level() {
+    let filter = tracing_filter_from_rust_log(None, false, tracing::Level::WARN);
+
+    assert_eq!(filter.directive, "warn");
+    assert_eq!(filter.source, TracingFilterSource::DefaultLevel);
+}
+
+#[test]
+fn redacts_sensitive_field_values() {
+    assert_eq!(redact_field_value("tracker.token", "MyAccessToken"), REDACTED);
+    assert_eq!(redact_field_value("smtp_password", "secret"), REDACTED);
+    assert_eq!(redact_field_value("auth.private_key_pem", "PEM"), REDACTED);
+}
+
+#[test]
+fn redacts_database_url_secrets() {
+    let redacted = redact_database_url("mysql://user:pass@example.test/db?ssl-mode=required&token=abc&password=def");
+
+    assert_eq!(redacted, "mysql://example.test/db?ssl-mode=required");
+}
+
+#[test]
+fn keeps_public_key_fields_visible() {
+    assert_eq!(
+        redact_field_value("auth.public_key_path", "/etc/torrust/public.pem"),
+        "/etc/torrust/public.pem"
+    );
 }

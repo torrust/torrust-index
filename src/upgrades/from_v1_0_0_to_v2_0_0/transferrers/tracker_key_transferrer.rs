@@ -1,22 +1,40 @@
 use std::sync::Arc;
 
+use tracing::info;
+
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::SqliteDatabaseV2_0_0;
+use crate::upgrades::from_v1_0_0_to_v2_0_0::error::UpgradeError;
 
-#[allow(clippy::missing_panics_doc)]
-pub async fn transfer_tracker_keys(source_database: Arc<SqliteDatabaseV1_0_0>, target_database: Arc<SqliteDatabaseV2_0_0>) {
-    println!("Transferring tracker keys ...");
+/// Transfer tracker keys from the source database to the target database.
+///
+/// # Errors
+///
+/// Returns an error if reading, inserting, or validating copied tracker-key data
+/// fails.
+pub async fn transfer_tracker_keys(
+    source_database: Arc<SqliteDatabaseV1_0_0>,
+    target_database: Arc<SqliteDatabaseV2_0_0>,
+) -> Result<(), UpgradeError> {
+    info!("transferring tracker keys");
 
     // Transfer table `torrust_tracker_keys`
 
-    let tracker_keys = source_database.get_tracker_keys().await.unwrap();
+    let tracker_keys = source_database
+        .get_tracker_keys()
+        .await
+        .map_err(|source| UpgradeError::Sqlx {
+            context: "failed to read source tracker keys",
+            source,
+        })?;
 
     for tracker_key in &tracker_keys {
         // [v2] table torrust_tracker_keys
 
-        println!(
-            "[v2][torrust_users] adding the tracker key with id {:?} ...",
-            tracker_key.key_id
+        info!(
+            tracker_key_id = tracker_key.key_id,
+            user_id = tracker_key.user_id,
+            "adding tracker key"
         );
 
         let id = target_database
@@ -27,17 +45,25 @@ pub async fn transfer_tracker_keys(source_database: Arc<SqliteDatabaseV1_0_0>, t
                 tracker_key.valid_until,
             )
             .await
-            .unwrap();
+            .map_err(|source| UpgradeError::Sqlx {
+                context: "failed to insert tracker key",
+                source,
+            })?;
 
-        assert!(
-            id == tracker_key.key_id,
-            "Error copying tracker key {:?} from source DB to the target DB",
-            tracker_key.key_id
-        );
+        if id != tracker_key.key_id {
+            return Err(UpgradeError::IdMismatch {
+                entity: "tracker key",
+                expected: tracker_key.key_id,
+                actual: id,
+            });
+        }
 
-        println!(
-            "[v2][torrust_tracker_keys] tracker key with id {:?} added.",
-            tracker_key.key_id
+        info!(
+            tracker_key_id = tracker_key.key_id,
+            user_id = tracker_key.user_id,
+            "tracker key added"
         );
     }
+
+    Ok(())
 }

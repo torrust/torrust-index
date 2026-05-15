@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-**Highlights:** container infrastructure refactor (ADR-T-009),
+**Highlights:** global command-line output contract (ADR-T-010),
+container infrastructure refactor (ADR-T-009),
 native role-based authorization replacing Casbin (ADR-T-008),
 RSA-signed JWTs with revocation support (ADR-T-007), domain-scoped
 error system (ADR-T-006), MSRV raised to 1.88.
@@ -15,6 +16,23 @@ error system (ADR-T-006), MSRV raised to 1.88.
 ### Breaking changes
 
 - MSRV raised from 1.85 to 1.88.
+- First-party command-line entrypoints are now governed by ADR-T-010's
+  JSON-only output contract. Stdout is reserved for machine-readable result
+  data, stderr is reserved for machine-readable diagnostics/control records, and
+  stdout-producing commands refuse direct terminal stdout. `parse_torrent` now
+  emits JSON result data on stdout. `create_test_torrent`,
+  `import_tracker_statistics`, `seeder`, and `upgrade` now keep stdout empty
+  while reporting status and diagnostics as JSON on stderr. The container entry
+  script also reports validation failures, status records, utility failures, and
+  debug phase records as JSON/NDJSON on stderr instead of plain text or shell
+  trace output. Scripts that scraped previous plain-text command or startup
+  output must switch to exit codes and JSON/NDJSON stderr parsing.
+- The `torrust-index` server's application logs now use JSON records on stderr
+  instead of the previous human-formatted tracing output. Log consumers should
+  parse stderr as NDJSON or pipe it through a JSON viewer.
+- `torrust-index-auth-keypair` and `torrust-index-health-check` stdout JSON now
+  includes a top-level `schema` field. Scripts that expected an exact object
+  shape must tolerate or consume the schema field.
 - `database.connect_url` and `tracker.token` are now mandatory
   schema fields with no defaults. Supply them via env-var override
   (`TORRUST_INDEX_CONFIG_OVERRIDE_DATABASE__CONNECT_URL`,
@@ -57,6 +75,56 @@ error system (ADR-T-006), MSRV raised to 1.88.
   domain-scoped enums: `AuthError`, `UserError`, `TorrentError`,
   `CategoryTagError`, with a thin `ApiError` wrapper (ADR-T-006).
 
+### ADR-T-010 — Global command-line output contract
+
+#### Added
+
+- ADR-T-010 establishes a repository-wide JSON-only output contract for
+  first-party command-line entrypoints. Stdout is reserved for result data;
+  stderr carries diagnostics and control records; commands that emit stdout
+  result data refuse direct terminal stdout.
+- `torrust-index-cli-common` provides the shared implementation for that
+  contract: JSON `clap` help/version/usage handling, JSON panic diagnostics,
+  JSON stderr tracing, TTY refusal, stdout JSON emission, command runners,
+  baseline exit-code classes, control-plane record types, and redaction
+  helpers.
+- Regression coverage now protects the contract with CLI behavior tests,
+  binary-boundary checks, and workspace lint rules denying accidental raw
+  stream output or direct process exits outside the shared CLI boundary.
+
+#### Changed
+
+- Helper binaries (`torrust-index-auth-keypair`,
+  `torrust-index-config-probe`, and `torrust-index-health-check`) share the
+  JSON CLI boundary. Their successful stdout payloads remain single JSON
+  objects, now explicitly versioned with a top-level `schema` field, while
+  help, version, argv errors, TTY refusal, panic diagnostics, and tracing are
+  emitted as JSON records on stderr.
+- The `torrust-index` server and root Rust binaries return explicit
+  `ExitCode` values at their `main` boundaries and install the shared JSON
+  panic hook. Central application logging uses JSON tracing on stderr, with a
+  non-empty `RUST_LOG` taking precedence over the configured default filter.
+- `parse_torrent` is a stdout-result command. It emits one JSON object with
+  `schema`, `torrent`, `original_v1_info_hash`, and `input_byte_length`, leaves
+  stdout empty on failure, and refuses direct terminal stdout with a JSON
+  diagnostic record.
+- `create_test_torrent`, `import_tracker_statistics`, `seeder`, and `upgrade`
+  are no-stdout side-effect commands. They keep stdout empty, report status and
+  diagnostics as JSON/NDJSON on stderr, and propagate command failures instead
+  of printing plain text or relying on panic output.
+- Command-reachable shared libraries use the command diagnostic path instead of
+  raw stream output. Shutdown notices are structured tracing records, mail
+  template failures are returned to callers, terminal color formatting is
+  removed from command paths, and parsing helpers leave reporting decisions to
+  their command callers.
+- The container entry script follows the JSON stderr contract during startup:
+  it captures helper stdout internally, keeps its own stdout empty before
+  `su-exec`, checks for `jq` before JSON-dependent helpers run, emits explicit
+  `DEBUG=1` phase records instead of `set -x`, and wraps controlled utility
+  failures with captured stderr fields.
+- Operator documentation and command examples describe the completed contract
+  across the README, container guide, upgrade notes, and command module docs.
+
 ### ADR-T-009 — Container infrastructure refactor
 
 #### Added
@@ -67,7 +135,7 @@ error system (ADR-T-006), MSRV raised to 1.88.
   configuration system. Leaf crate — no `tokio`, `reqwest`, `sqlx`,
   `hyper`, `rustls`, `native-tls`, or `openssl` in its dep closure.
 - Helper-binary crates split into leaves with no HTTP/TLS in their
-  dep closure: `torrust-index-cli-common` (shared P9 scaffolding —
+  dep closure: `torrust-index-cli-common` (shared ADR-T-010 scaffolding —
   `refuse_if_stdout_is_tty`, `init_json_tracing`, `emit`, `BaseArgs`),
   `torrust-index-health-check` (stdlib-only, Happy Eyeballs IPv6/IPv4
   fallback), `torrust-index-auth-keypair` (RSA-2048 key generator),
@@ -126,7 +194,7 @@ error system (ADR-T-006), MSRV raised to 1.88.
 - `EXPOSE ${IMPORTER_API_PORT}/tcp` in Containerfile; port 3002
   mapped in compose.
 - `restart: unless-stopped` on index and tracker compose services.
-- `DEBUG=1` env-var gate for entry-script shell tracing (`set -x`).
+- `DEBUG=1` env-var gate for entry-script JSON phase diagnostics.
 - `#[doc(hidden)] pub mod test_helpers` in `torrust-index-config`
   exposing `PLACEHOLDER_TOML` and `placeholder_settings()` — single
   source of truth for the ~40 tests across both crates that
@@ -391,8 +459,8 @@ error system (ADR-T-006), MSRV raised to 1.88.
 
 - Dev-only ports (MySQL 3306, tracker 6969/7070/1212, mailcatcher
   1025/1080) no longer bind to `0.0.0.0`; bound to `127.0.0.1`.
-- Entry script `set -x` gated behind `DEBUG=1` to avoid leaking
-  env vars into logs.
+- Entry script debug mode now emits structured JSON phase records instead of
+  enabling `set -x`, avoiding shell-trace leakage of env vars into logs.
 - Compose credentials annotated as DEV-ONLY with TODO for Docker
   secrets migration (ADR-T-009 §S1).
 

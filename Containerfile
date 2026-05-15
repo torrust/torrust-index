@@ -12,7 +12,7 @@ RUN cargo binstall --no-confirm --locked cargo-chef cargo-nextest
 FROM rust:slim-trixie AS tester
 WORKDIR /tmp
 
-RUN apt-get update; apt-get install -y curl sqlite3; apt-get autoclean
+RUN apt-get update; apt-get install -y curl jq sqlite3; apt-get autoclean
 RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/v1.18.1/install-from-binstall-release.sh | bash
 RUN cargo binstall --no-confirm --locked cargo-nextest imdl
 
@@ -80,6 +80,12 @@ RUN cargo chef prepare --recipe-path /build/recipe.json
 ## Cook (debug)
 FROM chef AS dependencies_debug
 WORKDIR /build/src
+# The debug archive stage holds both the Cargo target directory and the
+# nextest archive in one layer. Full debuginfo makes that layer exceed
+# common builder storage limits while not changing the test surface.
+ENV CARGO_INCREMENTAL=0 \
+  CARGO_PROFILE_DEV_DEBUG=0 \
+  CARGO_PROFILE_TEST_DEBUG=0
 COPY --from=recipe /build/recipe.json /build/recipe.json
 RUN cargo chef cook --workspace --all-targets --all-features --recipe-path /build/recipe.json
 RUN cargo nextest archive --workspace --all-targets --all-features --archive-file /build/temp.tar.zst ; rm -f /build/temp.tar.zst
@@ -97,6 +103,13 @@ FROM dependencies_debug AS build_debug
 WORKDIR /build/src
 COPY . /build/src
 RUN cargo nextest archive --workspace --all-targets --all-features --archive-file /build/torrust-index-debug.tar.zst
+
+## Build Runtime Binary (debug)
+FROM dependencies_debug AS build_debug_runtime
+WORKDIR /build/src
+COPY . /build/src
+RUN unset CARGO_PROFILE_DEV_DEBUG CARGO_PROFILE_TEST_DEBUG; \
+  cargo build --package torrust-index --all-features --bin torrust-index
 
 ## Build Archive (release)
 FROM dependencies AS build
@@ -314,6 +327,8 @@ ENV TORRUST_INDEX_CONFIG_TOML_PATH=/etc/torrust/index/index.toml \
 EXPOSE 3001/tcp 3002/tcp
 VOLUME ["/var/lib/torrust/index","/var/log/torrust/index","/etc/torrust/index"]
 COPY --from=test_debug /app/ /usr/
+COPY --from=build_debug_runtime --chmod=0755 --chown=0:0 \
+  /build/src/target/debug/torrust-index /usr/bin/torrust-index
 # jq binary for entry-script JSON consumption (§2.2 step 4).
 # Root-only (0500) — same posture as busybox and su-exec.
 # The two shared libraries (libjq, libonig) are required at

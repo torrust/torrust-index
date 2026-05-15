@@ -1,66 +1,32 @@
 //! Setup for the application logging.
-//!
-//! - `Off`
-//! - `Error`
-//! - `Warn`
-//! - `Info`
-//! - `Debug`
-//! - `Trace`
-use std::sync::Once;
-
-use tracing::info;
+use torrust_index_cli_common::init_json_tracing;
 use tracing::level_filters::LevelFilter;
+use tracing::{Level, info};
 
 use crate::config::Threshold;
-
-static INIT: Once = Once::new();
 
 pub fn setup(threshold: &Threshold) {
     let tracing_level_filter: LevelFilter = threshold.clone().into();
 
-    if tracing_level_filter == LevelFilter::OFF {
-        return;
-    }
-
-    INIT.call_once(|| {
-        tracing_stdout_init(tracing_level_filter, &TraceStyle::Default);
-    });
+    setup_level_filter(tracing_level_filter);
 }
 
-fn tracing_stdout_init(filter: LevelFilter, style: &TraceStyle) {
-    let builder = tracing_subscriber::fmt().with_max_level(filter);
-
-    let () = match style {
-        TraceStyle::Default => builder.init(),
-        TraceStyle::Pretty(display_filename) => builder.pretty().with_file(*display_filename).init(),
-        TraceStyle::Compact => builder.compact().init(),
-        TraceStyle::Json => builder.json().init(),
+pub fn setup_level_filter(filter: LevelFilter) {
+    let Some(level) = level_from_filter(filter) else {
+        return;
     };
 
+    init_json_tracing(level);
     info!("Logging initialized");
 }
 
-#[derive(Debug)]
-pub enum TraceStyle {
-    Default,
-    Pretty(bool),
-    Compact,
-    Json,
-}
-
-impl std::fmt::Display for TraceStyle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let style = match self {
-            Self::Default => "Default Style",
-            Self::Pretty(path) => match path {
-                true => "Pretty Style with File Paths",
-                false => "Pretty Style without File Paths",
-            },
-
-            Self::Compact => "Compact Style",
-            Self::Json => "Json Format",
-        };
-
-        f.write_str(style)
+const fn level_from_filter(filter: LevelFilter) -> Option<Level> {
+    match filter {
+        LevelFilter::OFF => None,
+        LevelFilter::ERROR => Some(Level::ERROR),
+        LevelFilter::WARN => Some(Level::WARN),
+        LevelFilter::INFO => Some(Level::INFO),
+        LevelFilter::DEBUG => Some(Level::DEBUG),
+        LevelFilter::TRACE => Some(Level::TRACE),
     }
 }

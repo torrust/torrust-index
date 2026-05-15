@@ -1,3 +1,5 @@
+#![allow(clippy::print_stdout)]
+
 use std::str::FromStr;
 
 use bittorrent_primitives::info_hash::InfoHash;

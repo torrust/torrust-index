@@ -52,6 +52,7 @@ opt-level = 3
 opt-level = 3
 
 [dependencies]
+torrust-index-cli-common = { version = "4.0.0-develop", path = "packages/index-cli-common" }
 torrust-index-config = { version = "4.0.0-develop", path = "packages/index-config" }
 torrust-index-render-text-as-image = { version = "0.1.0", path = "packages/render-text-as-image" }
 
@@ -100,14 +101,12 @@ sha-1 = "0"
 sha2 = "0"
 sqlx = { version = "0", features = ["migrate", "mysql", "runtime-tokio-native-tls", "sqlite", "time"] }
 tera = { version = "1", default-features = false }
-text-colorizer = "1"
 thiserror = "2"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "1"
 tower = { version = "0", features = ["timeout"] }
 tower-http = { version = "0", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
 tracing = "0"
-tracing-subscriber = { version = "0", features = ["json"] }
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }
@@ -139,9 +138,12 @@ warnings = { level = "deny", priority = -1 }
 all = { level = "deny", priority = -1 }
 complexity = { level = "deny", priority = -1 }
 correctness = { level = "deny", priority = -1 }
+exit = { level = "deny", priority = 0 }
 nursery = { level = "warn", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
 perf = { level = "deny", priority = -1 }
+print_stderr = { level = "deny", priority = 0 }
+print_stdout = { level = "deny", priority = 0 }
 style = { level = "deny", priority = -1 }
 suspicious = { level = "deny", priority = -1 }
 

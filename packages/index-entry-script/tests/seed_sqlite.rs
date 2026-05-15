@@ -7,21 +7,21 @@
 //!
 //! | Test                           | Outcome                          |
 //! |--------------------------------|----------------------------------|
-//! | `empty_path_errors`            | exit 1 with "database.path is empty" |
-//! | `memory_path_skips`            | exit 0 with INFO line            |
-//! | `relative_path_skips`          | exit 0 with WARN line            |
+//! | `empty_path_errors`            | exit 1 with JSON diagnostic      |
+//! | `memory_path_skips`            | exit 0 with JSON info status     |
+//! | `relative_path_skips`          | exit 0 with JSON warning status  |
 //! | `nonempty_absolute_untouched`  | exit 0, file bytes unchanged     |
-//! | `outside_volumes_errors`       | exit 1 with "outside the … volumes" |
+//! | `outside_volumes_errors`       | exit 1 with JSON diagnostic      |
 //!
 //! The "missing-under-volume seeded" outcome (mkdir + `inst()`
 //! into `/var/lib/torrust/index/`) requires root and the
 //! container's `torrust` user; it is exercised by the
-//! container e2e suite (Phase 8/9).
+//! container e2e suite.
 
 use std::fs;
 
 use tempfile::TempDir;
-use torrust_index_entry_script::run_sh_with_args;
+use torrust_index_entry_script::{assert_entry_script_record, run_sh_with_args, single_stderr_json_record};
 
 const SNIPPET: &str = "seed_sqlite \"$1\"";
 
@@ -29,10 +29,11 @@ const SNIPPET: &str = "seed_sqlite \"$1\"";
 fn empty_path_errors() {
     let out = run_sh_with_args(SNIPPET, &[""]);
     assert_eq!(out.status.code(), Some(1), "expected exit 1");
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("database.path is empty"),
-        "missing diagnostic; stderr={stderr}",
+    let record = single_stderr_json_record(&out);
+    assert_entry_script_record(&record, "diagnostic", "error", "database.path is empty");
+    assert_eq!(
+        record.pointer("/fields/exit_code").and_then(serde_json::Value::as_u64),
+        Some(1)
     );
 }
 
@@ -45,11 +46,8 @@ fn memory_path_skips() {
         out.status.code(),
         String::from_utf8_lossy(&out.stderr),
     );
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("INFO") && stderr.contains(":memory:"),
-        "missing INFO/:memory: line; stderr={stderr}",
-    );
+    let record = single_stderr_json_record(&out);
+    assert_entry_script_record(&record, "status", "info", ":memory:");
 }
 
 #[test]
@@ -61,11 +59,8 @@ fn relative_path_skips() {
         out.status.code(),
         String::from_utf8_lossy(&out.stderr),
     );
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("WARN") && stderr.contains("relative SQLite path"),
-        "missing WARN/relative line; stderr={stderr}",
-    );
+    let record = single_stderr_json_record(&out);
+    assert_entry_script_record(&record, "status", "warn", "relative SQLite path");
 }
 
 #[test]
@@ -101,9 +96,10 @@ fn outside_volumes_errors() {
     let out = run_sh_with_args(SNIPPET, &[path_str]);
 
     assert_eq!(out.status.code(), Some(1), "expected exit 1");
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        stderr.contains("outside the") && stderr.contains("volumes"),
-        "missing volumes-guard diagnostic; stderr={stderr}",
+    let record = single_stderr_json_record(&out);
+    assert_entry_script_record(&record, "diagnostic", "error", "outside the volumes");
+    assert_eq!(
+        record.pointer("/fields/exit_code").and_then(serde_json::Value::as_u64),
+        Some(1)
     );
 }

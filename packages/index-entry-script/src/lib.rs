@@ -7,7 +7,7 @@
 //! The crate ships **no runtime code** of its own — it exists
 //! purely as a home for `tests/` that invoke `sh` as a
 //! subprocess against the shell library and assert exit
-//! codes / stderr contents. This keeps the tests inside
+//! codes / JSON stderr records. This keeps the tests inside
 //! `cargo test --workspace` (so CI runs them automatically)
 //! while the helpers themselves remain POSIX `sh`, since they
 //! must run inside the distroless busybox runtime where Rust
@@ -36,11 +36,13 @@
 //!   `TORRUST_INDEX_CONFIG_OVERRIDE_AUTH__*_PATH` plus key
 //!   materialisation against the real generator.
 //!
-//! Both belong in the container e2e suite (Phase 8 / 9).
+//! Both belong in the container e2e suite.
 
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 use std::sync::OnceLock;
+
+use serde_json::Value;
 
 /// Contents of the shell library, embedded at compile time.
 ///
@@ -157,4 +159,65 @@ pub fn run_sh_with_args(snippet: &str, args: &[&str]) -> Output {
         cmd.arg(a);
     }
     cmd.output().expect("failed to spawn sh; is /bin/sh available?")
+}
+
+/// Parse every stderr line as one JSON record.
+///
+/// # Panics
+///
+/// Panics when any non-empty stderr line is not valid JSON.
+#[doc(hidden)]
+#[must_use]
+pub fn stderr_json_records(output: &Output) -> Vec<Value> {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    stderr
+        .lines()
+        .filter(|line| !line.is_empty())
+        .map(|line| serde_json::from_str(line).unwrap_or_else(|error| panic!("stderr line is not JSON: {line}; error: {error}")))
+        .collect()
+}
+
+/// Return the single JSON record emitted on stderr.
+///
+/// # Panics
+///
+/// Panics when stderr does not contain exactly one JSON record.
+#[doc(hidden)]
+#[must_use]
+pub fn single_stderr_json_record(output: &Output) -> Value {
+    let records = stderr_json_records(output);
+    assert_eq!(
+        records.len(),
+        1,
+        "expected exactly one stderr JSON record; stderr={}",
+        String::from_utf8_lossy(&output.stderr),
+    );
+    records.into_iter().next().expect("one record was asserted above")
+}
+
+/// Assert the common entry-script JSON control-plane fields.
+///
+/// # Panics
+///
+/// Panics when the record does not match the entry-script contract or
+/// the message does not contain `message_needle`.
+#[doc(hidden)]
+pub fn assert_entry_script_record(record: &Value, kind: &str, level: &str, message_needle: &str) {
+    assert_eq!(record.get("schema").and_then(Value::as_u64), Some(1));
+    assert_eq!(
+        record.get("command").and_then(Value::as_str),
+        Some("torrust-index-entry-script"),
+    );
+    assert_eq!(record.get("kind").and_then(Value::as_str), Some(kind));
+    assert_eq!(record.pointer("/fields/type").and_then(Value::as_str), Some("entry_script"),);
+    assert_eq!(record.pointer("/fields/level").and_then(Value::as_str), Some(level));
+
+    let message = record
+        .get("message")
+        .and_then(Value::as_str)
+        .expect("record message must be a string");
+    assert!(
+        message.contains(message_needle),
+        "expected message containing {message_needle:?}; got {message:?}",
+    );
 }

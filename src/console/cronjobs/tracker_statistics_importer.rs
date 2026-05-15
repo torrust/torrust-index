@@ -18,7 +18,6 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
-use text_colorizer::Colorize;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info};
@@ -37,9 +36,10 @@ struct ImporterState {
     pub torrent_info_update_interval: u64,
 }
 
-/// # Panics
+/// Start the tracker statistics importer launcher task.
 ///
-/// Will panic if it can't start the tracker statistics importer API
+/// Startup failures inside the spawned importer API task are logged as tracing
+/// diagnostics and stop that task.
 #[must_use]
 pub fn start(
     importer_port: u16,
@@ -70,13 +70,25 @@ pub fn start(
 
             info!("Tracker statistics importer API server listening on http://{}", addr); // # DevSkim: ignore DS137138
 
-            let socket_addr: SocketAddr = addr.parse().expect("importer API to have a valid socket address");
+            let socket_addr: SocketAddr = match addr.parse() {
+                Ok(socket_addr) => socket_addr,
+                Err(error) => {
+                    error!(%error, %addr, "invalid importer API socket address");
+                    return;
+                }
+            };
 
-            let listener = TcpListener::bind(socket_addr)
-                .await
-                .expect("importer API TCP listener to bind to socket address");
+            let listener = match TcpListener::bind(socket_addr).await {
+                Ok(listener) => listener,
+                Err(error) => {
+                    error!(%error, %socket_addr, "failed to bind importer API TCP listener");
+                    return;
+                }
+            };
 
-            axum::serve(listener, app).await.unwrap();
+            if let Err(error) = axum::serve(listener, app).await {
+                error!(%error, "importer API server stopped with an error");
+            }
         });
 
         // Start the Importer cronjob
@@ -119,17 +131,20 @@ pub fn start(
 
             match weak_tracker_statistics_importer.upgrade() {
                 Some(statistics_importer) => {
-                    let one_interval_ago = seconds_ago_utc(
-                        torrent_stats_update_interval
-                            .try_into()
-                            .expect("update interval should be a positive integer"),
-                    );
+                    let Ok(update_interval_seconds) = torrent_stats_update_interval.try_into() else {
+                        error!(
+                            torrent_stats_update_interval,
+                            "update interval does not fit in signed seconds"
+                        );
+                        break;
+                    };
+                    let one_interval_ago = seconds_ago_utc(update_interval_seconds);
                     let limit = 50;
 
                     debug!(
-                        "Importing torrents statistics not updated since {} limited to a maximum of {} torrents ...",
-                        one_interval_ago.to_string().yellow(),
-                        limit.to_string().yellow()
+                        since = %one_interval_ago,
+                        limit,
+                        "importing torrents statistics not updated since threshold"
                     );
 
                     match statistics_importer
@@ -154,13 +169,26 @@ pub fn start(
 
 /// Endpoint for container health check.
 async fn health_check_handler(State(state): State<Arc<ImporterState>>) -> Json<Value> {
-    let margin_in_seconds = 10;
+    let margin_in_seconds = 10_u64;
     let now = Utc::now();
-    let last_heartbeat = state.last_heartbeat.lock().unwrap();
+    let Ok(last_heartbeat) = state.last_heartbeat.lock() else {
+        error!("failed to acquire importer heartbeat lock");
+        return Json(json!({ "status": "Error" }));
+    };
 
-    if now.signed_duration_since(*last_heartbeat).num_seconds()
-        <= (state.torrent_info_update_interval + margin_in_seconds).try_into().unwrap()
-    {
+    let Ok(max_heartbeat_age_seconds) = state
+        .torrent_info_update_interval
+        .saturating_add(margin_in_seconds)
+        .try_into()
+    else {
+        error!(
+            torrent_info_update_interval = state.torrent_info_update_interval,
+            "importer health check interval does not fit in signed seconds"
+        );
+        return Json(json!({ "status": "Error" }));
+    };
+
+    if now.signed_duration_since(*last_heartbeat).num_seconds() <= max_heartbeat_age_seconds {
         Json(json!({ "status": "Ok" }))
     } else {
         Json(json!({ "status": "Error" }))
@@ -171,7 +199,10 @@ async fn health_check_handler(State(state): State<Arc<ImporterState>>) -> Json<V
 /// to inform that it's alive. This endpoint handles receiving that signal.
 async fn heartbeat_handler(State(state): State<Arc<ImporterState>>) -> Json<Value> {
     let now = Utc::now();
-    let mut last_heartbeat = state.last_heartbeat.lock().unwrap();
+    let Ok(mut last_heartbeat) = state.last_heartbeat.lock() else {
+        error!("failed to acquire importer heartbeat lock");
+        return Json(json!({ "status": "Error" }));
+    };
     *last_heartbeat = now;
     drop(last_heartbeat);
     Json(json!({ "status": "Heartbeat received" }))

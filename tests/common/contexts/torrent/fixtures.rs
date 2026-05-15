@@ -1,3 +1,5 @@
+#![allow(clippy::print_stderr, clippy::print_stdout)]
+
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};

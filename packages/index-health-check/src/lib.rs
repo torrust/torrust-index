@@ -13,8 +13,12 @@ use serde::Serialize;
 #[cfg(test)]
 mod tests;
 
+/// Schema version of the health-check JSON output.
+pub const SCHEMA: u32 = 1;
+
 #[derive(Serialize)]
 pub struct HealthCheckOutput {
+    pub schema: u32,
     pub target: String,
     pub status: u16,
     pub elapsed_ms: u64,
@@ -105,6 +109,7 @@ pub fn do_health_check(url: &str) -> Result<HealthCheckOutput, HealthCheckError>
     }
 
     Ok(HealthCheckOutput {
+        schema: SCHEMA,
         target: url.to_string(),
         status,
         elapsed_ms,

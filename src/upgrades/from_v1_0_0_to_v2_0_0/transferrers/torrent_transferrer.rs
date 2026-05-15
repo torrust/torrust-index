@@ -1,21 +1,23 @@
 #![allow(clippy::missing_errors_doc)]
 
+use std::fs;
 use std::sync::Arc;
-use std::{error, fs};
+
+use tracing::{debug, info};
 
 use crate::models::torrent_file::Torrent;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v1_0_0::SqliteDatabaseV1_0_0;
 use crate::upgrades::from_v1_0_0_to_v2_0_0::databases::sqlite_v2_0_0::{SqliteDatabaseV2_0_0, TorrentRecordV2};
+use crate::upgrades::from_v1_0_0_to_v2_0_0::error::UpgradeError;
 use crate::utils::parse_torrent::decode_torrent;
 
-#[allow(clippy::missing_panics_doc)]
 #[allow(clippy::too_many_lines)]
 pub async fn transfer_torrents(
     source_database: Arc<SqliteDatabaseV1_0_0>,
     target_database: Arc<SqliteDatabaseV2_0_0>,
     upload_path: &str,
-) {
-    println!("Transferring torrents ...");
+) -> Result<(), UpgradeError> {
+    info!("transferring torrents");
 
     // Transfer table `torrust_torrents_files`
 
@@ -24,149 +26,172 @@ pub async fn transfer_torrents(
 
     // Transfer table `torrust_torrents`
 
-    let torrents = source_database.get_torrents().await.unwrap();
+    let torrents = source_database.get_torrents().await.map_err(|source| UpgradeError::Sqlx {
+        context: "failed to read source torrents",
+        source,
+    })?;
 
     for torrent in &torrents {
         // [v2] table torrust_torrents
 
-        println!("[v2][torrust_torrents] adding the torrent: {:?} ...", torrent.torrent_id);
+        info!(torrent_id = torrent.torrent_id, "adding torrent");
 
-        let uploader = source_database.get_user_by_username(&torrent.uploader).await.unwrap();
+        let uploader = source_database
+            .get_user_by_username(&torrent.uploader)
+            .await
+            .map_err(|source| UpgradeError::Sqlx {
+                context: "failed to read torrent uploader",
+                source,
+            })?;
 
-        assert!(
-            uploader.username == torrent.uploader,
-            "Error copying torrent with id {:?}.
-                Username (`uploader`) in `torrust_torrents` table does not match `username` in `torrust_users` table",
-            torrent.torrent_id
-        );
+        if uploader.username != torrent.uploader {
+            return Err(UpgradeError::UploaderMismatch {
+                torrent_id: torrent.torrent_id,
+                expected: torrent.uploader.clone(),
+                actual: uploader.username,
+            });
+        }
 
         let filepath = format!("{}/{}.torrent", upload_path, torrent.torrent_id);
 
-        let torrent_from_file =
-            read_torrent_from_file(&filepath).unwrap_or_else(|_| panic!("Error torrent file not found: {filepath:?}"));
+        let torrent_from_file = read_torrent_from_file(&filepath)?;
 
+        let target_torrent = TorrentRecordV2::from_v1_data(torrent, &torrent_from_file.info, &uploader)?;
         let id = target_database
-            .insert_torrent(&TorrentRecordV2::from_v1_data(torrent, &torrent_from_file.info, &uploader))
+            .insert_torrent(&target_torrent)
             .await
-            .unwrap();
+            .map_err(|source| UpgradeError::Sqlx {
+                context: "failed to insert torrent",
+                source,
+            })?;
 
-        assert!(
-            id == torrent.torrent_id,
-            "Error copying torrent {:?} from source DB to the target DB",
-            torrent.torrent_id
-        );
+        if id != torrent.torrent_id {
+            return Err(UpgradeError::IdMismatch {
+                entity: "torrent",
+                expected: torrent.torrent_id,
+                actual: id,
+            });
+        }
 
-        println!("[v2][torrust_torrents] torrent with id {:?} added.", torrent.torrent_id);
+        info!(torrent_id = torrent.torrent_id, "torrent added");
 
         // [v2] table torrust_torrent_files
 
-        println!("[v2][torrust_torrent_files] adding torrent files");
+        info!(torrent_id = torrent.torrent_id, "adding torrent files");
 
         if torrent_from_file.is_a_single_file_torrent() {
             // The torrent contains only one file then:
             // - "path" is NULL
             // - "md5sum" can be NULL
 
-            println!(
-                "[v2][torrust_torrent_files][single-file-torrent] adding torrent file {:?} with length {:?} ...",
-                torrent_from_file.info.name, torrent_from_file.info.length,
-            );
+            let length = torrent_from_file.info.length.ok_or(UpgradeError::MissingTorrentField {
+                torrent_id: torrent.torrent_id,
+                field: "length",
+            })?;
+            info!(torrent_id = torrent.torrent_id, name = %torrent_from_file.info.name, length, "adding single-file torrent entry");
 
             let file_id = target_database
                 .insert_torrent_file_for_torrent_with_one_file(
                     torrent.torrent_id,
                     // TODO: it seems med5sum can be None. Why? When?
                     &torrent_from_file.info.md5sum.clone(),
-                    torrent_from_file.info.length.unwrap(),
+                    length,
                 )
-                .await;
+                .await
+                .map_err(|source| UpgradeError::Sqlx {
+                    context: "failed to insert single-file torrent file",
+                    source,
+                })?;
 
-            println!("[v2][torrust_torrent_files][single-file-torrent] torrent file insert result: {file_id:?}");
+            debug!(file_id, torrent_id = torrent.torrent_id, "inserted single-file torrent entry");
         } else {
             // Multiple files are being shared
-            let files = torrent_from_file.info.files.as_ref().unwrap();
+            let files = torrent_from_file
+                .info
+                .files
+                .as_ref()
+                .ok_or(UpgradeError::MissingTorrentField {
+                    torrent_id: torrent.torrent_id,
+                    field: "files",
+                })?;
 
             for file in files {
-                println!("[v2][torrust_torrent_files][multiple-file-torrent] adding torrent file: {file:?} ...");
+                debug!(torrent_id = torrent.torrent_id, ?file, "adding multi-file torrent entry");
 
                 let file_id = target_database
                     .insert_torrent_file_for_torrent_with_multiple_files(torrent, file)
-                    .await;
+                    .await
+                    .map_err(|source| UpgradeError::Sqlx {
+                        context: "failed to insert multi-file torrent file",
+                        source,
+                    })?;
 
-                println!("[v2][torrust_torrent_files][multiple-file-torrent] torrent file insert result: {file_id:?}");
+                debug!(file_id, torrent_id = torrent.torrent_id, "inserted multi-file torrent entry");
             }
         }
 
         // [v2] table torrust_torrent_info
 
-        println!(
-            "[v2][torrust_torrent_info] adding the torrent info for torrent id {:?} ...",
-            torrent.torrent_id
-        );
+        info!(torrent_id = torrent.torrent_id, "adding torrent info");
 
-        let id = target_database.insert_torrent_info(torrent).await;
+        let id = target_database
+            .insert_torrent_info(torrent)
+            .await
+            .map_err(|source| UpgradeError::Sqlx {
+                context: "failed to insert torrent info",
+                source,
+            })?;
 
-        println!("[v2][torrust_torrents] torrent info insert result: {id:?}.");
+        debug!(torrent_info_id = id, torrent_id = torrent.torrent_id, "inserted torrent info");
 
         // [v2] table torrust_torrent_announce_urls
 
-        println!(
-            "[v2][torrust_torrent_announce_urls] adding the torrent announce url for torrent id {:?} ...",
-            torrent.torrent_id
-        );
+        info!(torrent_id = torrent.torrent_id, "adding torrent announce urls");
 
-        if torrent_from_file.announce_list.is_some() {
+        if let Some(announce_list) = &torrent_from_file.announce_list {
             // BEP-0012. Multiple trackers.
 
-            println!(
-                "[v2][torrust_torrent_announce_urls][announce-list] adding the torrent announce url for torrent id {:?} ...",
-                torrent.torrent_id
-            );
-
-            // flatten the nested vec (this will however remove the)
-            let announce_urls = torrent_from_file
-                .announce_list
-                .clone()
-                .unwrap()
-                .into_iter()
-                .flatten()
-                .collect::<Vec<String>>();
-
-            for tracker_url in &announce_urls {
-                println!(
-                    "[v2][torrust_torrent_announce_urls][announce-list] adding the torrent announce url for torrent id {:?} ...",
-                    torrent.torrent_id
-                );
+            for tracker_url in announce_list.iter().flatten() {
+                debug!(torrent_id = torrent.torrent_id, %tracker_url, "adding announce-list URL");
 
                 let announce_url_id = target_database
                     .insert_torrent_announce_url(torrent.torrent_id, tracker_url)
-                    .await;
+                    .await
+                    .map_err(|source| UpgradeError::Sqlx {
+                        context: "failed to insert announce-list URL",
+                        source,
+                    })?;
 
-                println!(
-                    "[v2][torrust_torrent_announce_urls][announce-list] torrent announce url insert result {announce_url_id:?} ..."
-                );
+                debug!(announce_url_id, torrent_id = torrent.torrent_id, "inserted announce-list URL");
             }
-        } else if torrent_from_file.announce.is_some() {
-            println!(
-                "[v2][torrust_torrent_announce_urls][announce] adding the torrent announce url for torrent id {:?} ...",
-                torrent.torrent_id
-            );
+        } else if let Some(announce) = &torrent_from_file.announce {
+            debug!(torrent_id = torrent.torrent_id, tracker_url = %announce, "adding announce URL");
 
             let announce_url_id = target_database
-                .insert_torrent_announce_url(torrent.torrent_id, &torrent_from_file.announce.unwrap())
-                .await;
+                .insert_torrent_announce_url(torrent.torrent_id, announce)
+                .await
+                .map_err(|source| UpgradeError::Sqlx {
+                    context: "failed to insert announce URL",
+                    source,
+                })?;
 
-            println!("[v2][torrust_torrent_announce_urls][announce] torrent announce url insert result {announce_url_id:?} ...");
+            debug!(announce_url_id, torrent_id = torrent.torrent_id, "inserted announce URL");
         }
     }
-    println!("Torrents transferred");
+
+    info!("torrents transferred");
+
+    Ok(())
 }
 
-pub fn read_torrent_from_file(path: &str) -> Result<Torrent, Box<dyn error::Error>> {
-    let contents = fs::read(path)?;
+pub fn read_torrent_from_file(path: &str) -> Result<Torrent, UpgradeError> {
+    let contents = fs::read(path).map_err(|source| UpgradeError::Io {
+        context: "failed to read torrent file",
+        source,
+    })?;
 
-    match decode_torrent(&contents) {
-        Ok(torrent) => Ok(torrent),
-        Err(e) => Err(e),
-    }
+    decode_torrent(&contents).map_err(|error| UpgradeError::DecodeTorrent {
+        path: path.to_string(),
+        message: error.to_string(),
+    })
 }

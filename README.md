@@ -162,6 +162,90 @@ The following services are provided by the default configuration:
 - API
   - `http://127.0.0.1:3001/`.
 
+### Command-Line Output
+
+First-party Torrust Index command-line entrypoints are governed by
+[ADR-T-010](./adr/010-global-command-line-output-contract.md): stdout is
+reserved for machine-readable result data, stderr is reserved for
+machine-readable diagnostics/control records, and commands that emit stdout
+result data refuse to write it directly to a terminal.
+
+The `torrust-index` server binary is a no-stdout command. Application tracing is
+emitted as JSON records on stderr; the configured `[logging].threshold` selects
+the default filter, and a non-empty `RUST_LOG` environment variable overrides
+that default. Panics that cross the binary boundary are reported as ADR-T-010
+JSON control-plane records on stderr.
+
+Command-reachable server libraries use the same diagnostic path. Shutdown
+grace-period notices are structured tracing records, and mail-template
+initialization or rendering failures are propagated to callers for JSON
+diagnostic reporting instead of being printed or exiting from the mailer
+library.
+
+The shared helper infrastructure now wraps `clap` help, version, and usage
+errors as JSON control-plane records on stderr, installs a JSON-only panic hook,
+and uses JSON tracing on stderr. The container helper binaries emit exactly one
+JSON object on stdout when successful, include a top-level `schema` field, and
+should be inspected through a pipe or redirect:
+
+```sh
+torrust-index-auth-keypair | jq .
+torrust-index-config-probe | jq .
+torrust-index-health-check http://127.0.0.1:3001/health_check | jq .
+```
+
+For helper diagnostics, a non-empty `RUST_LOG` environment variable takes
+precedence over `--debug`; otherwise `--debug` raises the default diagnostic
+filter to debug.
+
+The container entry script is also a no-stdout orchestration command. It captures
+helper stdout internally, keeps its own stdout empty before `su-exec`, and emits
+startup validation failures, status records, utility failures, and `DEBUG=1`
+phase diagnostics as JSON records on stderr. Use `docker logs ... 2>&1` or your
+runtime's stderr capture and parse those lines as NDJSON when automation needs
+startup diagnostics.
+
+Two root diagnostic commands have also been migrated. `parse_torrent` is a
+stdout-result command: it emits one JSON object containing `schema`, `torrent`,
+`original_v1_info_hash`, and `input_byte_length`, and it refuses direct terminal
+stdout. Pipe or redirect it before inspection:
+
+```sh
+fixture=./tests/fixtures/torrents/6c690018c5786dbbb00161f62b0712d69296df97_with_custom_info_dict_key.torrent
+cargo run --quiet --bin parse_torrent -- "$fixture" | jq .
+```
+
+`create_test_torrent` is a no-stdout side-effect command. It writes the torrent
+file into an existing destination directory, keeps stdout empty, and emits JSON
+status or diagnostic records on stderr:
+
+```sh
+mkdir -p ./output/test/torrents
+cargo run --quiet --bin create_test_torrent -- ./output/test/torrents 2>create-test-torrent.ndjson
+jq . create-test-torrent.ndjson
+```
+
+The root maintenance binaries `import_tracker_statistics`, `seeder`, and
+`upgrade` are no-stdout side-effect commands. They keep stdout empty, use the
+shared JSON `clap` wrapper for help, version, and argv errors, and emit status
+or diagnostic records as JSON/NDJSON on stderr. Automation should branch on the
+process exit code and parse stderr as JSON when it needs diagnostics:
+
+```sh
+cargo run --quiet --bin import_tracker_statistics -- 2>import-tracker-statistics.ndjson
+
+cargo run --quiet --bin seeder -- \
+  --api-base-url "http://localhost:3001" \
+  --number-of-torrents 10 \
+  --user admin \
+  --password "$TORRUST_INDEX_ADMIN_PASSWORD" \
+  --interval 0 \
+  2>seeder.ndjson
+
+cargo run --quiet --bin upgrade -- ./data.db ./data_v2.db ./uploads 2>upgrade.ndjson
+jq . upgrade.ndjson
+```
+
 ## Documentation
 
 - [API (Version 1)][api]
@@ -177,6 +261,7 @@ The following services are provided by the default configuration:
 - [ADR-T-007: Refactor the JWT System](adr/007-jwt-system-refactor.md) — Centralise JWT handling into `src/jwt.rs`, redesign claims to RFC 7519, move to RS256 asymmetric signing, and consolidate session validation into a single code path.
 - [ADR-T-008: Refactor the Roles and Permissions System](adr/008-roles-and-permissions-refactor.md) — Replace Casbin with a native Rust permission system (`PermissionMatrix` + `RequirePermission<A>` Axum extractors), migrate from `administrator: bool` to a `role` column, and add a `/me/permissions` discovery endpoint.
 - [ADR-T-009: Container Infrastructure Refactor](adr/009-container-infrastructure-refactor.md) — Split the runtime image into `release` (distroless, root-only toolset) and `debug` bases; extract three helper binaries (`torrust-index-health-check`, `torrust-index-auth-keypair`, `torrust-index-config-probe`) into their own workspace crates with no HTTP/TLS/async-runtime deps; strip credentials from shipped TOMLs and make `database.connect_url` / `tracker.token` mandatory schema fields; split Compose into a production-shaped `compose.yaml` baseline plus an auto-loaded `compose.override.yaml` dev sandbox; and add an internal audit record for vendored `su-exec`.
+- [ADR-T-010: Global Command-Line Output Contract](adr/010-global-command-line-output-contract.md) — Apply the JSON-only stdout/stderr contract across first-party command-line entrypoints: stdout is result JSON, stderr is diagnostic JSON/NDJSON, and commands with stdout result data refuse direct TTY output.
 
 ## Contributing
 

@@ -1,29 +1,36 @@
 //! Console app to upload random torrents to a live Index API.
 //!
+//! ADR-T-010 classifies this as a side-effect command: stdout remains empty and
+//! diagnostics are JSON records on stderr.
+//!
 //! Run with:
 //!
 //! ```text
-//! cargo run --bin seeder -- \
+//! cargo run --quiet --bin seeder -- \
 //!   --api-base-url <API_BASE_URL> \
 //!   --number-of-torrents <NUMBER_OF_TORRENTS> \
 //!   --user <USER> \
 //!   --password <PASSWORD> \
-//!   --interval <INTERVAL>
+//!   --interval <INTERVAL> \
+//!   2>seeder.ndjson
+//! jq . seeder.ndjson
 //! ```
 //!
 //! For example:
 //!
 //! ```text
-//! cargo run --bin seeder -- \
+//! cargo run --quiet --bin seeder -- \
 //!   --api-base-url "http://localhost:3001" \
 //!   --number-of-torrents 1000 \
 //!   --user admin \
 //!   --password 12345678 \
-//!   --interval 0
+//!   --interval 0 \
+//!   2>seeder.ndjson
+//! jq . seeder.ndjson
 //! ```
 //!
 //! That command would upload 1000 random torrents to the Index using the user
-//! account admin with password 123456 and waiting 1 second between uploads.
+//! account `admin` with password `12345678` and no delay between uploads.
 //!
 //! The random torrents generated are single-file torrents from a TXT file.
 //! All generated torrents used a UUID to identify the test torrent. The torrent
@@ -127,20 +134,17 @@
 //!
 //! As you can see the `info` dictionary is exactly the same, which produces
 //! the same info-hash for the torrent.
-use std::str::FromStr;
-use std::thread::sleep;
 use std::time::Duration;
 
 use clap::Parser;
 use reqwest::Url;
-use text_colorizer::Colorize;
-use tracing::level_filters::LevelFilter;
-use tracing::{debug, info};
+use thiserror::Error;
+use torrust_index_cli_common::BaseArgs;
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
-use super::api::Error;
+use super::api::Error as ApiError;
 use crate::console::commands::seeder::api::{login, upload_torrent};
-use crate::console::commands::seeder::logging;
 use crate::services::torrent_file::generate_random_torrent;
 use crate::utils::parse_torrent;
 use crate::web::api::client::v1::client::Client;
@@ -148,9 +152,9 @@ use crate::web::api::client::v1::contexts::torrent::forms::{BinaryFile, UploadTo
 use crate::web::api::client::v1::contexts::torrent::responses::UploadedTorrent;
 use crate::web::api::client::v1::contexts::user::responses::LoggedInUserData;
 
-#[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
-struct Args {
+#[derive(Parser)]
+#[command(name = "seeder", version, about = "Upload random torrents to a live Index API", long_about = None)]
+pub struct Args {
     #[arg(short, long)]
     api_base_url: String,
 
@@ -165,42 +169,62 @@ struct Args {
 
     #[arg(short, long)]
     interval: u64,
+
+    #[command(flatten)]
+    pub base: BaseArgs,
+}
+
+#[derive(Debug, Error)]
+pub enum CommandError {
+    #[error("failed to parse API base URL: {source}")]
+    ParseApiBaseUrl { source: url::ParseError },
+
+    #[error("failed to login to the Index API: {source}")]
+    Login { source: ApiError },
+
+    #[error("failed to upload torrent to the Index API: {source}")]
+    UploadTorrent { source: ApiError },
+
+    #[error("failed to encode generated torrent: {source}")]
+    EncodeTorrent { source: serde_bencode::Error },
+
+    #[error("failed to serialize upload response into JSON: {source}")]
+    SerializeUploadResponse { source: serde_json::Error },
 }
 
 /// # Errors
 ///
-/// Returns an error if the API base URL cannot be parsed or if an uploaded
-/// torrent cannot be serialized to JSON.
-pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    logging::setup(LevelFilter::INFO);
+/// Returns an error if setup fails. Individual torrent upload failures are
+/// logged and the command continues with the next generated torrent.
+pub async fn run(args: Args) -> Result<(), CommandError> {
+    let api_url = args
+        .api_base_url
+        .parse::<Url>()
+        .map_err(|source| CommandError::ParseApiBaseUrl { source })?;
 
-    let args = Args::parse();
-
-    let api_url = Url::from_str(&args.api_base_url).map_err(|e| format!("failed to parse API base URL: {e}"))?;
-
-    let api_user = login_index_api(&api_url, &args.user, &args.password).await;
+    let api_user = login_index_api(&api_url, &args.user, &args.password).await?;
 
     let api_client = Client::authenticated(&api_url, &api_user.token);
 
-    info!(target:"seeder", "Uploading { } random torrents to the Torrust Index with a { } seconds interval...", args.number_of_torrents.to_string().yellow(), args.interval.to_string().yellow());
+    info!(target:"seeder", number_of_torrents = args.number_of_torrents, interval_seconds = args.interval, "uploading random torrents to the Index API");
 
     for i in 1..=args.number_of_torrents {
-        info!(target:"seeder", "Uploading torrent #{} ...", i.to_string().yellow());
+        info!(target:"seeder", torrent_number = i, "uploading torrent");
 
         match upload_random_torrent(&api_client).await {
             Ok(uploaded_torrent) => {
-                debug!(target:"seeder", "Uploaded torrent {uploaded_torrent:?}");
+                debug!(target:"seeder", ?uploaded_torrent, "uploaded torrent");
 
                 let json = serde_json::to_string(&uploaded_torrent)
-                    .map_err(|e| format!("failed to serialize upload response into JSON: {e}"))?;
+                    .map_err(|source| CommandError::SerializeUploadResponse { source })?;
 
-                info!(target:"seeder", "Uploaded torrent: {}", json.yellow());
+                info!(target:"seeder", uploaded_torrent = %json, "uploaded torrent");
             }
-            Err(err) => print!("Error uploading torrent {err:?}"),
+            Err(error) => error!(target:"seeder", torrent_number = i, %error, "failed to upload torrent"),
         }
 
         if i != args.number_of_torrents {
-            sleep(Duration::from_secs(args.interval));
+            tokio::time::sleep(Duration::from_secs(args.interval)).await;
         }
     }
 
@@ -208,28 +232,35 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// It logs in a user in the Index API.
-pub async fn login_index_api(api_url: &Url, username: &str, password: &str) -> LoggedInUserData {
+///
+/// # Errors
+///
+/// Returns an error if the login request fails or the response cannot be
+/// decoded.
+pub async fn login_index_api(api_url: &Url, username: &str, password: &str) -> Result<LoggedInUserData, CommandError> {
     let unauthenticated_client = Client::unauthenticated(api_url);
 
-    info!(target:"seeder", "Trying to login with username: {} ...", username.yellow());
+    info!(target:"seeder", username, "trying to login");
 
-    let user: LoggedInUserData = login(&unauthenticated_client, username, password).await;
+    let user: LoggedInUserData = login(&unauthenticated_client, username, password)
+        .await
+        .map_err(|source| CommandError::Login { source })?;
 
     if user.role == "admin" {
-        info!(target:"seeder", "Logged as admin with account: {} ", username.yellow());
+        info!(target:"seeder", username, role = %user.role, "logged in as admin");
     } else {
-        info!(target:"seeder", "Logged as {} ", username.yellow());
+        info!(target:"seeder", username, role = %user.role, "logged in");
     }
 
-    user
+    Ok(user)
 }
 
-async fn upload_random_torrent(api_client: &Client) -> Result<UploadedTorrent, Error> {
+async fn upload_random_torrent(api_client: &Client) -> Result<UploadedTorrent, CommandError> {
     let uuid = Uuid::new_v4();
 
-    info!(target:"seeder", "Uploading torrent with uuid: {} ...", uuid.to_string().yellow());
+    info!(target:"seeder", %uuid, "uploading torrent with uuid");
 
-    let torrent_file = generate_random_torrent_file(uuid);
+    let torrent_file = generate_random_torrent_file(uuid)?;
 
     let upload_form = UploadTorrentMultipartForm {
         title: format!("title-{uuid}"),
@@ -238,14 +269,16 @@ async fn upload_random_torrent(api_client: &Client) -> Result<UploadedTorrent, E
         torrent_file,
     };
 
-    upload_torrent(api_client, upload_form).await
+    upload_torrent(api_client, upload_form)
+        .await
+        .map_err(|source| CommandError::UploadTorrent { source })
 }
 
 /// It returns the bencoded binary data of the torrent meta file.
-fn generate_random_torrent_file(uuid: Uuid) -> BinaryFile {
+fn generate_random_torrent_file(uuid: Uuid) -> Result<BinaryFile, CommandError> {
     let torrent = generate_random_torrent(uuid);
 
-    let bytes = parse_torrent::encode_torrent(&torrent).expect("msg:the torrent should be bencoded");
+    let bytes = parse_torrent::encode_torrent(&torrent).map_err(|source| CommandError::EncodeTorrent { source })?;
 
-    BinaryFile::from_bytes(torrent.info.name, bytes)
+    Ok(BinaryFile::from_bytes(torrent.info.name, bytes))
 }

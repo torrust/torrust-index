@@ -207,7 +207,7 @@ impl Info {
             // tokens, SMTP passwords, …) so log only the env-var name
             // — never its value — and route through `tracing` (stderr)
             // so we don't pollute the JSON-only stdout contract used
-            // by helper binaries (P9).
+            // by helper binaries (ADR-T-010).
             tracing::info!(
                 env_var = ENV_VAR_CONFIG_TOML,
                 "loading extra configuration from environment variable"
@@ -229,7 +229,7 @@ impl Info {
     /// Build [`Info`] from the same env vars [`Self::new`] reads,
     /// without the diagnostic `println!`s.
     ///
-    /// Helper binaries that own a JSON-only stdout contract (P9)
+    /// Helper binaries that own a JSON-only stdout contract (ADR-T-010)
     /// must use this constructor instead of [`Self::new`] to avoid
     /// corrupting their output stream.
     #[must_use]

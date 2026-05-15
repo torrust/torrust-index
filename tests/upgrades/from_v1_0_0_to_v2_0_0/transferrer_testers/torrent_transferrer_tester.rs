@@ -123,7 +123,7 @@ impl TorrentTester {
         assert_eq!(imported_torrent.is_bep_30, i64::from(torrent_file.info.is_bep_30()));
         assert_eq!(
             imported_torrent.date_uploaded,
-            convert_timestamp_to_datetime(torrent.upload_date)
+            convert_timestamp_to_datetime(torrent.upload_date).expect("fixture timestamp must be valid")
         );
     }
 

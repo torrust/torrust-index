@@ -58,13 +58,7 @@ pub fn decode_and_validate_torrent_file(bytes: &[u8]) -> Result<(Torrent, InfoHa
 ///
 /// This function will return an error if unable to parse bytes into torrent.
 pub fn decode_torrent(bytes: &[u8]) -> Result<Torrent, Box<dyn error::Error>> {
-    match de::from_bytes::<Torrent>(bytes) {
-        Ok(torrent) => Ok(torrent),
-        Err(e) => {
-            println!("{e:?}");
-            Err(e.into())
-        }
-    }
+    de::from_bytes::<Torrent>(bytes).map_err(Into::into)
 }
 
 /// Encode a Torrent into Bencoded Bytes.
@@ -73,13 +67,7 @@ pub fn decode_torrent(bytes: &[u8]) -> Result<Torrent, Box<dyn error::Error>> {
 ///
 /// This function will return an error if unable to bencode torrent.
 pub fn encode_torrent(torrent: &Torrent) -> Result<Vec<u8>, SerdeError> {
-    match serde_bencode::to_bytes(torrent) {
-        Ok(bencode_bytes) => Ok(bencode_bytes),
-        Err(e) => {
-            eprintln!("{e:?}");
-            Err(e)
-        }
-    }
+    serde_bencode::to_bytes(torrent)
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]

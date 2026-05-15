@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
 #![cfg(feature = "dynamic-contour-tracking")]
+#![allow(clippy::print_stderr)]
 //! Integration tests for eviction ↔ plateau invariant maintenance.
 //!
 //! These tests exercise the plateau invariants (P-I2 basis

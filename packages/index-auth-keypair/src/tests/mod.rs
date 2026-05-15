@@ -3,6 +3,7 @@
 //! | Test                                  | What it covers                          |
 //! |---------------------------------------|-----------------------------------------|
 //! | `generated_json_round_trips`          | JSON output deserialises back           |
+//! | `generated_output_carries_schema`      | Output schema field is stable           |
 //! | `private_pem_parses`                  | Private key PEM is valid PKCS#8         |
 //! | `public_pem_parses`                   | Public key PEM is valid SPKI            |
 
@@ -13,8 +14,15 @@ fn generated_json_round_trips() {
     let output = super::generate_keypair().unwrap();
     let json = serde_json::to_string(&output).unwrap();
     let parsed: super::KeypairOutput = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed.schema, super::SCHEMA);
     assert!(!parsed.private_key_pem.is_empty());
     assert!(!parsed.public_key_pem.is_empty());
+}
+
+#[test]
+fn generated_output_carries_schema() {
+    let output = super::generate_keypair().unwrap();
+    assert_eq!(output.schema, super::SCHEMA);
 }
 
 #[test]

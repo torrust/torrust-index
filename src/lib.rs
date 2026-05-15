@@ -20,6 +20,7 @@
 //!     - [Development](#development)
 //! - [Configuration](#configuration)
 //! - [Usage](#usage)
+//!     - [Command-Line Output](#command-line-output)
 //!     - [API](#api)
 //!     - [Tracker Statistics Importer](#tracker-statistics-importer)
 //!     - [Upgrader](#upgrader)
@@ -225,6 +226,15 @@
 //!
 //! # Usage
 //!
+//! ## Command-Line Output
+//!
+//! ADR-T-010 classifies the `torrust-index` server as a no-stdout command:
+//! stdout remains empty, and server diagnostics are JSON records on stderr.
+//! Command-reachable libraries use the same path for operator-facing messages;
+//! shutdown notices are structured tracing records, and mail-template failures
+//! are propagated to callers for JSON diagnostic reporting instead of being
+//! printed or handled by exiting from the mailer library.
+//!
 //! ## API
 //!
 //! Running the index with the default configuration will expose the REST API on port 3001: <http://localhost:3001>
@@ -232,6 +242,9 @@
 //! ## Tracker Statistics Importer
 //!
 //! This console command allows you to manually import the tracker statistics.
+//! ADR-T-010 classifies it as a side-effect command: stdout remains empty and
+//! diagnostics are JSON records on stderr. Scripts should branch on the process
+//! exit code and parse stderr as NDJSON when they need diagnostics.
 //!
 //! For more information about this command you can visit the documentation for
 //! the [`Import tracker statistics`](crate::console::commands::tracker_statistics_importer) module.
@@ -240,6 +253,9 @@
 //!
 //! This console command allows you to manually upgrade the application from one
 //! version to another.
+//! ADR-T-010 classifies it as a side-effect command: stdout remains empty and
+//! diagnostics are JSON records on stderr. Scripts should branch on the process
+//! exit code and parse stderr as NDJSON when they need diagnostics.
 //!
 //! For more information about this command you can visit the documentation for
 //! the [`Upgrade app from version 1.0.0 to 2.0.0`](crate::upgrades::from_v1_0_0_to_v2_0_0::upgrader) module.
