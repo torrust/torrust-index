@@ -129,15 +129,15 @@ ignored = ["futures", "torrust-sentinel"]
 workspace = true
 
 [workspace.lints.rust]
-deprecated-safe = { level = "deny", priority = -1 }
-future-incompatible = { level = "deny", priority = -1 }
-let-underscore = { level = "deny", priority = -1 }
-nonstandard-style = { level = "deny", priority = -1 }
-rust-2018-compatibility = { level = "deny", priority = -1 }
-rust-2018-idioms = { level = "deny", priority = -1 }
-rust-2021-compatibility = { level = "deny", priority = -1 }
-rust-2024-compatibility = { level = "deny", priority = -1 }
-unsafe-code = "warn"
+deprecated_safe = { level = "deny", priority = -1 }
+future_incompatible = { level = "deny", priority = -1 }
+let_underscore = { level = "deny", priority = -1 }
+nonstandard_style = { level = "deny", priority = -1 }
+rust_2018_compatibility = { level = "deny", priority = -1 }
+rust_2018_idioms = { level = "deny", priority = -1 }
+rust_2021_compatibility = { level = "deny", priority = -1 }
+rust_2024_compatibility = { level = "deny", priority = -1 }
+unsafe_code = "warn"
 unused = { level = "deny", priority = -2 }
 warnings = { level = "deny", priority = -1 }
 
