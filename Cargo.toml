@@ -72,7 +72,6 @@ clap = { version = "4", features = ["derive", "env"] }
 derive_more = { version = "2", features = ["display"] }
 email_address = "0"
 figment = { version = "0", features = ["env", "test", "toml"] }
-futures = "0"
 futures-util = "0"
 hex = "0"
 http = "1"
@@ -121,9 +120,6 @@ uuid = { version = "1", features = ["v4"] }
 [dev-dependencies]
 tempfile = "3"
 which = "8"
-
-[package.metadata.cargo-machete]
-ignored = ["futures", "torrust-sentinel"]
 
 [lints]
 workspace = true
