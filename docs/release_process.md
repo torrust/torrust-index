@@ -69,7 +69,6 @@ git push --tags torrust
 
 Make sure the [deployment](https://github.com/torrust/torrust-index/actions/workflows/deployment.yaml) workflow was successfully executed and the new version for the following crates were published:
 
-- [torrust-index-located-error](https://crates.io/crates/torrust-index-located-error)
 - [torrust-index](https://crates.io/crates/torrust-index)
 
 ### 7. Create Release on Github from Tag
