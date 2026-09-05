@@ -3,7 +3,7 @@ use std::sync::Arc;
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use url::Url;
 
 use super::api::{Client, ConnectionInfo};
@@ -130,6 +130,13 @@ impl Service {
 
                 match status {
                     StatusCode::OK => Ok(()),
+                    StatusCode::CONFLICT => {
+                        // The tracker runs with the whitelist capability switched off, so it
+                        // keeps no whitelist at all and there is nothing for us to record.
+                        let reason = action_status_reason(&body);
+                        info!(target: "tracker-service", "add to whitelist skipped, the tracker has the capability disabled: {reason}");
+                        Ok(())
+                    }
                     StatusCode::INTERNAL_SERVER_ERROR => {
                         if body == "Unhandled rejection: Err { reason: \"token not valid\" }" {
                             Err(TrackerAPIError::InvalidToken)
@@ -172,6 +179,13 @@ impl Service {
 
                 match status {
                     StatusCode::OK => Ok(()),
+                    StatusCode::CONFLICT => {
+                        // The tracker runs with the whitelist capability switched off, so it
+                        // keeps no whitelist at all and there is nothing for us to remove.
+                        let reason = action_status_reason(&body);
+                        info!(target: "tracker-service", "remove from whitelist skipped, the tracker has the capability disabled: {reason}");
+                        Ok(())
+                    }
                     StatusCode::INTERNAL_SERVER_ERROR => {
                         if body == Self::invalid_token_body() {
                             Err(TrackerAPIError::InvalidToken)
@@ -408,6 +422,26 @@ pub(crate) fn build_announce_url_with_key(base_url: &Url, tracker_key: &str) -> 
     }
 
     url.join(tracker_key).expect("tracker key should be a valid URL segment")
+}
+
+/// The tracker's action-status body, as returned by endpoints whose only two
+/// outcomes are success or failure with no data.
+///
+/// The tracker serializes it with the status as a tag, so a refusal reads
+/// `{"status":"err","reason":"listed capability is disabled by configuration"}`.
+/// Only the reason is deserialized here: it is the part worth logging, and
+/// reading it alone keeps us insensitive to how the tag itself is spelled.
+#[derive(Debug, Deserialize)]
+struct ActionStatusBody {
+    reason: String,
+}
+
+/// Extracts the reason the tracker gave for refusing a request.
+///
+/// Falls back to the raw body when it is not the action-status JSON, so that an
+/// unexpected shape is still visible in the log rather than swallowed.
+pub(crate) fn action_status_reason(body: &str) -> String {
+    serde_json::from_str::<ActionStatusBody>(body).map_or_else(|_| body.to_owned(), |status| status.reason)
 }
 
 /// Temporary patch to map `StatusCode` from crate `http` 0.2.11 to `http` v1.0.0
