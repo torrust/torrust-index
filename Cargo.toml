@@ -56,7 +56,12 @@ torrust-index-cli-common = { version = "4.0.0-develop", path = "packages/index-c
 torrust-index-config = { version = "4.0.0-develop", path = "packages/index-config" }
 torrust-index-render-text-as-image = { version = "0.1.0", path = "packages/render-text-as-image" }
 
-argon2 = "0"
+# argon2 and pbkdf2 must stay on one `password-hash` major: the password
+# verification path in `src/services/authentication.rs` builds a `PasswordHash`
+# from one crate and verifies it with the other, so a mismatch is a type error.
+# Both are held to the 0.x line the sources are written against; a bare `0`
+# requirement admits every breaking 0.x release and had let them drift apart.
+argon2 = "0.5"
 async-trait = "0"
 axum = { version = "0", features = ["multipart"] }
 axum-server = { version = "0", features = ["tls-rustls"] }
@@ -86,7 +91,7 @@ lettre = { version = "0", features = [
 ] }
 log = "0"
 mockall = "0"
-pbkdf2 = { version = "0", features = ["simple"] }
+pbkdf2 = { version = "0.12", features = ["simple"] }
 pin-project-lite = "0"
 rand = "0.10"
 regex = "1"
@@ -105,7 +110,9 @@ thiserror = "2"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "1"
 tower = { version = "0", features = ["timeout"] }
-tower-http = { version = "0", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
+# Held at 0.6: tower-http 0.7 changes response behaviour for features this
+# workspace enables. Adopting it is an API decision, not a lock refresh.
+tower-http = { version = "0.6", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
 tracing = "0"
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
