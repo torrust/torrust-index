@@ -64,7 +64,7 @@ pub fn build_announce_url(tracker_url: &str, tracker_key: Option<&TrackerKey>) -
 
 fn build_announce_list(tracker_url: &str, tracker_key: Option<&TrackerKey>) -> Vec<Vec<String>> {
     tracker_key.as_ref().map_or_else(
-        || vec![vec![format!("{tracker_url}")]],
-        |key| vec![vec![format!("{tracker_url}/{}", key.key)], vec![format!("{tracker_url}")]],
+        || vec![vec![tracker_url.to_string()]],
+        |key| vec![vec![format!("{tracker_url}/{}", key.key)], vec![tracker_url.to_string()]],
     )
 }
