@@ -14,7 +14,6 @@ members = [
 [package]
 default-run = "torrust-index"
 name = "torrust-index"
-readme = "README.md"
 
 authors.workspace = true
 description.workspace = true
@@ -149,4 +148,9 @@ print_stderr = { level = "deny", priority = 0 }
 print_stdout = { level = "deny", priority = 0 }
 style = { level = "deny", priority = -1 }
 suspicious = { level = "deny", priority = -1 }
+# The `async` on these signatures is contractual, not incidental: axum's
+# `FromRequestParts` is an async trait, and the byte-cache methods are async so
+# callers keep one shape if a future implementation does await. Dropping it
+# would change the public API, which is a design decision, not a lint fix.
+unused_async_trait_impl = { level = "allow", priority = 0 }
 

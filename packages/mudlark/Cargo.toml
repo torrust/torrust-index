@@ -3,7 +3,6 @@ categories = ["algorithms", "data-structures"]
 description = "φ-Bounded Geometric-Value Graph"
 keywords = ["adaptive", "data-structure", "dual-tree", "sampling", "spatial-index"]
 name = "torrust-mudlark"
-readme = "README.md"
 version = "1.0.0"
 
 authors.workspace = true
