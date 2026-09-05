@@ -1,12 +1,11 @@
 [metadata]
-schema_version = "2.0.0"
+app = "torrust-tracker"
+purpose = "configuration"
+schema_version = "3.0.0"
 
 [logging]
-threshold = "info"
-
-[tracker]
-
-[auth]
+trace_filter = "info"
+trace_style = "full"
 
 [core]
 listed = false
@@ -16,8 +15,28 @@ private = false
 driver = "sqlite3"
 path = "/var/lib/torrust/tracker/database/e2e_testing_sqlite3.db"
 
+[udp_tracker_server]
+ip_bans_reset_interval_in_secs = 86400
+max_connection_id_errors_per_ip = 10
+connection_id_validation = "strict"
+
+# Both listeners are enabled so the one tracker service serves either
+# index mode: the public index announces over UDP, the private one
+# over HTTP.
+
+[[udp_trackers]]
+bind_address = "0.0.0.0:6969"
+
 [[http_trackers]]
 bind_address = "0.0.0.0:7070"
 
+# The admin access token is deliberately absent: shipped defaults carry
+# no credentials, and the environment supplies it through the
+# `HTTP_API__ACCESS_TOKENS__ADMIN` override before the service starts.
+
 [http_api]
 bind_address = "0.0.0.0:1212"
+
+[health_check_api]
+# Must be bound to wildcard IP to be accessible from outside the container
+bind_address = "0.0.0.0:1313"
