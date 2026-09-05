@@ -2,7 +2,7 @@
 
 [![container_wf_b]][container_wf] [![coverage_wf_b]][coverage_wf] [![deployment_wf_b]][deployment_wf] [![testing_wf_b]][testing_wf] [![labels_wf_b]][labels_wf]
 
-__Torrust Index__ is a library for [BitTorrent][bittorrent] Files. Written in [Rust Language][rust] (edition 2024, MSRV 1.88) with the [Axum] web framework. ___This index aims to be respectful to established standards, (both [formal][BEP 00] and [otherwise][torrent_source_field]).___
+__Torrust Index__ is a library for [BitTorrent][bittorrent] Files. Written in [Rust Language][rust] (edition 2024, MSRV 1.89) with the [Axum] web framework. ___This index aims to be respectful to established standards, (both [formal][BEP 00] and [otherwise][torrent_source_field]).___
 
 > This is a [Torrust][torrust] project and is in active development. It is community supported as well as sponsored by [Nautilus Cyberneering][nautilus].
 
@@ -262,6 +262,7 @@ jq . upgrade.ndjson
 - [ADR-T-008: Refactor the Roles and Permissions System](adr/008-roles-and-permissions-refactor.md) — Replace Casbin with a native Rust permission system (`PermissionMatrix` + `RequirePermission<A>` Axum extractors), migrate from `administrator: bool` to a `role` column, and add a `/me/permissions` discovery endpoint.
 - [ADR-T-009: Container Infrastructure Refactor](adr/009-container-infrastructure-refactor.md) — Split the runtime image into `release` (distroless, root-only toolset) and `debug` bases; extract three helper binaries (`torrust-index-health-check`, `torrust-index-auth-keypair`, `torrust-index-config-probe`) into their own workspace crates with no HTTP/TLS/async-runtime deps; strip credentials from shipped TOMLs and make `database.connect_url` / `tracker.token` mandatory schema fields; split Compose into a production-shaped `compose.yaml` baseline plus an auto-loaded `compose.override.yaml` dev sandbox; and add an internal audit record for vendored `su-exec`.
 - [ADR-T-010: Global Command-Line Output Contract](adr/010-global-command-line-output-contract.md) — Apply the JSON-only stdout/stderr contract across first-party command-line entrypoints: stdout is result JSON, stderr is diagnostic JSON/NDJSON, and commands with stdout result data refuse direct TTY output.
+- [ADR-T-011: Minimum Supported Rust Version Policy](adr/011-msrv-policy.md) — Compute `rust-version` as the newest stable Rust released at least one year before the day the pin is computed, recomputed at every release and in every maintenance pass; on 2026-09-05 that is 1.89.
 
 ## Contributing
 

@@ -7,15 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-**Highlights:** global command-line output contract (ADR-T-010),
-container infrastructure refactor (ADR-T-009),
-native role-based authorization replacing Casbin (ADR-T-008),
-RSA-signed JWTs with revocation support (ADR-T-007), domain-scoped
-error system (ADR-T-006), MSRV raised to 1.88.
+**Highlights:** global command-line output contract (ADR-T-010), container infrastructure refactor (ADR-T-009), native role-based authorization replacing Casbin (ADR-T-008), RSA-signed JWTs with revocation support (ADR-T-007), domain-scoped error system (ADR-T-006), MSRV policy and raise to 1.89 (ADR-T-011).
 
 ### Breaking changes
 
-- MSRV raised from 1.85 to 1.88.
+- MSRV raised from 1.85 to 1.89. ADR-T-011 replaces the dependency-driven floor with a computed one: `rust-version` is the newest stable Rust released at least one year before the day the pin is computed, recomputed at every release and in every maintenance pass. Computed on 2026-09-05 that is 1.89.
 - First-party command-line entrypoints are now governed by ADR-T-010's
   JSON-only output contract. Stdout is reserved for machine-readable result
   data, stderr is reserved for machine-readable diagnostics/control records, and
