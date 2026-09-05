@@ -543,7 +543,7 @@ fn decay_then_extract_roundtrip() {
     assert_invariants(&g);
     let pewei = g.extract();
     // The PEWEI should have at least one layer.
-    assert!(!pewei.layers.is_empty());
+    assert!(!pewei.layers.is_empty(), "expected at least one layer in the profile");
 }
 
 // ── Float coordinates ───────────────────────────────────────

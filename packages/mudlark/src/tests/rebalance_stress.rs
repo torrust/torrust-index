@@ -193,7 +193,8 @@ fn high_spike_ratio_three_of_four_no_violations() {
          is always >= any single entry), got {}",
         violations.len(),
     );
-    assert!(find_violated_nodes(&vnodes).is_empty());
+    let violated = find_violated_nodes(&vnodes);
+    assert!(violated.is_empty(), "unexpected violated nodes: {violated:?}");
 }
 
 /// Clustered 6-of-8: the first 6 of every 8 leaves are spiked.
