@@ -152,8 +152,8 @@ fn recompute_v_postorder<V: Accumulator>(vnodes: &mut Arena<VNode<V>>, id: VSlot
     let node = vnodes.get(id.index());
     if let VKind::Structural { children, .. } = &node.kind {
         let mut total = V::zero();
-        for i in 0..children.len() {
-            total = V::add(total, children.intensities[i]);
+        for &intensity in &children.intensities[..children.len()] {
+            total = V::add(total, intensity);
         }
         // Drop borrow before mutating.
         let _ = node;
@@ -307,8 +307,8 @@ pub fn recompute_structural_intensity<V: Accumulator>(vnodes: &mut Arena<VNode<V
     let node = vnodes.get(id.index());
     if let VKind::Structural { children, .. } = &node.kind {
         let mut total = V::zero();
-        for i in 0..children.len() {
-            total = V::add(total, children.intensities[i]);
+        for &intensity in &children.intensities[..children.len()] {
+            total = V::add(total, intensity);
         }
         // Must drop borrow before mutating.
         let _ = node;
