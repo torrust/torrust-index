@@ -31,13 +31,13 @@ version = "4.0.0-develop"
 authors = ["Nautilus Cyberneering <info@nautilus-cyberneering.de>, Mick van Dijke <mick@dutchbits.nl>"]
 categories = ["network-programming", "web-programming"]
 description = "A BitTorrent Index"
-documentation = "https://docs.rs/crate/torrust-tracker/"
+documentation = "https://docs.rs/torrust-index/"
 edition = "2024"
 homepage = "https://torrust.com/"
 keywords = ["bittorrent", "file-sharing", "index", "peer-to-peer", "torrent"]
 license = "AGPL-3.0-only"
 publish = true
-repository = "https://github.com/torrust/torrust-tracker"
+repository = "https://github.com/torrust/torrust-index"
 rust-version = "1.89"
 
 [features]
