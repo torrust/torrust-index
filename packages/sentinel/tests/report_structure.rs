@@ -751,20 +751,31 @@ fn batch_report_age_is_scoped_to_its_own_batch() {
 
     let _first = s.ingest(&cell_values(0xF, 64));
 
-    // A silence far longer than an ingest of this size takes.
+    // A silence, so that an age running from the sentinel's own beginning
+    // would have this stretch of quiet inside it.
     let quiet = Duration::from_millis(200);
     std::thread::sleep(quiet);
 
+    let call_start = Instant::now();
     let second = s.ingest(&cell_values(0x1, 64));
+    let call_micros = u64::try_from(call_start.elapsed().as_micros()).unwrap();
 
     let age = second
         .oldest_observation_age_micros
         .expect("a batch carrying observations has an oldest one");
     let quiet_micros = u64::try_from(quiet.as_micros()).unwrap();
 
+    // An age scoped to its own batch is bounded by the call that produced the
+    // batch, whatever happened before the call.
     assert!(
-        age < quiet_micros,
-        "age ({age}) should exclude the {quiet_micros} micros of silence before the batch arrived",
+        age <= call_micros,
+        "age ({age}) cannot exceed the call it was measured inside ({call_micros})",
+    );
+    // The same bound stated against the silence: excluding the quiet means the
+    // age stays under it once the call's own duration is accounted for.
+    assert!(
+        age < quiet_micros + call_micros,
+        "age ({age}) should exclude the {quiet_micros} micros of silence before the batch arrived, allowing the {call_micros} micros the call itself took",
     );
 }
 
