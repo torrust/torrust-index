@@ -214,7 +214,7 @@ impl Info {
             );
         }
 
-        if env::var(ENV_VAR_CONFIG_TOML_PATH).ok().is_some_and(|s| !s.is_empty()) {
+        if env::var(ENV_VAR_CONFIG_TOML_PATH).is_ok_and(|s| !s.is_empty()) {
             tracing::info!(path = %info.config_toml_path, "loading extra configuration from file");
         } else {
             tracing::info!(

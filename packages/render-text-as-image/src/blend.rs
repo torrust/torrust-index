@@ -20,7 +20,7 @@ fn f32_to_u8_sat(v: f32) -> u8 {
 pub fn blend_source_over(dst: &mut Rgba<u8>, fg: [u8; 4], src_alpha: u8) {
     let sa = f32::from(src_alpha) / 255.0;
     let da = f32::from(dst.0[3]) / 255.0;
-    let out_a = sa + da * (1.0 - sa);
+    let out_a = da.mul_add(1.0 - sa, sa);
 
     if out_a == 0.0 {
         return;

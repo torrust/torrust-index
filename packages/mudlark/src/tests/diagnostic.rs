@@ -249,7 +249,7 @@ fn audit_violations_returns_empty_when_no_violations() {
     let g = make_graph(100);
     // No observations → no violations possible.
     let missed = diagnostic::audit_violations(&g.vnodes, &g.violations, "EMPTY");
-    assert!(missed.is_empty());
+    assert!(missed.is_empty(), "unexpected missed entries: {missed:?}");
 }
 
 #[test]

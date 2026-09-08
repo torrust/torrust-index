@@ -405,10 +405,10 @@ fn adversarial_cousins_setup_then_spikes() {
     assert_eq!(p.len(), 10);
 
     // Setup phase: gentle delta=1 at both coords
-    for i in 0..6 {
+    for (i, observation) in p.observations.iter().enumerate().take(6) {
         let expected_coord = if i % 2 == 0 { 10 } else { 20 };
-        assert_eq!(p.observations[i].0, expected_coord, "setup obs {i}");
-        assert_eq!(p.observations[i].1, 1, "setup delta at {i}");
+        assert_eq!(observation.0, expected_coord, "setup obs {i}");
+        assert_eq!(observation.1, 1, "setup delta at {i}");
     }
 
     // Spike phase: alternating high deltas
@@ -492,8 +492,8 @@ fn cascade_shift_build_then_transition() {
     assert_eq!(p.len(), 10);
 
     // Build phase
-    for i in 0..4 {
-        assert_eq!(p.observations[i], (10, 5), "build phase obs {i}");
+    for (i, observation) in p.observations.iter().enumerate().take(4) {
+        assert_eq!(*observation, (10, 5), "build phase obs {i}");
     }
 
     // Shift phase: i%3==0 → coord 10 (lingering), else → coord 20

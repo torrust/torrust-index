@@ -14,7 +14,6 @@ members = [
 [package]
 default-run = "torrust-index"
 name = "torrust-index"
-readme = "README.md"
 
 authors.workspace = true
 description.workspace = true
@@ -26,21 +25,20 @@ license.workspace = true
 publish.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-version.workspace = true
+version = "4.0.0-develop"
 
 [workspace.package]
 authors = ["Nautilus Cyberneering <info@nautilus-cyberneering.de>, Mick van Dijke <mick@dutchbits.nl>"]
 categories = ["network-programming", "web-programming"]
 description = "A BitTorrent Index"
-documentation = "https://docs.rs/crate/torrust-tracker/"
+documentation = "https://docs.rs/torrust-index/"
 edition = "2024"
 homepage = "https://torrust.com/"
 keywords = ["bittorrent", "file-sharing", "index", "peer-to-peer", "torrent"]
 license = "AGPL-3.0-only"
 publish = true
-repository = "https://github.com/torrust/torrust-tracker"
-rust-version = "1.88"
-version = "4.0.0-develop"
+repository = "https://github.com/torrust/torrust-index"
+rust-version = "1.89"
 
 [features]
 default = []
@@ -52,11 +50,16 @@ opt-level = 3
 opt-level = 3
 
 [dependencies]
-torrust-index-cli-common = { version = "4.0.0-develop", path = "packages/index-cli-common" }
-torrust-index-config = { version = "4.0.0-develop", path = "packages/index-config" }
+torrust-index-cli-common = { version = "0.1.0", path = "packages/index-cli-common" }
+torrust-index-config = { version = "0.1.0", path = "packages/index-config" }
 torrust-index-render-text-as-image = { version = "0.1.0", path = "packages/render-text-as-image" }
 
-argon2 = "0"
+# argon2 and pbkdf2 must stay on one `password-hash` major: the password
+# verification path in `src/services/authentication.rs` builds a `PasswordHash`
+# from one crate and verifies it with the other, so a mismatch is a type error.
+# Both are held to the 0.x line the sources are written against; a bare `0`
+# requirement admits every breaking 0.x release and had let them drift apart.
+argon2 = "0.5"
 async-trait = "0"
 axum = { version = "0", features = ["multipart"] }
 axum-server = { version = "0", features = ["tls-rustls"] }
@@ -67,7 +70,6 @@ clap = { version = "4", features = ["derive", "env"] }
 derive_more = { version = "2", features = ["display"] }
 email_address = "0"
 figment = { version = "0", features = ["env", "test", "toml"] }
-futures = "0"
 futures-util = "0"
 hex = "0"
 http = "1"
@@ -86,7 +88,7 @@ lettre = { version = "0", features = [
 ] }
 log = "0"
 mockall = "0"
-pbkdf2 = { version = "0", features = ["simple"] }
+pbkdf2 = { version = "0.12", features = ["simple"] }
 pin-project-lite = "0"
 rand = "0.10"
 regex = "1"
@@ -105,7 +107,9 @@ thiserror = "2"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "1"
 tower = { version = "0", features = ["timeout"] }
-tower-http = { version = "0", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
+# Held at 0.6: tower-http 0.7 changes response behaviour for features this
+# workspace enables. Adopting it is an API decision, not a lock refresh.
+tower-http = { version = "0.6", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
 tracing = "0"
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
@@ -115,22 +119,19 @@ uuid = { version = "1", features = ["v4"] }
 tempfile = "3"
 which = "8"
 
-[package.metadata.cargo-machete]
-ignored = ["futures", "torrust-sentinel"]
-
 [lints]
 workspace = true
 
 [workspace.lints.rust]
-deprecated-safe = { level = "deny", priority = -1 }
-future-incompatible = { level = "deny", priority = -1 }
-let-underscore = { level = "deny", priority = -1 }
-nonstandard-style = { level = "deny", priority = -1 }
-rust-2018-compatibility = { level = "deny", priority = -1 }
-rust-2018-idioms = { level = "deny", priority = -1 }
-rust-2021-compatibility = { level = "deny", priority = -1 }
-rust-2024-compatibility = { level = "deny", priority = -1 }
-unsafe-code = "warn"
+deprecated_safe = { level = "deny", priority = -1 }
+future_incompatible = { level = "deny", priority = -1 }
+let_underscore = { level = "deny", priority = -1 }
+nonstandard_style = { level = "deny", priority = -1 }
+rust_2018_compatibility = { level = "deny", priority = -1 }
+rust_2018_idioms = { level = "deny", priority = -1 }
+rust_2021_compatibility = { level = "deny", priority = -1 }
+rust_2024_compatibility = { level = "deny", priority = -1 }
+unsafe_code = "warn"
 unused = { level = "deny", priority = -2 }
 warnings = { level = "deny", priority = -1 }
 
@@ -146,4 +147,9 @@ print_stderr = { level = "deny", priority = 0 }
 print_stdout = { level = "deny", priority = 0 }
 style = { level = "deny", priority = -1 }
 suspicious = { level = "deny", priority = -1 }
+# The `async` on these signatures is contractual, not incidental: axum's
+# `FromRequestParts` is an async trait, and the byte-cache methods are async so
+# callers keep one shape if a future implementation does await. Dropping it
+# would change the public API, which is a design decision, not a lint fix.
+unused_async_trait_impl = { level = "allow", priority = 0 }
 

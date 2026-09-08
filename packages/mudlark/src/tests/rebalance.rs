@@ -549,7 +549,7 @@ fn rebalance_resolves_single_violation() {
     rebalance(&mut vnodes, &mut gnodes, &mut violations, u32::MAX);
 
     assert!(!is_violated(&vnodes, c));
-    assert!(violations.is_empty());
+    assert!(violations.is_empty(), "unexpected invariant violations: {violations:?}");
 }
 
 #[test]
@@ -558,7 +558,7 @@ fn rebalance_empty_queue_is_noop() {
     let mut gnodes = make_gnodes();
     let mut violations = vec![];
     rebalance(&mut vnodes, &mut gnodes, &mut violations, u32::MAX);
-    assert!(violations.is_empty());
+    assert!(violations.is_empty(), "unexpected invariant violations: {violations:?}");
 }
 
 #[test]
@@ -570,7 +570,7 @@ fn rebalance_skips_destroyed_node() {
 
     let mut violations = vec![e];
     rebalance(&mut vnodes, &mut gnodes, &mut violations, u32::MAX);
-    assert!(violations.is_empty());
+    assert!(violations.is_empty(), "unexpected invariant violations: {violations:?}");
 }
 
 #[test]
@@ -585,7 +585,7 @@ fn rebalance_skips_already_resolved() {
 
     let mut violations = vec![c];
     rebalance(&mut vnodes, &mut gnodes, &mut violations, u32::MAX);
-    assert!(violations.is_empty());
+    assert!(violations.is_empty(), "unexpected invariant violations: {violations:?}");
 }
 
 #[test]
@@ -659,7 +659,7 @@ fn structural_violation_resolved_by_rebalance() {
     let mut violations = vec![p];
     rebalance(&mut vnodes, &mut gnodes, &mut violations, u32::MAX);
 
-    assert!(violations.is_empty());
+    assert!(violations.is_empty(), "unexpected invariant violations: {violations:?}");
     assert!(find_violated_nodes(&vnodes).is_empty(), "all violations should be resolved");
 }
 
@@ -739,7 +739,7 @@ fn source_4_noop_when_children_safe() {
     let mut violations = Vec::new();
     push_promoted_violations_with_config(&vnodes, p, &mut violations, ViolationSources::only_source_4());
 
-    assert!(violations.is_empty());
+    assert!(violations.is_empty(), "unexpected invariant violations: {violations:?}");
 }
 
 // ── Source 3: push_side_effect_violations (grandchildren) ──
@@ -876,7 +876,7 @@ fn escalation_direct_breaks_promote_cycle() {
     let mut violations = vec![c];
     rebalance(&mut vnodes, &mut gnodes, &mut violations, u32::MAX);
 
-    assert!(violations.is_empty());
+    assert!(violations.is_empty(), "unexpected invariant violations: {violations:?}");
     let remaining = find_violated_nodes(&vnodes);
     assert!(
         remaining.is_empty(),
@@ -927,7 +927,7 @@ fn escalation_with_structural_heaviest_child() {
     let mut violations = vec![c];
     rebalance(&mut vnodes, &mut gnodes, &mut violations, u32::MAX);
 
-    assert!(violations.is_empty());
+    assert!(violations.is_empty(), "unexpected invariant violations: {violations:?}");
     let remaining = find_violated_nodes(&vnodes);
     assert!(
         remaining.is_empty(),
@@ -973,7 +973,7 @@ fn escalation_indirect_child_of_heaviest_violated() {
     let mut violations = vec![c];
     rebalance(&mut vnodes, &mut gnodes, &mut violations, u32::MAX);
 
-    assert!(violations.is_empty());
+    assert!(violations.is_empty(), "unexpected invariant violations: {violations:?}");
     let remaining = find_violated_nodes(&vnodes);
     assert!(
         remaining.is_empty(),

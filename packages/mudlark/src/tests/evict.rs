@@ -348,7 +348,7 @@ fn no_candidates_when_within_d_evict() {
     // are at V-depth 2 or 3 — well within bounds.
     let g = graph_with_split();
     let candidates = scan_for_candidates(&g);
-    assert!(candidates.is_empty());
+    assert!(candidates.is_empty(), "unexpected eviction candidates: {candidates:?}");
 }
 
 #[test]

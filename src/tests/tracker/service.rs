@@ -1,6 +1,6 @@
 use url::Url;
 
-use crate::tracker::service::build_announce_url_with_key;
+use crate::tracker::service::{action_status_reason, build_announce_url_with_key};
 
 #[test]
 fn test_build_announce_url_with_key_with_announce_path() {
@@ -59,4 +59,31 @@ fn test_build_announce_url_with_key_multiple_path_segments() {
         result.to_string(),
         "https://tracker.example.com/api/v1/announce/complexkey456"
     );
+}
+
+#[test]
+fn test_action_status_reason_extracts_the_reason_the_tracker_gave() {
+    let body = r#"{"status":"err","reason":"listed capability is disabled by configuration"}"#;
+
+    let result = action_status_reason(body);
+
+    assert_eq!(result, "listed capability is disabled by configuration");
+}
+
+#[test]
+fn test_action_status_reason_falls_back_to_the_raw_body_when_it_is_not_json() {
+    let body = "listed capability is disabled by configuration";
+
+    let result = action_status_reason(body);
+
+    assert_eq!(result, "listed capability is disabled by configuration");
+}
+
+#[test]
+fn test_action_status_reason_falls_back_to_the_raw_body_when_the_json_carries_no_reason() {
+    let body = r#"{"status":"err"}"#;
+
+    let result = action_status_reason(body);
+
+    assert_eq!(result, r#"{"status":"err"}"#);
 }

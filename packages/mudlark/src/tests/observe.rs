@@ -297,11 +297,11 @@ fn observe_violations_drained() {
     // Multiple observations — violations queue should be empty
     // after each observe call returns.
     g.observe(3u64, 10u64);
-    assert!(g.violations.is_empty());
+    assert!(g.violations.is_empty(), "unexpected invariant violations: {:?}", g.violations);
     g.observe(3u64, 20u64);
-    assert!(g.violations.is_empty());
+    assert!(g.violations.is_empty(), "unexpected invariant violations: {:?}", g.violations);
     g.observe(10u64, 5u64);
-    assert!(g.violations.is_empty());
+    assert!(g.violations.is_empty(), "unexpected invariant violations: {:?}", g.violations);
     crate::invariants::assert_invariants(&g);
 }
 
@@ -351,7 +351,7 @@ fn observe_violations_empty_after_eviction() {
         g.observe(i % 16, 6u64);
     }
     // After each observe, violations should be fully drained.
-    assert!(g.violations.is_empty());
+    assert!(g.violations.is_empty(), "unexpected invariant violations: {:?}", g.violations);
     crate::invariants::assert_invariants(&g);
 }
 

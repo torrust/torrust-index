@@ -166,7 +166,7 @@ fn from_toml_round_trip() {
     // completeness alongside the other constructors.
     let info = Info::from_toml("body");
     assert_eq!(info.config_toml.as_deref(), Some("body"));
-    assert!(info.config_toml_path.is_empty());
+    assert_eq!(info.config_toml_path, "");
 }
 
 #[test]

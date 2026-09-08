@@ -1,9 +1,25 @@
 name: Deployment
 
+# Application release. See ADR-T-012 (independent package versioning),
+# `adr/012-independent-package-versioning.md`.
+#
+# Publishes only the root `torrust-index` binary crate. Every other workspace
+# crate versions independently and is published by `deployment-packages.yaml`
+# as it evolves, so by the time an application release happens they are
+# already on crates.io.
+#
+# The trigger is `releases/v*`, not `releases/**/*`: a `*` glob does not cross
+# a `/`, so this pattern cannot match the `releases/pkg/<crate-name>/v<semver>`
+# branches that drive package publishing. The previous pattern admitted every
+# branch under `releases/`, so pushing a package release branch would have
+# started this workflow and published the root crate.
+#
+# See `docs/release_process.md` for the full release workflow.
+
 on:
   push:
     branches:
-      - "releases/**/*"
+      - "releases/v*"
 
 jobs:
   test:
@@ -55,5 +71,4 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: "${{ secrets.TORRUST_UPDATE_CARGO_REGISTRY_TOKEN }}"
         run: |
-          cargo publish -p torrust-index-located-error
           cargo publish -p torrust-index

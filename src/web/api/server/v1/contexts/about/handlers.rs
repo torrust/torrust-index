@@ -16,7 +16,7 @@ pub async fn about_page_handler(
 ) -> Response {
     match app_data.about_service.get_about_page() {
         Ok(html) => (StatusCode::OK, [(header::CONTENT_TYPE, "text/html; charset=utf-8")], html).into_response(),
-        Err(error) => error.into_response(),
+        Err(infallible) => match infallible {},
     }
 }
 
@@ -27,6 +27,6 @@ pub async fn license_page_handler(
 ) -> Response {
     match app_data.about_service.get_license_page() {
         Ok(html) => (StatusCode::OK, [(header::CONTENT_TYPE, "text/html; charset=utf-8")], html).into_response(),
-        Err(error) => error.into_response(),
+        Err(infallible) => match infallible {},
     }
 }

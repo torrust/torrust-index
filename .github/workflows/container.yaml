@@ -1,11 +1,18 @@
 name: Container
 
+# The release trigger is `releases/v*`, not `releases/**/*`: a `*` glob does not
+# cross a `/`, so it cannot match the `releases/pkg/<crate-name>/v<semver>`
+# branches that publish a single workspace crate (ADR-T-012,
+# `adr/012-independent-package-versioning.md`). Publishing a crate produces no
+# container image, and the `Check Context` step below already refuses such a
+# ref; narrowing the trigger keeps the build from running at all.
+
 on:
   push:
     branches:
       - "develop"
       - "main"
-      - "releases/**/*"
+      - "releases/v*"
   pull_request:
     branches:
       - "develop"

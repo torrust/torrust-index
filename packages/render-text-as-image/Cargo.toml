@@ -2,7 +2,6 @@
 description = "Render short text strings as PNG images with no system dependencies."
 keywords = ["image", "rendering", "text", "library"]
 name = "torrust-index-render-text-as-image"
-readme = "README.md"
 
 authors.workspace = true
 documentation.workspace = true

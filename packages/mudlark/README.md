@@ -36,7 +36,7 @@ semver guarantees from 1.0.0 onwards.
 Internal machinery (Surface 3 / `pub(crate)`) is not part of the
 public API and may change in any release.
 
-**MSRV:** 1.80 (tested in CI)
+**MSRV:** 1.89 — inherited from the workspace `rust-version` and tested in CI.
 
 See [CHANGELOG.md](CHANGELOG.md) for the release history.
 

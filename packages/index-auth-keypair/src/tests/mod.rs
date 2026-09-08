@@ -15,8 +15,8 @@ fn generated_json_round_trips() {
     let json = serde_json::to_string(&output).unwrap();
     let parsed: super::KeypairOutput = serde_json::from_str(&json).unwrap();
     assert_eq!(parsed.schema, super::SCHEMA);
-    assert!(!parsed.private_key_pem.is_empty());
-    assert!(!parsed.public_key_pem.is_empty());
+    assert_ne!(parsed.private_key_pem, "");
+    assert_ne!(parsed.public_key_pem, "");
 }
 
 #[test]

@@ -43,7 +43,7 @@ async fn it_should_return_a_tag_list() {
     // There should be at least the tag we added.
     // Since this is an E2E test that could be executed in a shred env,
     // there might be more tags.
-    assert!(!res.data.is_empty());
+    assert!(!res.data.is_empty(), "expected at least one tag, got {:?}", res.data);
     if let Some(content_type) = &response.content_type {
         assert_eq!(content_type, "application/json");
     }

@@ -15,7 +15,7 @@ The container infrastructure consists of:
 - A single [`compose.yaml`](../compose.yaml) that orchestrates the index together with `tracker`, `mysql`, and `mailcatcher`.
 - A POSIX entry script ([`share/container/entry_script_sh`](../share/container/entry_script_sh)) that prepares the runtime, generates auth keys on first boot, and drops privileges via vendored `su-exec` ([`contrib/dev-tools/su-exec/su-exec.c`](../contrib/dev-tools/su-exec/su-exec.c)).
 - Default configurations under [`share/default/config/`](../share/default/config/) shipped inside the image at `/usr/share/torrust/default/config/`.
-- A small `health_check` binary ([`src/bin/health_check.rs`](../src/bin/health_check.rs)) invoked by the runtime `HEALTHCHECK`.
+- A small `health_check` binary (`src/bin/health_check.rs`, relocated by this ADR) invoked by the runtime `HEALTHCHECK`.
 - E2E orchestration scripts under [`contrib/dev-tools/container/e2e/`](../contrib/dev-tools/container/e2e/) and operator documentation in [`docs/containers.md`](../docs/containers.md).
 
 The previous round of work (see [Prior Work](#prior-work)) brought the infrastructure to a defensible baseline by fixing a long list of concrete bugs. What remained was *structural*: several pieces of the design carried assumptions that no longer matched how the project is used, and continuing to layer fixes onto those assumptions kept producing the same shapes of bug. This ADR records the structural decisions and how they were implemented; the [Appendix](#appendix-diagnostic-detail) catalogues the diagnostic items (`R1`–`R10`) that motivated each one.

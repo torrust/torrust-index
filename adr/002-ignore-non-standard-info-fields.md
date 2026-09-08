@@ -14,9 +14,7 @@ dictionary, including non-standard ones. Some real-world torrents
 carry custom keys such as `collections` (Internet Archive), `x_cross_seed`,
 or tracker-specific metadata.
 
-The index deserialises the `info` dictionary into a fixed Rust struct
-(`TorrentInfoDictionary` in
-[src/models/torrent_file.rs](../../src/models/torrent_file.rs)):
+The index deserialises the `info` dictionary into a fixed Rust struct (`TorrentInfoDictionary` in [src/models/torrent_file.rs](../src/models/torrent_file.rs)):
 
 ```rust
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]

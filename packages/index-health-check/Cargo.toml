@@ -8,10 +8,10 @@ license.workspace = true
 publish.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-version.workspace = true
+version = "0.1.0"
 
 [dependencies]
-torrust-index-cli-common = { version = "4.0.0-develop", path = "../index-cli-common" }
+torrust-index-cli-common = { version = "0.1.0", path = "../index-cli-common" }
 
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
