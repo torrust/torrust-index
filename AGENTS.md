@@ -71,14 +71,16 @@ Eagerly corrected when spotted in **any** file!
 
 Cross-references use the `§` (section sign) prefix. Every reference
 carries a **package qualifier** so the target document is never ambiguous.
-ADR references (`ADR-T-001`, `ADR-R-001`, …) are an exception — they
-use their own `ADR-<PREFIX>-<NNN>` form without the `§` prefix.
+ADR references (`ADR-T-001`, `ADR-S-001`, `ADR-R-001`, …) are an
+exception — they use their own `ADR-<PREFIX>-<NNN>` form without the `§`
+prefix.
 
-| Prefix | Package              | Example document                 |
-| ------ | -------------------- | -------------------------------- |
-| `T-`   | Torrust (root crate) |                                  |
-| `M-`   | Mudlark              | `packages/mudlark/docs/idea.md`  |
-| `R-`   | render-text-as-image | `packages/render-text-as-image/` |
+| Prefix | Package              | Example document                         |
+| ------ | -------------------- | ---------------------------------------- |
+| `T-`   | Torrust (root crate) |                                          |
+| `M-`   | Mudlark              | `packages/mudlark/docs/idea.md`          |
+| `S-`   | Sentinel             | `packages/sentinel/docs/algorithm.md`    |
+| `R-`   | render-text-as-image | `packages/render-text-as-image/`         |
 
 Helper crates (`index-health-check`, `index-auth-keypair`,
 `index-config`, `index-config-probe`, `index-cli-common`,
