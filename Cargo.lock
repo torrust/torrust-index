@@ -4255,7 +4255,7 @@ dependencies = [
 
 [[package]]
 name = "torrust-index-auth-keypair"
-version = "4.0.0-develop"
+version = "0.1.0"
 dependencies = [
  "clap",
  "rsa",
@@ -4267,7 +4267,7 @@ dependencies = [
 
 [[package]]
 name = "torrust-index-cli-common"
-version = "4.0.0-develop"
+version = "0.1.0"
 dependencies = [
  "clap",
  "serde",
@@ -4279,7 +4279,7 @@ dependencies = [
 
 [[package]]
 name = "torrust-index-config"
-version = "4.0.0-develop"
+version = "0.1.0"
 dependencies = [
  "camino",
  "derive_more",
@@ -4296,7 +4296,7 @@ dependencies = [
 
 [[package]]
 name = "torrust-index-config-probe"
-version = "4.0.0-develop"
+version = "0.1.0"
 dependencies = [
  "clap",
  "percent-encoding",
@@ -4310,7 +4310,7 @@ dependencies = [
 
 [[package]]
 name = "torrust-index-entry-script"
-version = "4.0.0-develop"
+version = "0.1.0"
 dependencies = [
  "serde_json",
  "tempfile",
@@ -4318,7 +4318,7 @@ dependencies = [
 
 [[package]]
 name = "torrust-index-health-check"
-version = "4.0.0-develop"
+version = "0.1.0"
 dependencies = [
  "clap",
  "serde",

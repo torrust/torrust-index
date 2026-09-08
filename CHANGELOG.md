@@ -7,10 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-**Highlights:** global command-line output contract (ADR-T-010), container infrastructure refactor (ADR-T-009), native role-based authorization replacing Casbin (ADR-T-008), RSA-signed JWTs with revocation support (ADR-T-007), domain-scoped error system (ADR-T-006), MSRV policy and raise to 1.89 (ADR-T-011).
+**Highlights:** global command-line output contract (ADR-T-010), container infrastructure refactor (ADR-T-009), native role-based authorization replacing Casbin (ADR-T-008), RSA-signed JWTs with revocation support (ADR-T-007), domain-scoped error system (ADR-T-006), MSRV policy and raise to 1.89 (ADR-T-011), independent package versioning (ADR-T-012).
 
 ### Breaking changes
 
+- Every workspace crate now declares its own `version`, and `[workspace.package]` no longer carries one (ADR-T-012). `torrust-index` keeps `4.0.0-develop`; the six member crates that inherited the workspace version are now at `0.1.0`, down from `4.0.0-develop`. `torrust-mudlark` keeps `1.0.0` and `torrust-index-render-text-as-image` keeps `0.1.0`, the versions they had already declared for themselves rather than inherited. None of the crates that moved has ever been on crates.io, so no dependency requirement and no lock file ever resolved the numbers they carried, and `0.x` is the honest statement of an API that has not been released. Sibling dependencies now pin the version each crate declares beside its `path`, which is the requirement `cargo publish` writes into a published manifest; a `4.0.0-develop` requirement named nothing the registry could resolve. Crates are published one at a time from a `releases/pkg/<crate-name>/v<semver>` branch, and the application release publishes only `torrust-index`.
 - MSRV raised from 1.85 to 1.89. ADR-T-011 replaces the dependency-driven floor with a computed one: `rust-version` is the newest stable Rust released at least one year before the day the pin is computed, recomputed at every release and in every maintenance pass. Computed on 2026-09-05 that is 1.89.
 - First-party command-line entrypoints are now governed by ADR-T-010's
   JSON-only output contract. Stdout is reserved for machine-readable result
