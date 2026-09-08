@@ -836,22 +836,27 @@ fn deterministic_reproduction() {
         }
 
         // Exact bit-for-bit equality — deterministic SVD produces identical
-        // floating-point values, so bitwise comparison is intentional.
+        // floating-point values, so the comparison is made on the bit
+        // patterns rather than on numeric equality.
         {
             let a = &results[0];
             let b_r = &results[1];
             assert_eq!(a.n, b_r.n, "{strategy}: n mismatch");
             for i in 0..a.n {
-                assert_eq!(a.sigmas[i], b_r.sigmas[i], "{strategy}: σ[{i}] not bitwise equal");
+                assert_eq!(
+                    a.sigmas[i].to_bits(),
+                    b_r.sigmas[i].to_bits(),
+                    "{strategy}: σ[{i}] not bitwise equal"
+                );
                 for j in 0..d {
                     assert_eq!(
-                        a.basis[(j, i)],
-                        b_r.basis[(j, i)],
+                        a.basis[(j, i)].to_bits(),
+                        b_r.basis[(j, i)].to_bits(),
                         "{strategy}: basis[{j},{i}] not bitwise equal"
                     );
                 }
             }
-        } // #[allow(clippy::float_cmp)]
+        }
     }
 }
 
