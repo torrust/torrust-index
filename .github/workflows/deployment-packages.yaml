@@ -1,0 +1,161 @@
+name: Deployment (Packages)
+
+# Workspace package publishing. See ADR-T-012 (independent package versioning),
+# `adr/012-independent-package-versioning.md`.
+#
+# Publishes exactly one workspace crate to crates.io. Every crate carries its
+# own version and is published as it evolves, which is why the application
+# release workflow (`deployment.yaml`) only has to publish `torrust-index`
+# itself.
+#
+# Triggered by:
+#   - pushing a branch matching `releases/pkg/<crate-name>/v<semver>`
+#   - `workflow_dispatch` with a crate name, for a publish that needs no branch
+#
+# Branch: releases/pkg/<crate-name>/v<semver>
+# Tag:    pkg/<crate-name>/v<semver> (signed, created after this workflow succeeds)
+#
+# The test job runs only the named crate's tests. No member crate needs an
+# external tool to test; the root crate does, and it is published by
+# `deployment.yaml`, which installs what its tests need.
+#
+# See `docs/release_process.md` for the full workflow.
+
+on:
+  push:
+    branches:
+      - "releases/pkg/**"
+  workflow_dispatch:
+    inputs:
+      crate-name:
+        description: "Crate to publish (e.g. torrust-index-config)"
+        required: true
+        type: string
+
+jobs:
+  extract-crate:
+    name: Extract Crate Name
+    runs-on: ubuntu-latest
+
+    outputs:
+      crate-name: ${{ steps.extract.outputs.crate-name }}
+
+    steps:
+      - id: extract
+        name: Extract Crate Name from Branch or Input
+        env:
+          INPUT_CRATE_NAME: ${{ inputs.crate-name }}
+        run: |
+          set -eu
+          if [ -n "$INPUT_CRATE_NAME" ]; then
+            # Strip newlines: a crate name carrying one would otherwise inject
+            # extra keys into the step output file.
+            CRATE=$(echo "$INPUT_CRATE_NAME" | tr -d '\r\n')
+            if [ -z "$CRATE" ]; then
+              echo "::error::crate name is empty after sanitisation"
+              exit 1
+            fi
+            {
+              echo 'crate-name<<EOF'
+              echo "$CRATE"
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+          else
+            BRANCH="${GITHUB_REF#refs/heads/}"
+            case "$BRANCH" in
+              releases/pkg/*/v*)
+                # releases/pkg/<crate-name>/v<semver> -> <crate-name>
+                CRATE="${BRANCH#releases/pkg/}"
+                CRATE="${CRATE%/v*}"
+                if [ -z "$CRATE" ]; then
+                  echo "::error::could not extract a crate name from branch '$BRANCH'"
+                  echo "expected releases/pkg/<crate-name>/v<semver>"
+                  exit 1
+                fi
+                # A remaining '/' means the branch carries extra path segments,
+                # so the name is not a crate name.
+                case "$CRATE" in
+                  */*)
+                    echo "::error::branch '$BRANCH' has extra path segments; '$CRATE' is not a crate name"
+                    echo "expected releases/pkg/<crate-name>/v<semver>, e.g. releases/pkg/torrust-index-config/v0.1.0"
+                    exit 1
+                    ;;
+                esac
+                echo "crate-name=${CRATE}" >> "$GITHUB_OUTPUT"
+                ;;
+              *)
+                echo "::error::branch '$BRANCH' does not match releases/pkg/<crate-name>/v<semver>"
+                echo "example: releases/pkg/torrust-index-config/v0.1.0"
+                exit 1
+                ;;
+            esac
+          fi
+
+  test:
+    name: Test
+    needs: extract-crate
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        toolchain: [nightly, stable]
+
+    steps:
+      - id: checkout
+        name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - id: setup
+        name: Setup Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+
+      - id: test
+        name: Run Tests for ${{ needs.extract-crate.outputs.crate-name }}
+        run: cargo test -p "${{ needs.extract-crate.outputs.crate-name }}" --all-targets --all-features
+
+  publish:
+    name: Publish
+    environment: deployment
+    needs: [extract-crate, test]
+    runs-on: ubuntu-latest
+
+    steps:
+      - id: checkout
+        name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - id: setup
+        name: Setup Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      # ADR-T-012: a crate is publishable only if it declares its own version.
+      # An inherited version cannot be published, because the requirement
+      # `cargo publish` writes beside a sibling dependency would name a version
+      # no registry copy has. Checking here blocks the only action it corrupts.
+      - id: verify-version
+        name: Verify Explicit Version
+        run: |
+          set -eu
+          CRATE="${{ needs.extract-crate.outputs.crate-name }}"
+          TOML_FILE=$(grep -rl "name = \"$CRATE\"" --include='Cargo.toml' . | head -1)
+          if [ -z "$TOML_FILE" ]; then
+            echo "::error::no Cargo.toml declares a crate named '$CRATE'"
+            exit 1
+          fi
+          if grep -q '^version.workspace = true' "$TOML_FILE"; then
+            echo "::error file=$TOML_FILE::crate '$CRATE' still inherits its version from [workspace.package]"
+            echo "every crate declares its own version (ADR-T-012, adr/012-independent-package-versioning.md)"
+            exit 1
+          fi
+          echo "crate '$CRATE' declares its own version in $TOML_FILE"
+
+      - id: publish
+        name: Publish ${{ needs.extract-crate.outputs.crate-name }}
+        env:
+          CARGO_REGISTRY_TOKEN: "${{ secrets.TORRUST_UPDATE_CARGO_REGISTRY_TOKEN }}"
+        run: |
+          cargo publish -p "${{ needs.extract-crate.outputs.crate-name }}"
