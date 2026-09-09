@@ -59,7 +59,7 @@ torrust-index-render-text-as-image = { version = "0.1.0", path = "packages/rende
 # from one crate and verifies it with the other, so a mismatch is a type error.
 # Both are held to the 0.x line the sources are written against; a bare `0`
 # requirement admits every breaking 0.x release and had let them drift apart.
-argon2 = "0.5"
+argon2 = "0.6"
 async-trait = "0"
 axum = { version = "0", features = ["multipart"] }
 axum-server = { version = "0", features = ["tls-rustls"] }
