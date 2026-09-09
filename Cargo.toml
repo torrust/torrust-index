@@ -77,7 +77,7 @@ http-body = "1"
 hyper = "1"
 hyper-util = { version = "0", features = ["http1", "http2", "tokio"] }
 indexmap = "2"
-jsonwebtoken = { version = "10", features = ["rust_crypto"] }
+jsonwebtoken = { version = "11", features = ["rust_crypto"] }
 lettre = { version = "0", features = [
     "builder",
     "file-transport-envelope",
