@@ -63,7 +63,7 @@ argon2 = "0.5"
 async-trait = "0"
 axum = { version = "0", features = ["multipart"] }
 axum-server = { version = "0", features = ["tls-rustls"] }
-bittorrent-primitives = "0.2"
+bittorrent-primitives = "0.3"
 bytes = "1"
 chrono = { version = "0", default-features = false, features = ["clock"] }
 clap = { version = "4", features = ["derive", "env"] }
