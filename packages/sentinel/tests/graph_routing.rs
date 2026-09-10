@@ -17,6 +17,8 @@
 //! | [`concentrated_traffic_grows_terminals`] | routing | cites (´claim:routing:concentrated-traffic-buys-resolution-by-splitting-the-range-it-lands-in´) |
 //! | [`diverse_traffic_respects_budget`] | routing | Traffic spread thinly over many well-separated ranges asks the graph to refine everywhere at once, and the node budget is what keeps that from being unbounded: however many ranges are busy and however low the split threshold is set, the graph holds no more cells than the budget allows. The cost of modelling is a configured ceiling rather than a function of how widely an adversary chooses to scatter. |
 //! | [`reset_restores_fresh_graph_state`] | routing | Reset discards the partition as well as the evidence: a graph that had split under load comes back as the single root cell of a fresh sentinel, with nothing accumulated and nothing to land in but the root. Structure is derived from observations, so once the observations are dropped there is no refinement left worth preserving, and a reset sentinel cannot be distinguished from a new one by what its graph holds. |
+//! | [`top_of_domain_coordinate_routes_to_a_cell`] | routing | The topmost coordinate of the domain reaches a tracker rather than falling through every cell. Cell intervals are half-open, which has no upper edge case while the coordinate width is narrower than the coordinate type — the bound is then a representable value outside the domain. At the full width the domain's maximum is the type's maximum, there is no value above it to be excluded, and a half-open reading of the topmost interval therefore excludes a coordinate that is genuinely inside the domain. The spatial layer counts that observation either way, so the two readings would disagree: the accumulated total records an arrival that no tracker was ever shown. |
+//! | [`an_ordinary_coordinate_still_lands_in_one_cell`] | routing | cites (´claim:routing:the-domains-top-coordinate-reaches-a-tracker-rather-than-falling-through-every-cell´) |
 
 //! Graph routing — how an observed value reaches the cell that will
 //! analyse it.
@@ -310,4 +312,63 @@ fn reset_restores_fresh_graph_state() {
     assert_eq!(s.graph().total_sum(), 0);
     assert_eq!(s.graph().node_count(), 1);
     assert_eq!(s.graph().terminal_count(), 1);
+}
+
+/// The topmost coordinate of the domain reaches a tracker rather than falling
+/// through every cell. Cell intervals are half-open, which has no upper edge
+/// case while the coordinate width is narrower than the coordinate type — the
+/// bound is then a representable value outside the domain. At the full width
+/// the domain's maximum is the type's maximum, there is no value above it to
+/// be excluded, and a half-open reading of the topmost interval therefore
+/// excludes a coordinate that is genuinely inside the domain. The spatial
+/// layer counts that observation either way, so the two readings would
+/// disagree: the accumulated total records an arrival that no tracker was ever
+/// shown.
+///
+/// ´claim:routing:the-domains-top-coordinate-reaches-a-tracker-rather-than-falling-through-every-cell´
+/// ´test:integration:top-of-domain-coordinate-routes-to-a-cell´
+#[test]
+fn top_of_domain_coordinate_routes_to_a_cell() {
+    let cfg = test_config();
+    let mut s = Sentinel128::new(cfg).unwrap();
+
+    let report = s.ingest(&[u128::MAX]);
+
+    assert_eq!(s.graph().total_sum(), 1, "the spatial layer counts the observation");
+
+    // Competitive and ancestor cells are reported separately, and a fresh
+    // sentinel holds only the root, which is an ancestor by construction.
+    let routed: usize = report
+        .cell_reports
+        .iter()
+        .chain(report.ancestor_reports.iter())
+        .map(|c| c.sample_count)
+        .sum();
+    assert_eq!(routed, 1, "and a tracker must be shown the same observation");
+}
+
+/// The inclusive reading is confined to the top of the domain, so an ordinary
+/// coordinate still lands in exactly one cell of the partition. Widening the
+/// upper bound everywhere would put each boundary value in two sibling cells
+/// at once and count it twice; widening it only where there is no successor
+/// leaves every other boundary exactly as it was.
+///
+/// (´claim:routing:the-domains-top-coordinate-reaches-a-tracker-rather-than-falling-through-every-cell´)
+/// ´test:integration:an-ordinary-coordinate-still-lands-in-one-cell´
+#[test]
+fn an_ordinary_coordinate_still_lands_in_one_cell() {
+    let cfg = test_config();
+    let mut s = Sentinel128::new(cfg).unwrap();
+
+    let report = s.ingest(&cell_values(0x7, 1));
+
+    assert_eq!(s.graph().total_sum(), 1);
+
+    let routed: usize = report
+        .cell_reports
+        .iter()
+        .chain(report.ancestor_reports.iter())
+        .map(|c| c.sample_count)
+        .sum();
+    assert_eq!(routed, 1, "one arrival is shown to one tracker");
 }

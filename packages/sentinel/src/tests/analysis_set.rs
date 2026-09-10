@@ -9,6 +9,8 @@
 //! | [`root_always_present`] | selection | The root is in the full set unconditionally — here even when nothing has been observed and no cell competed at all. Ancestor closure walks upward from each selected cell, so the root's presence is what guarantees every such walk terminates at a cell that has a model rather than running off the top of the tree. |
 //! | [`root_is_never_competitive`] | selection | However much traffic the graph has seen, and however generous the budget, the root is never competitively selected. It accumulates every observation by construction and would win any importance contest automatically, crowding out the cells whose behaviour is actually informative. Its place in the set is structural, and it is held apart from the cells that earned theirs. |
 //! | [`competitive_set_respects_k`] | selection | The competitive set never exceeds the budget it was asked for, however many cells would qualify on their merits. The budget is what bounds the sentinel's modelling cost, so it is a ceiling rather than a target that a sufficiently busy graph could push past. |
+//! | [`budget_of_one_selects_one_cell`] | selection | A budget of one selects a cell rather than nothing, because the root leaves the field before the cut rather than after it. Taken the other way round the root wins the only slot and is then discarded for being the root, so the smallest budget the configuration admits selects nothing at all however busy the graph is. The root wins that contest on a total it accumulated before its first split and stopped adding to at the split, while its children start from zero — so the emptiness persists until a child's own total passes a figure that is no longer growing, and every slot spent on the root is a slot spent on an entry that cannot be selected. |
+//! | [`a_larger_budget_fills_every_slot_with_selectable_cells`] | selection | cites (´claim:selection:the-root-leaves-the-field-before-the-cut-so-every-slot-goes-to-a-selectable-cell´) |
 //! | [`k_zero_yields_no_competitive_entries`] | selection | cites (´claim:selection:the-competitive-set-never-exceeds-the-budget-it-was-asked-for´) |
 //! | [`depth_cutoff_zero_excludes_all_non_root`] | selection | The depth cutoff bounds the V-depth of every competitive cell: with the cutoff at zero, no selected cell sits deeper than zero however busy the graph. The bound is enforced while the tree is being walked rather than by discarding candidates afterwards, so the cutoff limits the work done as well as the cells returned. |
 //! | [`tie_breaking_is_deterministic`] | selection | Recomputing over an unchanged graph selects the same cells in the same order. Nothing in selection depends on iteration order, hashing, or timing, so two sentinels fed identical observations reach identical analysis sets — the foundation the reproducibility of every downstream score rests on. |
@@ -135,6 +137,47 @@ fn competitive_set_respects_k() {
     let graph = populated_graph();
     let set = AnalysisSet::recompute(&graph, 2, 6);
     assert!(set.competitive_count() <= 2);
+}
+
+/// A budget of one selects a cell rather than nothing, because the root leaves
+/// the field before the cut rather than after it. Taken the other way round the
+/// root wins the only slot and is then discarded for being the root, so the
+/// smallest budget the configuration admits selects nothing at all however busy
+/// the graph is. The root wins that contest on a total it accumulated before
+/// its first split and stopped adding to at the split, while its children start
+/// from zero — so the emptiness persists until a child's own total passes a
+/// figure that is no longer growing, and every slot spent on the root is a slot
+/// spent on an entry that cannot be selected.
+///
+/// ´claim:selection:the-root-leaves-the-field-before-the-cut-so-every-slot-goes-to-a-selectable-cell´
+/// ´test:crate:budget-of-one-selects-one-cell´
+#[test]
+fn budget_of_one_selects_one_cell() {
+    let graph = populated_graph();
+    let available = AnalysisSet::recompute(&graph, 1000, 6).competitive_count();
+    assert!(available >= 1, "the populated graph must offer at least one candidate");
+
+    let set = AnalysisSet::recompute(&graph, 1, 6);
+    assert_eq!(set.competitive_count(), 1);
+    assert!(!set.is_competitive(graph.g_root()));
+}
+
+/// The same rule at a budget the root could not have exhausted on its own: the
+/// competitive set fills to the whole budget rather than to one less than it.
+/// Removing the root after the cut would cost exactly one slot at every budget,
+/// which is invisible at a large one and total at a budget of one.
+///
+/// (´claim:selection:the-root-leaves-the-field-before-the-cut-so-every-slot-goes-to-a-selectable-cell´)
+/// ´test:crate:a-larger-budget-fills-every-slot-with-selectable-cells´
+#[test]
+fn a_larger_budget_fills_every_slot_with_selectable_cells() {
+    let graph = populated_graph();
+    let available = AnalysisSet::recompute(&graph, 1000, 6).competitive_count();
+    assert!(available >= 3, "the populated graph must offer at least three candidates");
+
+    let set = AnalysisSet::recompute(&graph, 3, 6);
+    assert_eq!(set.competitive_count(), 3);
+    assert!(!set.is_competitive(graph.g_root()));
 }
 
 /// A budget of zero is the boundary of the same ceiling: a well-populated
