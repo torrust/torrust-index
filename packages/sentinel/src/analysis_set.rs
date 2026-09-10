@@ -117,11 +117,23 @@ impl<C: Coordinate, V: Inspectable> AnalysisSet<C, V> {
         });
 
         // ── Step 3: Take top K ──────────────────────────────────
+        //
+        // The root is always an ancestor and never competitive (§ALGO S-4.7),
+        // so it is dropped before the cut rather than after it. Dropped
+        // afterwards it consumes a slot it can never use: the root's own
+        // intensity is what it accumulated before its first split, and the
+        // split freezes that figure while both children start from zero, so
+        // the root outranks every real candidate until one of them passes a
+        // total the root is no longer adding to. At a capacity of one — a
+        // configuration the validation accepts — that leaves the competitive
+        // set permanently empty, and no descendant can ever become
+        // competitive. Removing it first spends every slot on an entry that
+        // can actually be selected.
+        let g_root = graph.g_root();
+        candidates.retain(|e| e.gnode != g_root);
         candidates.truncate(k);
 
-        // The root is always an ancestor, never competitive (§ALGO S-4.7).
-        let g_root = graph.g_root();
-        let competitive: Vec<AnalysisEntry<C, V>> = candidates.iter().filter(|e| e.gnode != g_root).copied().collect();
+        let competitive: Vec<AnalysisEntry<C, V>> = candidates;
 
         // ── Step 4: Ancestor closure (§ALGO S-4.2) ────────────────
         // Walk G-tree parents for each competitive entry. Collect
@@ -163,7 +175,6 @@ impl<C: Coordinate, V: Inspectable> AnalysisSet<C, V> {
         }
 
         // Ensure the root is always present (§ALGO S-4.7).
-        let g_root = graph.g_root();
         full_set.entry(g_root).or_insert_with(|| {
             let info = graph.gnode_info(g_root).expect("G-root must be live");
             AnalysisEntry {

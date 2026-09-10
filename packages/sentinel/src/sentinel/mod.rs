@@ -93,7 +93,10 @@ pub struct CellState<C: Coordinate> {
     /// Lower bound of the dyadic interval (inclusive).
     pub start: C,
 
-    /// Upper bound of the dyadic interval (exclusive).
+    /// Upper bound of the dyadic interval, exclusive everywhere except at the
+    /// top of the domain: the cell whose bound is the domain maximum owns that
+    /// maximum, because a coordinate width filling the coordinate type leaves
+    /// no value above it to be excluded.
     pub end: C,
 
     /// Whether this cell is competitively selected (vs ancestor-only).
@@ -1007,9 +1010,26 @@ where
         // producing set — staging cells are excluded by construction.
         let mut cell_obs: BTreeMap<GNodeId, Vec<usize>> = BTreeMap::new();
 
+        // Cell intervals are half-open, which needs one exception at the very
+        // top of the domain. When the coordinate width fills the coordinate
+        // type there is no value above the maximum to serve as an exclusive
+        // bound, so a half-open reading of the topmost interval excludes a
+        // coordinate that is genuinely inside the domain. That observation is
+        // still counted — it moves the spatial layer and it raises the
+        // lifetime total — so leaving it unrouted drops a real observation
+        // from every tracker while the totals go on including it. The cell
+        // ending at the top of the domain therefore owns its upper bound.
+        // Every other boundary stays half-open, so no coordinate can fall in
+        // two sibling cells, and where the width is narrower than the type the
+        // bound is a representable value outside the domain and stays
+        // exclusive.
+        let domain_top = C::domain_max(N);
+        let width_fills_type = N == C::BITS;
+
         for (i, &value) in values.iter().enumerate() {
             for (&gnode, cell) in &self.cells {
-                if value >= cell.start && value < cell.end {
+                let owns_domain_top = width_fills_type && cell.end == domain_top && value == domain_top;
+                if value >= cell.start && (value < cell.end || owns_domain_top) {
                     cell_obs.entry(gnode).or_default().push(i);
                 }
             }

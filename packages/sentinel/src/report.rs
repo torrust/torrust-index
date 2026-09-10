@@ -105,7 +105,10 @@ pub struct CellReport<C: Copy + Debug> {
     /// Lower bound of the dyadic interval (inclusive).
     pub start: C,
 
-    /// Upper bound of the dyadic interval (exclusive).
+    /// Upper bound of the dyadic interval, exclusive everywhere except at the
+    /// top of the domain: the cell whose bound is the domain maximum owns that
+    /// maximum, because a coordinate width filling the coordinate type leaves
+    /// no value above it to be excluded.
     pub end: C,
 
     /// G-tree depth of this cell.
@@ -655,7 +658,10 @@ pub struct CellInspection<C: Copy + Debug> {
     /// Lower bound of the dyadic interval (inclusive).
     pub start: C,
 
-    /// Upper bound of the dyadic interval (exclusive).
+    /// Upper bound of the dyadic interval, exclusive everywhere except at the
+    /// top of the domain: the cell whose bound is the domain maximum owns that
+    /// maximum, because a coordinate width filling the coordinate type leaves
+    /// no value above it to be excluded.
     pub end: C,
 
     /// G-tree depth of this cell.
