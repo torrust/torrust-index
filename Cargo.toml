@@ -55,11 +55,12 @@ torrust-index-config = { version = "0.1.0", path = "packages/index-config" }
 torrust-index-render-text-as-image = { version = "0.1.0", path = "packages/render-text-as-image" }
 
 # argon2 and pbkdf2 must stay on one `password-hash` major: the password
-# verification path in `src/services/authentication.rs` builds a `PasswordHash`
-# from one crate and verifies it with the other, so a mismatch is a type error.
-# Both are held to the 0.x line the sources are written against; a bare `0`
-# requirement admits every breaking 0.x release and had let them drift apart.
-argon2 = "0.5"
+# verification path in `src/services/authentication.rs` parses a stored hash
+# once and verifies it with whichever of the two the hash names, so a mismatch
+# is a type error. Raising one without the other reproduces it immediately:
+# rustc reports "multiple different versions of crate `password_hash` in the
+# dependency graph" at the shared verification site.
+argon2 = { version = "0.6", features = ["getrandom"] }
 async-trait = "0.1"
 axum = { version = "0.8", features = ["multipart"] }
 axum-server = { version = "0.8", features = ["tls-rustls"] }
@@ -87,7 +88,7 @@ lettre = { version = "0.11", features = [
 ] }
 log = "0.4"
 mockall = "0.15"
-pbkdf2 = { version = "0.12", features = ["simple"] }
+pbkdf2 = { version = "0.13", features = ["phc"] }
 pin-project-lite = "0.2"
 rand = "0.10"
 regex = "1"

@@ -170,6 +170,6 @@ fn from_database_fallback() {
 
 #[test]
 fn from_argon2_error() {
-    let err: AuthError = argon2::password_hash::Error::Password.into();
+    let err: AuthError = argon2::password_hash::Error::PasswordInvalid.into();
     assert_eq!(err, AuthError::InternalServerError);
 }
