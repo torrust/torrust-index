@@ -59,8 +59,14 @@
 //! | [`rejects_budget_zero`] | config | cites (´claim:config:a-capacity-of-zero-is-refused-because-it-leaves-the-sentinel-nothing-to-work-with´) |
 //! | [`rejects_budget_below_headroom`] | config | The node budget must exceed what the depth gates themselves imply: a buffer zone of a given width can hold a number of nodes growing as a power of three, and a budget merely equal to that leaves the graph no room to manoeuvre inside its own gates. Equality is refused, not merely shortfall. |
 //! | [`accepts_budget_just_above_headroom`] | config | cites (´claim:config:the-node-budget-must-exceed-the-headroom-the-depth-gates-imply-and-equalling-it-is-not-enough´) |
+//! | [`rejects_depth_buffer_whose_headroom_cannot_be_represented`] | config | Past a certain width the headroom the depth gates imply stops being a number the machine can hold, and the depth pair is refused on its own terms rather than measured against a figure that wrapped. The requirement grows as a power of three, so a buffer in the forties already exceeds the addressable range; computing it and comparing anyway would either abort the validation that promised to return its faults, or silently compare the budget against a small wrapped remainder and admit a configuration that cannot hold. The refusal names the two depths, since they are what the host must change. |
+//! | [`reports_a_shortfall_at_the_widest_representable_depth_buffer`] | config | cites (´claim:config:a-depth-buffer-whose-headroom-cannot-be-represented-is-refused-on-its-own-terms´) |
+//! | [`rejects_nan_in_every_floating_point_field`] | config | Every floating-point field refuses a non-number, because the ordered comparisons that police the other values cannot see one. A comparison against a non-number is false whichever way it is written, so a bound expressed as a pair of comparisons admits it silently — and the value then spreads, since every product and sum it enters returns a non-number too. A forgetting factor admitted this way reaches the baseline arithmetic and leaves every score afterwards unusable, with nothing in the report to say which field was responsible. The guard therefore sits ahead of the bound rather than inside it. |
+//! | [`accepts_infinite_clip_width_and_refuses_infinite_rates`] | config | An infinite value is admitted where the interval is one-sided, because there it names a real limit rather than the absence of one. An infinite clip width is the unclipped configuration — the control arm the package's own clipping study runs against — and it compares correctly against every bound it is checked with, which is precisely what a non-number does not do. The fields whose intervals are two-sided still refuse it, and they refuse it through the bound they already carry rather than through a separate guard. |
 //! | [`rejects_noise_batch_size_zero_when_enabled`] | config | A noise batch of no samples is a fault only when the schedule actually asks for rounds: with an active schedule the warm-up would run rounds that feed the tracker nothing. The check is conditional on the schedule rather than absolute, because zero samples per round is coherent when there are no rounds to run. |
 //! | [`accepts_noise_batch_size_zero_when_disabled`] | config | cites (´claim:config:a-noise-batch-of-zero-is-faulted-only-when-the-schedule-actually-asks-for-rounds´) |
+//! | [`rejects_noise_batch_size_zero_with_geometric_root_and_zero_floor`] | config | cites (´claim:config:a-noise-batch-of-zero-is-faulted-only-when-the-schedule-actually-asks-for-rounds´) |
+//! | [`accepts_noise_batch_size_zero_with_geometric_root_and_floor_zero`] | config | cites (´claim:config:a-noise-batch-of-zero-is-faulted-only-when-the-schedule-actually-asks-for-rounds´) |
 //! | [`accepts_noise_seed_none`] | config | An absent noise seed is valid and simply changes where the randomness comes from: with a seed the warm-up is reproducible across restarts, without one it is drawn from system entropy. Determinism is offered rather than required, so neither choice counts as a misconfiguration. |
 //! | [`rejects_geometric_decay_out_of_range`] | config | The geometric decay is bound to a half-open interval rather than the open one other rates get: values at or below zero and above one are refused, but one itself is not. Zero would collapse the schedule onto its floor immediately, whereas a schedule that never tapers with depth is a legitimate thing to ask for. |
 //! | [`rejects_geometric_decay_nan`] | config | A decay that is not a number is refused explicitly, because every comparison against it is false and a range check alone would let it through. The configuration is rejected before such a value could reach the exponentiation and turn every round count into nonsense. |
@@ -81,8 +87,9 @@
 //! | [`explicit_all_zeros_is_disabled`] | config | cites (´claim:config:an-explicit-schedule-that-can-never-yield-a-round-reports-itself-as-noise-switched-off´) |
 //! | [`explicit_single_zero_is_disabled`] | config | cites (´claim:config:an-explicit-schedule-that-can-never-yield-a-round-reports-itself-as-noise-switched-off´) |
 //! | [`explicit_mixed_zeros_not_disabled`] | config | A single non-zero entry anywhere keeps noise enabled, even where the shallow depths ask for none. A zero at a given depth is a statement about that depth alone, so a schedule may deliberately warm only the deeper cells and still counts as active. |
-//! | [`geometric_is_disabled_when_min_zero`] | config | A geometric schedule counts as disabled by its floor rather than by its root, because the floor is the count it can never fall below: a positive floor always produces some rounds however far the taper descends. With both root and floor at zero there is nothing left to produce. |
-//! | [`geometric_is_not_disabled_when_min_positive`] | config | cites (´claim:config:a-geometric-schedule-counts-as-disabled-by-its-floor-because-the-floor-is-what-it-never-falls-below´) |
+//! | [`geometric_is_disabled_when_root_and_min_are_zero`] | config | A geometric schedule is disabled only when both its root and its floor are zero, because either one alone still produces rounds. The floor lifts every depth to at least its own count, and the root sets the count at the shallow depths before the taper has descended. Reading only one of the two calls a schedule silent that is still asking for warm-up. |
+//! | [`geometric_is_not_disabled_when_min_positive`] | config | cites (´claim:config:a-geometric-schedule-is-disabled-only-when-both-its-root-and-its-floor-are-zero´) |
+//! | [`geometric_is_not_disabled_when_root_positive_and_min_zero`] | config | cites (´claim:config:a-geometric-schedule-is-disabled-only-when-both-its-root-and-its-floor-are-zero´) |
 //! | [`max_rounds_geometric`] | config | The most a geometric schedule can ever ask for is its root, because the taper only descends from there. A host sizing buffers for warm-up can read the ceiling off the root alone, without evaluating the schedule at any depth. |
 //! | [`max_rounds_explicit`] | config | For an explicit schedule the ceiling is the largest entry it holds, not the first. Since the explicit form imposes no ordering, the depth-zero value carries no promise about the rest and the maximum has to be found rather than assumed. |
 //! | [`max_rounds_explicit_empty`] | config | cites (´claim:config:the-ceiling-of-an-explicit-schedule-is-its-largest-entry-not-its-first´) |
@@ -94,6 +101,9 @@
 //! | [`warns_when_small_batch_and_lambda_095`] | config | Batch size enters the recommendation as well: with few synthetic samples per round, each round buys less convergence, so the same shorter memory demands markedly more rounds and a schedule that was adequate becomes advised against. Warm-up is really measured in observations rather than in rounds, and the recommendation reflects that. |
 //! | [`no_warning_for_explicit_schedule_with_enough_rounds`] | config | The advisory judges whatever the schedule actually yields at depth zero, whichever variant it is written in. An explicit schedule generous enough at the root passes the same check a geometric one would, so the recommendation is about warm-up delivered and not about how the host chose to express it. |
 //! | [`warning_display_is_informative`] | config | A rendered advisory carries the numbers a host needs in order to act on it: the root it found, the root it recommends, and the forgetting factor that set that recommendation. Advice naming only the problem would leave the reader to re-derive the target. |
+//! | [`rejects_coordinate_width_below_the_tracker_minimum`] | config | A coordinate width narrower than the smallest dimension a subspace tracker can model is refused at construction, with the same structured failure the configuration faults carry. The width is a parameter of the type rather than a field of the configuration, so validating the configuration alone can never see it, and the root tracker spans the whole width — at one dimension its lone basis vector spans the entire space, novelty is identically zero, and the tracker reports a settled model of everything while modelling nothing. Refusing is what lets the constructor's success mean the sentinel it returns can measure. |
+//! | [`accepts_the_narrowest_modellable_coordinate_width`] | config | cites (´claim:config:a-coordinate-width-below-the-tracker-minimum-is-refused-at-construction´) |
+//! | [`collects_a_width_fault_alongside_a_configuration_fault`] | config | cites (´claim:config:a-coordinate-width-below-the-tracker-minimum-is-refused-at-construction´) |
 
 use crate::config::*;
 
@@ -679,6 +689,163 @@ fn accepts_budget_just_above_headroom() {
     cfg.validate().unwrap();
 }
 
+/// Past a certain width the headroom the depth gates imply stops being a
+/// number the machine can hold, and the depth pair is refused on its own terms
+/// rather than measured against a figure that wrapped. The requirement grows as
+/// a power of three, so a buffer in the forties already exceeds the addressable
+/// range; computing it and comparing anyway would either abort the validation
+/// that promised to return its faults, or silently compare the budget against a
+/// small wrapped remainder and admit a configuration that cannot hold. The
+/// refusal names the two depths, since they are what the host must change.
+///
+/// ´claim:config:a-depth-buffer-whose-headroom-cannot-be-represented-is-refused-on-its-own-terms´
+/// ´test:crate:rejects-depth-buffer-whose-headroom-cannot-be-represented´
+#[test]
+fn rejects_depth_buffer_whose_headroom_cannot_be_represented() {
+    let cfg = SentinelConfig::<u64> {
+        d_create: 1,
+        d_evict: 41,
+        budget: 1_000_000,
+        ..SentinelConfig::<u64>::default()
+    };
+    let err = cfg.validate().unwrap_err();
+    assert!(err.0.contains(&ConfigError::DepthBufferTooLarge {
+        d_create: 1,
+        d_evict: 41
+    }));
+    assert!(
+        !err.0.iter().any(|e| matches!(e, ConfigError::BudgetTooSmall { .. })),
+        "an unrepresentable requirement is not reported as a budget shortfall"
+    );
+}
+
+/// The widest buffer whose headroom still fits is validated the ordinary way,
+/// which fixes the boundary between the two refusals rather than leaving it to
+/// be inferred. At this width the requirement is a real number, so a budget
+/// below it comes back as a shortfall naming the figure it fell short of.
+///
+/// (´claim:config:a-depth-buffer-whose-headroom-cannot-be-represented-is-refused-on-its-own-terms´)
+/// ´test:crate:reports-a-shortfall-at-the-widest-representable-depth-buffer´
+#[test]
+fn reports_a_shortfall_at_the_widest_representable_depth_buffer() {
+    let cfg = SentinelConfig::<u64> {
+        d_create: 1,
+        d_evict: 40,
+        budget: 1_000_000,
+        ..SentinelConfig::<u64>::default()
+    };
+    let err = cfg.validate().unwrap_err();
+    assert!(err.0.iter().any(|e| matches!(e, ConfigError::BudgetTooSmall { .. })));
+    assert!(!err.0.iter().any(|e| matches!(e, ConfigError::DepthBufferTooLarge { .. })));
+}
+
+// ── Per-field validation: non-numbers and infinities ────────
+
+/// Every floating-point field refuses a non-number, because the ordered
+/// comparisons that police the other values cannot see one. A comparison
+/// against a non-number is false whichever way it is written, so a bound
+/// expressed as a pair of comparisons admits it silently — and the value then
+/// spreads, since every product and sum it enters returns a non-number too. A
+/// forgetting factor admitted this way reaches the baseline arithmetic and
+/// leaves every score afterwards unusable, with nothing in the report to say
+/// which field was responsible. The guard therefore sits ahead of the bound
+/// rather than inside it.
+///
+/// ´claim:config:a-non-number-is-refused-in-every-floating-point-field-because-an-ordered-bound-cannot-see-one´
+/// ´test:crate:rejects-nan-in-every-floating-point-field´
+#[test]
+fn rejects_nan_in_every_floating_point_field() {
+    let nan = f64::NAN;
+    let cases: [(&str, SentinelConfig<u64>); 8] = [
+        (
+            "forgetting_factor",
+            SentinelConfig {
+                forgetting_factor: nan,
+                ..SentinelConfig::<u64>::default()
+            },
+        ),
+        (
+            "energy_threshold",
+            SentinelConfig {
+                energy_threshold: nan,
+                ..SentinelConfig::<u64>::default()
+            },
+        ),
+        (
+            "eps",
+            SentinelConfig {
+                eps: nan,
+                ..SentinelConfig::<u64>::default()
+            },
+        ),
+        (
+            "cusum_slow_decay",
+            SentinelConfig {
+                cusum_slow_decay: nan,
+                ..SentinelConfig::<u64>::default()
+            },
+        ),
+        (
+            "cusum_coord_slow_decay",
+            SentinelConfig {
+                cusum_coord_slow_decay: nan,
+                ..SentinelConfig::<u64>::default()
+            },
+        ),
+        (
+            "cusum_allowance_sigmas",
+            SentinelConfig {
+                cusum_allowance_sigmas: nan,
+                ..SentinelConfig::<u64>::default()
+            },
+        ),
+        (
+            "clip_sigmas",
+            SentinelConfig {
+                clip_sigmas: nan,
+                ..SentinelConfig::<u64>::default()
+            },
+        ),
+        (
+            "clip_pressure_decay",
+            SentinelConfig {
+                clip_pressure_decay: nan,
+                ..SentinelConfig::<u64>::default()
+            },
+        ),
+    ];
+
+    for (field, cfg) in cases {
+        assert!(cfg.validate().is_err(), "a non-number in {field} must be refused");
+    }
+}
+
+/// An infinite value is admitted where the interval is one-sided, because
+/// there it names a real limit rather than the absence of one. An infinite
+/// clip width is the unclipped configuration — the control arm the package's
+/// own clipping study runs against — and it compares correctly against every
+/// bound it is checked with, which is precisely what a non-number does not do.
+/// The fields whose intervals are two-sided still refuse it, and they refuse it
+/// through the bound they already carry rather than through a separate guard.
+///
+/// ´claim:config:an-infinite-value-is-admitted-where-the-interval-is-one-sided-because-there-it-names-a-real-limit´
+/// ´test:crate:accepts-infinite-clip-width-and-refuses-infinite-rates´
+#[test]
+fn accepts_infinite_clip_width_and_refuses_infinite_rates() {
+    let unclipped = SentinelConfig::<u64> {
+        clip_sigmas: f64::INFINITY,
+        ..SentinelConfig::<u64>::default()
+    };
+    unclipped.validate().unwrap();
+
+    let infinite_rate = SentinelConfig::<u64> {
+        forgetting_factor: f64::INFINITY,
+        ..SentinelConfig::<u64>::default()
+    };
+    let err = infinite_rate.validate().unwrap_err();
+    assert!(err.0.iter().any(|e| matches!(e, ConfigError::ForgettingFactorOutOfRange(_))));
+}
+
 // ── Per-field validation: noise injection fields ────────────
 
 /// A noise batch of no samples is a fault only when the schedule actually asks
@@ -710,6 +877,53 @@ fn rejects_noise_batch_size_zero_when_enabled() {
 fn accepts_noise_batch_size_zero_when_disabled() {
     let cfg = SentinelConfig::<u64> {
         noise_schedule: NoiseSchedule::Explicit(vec![]),
+        noise_batch_size: 0,
+        ..SentinelConfig::<u64>::default()
+    };
+    cfg.validate().unwrap();
+}
+
+/// The geometric form reaches the same check through its own reading of what
+/// silence is. A positive root with a zero floor still asks for rounds at the
+/// shallow depths, so a batch of no samples is faulted there exactly as it is
+/// for an explicit schedule. This is the pairing that a floor-only reading of
+/// disablement lets through, and letting it through is not a missing warning
+/// but a broken tracker: the warm-up runs its rounds, divides by a batch of
+/// nothing, and leaves the latent baseline unable to score anything for the
+/// rest of the sentinel's life.
+///
+/// (´claim:config:a-noise-batch-of-zero-is-faulted-only-when-the-schedule-actually-asks-for-rounds´)
+/// ´test:crate:rejects-noise-batch-size-zero-with-geometric-root-and-zero-floor´
+#[test]
+fn rejects_noise_batch_size_zero_with_geometric_root_and_zero_floor() {
+    let cfg = SentinelConfig::<u64> {
+        noise_schedule: NoiseSchedule::Geometric {
+            root: 450,
+            decay: 0.5,
+            min: 0,
+        },
+        noise_batch_size: 0,
+        ..SentinelConfig::<u64>::default()
+    };
+    let err = cfg.validate().unwrap_err();
+    assert!(err.0.contains(&ConfigError::NoiseBatchSizeZero));
+}
+
+/// The geometric form's own accepting side: with root and floor both zero the
+/// schedule asks for nothing at any depth, so a batch size of zero describes
+/// work that will never be requested and passes for the same reason the empty
+/// explicit schedule does.
+///
+/// (´claim:config:a-noise-batch-of-zero-is-faulted-only-when-the-schedule-actually-asks-for-rounds´)
+/// ´test:crate:accepts-noise-batch-size-zero-with-geometric-root-and-floor-zero´
+#[test]
+fn accepts_noise_batch_size_zero_with_geometric_root_and_floor_zero() {
+    let cfg = SentinelConfig::<u64> {
+        noise_schedule: NoiseSchedule::Geometric {
+            root: 0,
+            decay: 0.5,
+            min: 0,
+        },
         noise_batch_size: 0,
         ..SentinelConfig::<u64>::default()
     };
@@ -1091,28 +1305,30 @@ fn explicit_mixed_zeros_not_disabled() {
     assert_eq!(schedule.rounds_for_depth(10), 5);
 }
 
-/// A geometric schedule counts as disabled by its floor rather than by its
-/// root, because the floor is the count it can never fall below: a positive
-/// floor always produces some rounds however far the taper descends. With both
-/// root and floor at zero there is nothing left to produce.
+/// A geometric schedule is disabled only when both its root and its floor are
+/// zero, because either one alone still produces rounds. The floor lifts every
+/// depth to at least its own count, and the root sets the count at the shallow
+/// depths before the taper has descended. Reading only one of the two calls a
+/// schedule silent that is still asking for warm-up.
 ///
-/// ´claim:config:a-geometric-schedule-counts-as-disabled-by-its-floor-because-the-floor-is-what-it-never-falls-below´
-/// ´test:crate:geometric-is-disabled-when-min-zero´
+/// ´claim:config:a-geometric-schedule-is-disabled-only-when-both-its-root-and-its-floor-are-zero´
+/// ´test:crate:geometric-is-disabled-when-root-and-min-are-zero´
 #[test]
-fn geometric_is_disabled_when_min_zero() {
+fn geometric_is_disabled_when_root_and_min_are_zero() {
     let schedule = NoiseSchedule::Geometric {
         root: 0,
         decay: 0.5,
         min: 0,
     };
     assert!(schedule.is_disabled());
+    assert_eq!(schedule.rounds_for_depth(0), 0);
 }
 
-/// The other side of the same rule: a positive floor keeps the schedule active
-/// no matter how steeply it tapers, since every depth is lifted to at least
-/// that count.
+/// One side of the same rule: a positive floor keeps the schedule active no
+/// matter how steeply it tapers, since every depth is lifted to at least that
+/// count.
 ///
-/// (´claim:config:a-geometric-schedule-counts-as-disabled-by-its-floor-because-the-floor-is-what-it-never-falls-below´)
+/// (´claim:config:a-geometric-schedule-is-disabled-only-when-both-its-root-and-its-floor-are-zero´)
 /// ´test:crate:geometric-is-not-disabled-when-min-positive´
 #[test]
 fn geometric_is_not_disabled_when_min_positive() {
@@ -1122,6 +1338,25 @@ fn geometric_is_not_disabled_when_min_positive() {
         min: 1,
     };
     assert!(!schedule.is_disabled());
+}
+
+/// The other side, and the one a floor-only reading gets wrong: a positive root
+/// with a zero floor is not disabled, because the taper starts at the root and
+/// the shallow depths are served from it. The depth-zero count is the root
+/// itself, so a schedule reported silent here would be one that immediately
+/// asks for hundreds of rounds.
+///
+/// (´claim:config:a-geometric-schedule-is-disabled-only-when-both-its-root-and-its-floor-are-zero´)
+/// ´test:crate:geometric-is-not-disabled-when-root-positive-and-min-zero´
+#[test]
+fn geometric_is_not_disabled_when_root_positive_and_min_zero() {
+    let schedule = NoiseSchedule::Geometric {
+        root: 450,
+        decay: 0.5,
+        min: 0,
+    };
+    assert!(!schedule.is_disabled());
+    assert_eq!(schedule.rounds_for_depth(0), 450);
 }
 
 // ── NoiseSchedule::max_rounds ───────────────────────────────
@@ -1326,4 +1561,77 @@ fn warning_display_is_informative() {
     assert!(msg.contains("50"));
     assert!(msg.contains("450"));
     assert!(msg.contains("0.99"));
+}
+
+// ── Construction refusal: coordinate width ──────────────────
+
+/// A coordinate width narrower than the smallest dimension a subspace tracker
+/// can model is refused at construction, with the same structured failure the
+/// configuration faults carry. The width is a parameter of the type rather than
+/// a field of the configuration, so validating the configuration alone can
+/// never see it, and the root tracker spans the whole width — at one dimension
+/// its lone basis vector spans the entire space, novelty is identically zero,
+/// and the tracker reports a settled model of everything while modelling
+/// nothing. Refusing is what lets the constructor's success mean the sentinel
+/// it returns can measure.
+///
+/// ´claim:config:a-coordinate-width-below-the-tracker-minimum-is-refused-at-construction´
+/// ´test:crate:rejects-coordinate-width-below-the-tracker-minimum´
+#[test]
+fn rejects_coordinate_width_below_the_tracker_minimum() {
+    use crate::SpectralSentinel;
+
+    let Err(err) = SpectralSentinel::<u64, u64, 1>::new(SentinelConfig::<u64>::default()) else {
+        panic!("a coordinate width below the tracker minimum must be refused");
+    };
+    assert!(err.0.contains(&ConfigError::TrackerDimensionTooSmall {
+        width: 1,
+        minimum: crate::MIN_TRACKER_DIM
+    }));
+}
+
+/// The narrowest width the tracker can model is admitted, which fixes the
+/// boundary rather than leaving it to be inferred from the refusal alone. Two
+/// dimensions leave one residual degree of freedom, which is the least that
+/// makes a novelty reading mean anything.
+///
+/// (´claim:config:a-coordinate-width-below-the-tracker-minimum-is-refused-at-construction´)
+/// ´test:crate:accepts-the-narrowest-modellable-coordinate-width´
+#[test]
+fn accepts_the_narrowest_modellable_coordinate_width() {
+    use crate::SpectralSentinel;
+
+    let sentinel = SpectralSentinel::<u64, u64, 2>::new(SentinelConfig::<u64>::default()).unwrap();
+    assert_eq!(
+        sentinel.cells_tracked(),
+        1,
+        "the root tracker is built at the narrowest width"
+    );
+}
+
+/// A width fault and a configuration fault come back together rather than one
+/// at a time, so a host repairing a sentinel that is wrong in both respects
+/// learns both in a single pass. This is the collecting behaviour the
+/// configuration's own validation promises, extended to the one fault that
+/// validation cannot reach by itself.
+///
+/// (´claim:config:a-coordinate-width-below-the-tracker-minimum-is-refused-at-construction´)
+/// ´test:crate:collects-a-width-fault-alongside-a-configuration-fault´
+#[test]
+fn collects_a_width_fault_alongside_a_configuration_fault() {
+    use crate::SpectralSentinel;
+
+    let cfg = SentinelConfig::<u64> {
+        max_rank: 0,
+        ..SentinelConfig::<u64>::default()
+    };
+    let Err(err) = SpectralSentinel::<u64, u64, 1>::new(cfg) else {
+        panic!("a coordinate width below the tracker minimum must be refused");
+    };
+    assert!(
+        err.0
+            .iter()
+            .any(|e| matches!(e, ConfigError::TrackerDimensionTooSmall { .. }))
+    );
+    assert!(err.0.contains(&ConfigError::MaxRankZero));
 }

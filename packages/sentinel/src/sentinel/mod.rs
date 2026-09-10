@@ -64,7 +64,7 @@ use torrust_mudlark::{Config as GvConfig, Coordinate, GNodeId, GvGraph, Inspecta
 use self::tracker::SubspaceTracker;
 use crate::{
     AnalysisSet, AxisBaselineSnapshots, BatchReport, CellInspection, CellReport, CentredBits, ClipPressureDistribution,
-    ConfigErrors, ContourSnapshot, CoordinationHealth, CoordinationReport, GeometryDistribution, HealthReport,
+    ConfigError, ConfigErrors, ContourSnapshot, CoordinationHealth, CoordinationReport, GeometryDistribution, HealthReport,
     MaturityDistribution, MemberScore, RankDistribution, SentinelConfig,
 };
 
@@ -229,9 +229,30 @@ where
     ///
     /// Returns [`ConfigErrors`] if the
     /// configuration violates any invariant (see
-    /// [`SentinelConfig::validate`]).
+    /// [`SentinelConfig::validate`]), or if the coordinate width `N` is
+    /// narrower than the smallest dimension a subspace tracker can model.
+    /// Both faults are collected in one pass.
     pub fn new(config: SentinelConfig<V>) -> Result<Self, ConfigErrors> {
-        config.validate()?;
+        // The root tracker spans the whole coordinate width, so a width the
+        // tracker cannot model is refused here rather than left to build a
+        // root whose lone basis vector spans its own space and therefore
+        // reports no novelty at all. This is the only place the width can be
+        // judged: it is a parameter of the type, not a field of the
+        // configuration, so validation of the configuration alone can never
+        // see it.
+        let mut errors = Vec::new();
+        if (N as usize) < crate::MIN_TRACKER_DIM {
+            errors.push(ConfigError::TrackerDimensionTooSmall {
+                width: N,
+                minimum: crate::MIN_TRACKER_DIM,
+            });
+        }
+        if let Err(ConfigErrors(config_errors)) = config.validate() {
+            errors.extend(config_errors);
+        }
+        if !errors.is_empty() {
+            return Err(ConfigErrors(errors));
+        }
 
         // ── G-V Graph construction ──────────────────────
         let gv_config = GvConfig {
@@ -664,7 +685,12 @@ where
         self.prev_terminal_count = self.graph.terminal_count();
         self.prev_node_count = self.graph.node_count();
 
-        // Recreate the root tracker with auto noise injection.
+        // Recreate the root tracker with auto noise injection. The width
+        // needs no second judgement here: it is fixed by the type, the sole
+        // constructor refuses a width below the tracker's minimum, and a
+        // reset can only be reached through an instance that constructor
+        // returned. A width this method could reject could never have got
+        // this far.
         let mut root_cell = CellState {
             tracker: SubspaceTracker::new(N as usize, &self.config, self.config.cusum_slow_decay),
             depth: 0,
