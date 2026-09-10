@@ -1,0 +1,11 @@
+{
+  "namespace": "com.torrust.repository.symlinks",
+  "version": [1, 0, 0],
+  "symlinks": [
+    {
+      "path": ".dockerignore",
+      "target": ".containerignore",
+      "reason": "Docker reads only .dockerignore, while Podman and Buildah prefer .containerignore. The link lets one ignore list serve both toolchains instead of two files that drift apart."
+    }
+  ]
+}
