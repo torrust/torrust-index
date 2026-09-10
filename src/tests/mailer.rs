@@ -1,5 +1,5 @@
 use lettre::Message;
-use serde_json::json;
+use tera::{Context, Tera};
 
 use crate::mailer::{build_content, build_letter, do_nothing_filter};
 
@@ -22,8 +22,12 @@ fn it_should_build_content() {
 
 #[test]
 fn do_nothing_filter_passes_through_string() {
-    let input = json!("hello world");
-    let args = std::collections::HashMap::new();
-    let result = do_nothing_filter(&input, &args).unwrap();
-    assert_eq!(result, json!("hello world"));
+    let mut tera = Tera::default();
+    tera.register_filter("do_nothing", do_nothing_filter);
+    tera.add_raw_template("passthrough", "{{ value | do_nothing }}").unwrap();
+
+    let mut context = Context::new();
+    context.insert("value", "hello world");
+
+    assert_eq!(tera.render("passthrough", &context).unwrap(), "hello world");
 }
