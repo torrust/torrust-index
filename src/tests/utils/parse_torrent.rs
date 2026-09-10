@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use bittorrent_primitives::info_hash::InfoHash;
+use torrust_info_hash::InfoHash;
 
 /// Returns a torrent file binary contents for a torrent with a custom key
 /// inside the `info` dictionary. A custom key means a key not included in

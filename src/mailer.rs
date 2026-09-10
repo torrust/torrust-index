@@ -1,12 +1,10 @@
-use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::sync::{Arc, LazyLock};
 
 use lettre::message::{MessageBuilder, MultiPart, SinglePart};
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
-use serde_json::value::{Value, to_value};
-use tera::{Context, Tera, try_get_value};
+use tera::{Context, Kwargs, State, Tera, TeraResult};
 use thiserror::Error;
 use tracing::error;
 
@@ -49,27 +47,31 @@ fn build_templates() -> Result<Tera, MailTemplateError> {
         Err(source) => return Err(MailTemplateError::ReadOverride { source }),
     };
 
+    // The filter and the escaping rules are installed before the template is
+    // added: tera 2 resolves filter names when it compiles a template, so a
+    // template that pipes through `do_nothing` fails to compile unless the
+    // filter is already registered.
+    tera.autoescape_on(vec![".html", ".sql"]);
+    tera.register_filter("do_nothing", do_nothing_filter);
+
     tera.add_raw_template("html_verify_email", &template)
         .map_err(|source| MailTemplateError::RegisterTemplate { source })?;
 
-    tera.autoescape_on(vec![".html", ".sql"]);
-    tera.register_filter("do_nothing", do_nothing_filter);
     Ok(tera)
 }
 
 /// This function is a dummy filter for tera.
 ///
-/// # Panics
-///
-/// Panics if unable to convert values.
+/// It returns its input unchanged. Deployers who override
+/// `templates/verify.html` can pipe a value through `do_nothing` where a
+/// filter is syntactically required but no transformation is wanted.
 ///
 /// # Errors
 ///
-/// This function will return an error if...
-#[allow(clippy::implicit_hasher)]
-pub fn do_nothing_filter(value: &Value, _: &HashMap<String, Value>) -> tera::Result<Value> {
-    let s = try_get_value!("do_nothing_filter", "value", String, value);
-    Ok(to_value(s).unwrap())
+/// This function does not fail; the result type is the one tera requires of
+/// a filter.
+pub fn do_nothing_filter(value: &str, _: Kwargs, _: &State<'_>) -> TeraResult<String> {
+    Ok(value.to_string())
 }
 
 pub struct Service {

@@ -55,30 +55,30 @@ torrust-index-config = { version = "0.1.0", path = "packages/index-config" }
 torrust-index-render-text-as-image = { version = "0.1.0", path = "packages/render-text-as-image" }
 
 # argon2 and pbkdf2 must stay on one `password-hash` major: the password
-# verification path in `src/services/authentication.rs` builds a `PasswordHash`
-# from one crate and verifies it with the other, so a mismatch is a type error.
-# Both are held to the 0.x line the sources are written against; a bare `0`
-# requirement admits every breaking 0.x release and had let them drift apart.
-argon2 = "0.5"
-async-trait = "0"
-axum = { version = "0", features = ["multipart"] }
-axum-server = { version = "0", features = ["tls-rustls"] }
-bittorrent-primitives = "0.2"
+# verification path in `src/services/authentication.rs` parses a stored hash
+# once and verifies it with whichever of the two the hash names, so a mismatch
+# is a type error. Raising one without the other reproduces it immediately:
+# rustc reports "multiple different versions of crate `password_hash` in the
+# dependency graph" at the shared verification site.
+argon2 = { version = "0.6", features = ["getrandom"] }
+async-trait = "0.1"
+axum = { version = "0.8", features = ["multipart"] }
+axum-server = { version = "0.8", features = ["tls-rustls"] }
 bytes = "1"
-chrono = { version = "0", default-features = false, features = ["clock"] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4", features = ["derive", "env"] }
 derive_more = { version = "2", features = ["display"] }
-email_address = "0"
-figment = { version = "0", features = ["env", "test", "toml"] }
-futures-util = "0"
-hex = "0"
+email_address = "0.2"
+figment = { version = "0.10", features = ["env", "test", "toml"] }
+futures-util = "0.3"
+hex = "0.4"
 http = "1"
 http-body = "1"
 hyper = "1"
-hyper-util = { version = "0", features = ["http1", "http2", "tokio"] }
+hyper-util = { version = "0.1", features = ["http1", "http2", "tokio"] }
 indexmap = "2"
-jsonwebtoken = { version = "10", features = ["rust_crypto"] }
-lettre = { version = "0", features = [
+jsonwebtoken = { version = "11", features = ["rust_crypto"] }
+lettre = { version = "0.11", features = [
     "builder",
     "file-transport-envelope",
     "smtp-transport",
@@ -86,31 +86,30 @@ lettre = { version = "0", features = [
     "tokio1-native-tls",
     "tokio1-rustls-tls",
 ] }
-log = "0"
-mockall = "0"
-pbkdf2 = { version = "0.12", features = ["simple"] }
-pin-project-lite = "0"
+log = "0.4"
+mockall = "0.15"
+pbkdf2 = { version = "0.13", features = ["phc"] }
+pin-project-lite = "0.2"
 rand = "0.10"
 regex = "1"
 rsa = { version = "0.9", default-features = false, features = ["std", "pem"] }
-reqwest = { version = "0", features = ["json", "multipart", "query"] }
+reqwest = { version = "0.13", features = ["json", "multipart", "query"] }
 serde = { version = "1", features = ["derive", "rc"] }
-serde_bencode = "0"
-serde_bytes = "0"
+serde_bencode = "0.2"
+serde_bytes = "0.11"
 serde_derive = "1"
 serde_json = "1"
-sha-1 = "0"
-sha2 = "0"
-sqlx = { version = "0", features = ["migrate", "mysql", "runtime-tokio-native-tls", "sqlite", "time"] }
-tera = { version = "1", default-features = false }
+sha-1 = "0.10"
+sha2 = "0.11"
+sqlx = { version = "0.8", features = ["migrate", "mysql", "runtime-tokio-native-tls", "sqlite", "time"] }
+tera = { version = "2", default-features = false }
 thiserror = "2"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "1"
-tower = { version = "0", features = ["timeout"] }
-# Held at 0.6: tower-http 0.7 changes response behaviour for features this
-# workspace enables. Adopting it is an API decision, not a lock refresh.
-tower-http = { version = "0.6", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
-tracing = "0"
+torrust-info-hash = { version = "0.2", features = ["serde"] }
+tower = { version = "0.5", features = ["timeout"] }
+tower-http = { version = "0.7", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
+tracing = "0.1"
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
 uuid = { version = "1", features = ["v4"] }

@@ -1,11 +1,11 @@
 use std::error;
 
-use bittorrent_primitives::info_hash::InfoHash;
 use serde::{Deserialize, Serialize};
 use serde_bencode::value::Value;
 use serde_bencode::{Error as SerdeError, de};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
+use torrust_info_hash::InfoHash;
 
 use crate::models::torrent_file::Torrent;
 

@@ -452,6 +452,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `IntoResponse` impl for `database::Error` (now handled by domain
   errors).
 
+### Dependencies
+
+- Every dependency of the workspace refreshed to its newest release, majors included. The lock moved to the newest versions the existing requirements admitted, and six requirements crossed a major: `bittorrent-primitives` 0.2 is replaced by `torrust-info-hash` 0.2, the crate its own 0.3 release deprecates the whole of itself in favour of; `jsonwebtoken` 10 to 11; `tower-http` 0.6 to 0.7; `argon2` 0.5 to 0.6 together with `pbkdf2` 0.12 to 0.13, which share a `password-hash` release and cannot move apart; and `tera` 1 to 2. No user-visible behaviour moves: the HTTP API, its responses, the JWT format, the email template language and the on-disk and on-wire form of infohashes are all unchanged. Stored password hashes keep verifying — the PHC string carries the algorithm, version, parameters and salt each hash was written with, so credentials created under the previous releases are read back with their own parameters and remain valid; this is not a breaking change for deployments. `sqlx` stays at 0.8 because 0.9 requires Rust 1.94, above this project's 1.89 floor.
+- Requirements of the bare form `0`, which admit every breaking pre-1.0 release, are narrowed to the `0.x` line the sources are written against, so the manifests now declare what the code actually depends on.
+
 ### Security
 
 - Dev-only ports (MySQL 3306, tracker 6969/7070/1212, mailcatcher

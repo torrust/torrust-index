@@ -2,13 +2,11 @@
 use std::str::FromStr;
 use std::sync::{Arc, LazyLock};
 
-use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
 use async_trait::async_trait;
 use chrono::NaiveDate;
 #[cfg(test)]
 use mockall::automock;
-use pbkdf2::password_hash::rand_core::OsRng;
 use serde_derive::Deserialize;
 use tracing::{debug, info, warn};
 
@@ -581,13 +579,12 @@ fn validate_password_constraints(
 }
 
 fn hash_password(password: &str) -> Result<String, UserError> {
-    let salt = SaltString::generate(&mut OsRng);
-
     // Argon2 with default params (Argon2id v19)
     let argon2 = Argon2::default();
 
-    // Hash password to PHC string ($argon2id$v=19$...)
-    let password_hash = argon2.hash_password(password.as_bytes(), &salt)?.to_string();
+    // Hash password to PHC string ($argon2id$v=19$...). The salt is drawn from
+    // the operating system for each call and carried in the string itself.
+    let password_hash = argon2.hash_password(password.as_bytes())?.to_string();
 
     Ok(password_hash)
 }

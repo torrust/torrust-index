@@ -102,6 +102,13 @@ impl From<argon2::password_hash::Error> for AuthError {
     }
 }
 
+impl From<argon2::password_hash::phc::Error> for AuthError {
+    fn from(e: argon2::password_hash::phc::Error) -> Self {
+        error!(error = %e, "password hash string error");
+        Self::InternalServerError
+    }
+}
+
 // ── UserError ────────────────────────────────────────────────────────
 
 /// Domain error for user management operations.

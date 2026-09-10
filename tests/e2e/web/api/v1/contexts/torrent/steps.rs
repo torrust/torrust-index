@@ -2,8 +2,8 @@
 
 use std::str::FromStr;
 
-use bittorrent_primitives::info_hash::InfoHash;
 use torrust_index::web::api::server::v1::responses::ErrorResponseData;
+use torrust_info_hash::InfoHash;
 
 use crate::common::client::Client;
 use crate::common::contexts::torrent::fixtures::{TestTorrent, TorrentIndexInfo, TorrentListedInIndex, random_torrent};

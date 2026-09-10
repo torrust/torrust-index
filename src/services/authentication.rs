@@ -13,7 +13,8 @@
 //! rejects banned users in a single code path.
 use std::sync::Arc;
 
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use argon2::password_hash::phc::PasswordHash;
+use argon2::{Argon2, PasswordVerifier};
 use pbkdf2::Pbkdf2;
 
 use super::user::DbUserProfileRepository;
@@ -215,7 +216,7 @@ pub fn verify_password(password: &[u8], user_authentication: &UserAuthentication
             Ok(())
         }
         "pbkdf2-sha256" => {
-            if Pbkdf2.verify_password(password, &parsed_hash).is_err() {
+            if Pbkdf2::default().verify_password(password, &parsed_hash).is_err() {
                 return Err(AuthError::InvalidPassword);
             }
 

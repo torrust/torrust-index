@@ -16,7 +16,7 @@ torrust-index-cli-common = { version = "0.1.0", path = "../index-cli-common" }
 clap = { version = "4", features = ["derive"] }
 rsa = { version = "0.9", default-features = false, features = ["std", "pem"] }
 serde = { version = "1", features = ["derive"] }
-tracing = "0"
+tracing = "0.1"
 
 [dev-dependencies]
 serde_json = "1"

@@ -7,8 +7,8 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::{self, Multipart, Path, Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
-use bittorrent_primitives::info_hash::InfoHash;
 use serde::Deserialize;
+use torrust_info_hash::InfoHash;
 use tracing::debug;
 use uuid::Uuid;
 

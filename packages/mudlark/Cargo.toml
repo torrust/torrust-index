@@ -26,15 +26,15 @@ serde = ["dep:serde"]
 [dependencies]
 rand_core = { version = "0.10", optional = true }
 serde = { version = "1", features = ["derive"], optional = true }
-tracing = "0"
+tracing = "0.1"
 
 [dev-dependencies]
-criterion = { version = "0", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 rand = "0.10"
 rand_core = { version = "0.10" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tracing-subscriber = { version = "0", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [package.metadata.cargo-machete]
 ignored = ["rand"]
