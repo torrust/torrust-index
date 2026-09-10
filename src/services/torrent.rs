@@ -2,8 +2,8 @@
 use std::fmt::Write as _;
 use std::sync::Arc;
 
-use bittorrent_primitives::info_hash::InfoHash;
 use serde_derive::{Deserialize, Serialize};
+use torrust_info_hash::InfoHash;
 use tracing::debug;
 use url::Url;
 

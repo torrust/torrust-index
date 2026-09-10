@@ -63,7 +63,6 @@ argon2 = "0.5"
 async-trait = "0.1"
 axum = { version = "0.8", features = ["multipart"] }
 axum-server = { version = "0.8", features = ["tls-rustls"] }
-bittorrent-primitives = "0.2"
 bytes = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4", features = ["derive", "env"] }
@@ -106,6 +105,7 @@ tera = { version = "1", default-features = false }
 thiserror = "2"
 tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml = "1"
+torrust-info-hash = { version = "0.2", features = ["serde"] }
 tower = { version = "0.5", features = ["timeout"] }
 # Held at 0.6: tower-http 0.7 changes response behaviour for features this
 # workspace enables. Adopting it is an API decision, not a lock refresh.

@@ -103,7 +103,7 @@ impl TorrentResponse {
             canonical_info_hash_group: canonical_info_hash_group
                 .original_info_hashes
                 .iter()
-                .map(bittorrent_primitives::info_hash::InfoHash::to_hex_string)
+                .map(torrust_info_hash::InfoHash::to_hex_string)
                 .collect(),
         }
     }

@@ -1,10 +1,10 @@
 use std::str::FromStr;
 
 use async_trait::async_trait;
-use bittorrent_primitives::info_hash::InfoHash;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use torrust_info_hash::InfoHash;
 use url::Url;
 
 use crate::databases::mysql::Mysql;

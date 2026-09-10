@@ -1,8 +1,8 @@
-use bittorrent_primitives::info_hash::InfoHash;
 use serde::{Deserialize, Serialize};
 use serde_bencode::ser;
 use serde_bytes::ByteBuf;
 use sha1::{Digest, Sha1};
+use torrust_info_hash::InfoHash;
 use tracing::error;
 use url::Url;
 

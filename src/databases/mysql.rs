@@ -2,10 +2,10 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use bittorrent_primitives::info_hash::InfoHash;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions};
 use sqlx::{Acquire, ConnectOptions, MySqlPool, query, query_as};
+use torrust_info_hash::InfoHash;
 use url::Url;
 
 use super::database::{TABLES_TO_TRUNCATE, UsersFilters, UsersSorting};
