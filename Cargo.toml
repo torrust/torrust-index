@@ -107,9 +107,7 @@ tokio = { version = "1", features = ["fs", "io-util", "macros", "net", "rt-multi
 toml = "1"
 torrust-info-hash = { version = "0.2", features = ["serde"] }
 tower = { version = "0.5", features = ["timeout"] }
-# Held at 0.6: tower-http 0.7 changes response behaviour for features this
-# workspace enables. Adopting it is an API decision, not a lock refresh.
-tower-http = { version = "0.6", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
+tower-http = { version = "0.7", features = ["compression-full", "cors", "propagate-header", "request-id", "trace"] }
 tracing = "0.1"
 url = { version = "2", features = ["serde"] }
 urlencoding = "2"
