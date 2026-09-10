@@ -97,12 +97,15 @@ impl NoiseSchedule {
 
     /// Whether this schedule produces zero rounds at every depth.
     ///
-    /// True only for `Explicit(vec![])` or `Explicit(vec![0, 0, …])`.
-    /// `Geometric` always produces at least `min` rounds.
+    /// True for `Explicit(vec![])`, for `Explicit(vec![0, 0, …])`, and for
+    /// a `Geometric` schedule whose root and floor are both zero. A
+    /// `Geometric` schedule with a positive root still produces rounds at
+    /// the shallow depths even when its floor is zero, because the taper
+    /// starts from the root and only decays towards the floor.
     #[must_use]
     pub fn is_disabled(&self) -> bool {
         match self {
-            Self::Geometric { min, .. } => *min == 0,
+            Self::Geometric { root, min, .. } => *root == 0 && *min == 0,
             Self::Explicit(v) => v.is_empty() || v.iter().all(|&r| r == 0),
         }
     }
@@ -479,6 +482,12 @@ pub enum ConfigError {
     NoiseScheduleDecayOutOfRange(f64),
     /// `NoiseSchedule::Geometric::root` must be > 0 when `min` > 0.
     NoiseScheduleRootZero,
+    /// The gap between `d_create` and `d_evict` implies a headroom
+    /// requirement too large to represent, so no budget can satisfy it.
+    DepthBufferTooLarge { d_create: u32, d_evict: u32 },
+    /// The coordinate width `N` is below the smallest width a subspace
+    /// tracker can model.
+    TrackerDimensionTooSmall { width: u32, minimum: usize },
 }
 
 impl std::fmt::Display for ConfigError {
@@ -538,6 +547,21 @@ impl std::fmt::Display for ConfigError {
             }
             Self::NoiseScheduleRootZero => {
                 write!(f, "noise_schedule geometric root must be > 0 when min > 0")
+            }
+            Self::DepthBufferTooLarge { d_create, d_evict } => {
+                write!(
+                    f,
+                    "the depth buffer d_evict ({d_evict}) - d_create ({d_create}) implies a \
+                     headroom of 3^(buffer+1) that exceeds the addressable range, so no budget \
+                     can satisfy it"
+                )
+            }
+            Self::TrackerDimensionTooSmall { width, minimum } => {
+                write!(
+                    f,
+                    "coordinate width N ({width}) is below the minimum tracker dimension \
+                     ({minimum}); a narrower root spans its own space and can model nothing"
+                )
             }
         }
     }
@@ -623,7 +647,7 @@ impl<V: Inspectable> SentinelConfig<V> {
         if self.max_rank == 0 {
             errors.push(ConfigError::MaxRankZero);
         }
-        if self.forgetting_factor <= 0.0 || self.forgetting_factor >= 1.0 {
+        if self.forgetting_factor.is_nan() || self.forgetting_factor <= 0.0 || self.forgetting_factor >= 1.0 {
             errors.push(ConfigError::ForgettingFactorOutOfRange(self.forgetting_factor));
         }
         if self.rank_update_interval == 0 {
@@ -632,13 +656,13 @@ impl<V: Inspectable> SentinelConfig<V> {
         if self.analysis_k == 0 {
             errors.push(ConfigError::AnalysisKZero);
         }
-        if self.energy_threshold <= 0.0 || self.energy_threshold >= 1.0 {
+        if self.energy_threshold.is_nan() || self.energy_threshold <= 0.0 || self.energy_threshold >= 1.0 {
             errors.push(ConfigError::EnergyThresholdOutOfRange(self.energy_threshold));
         }
-        if self.eps <= 0.0 {
+        if self.eps.is_nan() || self.eps <= 0.0 {
             errors.push(ConfigError::EpsNotPositive(self.eps));
         }
-        if self.cusum_slow_decay <= 0.0 || self.cusum_slow_decay >= 1.0 {
+        if self.cusum_slow_decay.is_nan() || self.cusum_slow_decay <= 0.0 || self.cusum_slow_decay >= 1.0 {
             errors.push(ConfigError::CusumSlowDecayOutOfRange(self.cusum_slow_decay));
         }
         if self.cusum_slow_decay <= self.forgetting_factor {
@@ -647,7 +671,7 @@ impl<V: Inspectable> SentinelConfig<V> {
                 fast: self.forgetting_factor,
             });
         }
-        if self.cusum_coord_slow_decay <= 0.0 || self.cusum_coord_slow_decay >= 1.0 {
+        if self.cusum_coord_slow_decay.is_nan() || self.cusum_coord_slow_decay <= 0.0 || self.cusum_coord_slow_decay >= 1.0 {
             errors.push(ConfigError::CusumCoordSlowDecayOutOfRange(self.cusum_coord_slow_decay));
         }
         if self.cusum_coord_slow_decay <= self.forgetting_factor {
@@ -656,18 +680,18 @@ impl<V: Inspectable> SentinelConfig<V> {
                 fast: self.forgetting_factor,
             });
         }
-        if self.cusum_allowance_sigmas < 0.0 {
+        if self.cusum_allowance_sigmas.is_nan() || self.cusum_allowance_sigmas < 0.0 {
             errors.push(ConfigError::CusumAllowanceNegative(self.cusum_allowance_sigmas));
         }
-        if self.clip_sigmas <= 0.0 {
+        if self.clip_sigmas.is_nan() || self.clip_sigmas <= 0.0 {
             errors.push(ConfigError::ClipSigmasNotPositive(self.clip_sigmas));
         }
-        if self.clip_pressure_decay <= 0.0 || self.clip_pressure_decay >= 1.0 {
+        if self.clip_pressure_decay.is_nan() || self.clip_pressure_decay <= 0.0 || self.clip_pressure_decay >= 1.0 {
             errors.push(ConfigError::ClipPressureDecayOutOfRange(self.clip_pressure_decay));
         }
 
         // ── G-V Graph fields (§ALGO S-13.3) ────────────────────
-        if self.split_threshold.to_f64_approx() <= 0.0 {
+        if self.split_threshold.to_f64_approx().is_nan() || self.split_threshold.to_f64_approx() <= 0.0 {
             errors.push(ConfigError::SplitThresholdNotPositive(self.split_threshold.to_f64_approx()));
         }
         if self.d_create < 1 {
@@ -687,13 +711,23 @@ impl<V: Inspectable> SentinelConfig<V> {
         // Only check when d_evict > d_create (otherwise the earlier check fails).
         if self.budget > 0 && self.d_evict > self.d_create {
             let buffer = self.d_evict - self.d_create;
-            let headroom = 3usize.pow(buffer + 1);
-            let convergence = 2 * (self.d_create as usize).saturating_sub(1);
-            let required = headroom.max(convergence);
-            if self.budget <= required {
-                errors.push(ConfigError::BudgetTooSmall {
-                    budget: self.budget,
-                    required_minimum: required,
+            // A buffer wide enough to overflow the exponent leaves no
+            // representable budget that could clear the requirement, so the
+            // depth pair is refused on its own terms rather than measured
+            // against a wrapped figure.
+            if let Some(headroom) = 3usize.checked_pow(buffer + 1) {
+                let convergence = 2 * (self.d_create as usize).saturating_sub(1);
+                let required = headroom.max(convergence);
+                if self.budget <= required {
+                    errors.push(ConfigError::BudgetTooSmall {
+                        budget: self.budget,
+                        required_minimum: required,
+                    });
+                }
+            } else {
+                errors.push(ConfigError::DepthBufferTooLarge {
+                    d_create: self.d_create,
+                    d_evict: self.d_evict,
                 });
             }
         }

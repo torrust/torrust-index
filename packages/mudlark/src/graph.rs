@@ -219,7 +219,12 @@ impl<V: Accumulator> Config<V> {
         );
         if let Some(budget) = self.budget {
             let buffer = self.depth_evict - self.depth_create;
-            let headroom = 3usize.pow(buffer + 1);
+            // Saturating rather than wrapping: a buffer wide enough to
+            // overflow the exponent leaves no representable budget that
+            // could clear the requirement, and the saturated figure carries
+            // exactly that verdict into the assertion below. A wrapped
+            // figure would admit or refuse arbitrarily instead.
+            let headroom = 3usize.checked_pow(buffer + 1).unwrap_or(usize::MAX);
             let convergence = 2 * (self.depth_create as usize).saturating_sub(1);
             let required = headroom.max(convergence);
             assert!(
@@ -522,11 +527,20 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
         let live_depth_evict = config.depth_evict;
         let live_depth_create = config.depth_create;
         let depth_buffer = config.depth_evict - config.depth_create;
-        let headroom = 3usize.pow(depth_buffer + 1);
+        // Saturating for the same reason as in the configuration check, and
+        // reachable here even when that check stood down: a budgetless
+        // configuration skips the headroom assertion entirely, yet still
+        // computes and stores this figure.
+        let headroom = 3usize.checked_pow(depth_buffer + 1).unwrap_or(usize::MAX);
         let convergence_bound = 2 * (live_depth_create as usize).saturating_sub(1);
         let required_headroom = headroom.max(convergence_bound);
         let soft_limit = config.budget.map(|b| {
-            let s = b - required_headroom;
+            // Saturating so a budget below the requirement lands on the
+            // assertion that names it rather than wrapping into a soft limit
+            // near the top of the range. The configuration check has already
+            // refused this pairing, so the floor is a second line, not the
+            // first.
+            let s = b.saturating_sub(required_headroom);
             assert!(s >= 1, "soft_limit must be >= 1 (budget={b}, headroom={required_headroom})");
             s
         });
@@ -960,6 +974,11 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// $3^{(\text{buffer}+1)}$ entries can reside between the root
     /// and `D_evict`.  These entries are not evictable, so any
     /// configured budget must exceed this value.
+    ///
+    /// A depth buffer wide enough to overflow the exponent saturates the
+    /// figure at the top of the range instead of wrapping, so the reading
+    /// stays a ceiling no budget can clear rather than becoming a small
+    /// number a budget could accidentally satisfy.
     ///
     /// # Examples
     ///
