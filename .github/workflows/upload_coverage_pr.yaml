@@ -96,13 +96,13 @@ jobs:
           echo "override_commit=$(<commit_sha.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.parse_previous_artifacts.outputs.override_commit || '' }}
           path: repo_root
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}

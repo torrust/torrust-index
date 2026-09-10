@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install LLVM tools
         run: sudo apt-get update && sudo apt-get install -y llvm
@@ -37,7 +37,7 @@ jobs:
 
       - id: tools
         name: Install Tools
-        uses: taiki-e/install-action@v2.87.2
+        uses: taiki-e/install-action@v2.87.9
         with:
           tool: grcov,cargo-llvm-cov
 
@@ -53,7 +53,7 @@ jobs:
 
       - id: upload
         name: Upload Coverage Report
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           verbose: true
           token: ${{ secrets.CODECOV_TOKEN }}

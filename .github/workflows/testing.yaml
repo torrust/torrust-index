@@ -15,7 +15,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - id: setup
         name: Setup Toolchain
@@ -40,7 +40,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - id: msrv
         name: Read MSRV from Cargo.toml
@@ -88,7 +88,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - id: setup
         name: Setup Toolchain
@@ -103,7 +103,7 @@ jobs:
 
       - id: tools
         name: Install Tools
-        uses: taiki-e/install-action@v2.87.2
+        uses: taiki-e/install-action@v2.87.9
         with:
           tool: cargo-machete
 
@@ -141,7 +141,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - id: setup
         name: Setup Toolchain
@@ -178,7 +178,7 @@ jobs:
     steps:
       - id: checkout
         name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - id: setup
         name: Setup Toolchain
