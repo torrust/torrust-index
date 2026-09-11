@@ -790,10 +790,12 @@ Serde bounds:
 
 ### §7.5 Determinism (ADR-S-005) · `sec:sentinel:api-determinism`
 
-All output is deterministic given the same inputs and configuration:
+Output *ordering* is deterministic given the same inputs and configuration. Output *values* are deterministic as well with `background_warming` disabled and on a fixed build — one target and one set of dependency versions:
 - `BTreeMap` iteration order for cell/coordination maps.
 - Tie-breaking by `start` (ascending) in competitive selection.
-- Fixed `noise_seed` for reproducible warm-up.
+- Fixed `noise_seed` for reproducible warm-up, within that scope.
+
+Under background warming the same seed and the same traffic still give the same graph, the same investment set and the same ascending-handle report order, but neither the baselines a tracker starts from nor the ingest cycle on which it first scores: the warming worker draws from its own generator and takes whichever staged cell leads on volume when it looks. A caller diffing two runs against each other holds the flag off, or compares converged state rather than cycle-by-cycle output.
 
 ---
 
