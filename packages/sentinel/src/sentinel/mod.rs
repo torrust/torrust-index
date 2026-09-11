@@ -1662,34 +1662,20 @@ fn compute_col_means(cells: &[(GNodeId, [f64; 4])]) -> [f64; 4] {
     col_means
 }
 
-/// Returns the per-round mean score vectors (4D), needed for chained
-/// coordination warming when the cell is competitive.
+/// Runs a cell's whole noise schedule, then seeds the drift reference from the
+/// baselines the noise built and clears the evidence it accumulated, so the
+/// warm-up shapes what counts as normal without itself counting as history.
 #[allow(clippy::cast_possible_truncation)] // depth ≤ 128
-fn inject_noise_into_cell<C: Coordinate>(
-    cell: &mut CellState<C>,
-    rounds: usize,
-    batch_size: usize,
-    rng: &mut SmallRng,
-) -> Vec<[f64; 4]> {
-    let mut round_scores = Vec::with_capacity(rounds);
-
+fn inject_noise_into_cell<C: Coordinate>(cell: &mut CellState<C>, rounds: usize, batch_size: usize, rng: &mut SmallRng) {
     for _ in 0..rounds {
         let noise = generate_noise_batch(cell.width, batch_size, rng);
         let slices: Vec<&[f64]> = noise.iter().map(Vec::as_slice).collect();
-        let report = cell.tracker.observe(&slices, cell.depth as u8, true);
-
-        round_scores.push([
-            report.scores.novelty.mean,
-            report.scores.displacement.mean,
-            report.scores.surprise.mean,
-            report.scores.coherence.mean,
-        ]);
+        cell.tracker.observe(&slices, cell.depth as u8, true);
     }
 
     cell.tracker.seed_cusum_slow_from_baselines();
     cell.tracker.reset_cusum();
     cell.tracker.reset_clip_pressure();
-    round_scores
 }
 
 // ─── Coordination warming (§ALGO S-9.8) ──────────────────────

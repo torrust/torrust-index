@@ -187,14 +187,16 @@ pub fn evolve(
 
     // SVD of the small corrective matrix.
     let Some(corr_svd) = m_corr.thin_svd().ok() else {
-        // Fallback: skip re-orthogonalisation if the tiny SVD
-        // fails (should never happen for well-conditioned n × n).
-        let out_sigmas: Vec<f64> = (0..n).map(|i| s_hat[i]).collect();
-        return Some(SubspaceUpdate {
-            basis,
-            sigmas: out_sigmas,
-            n,
-        });
+        // The corrective factorisation is what re-orthogonalises the basis,
+        // so there is no result to return without it. Handing back the
+        // pre-correction basis would satisfy the signature while breaking
+        // what the returned value promises — the field is documented
+        // orthonormal, and every caller writes it straight into the tracker's
+        // state and then relies on that. Reporting the failure instead lets
+        // the dispatcher fall back to the strategy that does not need this
+        // step, which is the same answer it gives when this algorithm cannot
+        // handle the dimensions at all.
+        return None;
     };
     let u_corr = corr_svd.U(); // (n × n)
     let s_corr = corr_svd.S().column_vector();

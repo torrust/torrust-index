@@ -91,6 +91,7 @@
 //! | [`geometric_is_not_disabled_when_min_positive`] | config | cites (´claim:config:a-geometric-schedule-is-disabled-only-when-both-its-root-and-its-floor-are-zero´) |
 //! | [`geometric_is_not_disabled_when_root_positive_and_min_zero`] | config | cites (´claim:config:a-geometric-schedule-is-disabled-only-when-both-its-root-and-its-floor-are-zero´) |
 //! | [`max_rounds_geometric`] | config | The most a geometric schedule can ever ask for is its root, because the taper only descends from there. A host sizing buffers for warm-up can read the ceiling off the root alone, without evaluating the schedule at any depth. |
+//! | [`max_rounds_geometric_floor_above_root`] | config | cites (´claim:config:the-ceiling-of-a-geometric-schedule-is-its-root-because-the-taper-only-descends´) |
 //! | [`max_rounds_explicit`] | config | For an explicit schedule the ceiling is the largest entry it holds, not the first. Since the explicit form imposes no ordering, the depth-zero value carries no promise about the rest and the maximum has to be found rather than assumed. |
 //! | [`max_rounds_explicit_empty`] | config | cites (´claim:config:the-ceiling-of-an-explicit-schedule-is-its-largest-entry-not-its-first´) |
 //! | [`max_rounds_explicit_large`] | config | cites (´claim:config:the-ceiling-of-an-explicit-schedule-is-its-largest-entry-not-its-first´) |
@@ -1372,6 +1373,30 @@ fn geometric_is_not_disabled_when_root_positive_and_min_zero() {
 fn max_rounds_geometric() {
     let schedule = NoiseSchedule::geometric(999, 0.1, 1);
     assert_eq!(schedule.max_rounds(), 999);
+}
+
+/// Where the floor stands above the root, the floor is the ceiling. The taper
+/// descends from the root, so with a floor above it every depth is lifted to
+/// the floor and the schedule yields that count everywhere — the root never
+/// being reached at all. Reading the root alone understates what the schedule
+/// asks for, and understates it at every depth rather than at some extreme,
+/// which matters because this figure is what a host sizes warm-up buffers
+/// from. The pairing is admitted by validation, so it is a configuration a
+/// host can actually be holding.
+///
+/// (´claim:config:the-ceiling-of-a-geometric-schedule-is-its-root-because-the-taper-only-descends´)
+/// ´test:crate:max-rounds-geometric-floor-above-root´
+#[test]
+fn max_rounds_geometric_floor_above_root() {
+    let schedule = NoiseSchedule::geometric(10, 0.5, 50);
+    let cfg = SentinelConfig::<u64> {
+        noise_schedule: NoiseSchedule::geometric(10, 0.5, 50),
+        ..SentinelConfig::<u64>::default()
+    };
+    cfg.validate().expect("a floor above the root is an accepted configuration");
+
+    assert_eq!(schedule.rounds_for_depth(0), 50);
+    assert_eq!(schedule.max_rounds(), 50);
 }
 
 /// For an explicit schedule the ceiling is the largest entry it holds, not the
