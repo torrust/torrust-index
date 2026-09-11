@@ -194,7 +194,7 @@ impl EwmaStats {
         }
 
         // When cold, accept everything — no real baseline to filter against.
-        // Upper-tail only — see docs/algorithm.md §7.1.1: anomaly scores are right-skewed.
+        // Upper-tail only: anomaly scores are right-skewed.
         let normals: Vec<f64> = if self.warm {
             let ceiling = clip_sigmas.mul_add(self.variance.sqrt(), self.mean);
             let filtered: Vec<f64> = values.iter().copied().filter(|&v| v < ceiling).collect();
