@@ -8,7 +8,7 @@
 //! | [`identical_seed_produces_identical_reports`] | determinism | Two sentinels built from one configuration with one seed, and stepped through the same batches, agree at every step — the same number of cells, the same ancestors, the same cross-cell contexts, and score means whose floating-point bit patterns are equal rather than merely near. Agreement is checked batch by batch and not only at the end, so a divergence could not open and close again unnoticed. |
 //! | [`deterministic_across_repeated_runs`] | engine | cites (´claim:engine:the-root-tracker-receives-every-observation-in-every-batch´) |
 //! | [`different_seeds_produce_different_scores`] | determinism | The seed is an input with observable consequences, not a formality: two sentinels differing only in their seed, fed identical values, disagree in at least one of the root's score means. The warming noise a tracker is primed with shapes the subspace it starts from, and that starting point is still visible in what the tracker measures once real traffic arrives — which is why reproducibility has to be stated in terms of the seed rather than of the data alone. |
-//! | [`report_ordering_is_deterministic`] | determinism | All three report vectors — competitive cells, ancestors, and cross-cell contexts — come out in ascending node-handle order. The ordering is a property of the handle rather than of traversal or of when a cell was created, so two runs list the same cells in the same positions and a reader may compare them index by index. Splitting is forced aggressively here so that each vector holds several entries and the ordering is actually put to the question. |
+//! | [`report_ordering_is_deterministic`] | determinism | All three report vectors come out in the order their contract states rather than in the order the walk produced: the competitive cells and the ancestors ascend by node handle, and the cross-cell contexts come shallowest first with ties broken by the handle. Depth leads there because handles are recycled as cells are evicted and restored, so a correctly ordered run can carry a lower handle at a greater depth. Neither ordering is a property of traversal or of when a cell was created, so two runs list the same entries in the same positions and a reader may compare them index by index. Splitting is forced aggressively here so that each vector holds several entries and the ordering is actually put to the question. |
 //! | [`send_and_sync_bounds`] | engine | The engine type may be moved between threads and referenced from several at once — a statement about the type, discharged by the compiler when these bounds are demanded, not by anything the test executes at run time. It holds because the sentinel keeps no thread-bound state: its optional background warming lives behind a lock it owns. A host is therefore free to place a sentinel wherever its own concurrency model wants it. |
 
 //! Reproducibility of the sentinel's output, and the bounds its type
@@ -183,13 +183,16 @@ fn different_seeds_produce_different_scores() {
 
 // ── Report ordering ─────────────────────────────────────────
 
-/// All three report vectors — competitive cells, ancestors, and cross-cell
-/// contexts — come out in ascending node-handle order. The ordering is a
-/// property of the handle rather than of traversal or of when a cell was
-/// created, so two runs list the same cells in the same positions and a
-/// reader may compare them index by index. Splitting is forced aggressively
-/// here so that each vector holds several entries and the ordering is
-/// actually put to the question.
+/// All three report vectors come out in the order their contract states
+/// rather than in the order the walk produced: the competitive cells and the
+/// ancestors ascend by node handle, and the cross-cell contexts come
+/// shallowest first with ties broken by the handle. Depth leads there because
+/// handles are recycled as cells are evicted and restored, so a correctly
+/// ordered run can carry a lower handle at a greater depth. Neither ordering
+/// is a property of traversal or of when a cell was created, so two runs list
+/// the same entries in the same positions and a reader may compare them index
+/// by index. Splitting is forced aggressively here so that each vector holds
+/// several entries and the ordering is actually put to the question.
 ///
 /// ´claim:determinism:every-report-vector-is-ordered-by-node-handle-so-a-reader-never-depends-on-visit-order´
 /// ´test:integration:report-ordering-is-deterministic´
@@ -223,8 +226,12 @@ fn report_ordering_is_deterministic() {
 
     for window in report.coordination_reports.windows(2) {
         assert!(
-            window[0].gnode_id < window[1].gnode_id,
-            "coordination_reports not in GNodeId order"
+            (window[0].depth, window[0].gnode_id) < (window[1].depth, window[1].gnode_id),
+            "coordination_reports not in (depth, GNodeId) order: ({}, {:?}) >= ({}, {:?})",
+            window[0].depth,
+            window[0].gnode_id,
+            window[1].depth,
+            window[1].gnode_id,
         );
     }
 }
