@@ -16,7 +16,7 @@
 //! from the investment set and tracker online status (ADR-S-019).
 
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use torrust_mudlark::{Accumulator, Coordinate, GNodeId, GvGraph, Inspectable};
 
@@ -233,18 +233,46 @@ impl<C: Coordinate, V: Accumulator> AnalysisSet<C, V> {
 }
 
 impl<C: Coordinate, V: Inspectable> AnalysisSet<C, V> {
-    /// Build a summary snapshot of the current analysis set.
+    /// Build a summary snapshot of the current analysis set — the whole
+    /// selection, whether or not each cell has a tracker yet.
+    ///
+    /// See [`summary_online`](Self::summary_online) for the reading over the
+    /// cells that are online, which is the one the batch report carries.
     #[must_use]
     pub fn summary(&self) -> AnalysisSetSummary {
-        let competitive_size = self.competitive_count();
-        let full_size = self.total_count();
+        self.summarise(|_| true)
+    }
+
+    /// Build a summary snapshot of the producing sets — the reading the batch
+    /// report carries.
+    ///
+    /// `online` names the cells that currently have a tracker. Every figure is
+    /// taken over the selection intersected with it, because the producing
+    /// sets are the online ones. [`summary`](Self::summary) reads the whole
+    /// selection instead, which is the investment set: it includes cells still
+    /// warming in staging, which have produced nothing and whose depths and
+    /// importances would widen these ranges with cells no observation has yet
+    /// reached. The two readings are separate methods because the difference
+    /// between them is exactly what a caller has to choose.
+    #[must_use]
+    pub fn summary_online(&self, online: &BTreeSet<GNodeId>) -> AnalysisSetSummary {
+        self.summarise(|gnode| online.contains(&gnode))
+    }
+
+    /// Shared body of the two summaries, over whichever entries are included.
+    fn summarise(&self, included: impl Fn(GNodeId) -> bool) -> AnalysisSetSummary {
+        let competitive_included = || self.competitive.iter().filter(|e| included(e.gnode));
+        let full_included = || self.full.iter().filter(|e| included(e.gnode));
+
+        let competitive_size = competitive_included().count();
+        let full_size = full_included().count();
 
         let depth_range = if full_size == 0 {
             (0, 0)
         } else {
             let mut min_d = u32::MAX;
             let mut max_d = 0u32;
-            for entry in self.full() {
+            for entry in full_included() {
                 min_d = min_d.min(entry.depth);
                 max_d = max_d.max(entry.depth);
             }
@@ -258,7 +286,7 @@ impl<C: Coordinate, V: Inspectable> AnalysisSet<C, V> {
             let mut max_imp = f64::NEG_INFINITY;
             let mut min_vd = usize::MAX;
             let mut max_vd = 0usize;
-            for entry in self.competitive() {
+            for entry in competitive_included() {
                 let imp = entry.importance.to_f64_approx();
                 min_imp = min_imp.min(imp);
                 max_imp = max_imp.max(imp);

@@ -659,6 +659,41 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
         self.terminal_count
     }
 
+    /// Number of semi-internal G-nodes — those carrying exactly one G-child.
+    ///
+    /// Semi-internal nodes are part of the observation-receiving contour: the
+    /// half that was never subdivided still accumulates locally, so the node
+    /// is a cell in its own right as well as an ancestor.
+    ///
+    /// Counted by scanning the live nodes rather than maintained
+    /// incrementally, because the transitions that create and remove a
+    /// semi-internal node are spread across splitting, eviction and
+    /// restoration; a counter threaded through all of them would have to be
+    /// right at every site to be trustworthy at any. The scan is linear in the
+    /// number of live nodes, which the budget bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use torrust_mudlark::{Config, GvGraph};
+    /// # let cfg = Config {
+    /// #     split_threshold: 5u64,
+    /// #     depth_create: 3,
+    /// #     depth_evict: 6,
+    /// #     budget: None,
+    /// #     alpha_relax: 0.75,
+    /// #     bounded_eviction: true,
+    /// # };
+    /// # let g = GvGraph::<u64, u64, 8>::new(cfg);
+    /// // A fresh graph is a single terminal root, so no node is half subdivided.
+    /// assert_eq!(g.semi_internal_count(), 0);
+    /// ```
+    #[must_use]
+    pub fn semi_internal_count(&self) -> u32 {
+        let live = self.gnodes.iter_occupied().filter(|(_, g)| g.is_semi_internal()).count();
+        u32::try_from(live).unwrap_or(u32::MAX)
+    }
+
     // Plateau tracking methods (plateaus, build_plateaus, plateau_basis,
     // debug_plateau_basis, recompute_plateau, place_basis_element,
     // place_subtree_basis_elements, consolidate_basis_up, normalize_plateaus,

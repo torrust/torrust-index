@@ -48,6 +48,8 @@
 //! | [`contains_checks_both_warming_and_ready`] | staging | Presence is answered across every state a staged cell can occupy: a cell still warming and a cell already waiting to be promoted both answer yes. The caller asking is deciding whether a cell needs creating, and it must not be told "absent" merely because the cell has moved on within the staging area. |
 //! | [`take_highest_priority_moves_to_in_flight`] | staging | Checking a cell out for background work takes the busiest waiting cell and marks it in flight, leaving the others warming; while it is away it still counts as present in the staging area. That is what makes the expensive noise injection safe to do without holding the lock: the main thread can see the cell is spoken for even though the warming map no longer holds it. |
 //! | [`equal_volumes_take_the_shallower_cell_first`] | staging | Equal volumes resolve to the shallower cell rather than the deeper one. A tie is the ordinary case for a pair of siblings the moment they are created, and the rule the queue exists to serve is that a busy ancestor is warmed before the cells beneath it. Identifiers are handed out as the tree grows downward, so the larger of two is always the newer and deeper cell, and resolving a tie toward it inverts the rule exactly. This path and the synchronous drain are two ways of serving one queue, so they must not disagree about which cell comes next. |
+//! | [`an_in_flight_cell_still_counts_as_a_competitive_target`] | staging | A cell checked out for background warming is still a warming cell, so it still counts among the competitive targets being warmed. Checking a cell out is how the expensive work is done off the lock, not a change in what the cell is; a count that dropped it would fall precisely when the work was happening, understating what is in progress by the number of cells actually in progress. The flag is recorded at checkout, so counting it needs nothing from a cell another thread is holding. |
+//! | [`an_in_flight_ancestor_cell_is_not_a_competitive_target`] | staging | cites (´claim:staging:a-cell-checked-out-for-warming-still-counts-among-the-competitive-targets´) |
 //! | [`a_newly_queued_cell_carries_its_volume`] | staging | A cell joining the queue carries its volume with it instead of waiting for a later pass to supply one. The queue is served highest volume first, so a cell admitted at zero is indistinguishable from a cell with no traffic behind it, and a field of zeroes is decided entirely by the tie-break — which puts the newest and deepest cell first, the inverse of what the queue is for. Refreshing the cached volumes before the new cells are added rather than after leaves every one of them in exactly that state until some later pass happens to refresh again. |
 //! | [`return_warming_restores_cell`] | staging | A cell handed back unfinished rejoins the warming set and stops being in flight, with its accumulated rounds intact. Background warming can therefore be interrupted between rounds — the thread need not carry a cell to completion once it has taken it. |
 //! | [`finish_warming_moves_to_ready`] | staging | A cell handed back finished joins the ready queue instead of the warming set, and is no longer in flight. Which of the two return paths the background thread takes is what decides the cell's fate, so completion is declared by the worker that did the rounds rather than re-derived by the staging area. |
@@ -116,7 +118,10 @@ pub struct StagingArea<C: Coordinate> {
     /// been temporarily removed from `warming` so the thread can
     /// work on them without holding the lock. [`contains`] and
     /// [`retain_in_set`] account for them.
-    in_flight: BTreeSet<GNodeId>,
+    /// Cells checked out for background warming, each carrying the
+    /// competitive flag it held at checkout so the reported count of
+    /// competitive targets can include it while it is away.
+    in_flight: BTreeMap<GNodeId, bool>,
 }
 
 impl<C: Coordinate> StagingArea<C> {
@@ -125,7 +130,7 @@ impl<C: Coordinate> StagingArea<C> {
         Self {
             warming: BTreeMap::new(),
             ready: Vec::new(),
-            in_flight: BTreeSet::new(),
+            in_flight: BTreeMap::new(),
         }
     }
 
@@ -185,7 +190,7 @@ impl<C: Coordinate> StagingArea<C> {
                 .then_with(|| b_gnode.cmp(a_gnode))
         })?;
         let wc = self.warming.remove(&gnode)?;
-        self.in_flight.insert(gnode);
+        self.in_flight.insert(gnode, wc.cell.is_competitive);
         Some((gnode, wc))
     }
 
@@ -195,7 +200,7 @@ impl<C: Coordinate> StagingArea<C> {
     /// `in_flight` by [`retain_in_set`]), the cell is silently
     /// discarded — the work is wasted but correctness is preserved.
     pub fn return_warming(&mut self, gnode: GNodeId, wc: WarmingCell<C>) {
-        if self.in_flight.remove(&gnode) {
+        if self.in_flight.remove(&gnode).is_some() {
             self.warming.insert(gnode, wc);
         }
         // else: evicted while in-flight — discard.
@@ -206,7 +211,7 @@ impl<C: Coordinate> StagingArea<C> {
     /// If the cell was evicted while in-flight, it is silently
     /// discarded.
     pub fn finish_warming(&mut self, gnode: GNodeId, cell: CellState<C>) {
-        if self.in_flight.remove(&gnode) {
+        if self.in_flight.remove(&gnode).is_some() {
             self.ready.push((gnode, cell));
         }
         // else: evicted while in-flight — discard.
@@ -279,7 +284,7 @@ impl<C: Coordinate> StagingArea<C> {
     /// Check if a `GNodeId` is currently in the staging area
     /// (warming, ready, or in-flight).
     pub fn contains(&self, gnode: GNodeId) -> bool {
-        self.warming.contains_key(&gnode) || self.in_flight.contains(&gnode) || self.ready.iter().any(|(g, _)| *g == gnode)
+        self.warming.contains_key(&gnode) || self.in_flight.contains_key(&gnode) || self.ready.iter().any(|(g, _)| *g == gnode)
     }
 
     /// Set of all `GNodeId`s currently in the staging area.
@@ -288,7 +293,7 @@ impl<C: Coordinate> StagingArea<C> {
     #[allow(dead_code)] // used in tests; no longer needed for routing
     pub fn gnode_set(&self) -> BTreeSet<GNodeId> {
         let mut set: BTreeSet<GNodeId> = self.warming.keys().copied().collect();
-        set.extend(&self.in_flight);
+        set.extend(self.in_flight.keys());
         for (g, _) in &self.ready {
             set.insert(*g);
         }
@@ -303,7 +308,7 @@ impl<C: Coordinate> StagingArea<C> {
         if self.warming.remove(&gnode).is_some() {
             return true;
         }
-        if self.in_flight.remove(&gnode) {
+        if self.in_flight.remove(&gnode).is_some() {
             return true;
         }
         let before = self.ready.len();
@@ -321,7 +326,7 @@ impl<C: Coordinate> StagingArea<C> {
     pub fn retain_in_set(&mut self, keep: &BTreeSet<GNodeId>) {
         self.warming.retain(|gnode, _| keep.contains(gnode));
         self.ready.retain(|(gnode, _)| keep.contains(gnode));
-        self.in_flight.retain(|gnode| keep.contains(gnode));
+        self.in_flight.retain(|gnode, _| keep.contains(gnode));
     }
 
     // ── Volume update ───────────────────────────────────
@@ -408,17 +413,22 @@ impl<C: Coordinate> StagingArea<C> {
         self.warming.len() + self.ready.len() + self.in_flight.len()
     }
 
-    /// Number of warming cells (including in-flight) that are
-    /// competitive targets (not ancestor-only).
+    /// Number of warming cells, in-flight ones included, that are
+    /// competitive targets rather than ancestor-only.
     ///
     /// Used to populate `HealthReport::warming_competitive_targets`
     /// (§ALGO S-14.11, ADR-S-019).
+    ///
+    /// A cell checked out for background warming is still being warmed — that
+    /// is what it was taken for — so excluding it made the figure disagree
+    /// with its own description and understate the work in progress by the
+    /// number of cells actually being worked on. The flag is recorded at
+    /// checkout rather than read back afterwards, so the count needs nothing
+    /// from a cell another thread is holding.
     pub fn warming_competitive_count(&self) -> usize {
-        self.warming.values().filter(|wc| wc.cell.is_competitive).count()
-        // Note: in-flight cells are not counted here because their
-        // competitive status may have changed since checkout. This
-        // is conservative — the count may undercount by at most the
-        // number of in-flight cells (typically 0 or 1).
+        let waiting = self.warming.values().filter(|wc| wc.cell.is_competitive).count();
+        let in_flight = self.in_flight.values().filter(|&&is_competitive| is_competitive).count();
+        waiting + in_flight
     }
 
     /// Whether there are any cells that need warming work.
@@ -874,6 +884,58 @@ mod tests {
         let (gnode, _wc) = staging.take_highest_priority().unwrap();
         assert_eq!(gnode, earlier, "a tie goes to the earlier, shallower identifier");
         assert_ne!(gnode, later);
+    }
+
+    /// A cell checked out for background warming is still a warming cell, so
+    /// it still counts among the competitive targets being warmed. Checking a
+    /// cell out is how the expensive work is done off the lock, not a change
+    /// in what the cell is; a count that dropped it would fall precisely when
+    /// the work was happening, understating what is in progress by the number
+    /// of cells actually in progress. The flag is recorded at checkout, so
+    /// counting it needs nothing from a cell another thread is holding.
+    ///
+    /// ´claim:staging:a-cell-checked-out-for-warming-still-counts-among-the-competitive-targets´
+    /// ´test:unit:an-in-flight-cell-still-counts-as-a-competitive-target´
+    #[test]
+    fn an_in_flight_cell_still_counts_as_a_competitive_target() {
+        let mut staging = StagingArea::<u128>::new();
+        let (_, _, left, right) = split_graph();
+
+        let mut busy = make_cell(1);
+        busy.is_competitive = true;
+        let mut quiet = make_cell(1);
+        quiet.is_competitive = true;
+        staging.enqueue(left, busy, 3);
+        staging.enqueue(right, quiet, 3);
+        assert_eq!(staging.warming_competitive_count(), 2);
+
+        let (_gnode, _wc) = staging.take_highest_priority().unwrap();
+        assert_eq!(staging.in_flight_count(), 1);
+        assert_eq!(
+            staging.warming_competitive_count(),
+            2,
+            "a cell being warmed is still being warmed while it is checked out"
+        );
+    }
+
+    /// An ancestor-only cell is not a competitive target wherever it is being
+    /// held, so checking one out does not inflate the figure either. The count
+    /// follows the cell's own flag rather than its location in the queue.
+    ///
+    /// (´claim:staging:a-cell-checked-out-for-warming-still-counts-among-the-competitive-targets´)
+    /// ´test:unit:an-in-flight-ancestor-cell-is-not-a-competitive-target´
+    #[test]
+    fn an_in_flight_ancestor_cell_is_not_a_competitive_target() {
+        let mut staging = StagingArea::<u128>::new();
+        let (_, _, left, _right) = split_graph();
+
+        let cell = make_cell(1);
+        assert!(!cell.is_competitive);
+        staging.enqueue(left, cell, 3);
+        assert_eq!(staging.warming_competitive_count(), 0);
+
+        let (_gnode, _wc) = staging.take_highest_priority().unwrap();
+        assert_eq!(staging.warming_competitive_count(), 0);
     }
 
     /// A cell joining the queue carries its volume with it instead of waiting
