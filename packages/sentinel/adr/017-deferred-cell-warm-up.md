@@ -49,7 +49,7 @@ When `background_warming` is disabled, warm-up runs synchronously within `reconc
 
 ## Work Variance Bound (§ALGO S-18.4) · `sec:sentinel:deferredwarmup-work-variance-bound`
 
-With deferred warm-up, the per-call cost of `ingest()` is bounded by:
+With warm-up deferred to the background worker, the per-call cost of `ingest()` is bounded by:
 
 $$O\!\Big(n(d_{\text{geo}} + h_V) \;+\; |\mathcal{A}^*| \cdot w_{\max} \cdot (k + b)^2\Big)$$
 
@@ -61,7 +61,7 @@ Deferred warm-up makes `ingest()` operationally predictable — bounded work per
 
 ## Consequences · `sec:sentinel:deferredwarmup-consequences`
 
-- `ingest()` has bounded, predictable work per call. Cell creation and noise injection never stall the hot path.
+- With `background_warming` enabled, `ingest()` has bounded, predictable work per call: cell creation and noise injection never stall the hot path. The flag defaults to disabled, and there the bound does not hold — reconciliation drains the staging area in line, warming every newly staged cell to completion before `ingest()` returns, which is the stall this record's context describes. That is the price of the fallback rather than a defect in it: synchronous warm-up buys single-threaded determinism with exactly the latency the background path moves off the call.
 
 - A background thread (or synchronous fallback) is required for warming. The interaction surface is minimal: a staging map with atomic promotion at the top of each `ingest()` call.
 
