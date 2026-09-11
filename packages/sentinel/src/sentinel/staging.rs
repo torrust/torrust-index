@@ -76,10 +76,6 @@ pub struct WarmingCell<C: Coordinate> {
     /// Rounds completed so far.
     pub completed_rounds: u32,
 
-    /// Accumulated per-round mean score vectors (4D) for coordination
-    /// warm-up at promotion time.
-    pub round_scores: Vec<[f64; 4]>,
-
     /// Cached volume (g.sum) for priority ordering, erased to `f64`.
     /// Updated by the main thread during `reconcile_analysis_set()` via
     /// [`StagingArea::update_volumes`].
@@ -153,7 +149,6 @@ impl<C: Coordinate> StagingArea<C> {
                 cell,
                 target_rounds,
                 completed_rounds: 0,
-                round_scores: Vec::with_capacity(target_rounds as usize),
                 volume: 0.0,
             },
         );
@@ -251,14 +246,7 @@ impl<C: Coordinate> StagingArea<C> {
         let noise = generate_noise_batch(wc.cell.width, batch_size, rng);
         let slices: Vec<&[f64]> = noise.iter().map(Vec::as_slice).collect();
         #[allow(clippy::cast_possible_truncation)] // depth ≤ 128, fits in u8
-        let report = wc.cell.tracker.observe(&slices, wc.cell.depth as u8, true);
-
-        wc.round_scores.push([
-            report.scores.novelty.mean,
-            report.scores.displacement.mean,
-            report.scores.surprise.mean,
-            report.scores.coherence.mean,
-        ]);
+        wc.cell.tracker.observe(&slices, wc.cell.depth as u8, true);
         wc.completed_rounds += 1;
 
         if wc.is_ready() {
@@ -369,14 +357,7 @@ impl<C: Coordinate> StagingArea<C> {
             while !wc.is_ready() {
                 let noise = generate_noise_batch(wc.cell.width, batch_size, rng);
                 let slices: Vec<&[f64]> = noise.iter().map(Vec::as_slice).collect();
-                let report = wc.cell.tracker.observe(&slices, wc.cell.depth as u8, true);
-
-                wc.round_scores.push([
-                    report.scores.novelty.mean,
-                    report.scores.displacement.mean,
-                    report.scores.surprise.mean,
-                    report.scores.coherence.mean,
-                ]);
+                wc.cell.tracker.observe(&slices, wc.cell.depth as u8, true);
                 wc.completed_rounds += 1;
             }
 
@@ -512,7 +493,6 @@ mod tests {
             cell,
             target_rounds: 5,
             completed_rounds: 4,
-            round_scores: Vec::new(),
             volume: 100.0,
         };
         assert!(!wc.is_ready());
@@ -522,7 +502,6 @@ mod tests {
             cell: cell2,
             target_rounds: 5,
             completed_rounds: 5,
-            round_scores: Vec::new(),
             volume: 100.0,
         };
         assert!(wc2.is_ready());
@@ -542,7 +521,6 @@ mod tests {
             cell,
             target_rounds: 3,
             completed_rounds: 10,
-            round_scores: Vec::new(),
             volume: 0.0,
         };
         assert!(wc.is_ready());

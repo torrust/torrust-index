@@ -30,6 +30,7 @@
 //! | [`seed_cusum_slow_from_baselines_then_reset`] | subspace | Finishing warm-up is a two-step handover applied to every axis at once: the long-memory reference is seeded from the short-memory one that has already converged on the injected traffic, and only then is the evidence cleared. Done in that order, drift detection resumes from a state where the two references agree, so the first real batches are scored against a reference that is already current instead of registering the warm-up's own leftover gap as drift for as long as the slow memory takes to catch up. |
 //! | [`explicit_reset_clip_pressure`] | subspace | Clip pressure records how often a cell has lately been discarding scores as outliers, and it widens that cell's own outlier band while it is high. Warm-up is exactly when it runs high, since injected traffic is scored against a barely-formed model. Clearing it zeroes every axis together, so a cell entering production judges its first real batches by the ordinary band rather than by one still slackened by the noise it was taught with. |
 //! | [`eta_threshold_crossing_zeros_clip_pressure`] | subspace | cites (´claim:subspace:clearing-clip-pressure-zeroes-every-axis-so-warm-up-clipping-does-not-slacken-production-scoring´) |
+//! | [`a_declined_incremental_step_still_yields_a_usable_model`] | subspace | A step the incremental strategy declines is answered by the dense one, so what comes back is always a basis that was actually re-orthogonalised. The incremental path builds a small kernel and back-transforms through it, which needs spare dimensions to be stable, and at the coordination tier's width it declines every step on exactly those grounds. Declining is the honest answer, and the dispatcher's response to it is to run the strategy that does not need the step. That is the same response the incremental path now gives when its own corrective factorisation fails — the step that re-orthogonalises the basis — because the alternative is returning the basis from before that step under a field documented orthonormal, which every caller writes straight into a tracker and then relies on. The failure of that factorisation cannot be provoked from outside without a hook into the linear algebra, so what is exercised here is the fallback it now takes. |
 
 //! Crate-level tests for [`SubspaceTracker`](crate::sentinel::tracker::SubspaceTracker).
 //!
@@ -821,4 +822,50 @@ fn eta_threshold_crossing_zeros_clip_pressure() {
         }
     }
     assert!(crossed, "η never crossed the 0.01 threshold");
+}
+
+/// A step the incremental strategy declines is answered by the dense one, so
+/// what comes back is always a basis that was actually re-orthogonalised. The
+/// incremental path builds a small kernel and back-transforms through it,
+/// which needs spare dimensions to be stable, and at the coordination tier's
+/// width it declines every step on exactly those grounds. Declining is the
+/// honest answer, and the dispatcher's response to it is to run the strategy
+/// that does not need the step. That is the same response the incremental path
+/// now gives when its own corrective factorisation fails — the step that
+/// re-orthogonalises the basis — because the alternative is returning the
+/// basis from before that step under a field documented orthonormal, which
+/// every caller writes straight into a tracker and then relies on. The failure
+/// of that factorisation cannot be provoked from outside without a hook into
+/// the linear algebra, so what is exercised here is the fallback it now takes.
+///
+/// ´claim:subspace:a-step-the-incremental-strategy-declines-is-answered-by-the-dense-one´
+/// ´test:crate:a-declined-incremental-step-still-yields-a-usable-model´
+#[test]
+fn a_declined_incremental_step_still_yields_a_usable_model() {
+    let cfg = SentinelConfig::<u64> {
+        svd_strategy: crate::SvdStrategy::Brand,
+        ..cfg_per_sample()
+    };
+
+    // The coordination tier's width, where the incremental kernel has no
+    // spare dimensions to work in and the strategy declines every step.
+    let mut tracker = SubspaceTracker::new(4, &cfg, 0.999);
+
+    for round in 0..40 {
+        let a = f64::from(round % 7) / 10.0 - 0.3;
+        let b = f64::from(round % 5) / 10.0 - 0.2;
+        let rows: Vec<Vec<f64>> = vec![vec![a, b, -a, -b], vec![b, -a, a, -b]];
+        let slices: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+        let report = tracker.observe(&slices, 0, false);
+
+        assert!(
+            report.scores.novelty.mean.is_finite(),
+            "a declined step must still leave a model that can score"
+        );
+        assert!(report.rank >= 1, "the model keeps at least one direction");
+        assert!(
+            report.energy_ratio >= 0.0 && report.energy_ratio <= 1.0,
+            "the captured fraction stays a fraction, which an un-orthogonalised basis would not give"
+        );
+    }
 }

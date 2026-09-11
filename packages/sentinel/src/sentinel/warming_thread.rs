@@ -173,14 +173,7 @@ fn warming_loop<C: Coordinate>(
         let noise = generate_noise_batch(wc.cell.width, batch_size, &mut rng);
         let slices: Vec<&[f64]> = noise.iter().map(Vec::as_slice).collect();
         #[allow(clippy::cast_possible_truncation)] // depth ≤ 128, fits u8
-        let report = wc.cell.tracker.observe(&slices, wc.cell.depth as u8, true);
-
-        wc.round_scores.push([
-            report.scores.novelty.mean,
-            report.scores.displacement.mean,
-            report.scores.surprise.mean,
-            report.scores.coherence.mean,
-        ]);
+        wc.cell.tracker.observe(&slices, wc.cell.depth as u8, true);
         wc.completed_rounds += 1;
 
         // ── Step 4: Return the cell ─────────────────────

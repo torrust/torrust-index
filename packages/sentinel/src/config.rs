@@ -111,10 +111,15 @@ impl NoiseSchedule {
     }
 
     /// Maximum rounds this schedule can produce (useful for capacity hints).
+    ///
+    /// For a geometric schedule this is the higher of the root and the floor,
+    /// not the root alone: the taper descends from the root but every depth is
+    /// lifted to at least the floor, so a floor above the root is what the
+    /// schedule actually yields at every depth.
     #[must_use]
     pub fn max_rounds(&self) -> u32 {
         match self {
-            Self::Geometric { root, .. } => *root,
+            Self::Geometric { root, min, .. } => (*root).max(*min),
             Self::Explicit(v) => v.iter().copied().max().unwrap_or(0),
         }
     }
