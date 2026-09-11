@@ -29,6 +29,17 @@ use torrust_mudlark::Coordinate;
 /// here are what a wrapper around one of those widths delegates to.
 pub trait CentredBitSource: Coordinate {
     /// Convert `self` into a centred bit vector of length `n`.
+    ///
+    /// `n` is a request, not a promise: the effective width is `n` capped at
+    /// the width the implementing type actually holds, which is also the
+    /// width of the vector that comes back. The implementations here cap at
+    /// 128 and 64 respectively, and an implementation for another coordinate
+    /// type caps at its own. The cap is not a courtesy — the returned vector
+    /// is backed by a fixed hundred-and-twenty-eight-slot array, and a width
+    /// beyond the type's own would either read bits that do not exist or
+    /// index past that array — so an implementation applies it rather than
+    /// trusting the caller, and no caller can provoke a panic by asking for
+    /// more than the domain holds.
     fn to_centred_bits(&self, n: u32) -> CentredBits;
 }
 
@@ -36,9 +47,14 @@ impl CentredBitSource for u128 {
     #[allow(clippy::cast_possible_truncation)] // i < 128, fits in u32
     fn to_centred_bits(&self, n: u32) -> CentredBits {
         let mut bits = [0.0_f64; 128];
-        let len = n as usize;
+        let width = n.min(128);
+        let len = width as usize;
         for (i, slot) in bits[..len].iter_mut().enumerate() {
-            *slot = if (self >> (n - 1 - i as u32)) & 1 == 1 { 0.5 } else { -0.5 };
+            *slot = if (self >> (width - 1 - i as u32)) & 1 == 1 {
+                0.5
+            } else {
+                -0.5
+            };
         }
         CentredBits { bits, len }
     }
@@ -81,6 +97,43 @@ pub struct CentredBits {
 }
 
 impl CentredBits {
+    /// Build a vector from centred bit values already computed, with `len`
+    /// of them meaningful.
+    ///
+    /// This is how an implementation of [`CentredBitSource`] outside this
+    /// crate returns its conversion. The two implementations here work on
+    /// coordinate types whose bits are already there to be shifted out, and a
+    /// wrapper around one of those widths delegates to them; a coordinate
+    /// type whose centred form has to be computed has nothing to delegate to,
+    /// and this is the constructor it uses. Slots from `len` onward are the
+    /// caller's to leave at zero — [`suffix`](Self::suffix) never reads them.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `len` exceeds 128, the fixed size of the backing array. A
+    /// length past the array is a mistake in the implementation rather than a
+    /// value a host could supply, which is the same reading
+    /// [`suffix`](Self::suffix) takes of a depth past the width: there is no
+    /// honest vector to return, and clamping would hand back an observation
+    /// narrower than the one the caller believes it built.
+    #[must_use]
+    pub const fn new(bits: [f64; 128], len: usize) -> Self {
+        assert!(len <= 128, "centred bit length exceeds the 128-slot backing array");
+        Self { bits, len }
+    }
+
+    /// How many of the backing array's slots carry a centred bit.
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Whether the vector carries no bits at all — the zero-width domain.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     /// Convert a `u128` value to centred bits (128-bit, convenience wrapper).
     #[must_use]
     pub fn from_u128(value: u128) -> Self {
