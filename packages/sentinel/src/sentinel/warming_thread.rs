@@ -20,13 +20,24 @@
 //!
 //! # Shutdown
 //!
-//! The sentinel sets `shutdown` to `true` and notifies the condvar.
-//! The thread finishes any in-progress batch, then exits. The sentinel
-//! joins the thread in [`WarmingThreadHandle::shutdown`] (called from
-//! `Drop` or `reset()`).
+//! The sentinel sets `shutdown` to `true` **under the staging lock** and
+//! notifies the condvar. The thread finishes any in-progress batch, then
+//! exits. The sentinel joins the thread in
+//! [`WarmingThreadHandle::shutdown`] (called from `Drop` or `reset()`).
+//!
+//! The lock is what makes the transition observable. The worker holds the
+//! staging mutex from the moment it reads the two predicates until
+//! `Condvar::wait` releases it, so a writer that stores the flag without
+//! that lock can land its store and its notification inside that window:
+//! the sleep begins after a notification that has already been delivered
+//! to nobody, and nothing wakes the thread again because the predicate it
+//! would re-read only changes once. Performing the store under the same
+//! mutex places it either before the worker reads the predicate — in which
+//! case the worker sees it and never sleeps — or after the worker is
+//! already sleeping and the notification can reach it.
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::thread::JoinHandle;
 
 use rand::SeedableRng;
@@ -40,22 +51,27 @@ use super::staging::StagingArea;
 
 /// Handle to the background warming thread.
 ///
-/// Owns the shutdown flag, condvar, and `JoinHandle`. The staging
-/// `Arc<Mutex<StagingArea>>` is shared with the sentinel.
+/// Owns the shutdown flag, condvar, and `JoinHandle`, and holds the same
+/// staging `Arc<Mutex<StagingArea>>` the sentinel and the worker share.
 ///
 /// # Thread safety
 ///
 /// All fields are `Send + Sync`:
 /// - `Arc<AtomicBool>`, `Arc<Condvar>`: trivially `Send + Sync`.
+/// - `Arc<Mutex<StagingArea<C>>>`: `Send + Sync` for `C: Coordinate`,
+///   and the same allocation the worker waits on.
 /// - `Mutex<Option<JoinHandle<()>>>`: `Send + Sync` because
 ///   `JoinHandle<()>: Send`.
 pub struct WarmingThreadHandle<C: Coordinate> {
     shutdown: Arc<AtomicBool>,
     condvar: Arc<Condvar>,
+    /// The mutex the worker's `wait` is paired with. The handle keeps it so
+    /// the shutdown transition can be made under the lock that governs the
+    /// predicate, which is what stops the notification from being lost.
+    staging: Arc<Mutex<StagingArea<C>>>,
     /// The join handle is behind a `Mutex` so that `WarmingThreadHandle`
     /// is `Sync` (§ALGO S-18.2 Step 3.5 — `SpectralSentinel: Send + Sync`).
     handle: Mutex<Option<JoinHandle<()>>>,
-    _marker: std::marker::PhantomData<C>,
 }
 
 impl<C: Coordinate> WarmingThreadHandle<C> {
@@ -92,8 +108,8 @@ impl<C: Coordinate> WarmingThreadHandle<C> {
         Self {
             shutdown,
             condvar,
+            staging: Arc::clone(staging),
             handle: Mutex::new(Some(handle)),
-            _marker: std::marker::PhantomData,
         }
     }
 
@@ -105,8 +121,24 @@ impl<C: Coordinate> WarmingThreadHandle<C> {
     /// Signal the thread to stop and wait for it to exit.
     ///
     /// Safe to call multiple times (subsequent calls are no-ops).
+    ///
+    /// The flag is stored under the staging lock, because that lock is what
+    /// the worker's `Condvar::wait` releases: a store made outside it can
+    /// fall between the worker reading the predicate and the worker going to
+    /// sleep, and the wake-up that followed the store then reaches a thread
+    /// that is not yet waiting. The notification itself is sent after the
+    /// guard is dropped, so the woken thread does not immediately block on a
+    /// mutex this call still holds.
+    ///
+    /// A poisoned staging mutex is taken as it stands rather than refused.
+    /// The lock is poisoned only when the worker panicked while holding it,
+    /// and that panic is reported by the join below; refusing here would
+    /// replace that report with a panic raised inside `Drop`.
     pub fn shutdown(&self) {
-        self.shutdown.store(true, Ordering::Release);
+        {
+            let _staging = self.staging.lock().unwrap_or_else(PoisonError::into_inner);
+            self.shutdown.store(true, Ordering::Release);
+        }
         self.condvar.notify_one();
 
         let handle = self.handle.lock().expect("warming handle poisoned").take();
