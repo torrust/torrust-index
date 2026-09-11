@@ -36,8 +36,10 @@ Introduce a crate-level constant:
 /// Minimum suffix width for a functional subspace tracker.
 ///
 /// At `dim < MIN_TRACKER_DIM`, the tracker cannot form a
-/// meaningful basis or compute residuals.  Cells at or below
-/// this threshold are excluded from the analysis set.
+/// meaningful basis or compute residuals.  Cells below this
+/// threshold are excluded from the analysis set; a cell at it
+/// is kept, which is what makes the value a minimum rather
+/// than a floor the analysis set sits above.
 pub(crate) const MIN_TRACKER_DIM: usize = 2;
 ```
 
