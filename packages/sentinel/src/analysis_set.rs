@@ -248,12 +248,17 @@ impl<C: Coordinate, V: Inspectable> AnalysisSet<C, V> {
     ///
     /// `online` names the cells that currently have a tracker. Every figure is
     /// taken over the selection intersected with it, because the producing
-    /// sets are the online ones. [`summary`](Self::summary) reads the whole
-    /// selection instead, which is the investment set: it includes cells still
-    /// warming in staging, which have produced nothing and whose depths and
-    /// importances would widen these ranges with cells no observation has yet
-    /// reached. The two readings are separate methods because the difference
-    /// between them is exactly what a caller has to choose.
+    /// sets are the online ones — every figure but the investment count, which
+    /// is documented as the whole investment and is reported as the whole
+    /// selection here too. Filtering that one would report an investment with
+    /// the warming cells removed, and those are exactly the part of it that
+    /// has been paid for and has not yet produced anything.
+    /// [`summary`](Self::summary) reads the whole selection throughout, which
+    /// is the investment set: it includes cells still warming in staging,
+    /// whose depths and importances would widen these ranges with cells no
+    /// observation has yet reached. The two readings are separate methods
+    /// because the difference between them is exactly what a caller has to
+    /// choose.
     #[must_use]
     pub fn summary_online(&self, online: &BTreeSet<GNodeId>) -> AnalysisSetSummary {
         self.summarise(|gnode| online.contains(&gnode))
@@ -299,7 +304,14 @@ impl<C: Coordinate, V: Inspectable> AnalysisSet<C, V> {
         AnalysisSetSummary {
             competitive_size,
             full_size,
-            investment_set_size: full_size, // Adjusted by orchestrator to include warming cells.
+            // The investment set is the whole selection, whether or not a cell
+            // is online yet, so this figure is taken before the filter rather
+            // than after it: filtered, it would report an investment that
+            // excluded every cell still being warmed, which is precisely the
+            // part of the investment that has been paid for and not yet
+            // returned. The orchestrator replaces it with the tracker
+            // population it can see directly.
+            investment_set_size: self.full.len(),
             depth_range,
             importance_range,
             v_depth_range,
