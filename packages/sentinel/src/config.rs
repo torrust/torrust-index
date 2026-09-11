@@ -494,6 +494,9 @@ pub enum ConfigError {
     /// The coordinate width `N` is below the smallest width a subspace
     /// tracker can model.
     TrackerDimensionTooSmall { width: u32, minimum: usize },
+    /// The coordinate width `N` is above the widest width the centred bit
+    /// vector that feeds the trackers can carry.
+    TrackerDimensionTooLarge { width: u32, maximum: usize },
 }
 
 impl std::fmt::Display for ConfigError {
@@ -567,6 +570,14 @@ impl std::fmt::Display for ConfigError {
                     f,
                     "coordinate width N ({width}) is below the minimum tracker dimension \
                      ({minimum}); a narrower root spans its own space and can model nothing"
+                )
+            }
+            Self::TrackerDimensionTooLarge { width, maximum } => {
+                write!(
+                    f,
+                    "coordinate width N ({width}) is above the maximum tracker dimension \
+                     ({maximum}); a centred bit vector cannot carry a wider observation, and the \
+                     dimensions past it would be modelled over a constant the data never produced"
                 )
             }
         }

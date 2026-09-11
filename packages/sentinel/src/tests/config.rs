@@ -107,6 +107,8 @@
 //! | [`rejects_coordinate_width_below_the_tracker_minimum`] | config | A coordinate width narrower than the smallest dimension a subspace tracker can model is refused at construction, with the same structured failure the configuration faults carry. The width is a parameter of the type rather than a field of the configuration, so validating the configuration alone can never see it, and the root tracker spans the whole width — at one dimension its lone basis vector spans the entire space, novelty is identically zero, and the tracker reports a settled model of everything while modelling nothing. Refusing is what lets the constructor's success mean the sentinel it returns can measure. |
 //! | [`accepts_the_narrowest_modellable_coordinate_width`] | config | cites (´claim:config:a-coordinate-width-below-the-tracker-minimum-is-refused-at-construction´) |
 //! | [`collects_a_width_fault_alongside_a_configuration_fault`] | config | cites (´claim:config:a-coordinate-width-below-the-tracker-minimum-is-refused-at-construction´) |
+//! | [`refuses_a_coordinate_width_above_the_centred_bit_ceiling`] | config | A coordinate width above what the centred bit vector can carry is refused at construction, the same way a width below the tracker minimum is. The bridge that turns a coordinate into centred bits is open to any implementor, and the spatial layer asks only that the width fit the coordinate type, so a host whose coordinates are wider than the vector can otherwise ask for a sentinel wider than the vector that feeds it. Nothing would fault: the slots past the vector's length come back as zeros, a centred bit is ±0.5 and never zero, and every dimension past the end would be modelled over a constant the coordinate stream never produced — a settled reading of data that does not exist, mixed into novelty, residual and rank alike. The refusal names the width and the ceiling, since those are what the host must reconcile. |
+//! | [`accepts_the_widest_modellable_coordinate_width`] | config | cites (´claim:config:a-coordinate-width-above-the-centred-bit-ceiling-is-refused-at-construction´) |
 
 use crate::config::*;
 
@@ -1718,4 +1720,126 @@ fn collects_a_width_fault_alongside_a_configuration_fault() {
             .any(|e| matches!(e, ConfigError::TrackerDimensionTooSmall { .. }))
     );
     assert!(err.0.contains(&ConfigError::MaxRankZero));
+}
+
+// ── Construction refusal: the centred-bit ceiling ───────────
+
+/// A coordinate type wider than the centred bit vector, standing in for the
+/// downstream implementation the bridge trait is open to.
+///
+/// No coordinate this crate ships can reach a width above the ceiling: the two
+/// it implements the bridge for are sixty-four and a hundred and twenty-eight
+/// bits wide, and the spatial layer settles at compile time that the width fit
+/// the coordinate type — so a wider width over an in-crate coordinate never
+/// reaches the constructor to be refused at all. A type declaring a wider
+/// domain is what a host writes when its coordinates are wider, and it is
+/// therefore the only way to put the constructor's ceiling to the question.
+/// Its conversion delegates to the widest in-crate width, which is the honest
+/// half of the dilemma the refusal removes: the alternative is a vector longer
+/// than the array that carries it. Nothing past construction is exercised
+/// through this type.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+struct WideCoordinate(u128);
+
+impl torrust_mudlark::Coordinate for WideCoordinate {
+    const BITS: u32 = 256;
+
+    fn zero() -> Self {
+        Self(0)
+    }
+
+    fn domain_max(n: u32) -> Self {
+        if n >= u128::BITS { Self(u128::MAX) } else { Self(1 << n) }
+    }
+
+    fn midpoint(a: Self, b: Self) -> Self {
+        Self(a.0 + (b.0 - a.0) / 2)
+    }
+
+    fn width(start: Self, end: Self) -> Self {
+        Self(end.0 - start.0)
+    }
+
+    fn is_final(start: Self, end: Self, _depth: u32, _n: u32) -> bool {
+        end.0 - start.0 == 1
+    }
+
+    fn from_u64(v: u64) -> Self {
+        Self(u128::from(v))
+    }
+
+    fn next_value(self) -> Self {
+        Self(self.0 + 1)
+    }
+
+    fn to_f64(self) -> f64 {
+        unreachable!("the stand-in never reaches the width ratio a range query would ask for")
+    }
+
+    fn is_nan(self) -> bool {
+        false
+    }
+
+    fn total_cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl crate::CentredBitSource for WideCoordinate {
+    fn to_centred_bits(&self, n: u32) -> crate::CentredBits {
+        crate::CentredBitSource::to_centred_bits(&self.0, n)
+    }
+}
+
+/// A coordinate width above what the centred bit vector can carry is refused
+/// at construction, the same way a width below the tracker minimum is. The
+/// bridge that turns a coordinate into centred bits is open to any
+/// implementor, and the spatial layer asks only that the width fit the
+/// coordinate type, so a host whose coordinates are wider than the vector can
+/// otherwise ask for a sentinel wider than the vector that feeds it. Nothing
+/// would fault: the slots past the vector's length come back as zeros, a
+/// centred bit is ±0.5 and never zero, and every dimension past the end would
+/// be modelled over a constant the coordinate stream never produced — a
+/// settled reading of data that does not exist, mixed into novelty, residual
+/// and rank alike. The refusal names the width and the ceiling, since those
+/// are what the host must reconcile.
+///
+/// ´claim:config:a-coordinate-width-above-the-centred-bit-ceiling-is-refused-at-construction´
+/// ´test:crate:refuses-a-coordinate-width-above-the-centred-bit-ceiling´
+#[test]
+fn refuses_a_coordinate_width_above_the_centred_bit_ceiling() {
+    use crate::SpectralSentinel;
+
+    let cfg = SentinelConfig::<u64> {
+        noise_schedule: NoiseSchedule::Explicit(vec![]),
+        ..SentinelConfig::<u64>::default()
+    };
+    let Err(err) = SpectralSentinel::<WideCoordinate, u64, 200>::new(cfg) else {
+        panic!("a coordinate width above the centred bit ceiling must be refused");
+    };
+    assert!(err.0.contains(&ConfigError::TrackerDimensionTooLarge {
+        width: 200,
+        maximum: crate::MAX_TRACKER_DIM
+    }));
+}
+
+/// The widest width the observation path can carry is admitted, which fixes
+/// the ceiling from the accepting side. A hundred and twenty-eight bits is the
+/// width the vector is built for and the one the crate's own default alias
+/// stands at, so the refusal above must land strictly beyond it; with the
+/// narrowest admitted width already pinned, both ends of the modellable range
+/// are fixed by tests rather than inferred from the refusals alone.
+///
+/// (´claim:config:a-coordinate-width-above-the-centred-bit-ceiling-is-refused-at-construction´)
+/// ´test:crate:accepts-the-widest-modellable-coordinate-width´
+#[test]
+fn accepts_the_widest_modellable_coordinate_width() {
+    use crate::SpectralSentinel;
+
+    let sentinel = SpectralSentinel::<u128, u64, 128>::new(SentinelConfig::<u64>::default()).unwrap();
+    assert_eq!(
+        sentinel.cells_tracked(),
+        1,
+        "the root tracker is built at the widest modellable width"
+    );
 }
