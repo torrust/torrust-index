@@ -10,10 +10,14 @@
 /// value of sixteen or above pushes its high bits off the top of the
 /// coordinate and lands on the range sixteen below it, so a caller sweeping
 /// past fifteen would revisit ranges it believed were new. The assertion
-/// refuses that rather than letting the aliasing pass as traffic.
+/// refuses that rather than letting the aliasing pass as traffic, and it
+/// refuses it in every build: a release test run is a routine way to exercise
+/// this suite, and a check that is compiled out of the build where the timings
+/// are taken is no check at all — the aliasing would pass there as the very
+/// concentrated traffic the caller was trying not to generate.
 /// [`cell_values_prefix`] is the generator for a wider sweep.
 pub fn cell_values(nibble: u128, count: usize) -> Vec<u128> {
-    debug_assert!(
+    assert!(
         nibble < 16,
         "cell_values takes a four-bit nibble; cell_values_prefix addresses a wider sweep"
     );
@@ -29,16 +33,21 @@ pub fn cell_values(nibble: u128, count: usize) -> Vec<u128> {
 /// sweep: past fifteen its ranges repeat, and a spray that believed it was
 /// touching sixty-four ranges would be touching sixteen of them four times
 /// each — traffic concentrated enough to build the very structure the spray
-/// was meant to spread thin.
+/// was meant to spread thin. A prefix past sixty-three aliases the same way
+/// one bit up, so it is refused here rather than generated, in every build for
+/// the reason [`cell_values`] gives.
 pub fn cell_values_prefix(prefix: u128, count: usize) -> Vec<u128> {
-    debug_assert!(prefix < 64, "cell_values_prefix takes a six-bit prefix");
+    assert!(prefix < 64, "cell_values_prefix takes a six-bit prefix");
     (0..count).map(|i| (prefix << 122) | (i as u128 + 1)).collect()
 }
 
 /// Generate values with a dense bit pattern to create
 /// structurally novel data relative to [`cell_values()`].
+///
+/// The leading nibble addresses ranges the same way it does there, and is
+/// refused past fifteen for the same reason and in every build.
 pub fn anomalous_values(nibble: u128, count: usize) -> Vec<u128> {
-    debug_assert!(nibble < 16, "anomalous_values takes a four-bit nibble");
+    assert!(nibble < 16, "anomalous_values takes a four-bit nibble");
     // Set a dense block of high bits in the middle — structurally
     // very different from the sparse sequential values above.
     (0..count)
