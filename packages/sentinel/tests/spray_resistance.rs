@@ -8,9 +8,9 @@
 //! | [`competitive_set_bounded_by_k`] | resistance | Spraying traffic across far more leading ranges than the sentinel is permitted to model does not enlarge the set of cells that compete for modelling effort: it stays within the configured cap. The cap is on attention, not on input, so an attacker who can address any part of the domain still cannot make the sentinel promise more work than it budgeted for. |
 //! | [`competitive_set_at_k_equals_one`] | resistance | cites (´claim:resistance:a-spray-across-many-ranges-cannot-enlarge-the-competitive-set-beyond-its-cap´) |
 //! | [`full_set_bounded_by_steiner`] | resistance | Capping the winners would be hollow if the ancestors pulled in to connect them to the root were unbounded, since each of those also carries a tracker. After a spray across many ranges the materialised set stays within the root plus the cap times the deepest level reached — the connecting chains are shared and counted, so the total cost of attention is a function of the cap and the depth alone, never of how many ranges were touched. |
-//! | [`g_nodes_bounded_by_budget_under_spray`] | resistance | Feeding a long run of one-value batches, each a distinct coordinate spread over the ranges, leaves the tree comfortably inside its node budget rather than growing a node per distinct value. Memory is the resource an attacker would most like to exhaust, so the budget is enforced by eviction as the tree grows and is not merely a hint the structure is asked to respect. |
+//! | [`g_nodes_bounded_by_budget_under_spray`] | resistance | Feeding a long run of one-value batches, each a distinct coordinate spread over the ranges, leaves the tree inside its node budget rather than growing a node per distinct value. The bound asserted is the budget itself, which is the figure the structure's own invariant refuses to exceed — a guard at twice it would let the test pass through states the structure calls violations. Memory is the resource an attacker would most like to exhaust, so the budget is enforced by eviction as the tree grows and is not merely a hint the structure is asked to respect. |
 //! | [`cells_tracked_bounded_under_diverse_traffic`] | resistance | Sustained traffic to every leading range at once leaves the number of live trackers bounded by roughly twice the competitive cap. Trackers are the expensive objects — each carries a learned subspace and its baselines — so what bounds them is the cap on attention rather than the diversity of the traffic. Diverse traffic that is not adversarial is held to the same bound as a spray, because the sentinel does not need to tell them apart to stay within budget. |
-//! | [`concentrated_range_survives_spray`] | resistance | A range carrying the great bulk of the traffic is still represented in the reports after a thin spray touches every other range — either as a competitor in its own right or through the chain of ancestors that covers it. Attention is bought with accumulated weight rather than with novelty, which is what stops a cheap spray from evicting the model of the range an operator actually cares about. |
+//! | [`concentrated_range_survives_spray`] | resistance | A range carrying the great bulk of the traffic is still represented in the reports after a thin spray touches every other range — as a competitor in its own right or through an ancestor below the root that covers it. The root does not count towards that: it contains every coordinate and receives every batch, so a reading that accepted it would be satisfied by a report in which the concentrated range had lost every cell of its own. Attention is bought with accumulated weight rather than with novelty, which is what stops a cheap spray from evicting the model of the range an operator actually cares about. |
 //! | [`invariants_hold_under_spray`] | resistance | The structural guarantees are checked after every single batch of a wide spray and again through the concentrated burst that follows it, and none of them breaks. The bounds, the ordering of the reports and the presence of the root are not properties of a settled sentinel: they hold batch by batch while the tree is being churned by hostile traffic and while it is reconverging afterwards, which is the only time they matter. |
 
 //! Integration tests for the sentinel's **resistance to spray** — traffic
@@ -39,8 +39,8 @@
 
 mod common;
 
-use common::{assert_invariants, cell_values, integration_config, test_config};
-use torrust_sentinel::{Sentinel128, SentinelConfig};
+use common::{assert_invariants, cell_values, cell_values_prefix, integration_config, test_config};
+use torrust_sentinel::{CellReport, Sentinel128, SentinelConfig};
 
 // ═══════════════════════════════════════════════════════════
 //  Analysis-set bounds
@@ -66,12 +66,12 @@ fn competitive_set_bounded_by_k() {
     };
     let mut s = Sentinel128::new(cfg).unwrap();
 
-    // Spray traffic across 64 distinct leading nibbles.
-    for nibble in 0..64u128 {
-        s.ingest(&cell_values(nibble, 20));
+    // Spray traffic across 64 distinct leading six-bit prefixes.
+    for prefix in 0..64u128 {
+        s.ingest(&cell_values_prefix(prefix, 20));
     }
 
-    let report = s.ingest(&cell_values(0, 4));
+    let report = s.ingest(&cell_values_prefix(0, 4));
     assert_invariants(&s, &report);
     assert!(
         report.analysis_set_summary.competitive_size <= k,
@@ -139,11 +139,11 @@ fn full_set_bounded_by_steiner() {
     };
     let mut s = Sentinel128::new(cfg).unwrap();
 
-    for nibble in 0..64u128 {
-        s.ingest(&cell_values(nibble, 20));
+    for prefix in 0..64u128 {
+        s.ingest(&cell_values_prefix(prefix, 20));
     }
 
-    let report = s.ingest(&cell_values(0, 4));
+    let report = s.ingest(&cell_values_prefix(0, 4));
     assert_invariants(&s, &report);
 
     let summary = &report.analysis_set_summary;
@@ -164,10 +164,13 @@ fn full_set_bounded_by_steiner() {
 // ═══════════════════════════════════════════════════════════
 
 /// Feeding a long run of one-value batches, each a distinct coordinate spread
-/// over the ranges, leaves the tree comfortably inside its node budget rather
-/// than growing a node per distinct value. Memory is the resource an attacker
-/// would most like to exhaust, so the budget is enforced by eviction as the
-/// tree grows and is not merely a hint the structure is asked to respect.
+/// over the ranges, leaves the tree inside its node budget rather than
+/// growing a node per distinct value. The bound asserted is the budget
+/// itself, which is the figure the structure's own invariant refuses to
+/// exceed — a guard at twice it would let the test pass through states the
+/// structure calls violations. Memory is the resource an attacker would most
+/// like to exhaust, so the budget is enforced by eviction as the tree grows
+/// and is not merely a hint the structure is asked to respect.
 ///
 /// ´claim:resistance:a-stream-of-distinct-sprayed-values-cannot-grow-the-tree-past-its-node-budget´
 /// ´test:integration:g-nodes-bounded-by-budget-under-spray´
@@ -191,8 +194,8 @@ fn g_nodes_bounded_by_budget_under_spray() {
 
     let g_nodes = s.health().total_g_nodes;
     assert!(
-        g_nodes <= budget * 2 + 2,
-        "G-tree node count {g_nodes} exceeds budget guard (budget={budget})",
+        g_nodes <= budget,
+        "G-tree node count {g_nodes} exceeds the node budget ({budget})",
     );
 }
 
@@ -238,9 +241,12 @@ fn cells_tracked_bounded_under_diverse_traffic() {
 // ═══════════════════════════════════════════════════════════
 
 /// A range carrying the great bulk of the traffic is still represented in the
-/// reports after a thin spray touches every other range — either as a
-/// competitor in its own right or through the chain of ancestors that covers
-/// it. Attention is bought with accumulated weight rather than with novelty,
+/// reports after a thin spray touches every other range — as a competitor in
+/// its own right or through an ancestor below the root that covers it. The
+/// root does not count towards that: it contains every coordinate and
+/// receives every batch, so a reading that accepted it would be satisfied by
+/// a report in which the concentrated range had lost every cell of its own.
+/// Attention is bought with accumulated weight rather than with novelty,
 /// which is what stops a cheap spray from evicting the model of the range an
 /// operator actually cares about.
 ///
@@ -271,14 +277,32 @@ fn concentrated_range_survives_spray() {
     assert_invariants(&s, &report);
 
     // The concentrated range should still be represented — either as a
-    // competitive cell or through its ancestor chain.
+    // competitive cell or through an ancestor below the root that covers it.
+    // The root is excluded: it contains every coordinate and receives every
+    // batch, so accepting it would accept a report in which range A had lost
+    // every cell of its own.
+    let range_a = cell_values(0xA, 1)[0];
+    let covers_range_a = |cr: &CellReport<u128>| cr.depth > 0 && cr.sample_count > 0 && cr.start <= range_a && range_a < cr.end;
     let has_range_a = report
         .cell_reports
         .iter()
         .chain(report.ancestor_reports.iter())
-        .any(|cr| cr.sample_count > 0);
+        .any(covers_range_a);
 
-    assert!(has_range_a, "concentrated range A should still be represented in reports");
+    assert!(
+        has_range_a,
+        "no report below the root covers range A with samples: cells {:?}, ancestors {:?}",
+        report
+            .cell_reports
+            .iter()
+            .map(|cr| (cr.depth, cr.start, cr.end, cr.sample_count))
+            .collect::<Vec<_>>(),
+        report
+            .ancestor_reports
+            .iter()
+            .map(|cr| (cr.depth, cr.start, cr.end, cr.sample_count))
+            .collect::<Vec<_>>(),
+    );
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -304,9 +328,9 @@ fn invariants_hold_under_spray() {
     };
     let mut s = Sentinel128::new(cfg).unwrap();
 
-    // Phase 1: wide spray across 64 nibbles.
-    for nibble in 0..64u128 {
-        let report = s.ingest(&cell_values(nibble, 20));
+    // Phase 1: wide spray across 64 distinct leading six-bit prefixes.
+    for prefix in 0..64u128 {
+        let report = s.ingest(&cell_values_prefix(prefix, 20));
         assert_invariants(&s, &report);
     }
 
