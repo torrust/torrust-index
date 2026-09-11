@@ -59,13 +59,15 @@
 //! | [`batch_report_coordination_is_vec`] | coordination | The batch report always carries a list of coordination reports, empty when nothing fired, rather than an optional one. Absence of coordination is an ordinary outcome — a lone value in a batch simply produces none — so a host iterates the list without first having to test for presence. |
 //! | [`health_report_has_coordination_health`] | coordination | cites (´claim:coordination:the-tier-works-in-four-dimensions-because-a-member-contributes-one-value-per-scoring-axis´) |
 //! | [`config_cusum_coord_slow_decay_validated`] | coordination | The slow baseline the coordination tier measures drift against is validated like any other rate: strictly inside zero and one, and strictly slower than the fast forgetting factor. The separation is the whole point — the slow baseline is the reference the fast one is judged against — so a configuration where the two move at the same speed is rejected outright rather than quietly producing a meaningless reading. |
+//! | [`coordination_reports_are_ordered_by_depth_then_identifier`] | coordination | Coordination reports arrive shallowest first, ties broken by ascending identifier. The walk that produces them is bottom-up, which emits a strictly post-order sequence and puts the root — the shallowest context of all — last; that is deterministic but it is not the order either record states, and a reader taking the reports as a descent from the coarsest scale to the finest would have had the sequence exactly backwards. Depth is the ordering the output record describes and the identifier is the ordering this type's own documentation describes, so sorting on the pair satisfies both and is a total order besides, which sorting on depth alone would not be. |
+//! | [`contour_count_includes_semi_internal_nodes`] | coordination | The contour count is the whole contour: the terminal cells together with the semi-internal ones. A semi-internal node has one half subdivided and one that still accumulates locally, so that second half receives observations exactly as a terminal cell does and is part of the surface the snapshot describes. Counting only the terminals reported a resolution short by every half-subdivided node, which is a figure that drifts from the truth precisely while the structure is being reshaped. |
 
 mod common;
 
 use std::collections::BTreeSet;
 
 use common::{ScenarioBuilder, assert_invariants, cell_values, seeded_sentinel, test_config};
-use torrust_sentinel::{Sentinel128, SentinelConfig};
+use torrust_sentinel::{GNodeId, Sentinel128, SentinelConfig};
 
 // ═══════════════════════════════════════════════════════════
 //  Activation & deactivation (§7.1)
@@ -966,4 +968,97 @@ fn config_cusum_coord_slow_decay_validated() {
         ..SentinelConfig::<u64>::default()
     };
     assert!(cfg.validate().is_err());
+}
+
+/// Coordination reports arrive shallowest first, ties broken by ascending
+/// identifier. The walk that produces them is bottom-up, which emits a
+/// strictly post-order sequence and puts the root — the shallowest context of
+/// all — last; that is deterministic but it is not the order either record
+/// states, and a reader taking the reports as a descent from the coarsest
+/// scale to the finest would have had the sequence exactly backwards. Depth
+/// is the ordering the output record describes and the identifier is the
+/// ordering this type's own documentation describes, so sorting on the pair
+/// satisfies both and is a total order besides, which sorting on depth alone
+/// would not be.
+///
+/// ´claim:coordination:reports-arrive-shallowest-first-with-ties-broken-by-identifier´
+/// ´test:integration:coordination-reports-are-ordered-by-depth-then-identifier´
+#[test]
+fn coordination_reports_are_ordered_by_depth_then_identifier() {
+    let cfg = SentinelConfig::<u64> {
+        analysis_k: 16,
+        split_threshold: 10,
+        ..test_config()
+    };
+    let mut s = ScenarioBuilder::new()
+        .config(cfg)
+        .seed_range(0x1, 4)
+        .seed_range(0x3, 4)
+        .seed_range(0x9, 4)
+        .seed_range(0xF, 4)
+        .warm_batches(19)
+        .build();
+
+    let report = s.ingest(
+        &[
+            cell_values(0x1, 4),
+            cell_values(0x3, 4),
+            cell_values(0x9, 4),
+            cell_values(0xF, 4),
+        ]
+        .concat(),
+    );
+
+    assert!(
+        report.coordination_reports.len() > 1,
+        "nested contexts are needed for an ordering to be observable"
+    );
+    let keys: Vec<(u32, GNodeId)> = report.coordination_reports.iter().map(|cr| (cr.depth, cr.gnode_id)).collect();
+    let mut sorted = keys.clone();
+    sorted.sort_unstable();
+    assert_eq!(keys, sorted, "reports run shallowest first, ties by ascending identifier");
+
+    assert_invariants(&s, &report);
+}
+
+/// The contour count is the whole contour: the terminal cells together with
+/// the semi-internal ones. A semi-internal node has one half subdivided and
+/// one that still accumulates locally, so that second half receives
+/// observations exactly as a terminal cell does and is part of the surface the
+/// snapshot describes. Counting only the terminals reported a resolution
+/// short by every half-subdivided node, which is a figure that drifts from the
+/// truth precisely while the structure is being reshaped.
+///
+/// ´claim:coordination:the-contour-count-is-the-terminals-together-with-the-semi-internal-nodes´
+/// ´test:integration:contour-count-includes-semi-internal-nodes´
+#[test]
+fn contour_count_includes_semi_internal_nodes() {
+    let cfg = SentinelConfig::<u64> {
+        split_threshold: 5,
+        budget: 200,
+        ..test_config()
+    };
+    let mut s = Sentinel128::new(cfg).unwrap();
+
+    let mut saw_semi_internal = false;
+    for nibble in 0..16u128 {
+        let batch: Vec<u128> = (0u128..500).map(|i| (nibble << 124) | (i << 100)).collect();
+        let report = s.ingest(&batch);
+
+        let terminals = s.graph().terminal_count() as usize;
+        let semi_internal = report.health.semi_internal_count;
+        assert_eq!(
+            report.contour.cell_count,
+            terminals + semi_internal,
+            "the contour is the terminals together with the semi-internal nodes"
+        );
+        if semi_internal > 0 {
+            saw_semi_internal = true;
+        }
+    }
+
+    assert!(
+        saw_semi_internal,
+        "this run must reach a half-subdivided node for the sum to be distinguishable"
+    );
 }
