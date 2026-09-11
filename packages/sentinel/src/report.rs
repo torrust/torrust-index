@@ -173,7 +173,12 @@ pub struct CoordinationReport<C: Copy + Debug> {
     /// Lower bound of the coordination context's dyadic interval (inclusive).
     pub start: C,
 
-    /// Upper bound of the coordination context's dyadic interval (exclusive).
+    /// Upper bound of the coordination context's dyadic interval, exclusive
+    /// everywhere except at the top of the domain: a context whose bound is the
+    /// domain maximum owns that maximum, because a coordinate width filling the
+    /// coordinate type leaves no value above it to be excluded. The root
+    /// context covers the full-width interval, so this is the ordinary case
+    /// rather than a corner of it.
     pub end: C,
 
     /// G-tree depth of the coordination context.

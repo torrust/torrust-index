@@ -196,7 +196,7 @@ Analysis set management (module `analysis_set`). Document:
 
 #### 7.2 Thread Safety · `sec:sentinel:apiplan-thread-safety`
 
-- `SpectralSentinel` is **not** `Sync` due to internal `Mutex<StagingArea>`.
+- `SpectralSentinel` is `Send + Sync`, and the crate asserts both statically. The staging area behind a `Mutex` is what makes it so rather than what prevents it: a `Mutex<T>` is `Sync` whenever `T` is `Send`.
 - `BatchReport` and all report types are `Send + Sync`.
 - Background warming thread (when enabled) runs independently.
 

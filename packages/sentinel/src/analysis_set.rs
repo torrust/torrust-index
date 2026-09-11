@@ -42,7 +42,10 @@ pub struct AnalysisEntry<C: Coordinate, V: Accumulator> {
     pub importance: V,
     /// Lower bound of the dyadic interval (inclusive).
     pub start: C,
-    /// Upper bound of the dyadic interval (exclusive).
+    /// Upper bound of the dyadic interval, exclusive everywhere except at the
+    /// top of the domain: the entry whose bound is the domain maximum owns that
+    /// maximum, because a coordinate width filling the coordinate type leaves
+    /// no value above it to be excluded.
     pub end: C,
     /// Whether this entry is competitively selected (vs ancestor-only).
     pub is_competitive: bool,
@@ -60,7 +63,10 @@ pub struct AnalysisSet<C: Coordinate, V: Accumulator> {
     competitive: Vec<AnalysisEntry<C, V>>,
 
     /// All cells: competitive + ancestors (deduplicated).
-    /// The "full" set $\mathcal{A}^*$ from §ALGO S-4.2.
+    /// The investment set $\mathcal{I}$: the competitive targets closed under
+    /// G-tree ancestry, with no filter on whether a cell is online yet. The
+    /// producing sets $\mathcal{A}$ and $\mathcal{A}^*$ are its online
+    /// subsets, which this type cannot see and the orchestrator derives.
     /// Ordered by `GNodeId` for deterministic iteration (ADR-S-005).
     full: Vec<AnalysisEntry<C, V>>,
 }
