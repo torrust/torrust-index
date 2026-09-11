@@ -22,6 +22,7 @@
 //! | [`is_competitive_false_for_ancestor_only`] | selection | cites (´claim:selection:the-competitiveness-predicate-agrees-with-the-competitive-list´) |
 //! | [`summary_empty_graph`] | selection | A summary of a set with nothing selected reports zeroes throughout — sizes, depth span, importance span and V-depth span alike — rather than omitting the ranges or filling them with sentinels. The full size is one, because the root is there. A host parsing summaries gets the same shape whether or not anything was selected. |
 //! | [`summary_with_competitive_cells`] | selection | A summary counts the cells that competed and the cells the closure added as separate figures, and on a populated graph the full count strictly exceeds the competitive one. The cost of ancestry is therefore visible: a host can see how much modelling it is paying for beyond the cells it actually chose to invest in. |
+//! | [`summary_online_keeps_the_investment_count_whole`] | selection | The producing sets shrink to whatever is online, but the investment does not: a cell still being warmed has been paid for and has produced nothing yet, and that gap is the whole difference between the two readings. A summary taken over the online cells therefore filters the producing count and leaves the investment count whole, so a host watching a warm-up sees what it has committed to as well as what is answering. |
 //! | [`summary_depth_range_includes_root`] | selection | cites (´claim:selection:the-root-is-always-in-the-full-set-so-every-ancestor-chain-terminates´) |
 //! | [`summary_importance_range_positive`] | selection | Where cells were selected at all, the least important of them still carries importance above zero, and the reported span runs the right way round. A cell can only win the competition on accumulated observation, so nothing with no traffic behind it appears in the summary as though it had been chosen. |
 //! | [`summary_v_depth_range_nonzero`] | selection | cites (´claim:selection:the-root-is-never-competitive-however-important-it-is´) |
@@ -46,6 +47,8 @@
 //! G-tree state, so an internal cell is as eligible as a terminal one, and
 //! ties are broken by interval start so that recomputing over an unchanged
 //! graph returns the same cells in the same order.
+
+use std::collections::BTreeSet;
 
 use torrust_mudlark::{Config as GvConfig, GNodeId, GvGraph};
 
@@ -401,6 +404,34 @@ fn summary_with_competitive_cells() {
     assert!(s.competitive_size > 0);
     assert!(s.competitive_size <= 4);
     assert!(s.full_size > s.competitive_size); // at least root + competitive
+}
+
+/// The producing sets shrink to whatever is online, but the investment does
+/// not: a cell still being warmed has been paid for and has produced nothing
+/// yet, and that gap is the whole difference between the two readings. A
+/// summary taken over the online cells therefore filters the producing count
+/// and leaves the investment count whole, so a host watching a warm-up sees
+/// what it has committed to as well as what is answering.
+///
+/// ´claim:selection:a-summary-over-the-online-cells-leaves-the-investment-count-whole´
+/// ´test:crate:summary-online-keeps-the-investment-count-whole´
+#[test]
+fn summary_online_keeps_the_investment_count_whole() {
+    let graph = populated_graph();
+    let set = AnalysisSet::recompute(&graph, 4, 6);
+    assert!(set.total_count() > 1, "the fixture must select more than the root");
+
+    // One cell online; every other selected cell stands for one still being
+    // warmed in staging.
+    let online: BTreeSet<GNodeId> = set.full().iter().map(|e| e.gnode).take(1).collect();
+    let s = set.summary_online(&online);
+
+    assert_eq!(s.full_size, 1, "the producing set is the online part of the selection");
+    assert_eq!(
+        s.investment_set_size,
+        set.total_count(),
+        "the investment is the whole selection, warming cells included"
+    );
 }
 
 /// The depth span of a populated set always begins at zero, because the root

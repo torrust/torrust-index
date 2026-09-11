@@ -445,7 +445,12 @@ where
         let online: BTreeSet<GNodeId> = self.cells.keys().copied().collect();
         let mut analysis_set_summary = self.analysis_set.summary_online(&online);
         analysis_set_summary.degenerate_cells_skipped = self.degenerate_cells_skipped;
-        // Investment set = online cells + warming cells (ADR-S-019).
+        // Investment set = online cells + warming cells (ADR-S-019). The
+        // selection snapshot reports the size of the selection, which is all
+        // it can see; what is written here is the tracker population itself,
+        // which is what the report's field names. The two readings part
+        // wherever a tracker outlives its cell's membership of the selection,
+        // and the population is the one that is being paid for.
         let warming_count = self.staging.lock().expect("staging mutex poisoned").total_count();
         analysis_set_summary.investment_set_size = self.cells.len() + warming_count;
 
@@ -1562,6 +1567,7 @@ where
         let health = self.health();
         let online: BTreeSet<GNodeId> = self.cells.keys().copied().collect();
         let mut summary = self.analysis_set.summary_online(&online);
+        // The tracker population, for the reason the non-empty path gives.
         let warming_count = self.staging.lock().expect("staging mutex poisoned").total_count();
         summary.investment_set_size = self.cells.len() + warming_count;
         summary.degenerate_cells_skipped = self.degenerate_cells_skipped;
