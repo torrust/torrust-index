@@ -436,7 +436,7 @@ where
 
         let contour = ContourSnapshot {
             plateau_count: self.graph.plateaus().len(),
-            cell_count: terminal_count as usize,
+            cell_count: terminal_count as usize + self.graph.semi_internal_count() as usize,
             total_importance: self.graph.total_sum().to_f64_approx(),
             splits_since_last_report: splits,
             net_removals_since_last_report: net_removals,
@@ -1170,7 +1170,17 @@ where
         };
 
         // Walk bottom-up and fire coordination at active contexts.
-        let (reports, _cells) = self.walk_coordination(&tree, cell_scores);
+        let (mut reports, _cells) = self.walk_coordination(&tree, cell_scores);
+
+        // The walk emits in post-order, which puts the root last and is not
+        // the order either record states. Sort shallowest first, ties by
+        // ascending identifier: that is a total order, it is the depth
+        // ordering the output record describes, and among nodes of equal
+        // depth it is the identifier ordering this type's own documentation
+        // describes. The two agree everywhere except where eviction and
+        // restoration have recycled identifiers, and there the depth is the
+        // reading that still means what it says.
+        reports.sort_by(|a, b| a.depth.cmp(&b.depth).then_with(|| a.gnode_id.cmp(&b.gnode_id)));
 
         // Prune stale coordination contexts (§5.5).
         let active_gnodes = Self::collect_internal_gnodes(&tree);
@@ -1561,7 +1571,7 @@ where
             coordination_reports: Vec::new(),
             contour: ContourSnapshot {
                 plateau_count: self.graph.plateaus().len(),
-                cell_count: terminal_count as usize,
+                cell_count: terminal_count as usize + self.graph.semi_internal_count() as usize,
                 total_importance: self.graph.total_sum().to_f64_approx(),
                 splits_since_last_report: splits,
                 net_removals_since_last_report: net_removals,

@@ -2035,7 +2035,7 @@ Present only when per-sample reporting is enabled. One per observation delivered
 
 ### 14.9 Coordination Report · `sec:sentinel:algorithm-output-coordination-report`
 
-One record per active coordination context (§7.1) that fired in this batch, ordered by G-Tree depth (shallowest first).
+One record per active coordination context (§7.1) that fired in this batch, ordered by G-Tree depth (shallowest first), ties broken by ascending G-node identifier so that the order is total.
 
 | Field              | Type                            | Description                                                 |
 | ------------------ | ------------------------------- | ----------------------------------------------------------- |

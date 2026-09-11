@@ -40,7 +40,8 @@ pub struct BatchReport<C: Copy + Debug> {
 
     /// Hierarchical coordination reports from the G-tree walk (§ALGO S-9.4).
     ///
-    /// One report per active coordination context. Ordered by `GNodeId`.
+    /// One report per active coordination context. Ordered shallowest first,
+    /// ties broken by ascending `GNodeId`.
     /// Empty when fewer than 2 competitive cells report scores.
     pub coordination_reports: Vec<CoordinationReport<C>>,
 
@@ -712,10 +713,14 @@ pub struct ContourSnapshot {
     /// depth. Fewer plateaus → more uniform spatial resolution.
     pub plateau_count: usize,
 
-    /// Number of terminal (leaf) cells in the G-tree.
+    /// Number of cells on the contour: the terminal nodes together with the
+    /// semi-internal ones, whose unsubdivided half still accumulates locally
+    /// and is a cell in its own right.
     ///
     /// This is the spatial resolution: how many non-overlapping
-    /// regions the domain is partitioned into.
+    /// regions the domain is partitioned into. It may differ from the number
+    /// of cells in the batch report, which also carries the ancestors above
+    /// the contour.
     pub cell_count: usize,
 
     /// Total accumulated importance across the entire G-V Graph.
