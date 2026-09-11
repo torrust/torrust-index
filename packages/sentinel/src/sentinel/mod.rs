@@ -46,6 +46,12 @@
 //! // Root cell always receives all observations (as an ancestor).
 //! assert!(!report.ancestor_reports.is_empty());
 //! ```
+//!
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`a_scoring_pass_with_no_competitive_scores_retires_every_context`] | coordination | A scoring pass that receives no competitive scores retires every context, rather than returning while they stand. Contexts are pruned against the set that is active in the pass, and a pass in which nothing scored makes that set empty — which is a reason to prune all of them, not a reason to skip pruning. Left standing they are wrong twice over: the health figure goes on counting contexts that describe nothing, and a node that becomes active again later finds a model already in place and so skips the baseline warm-up it would otherwise be given, resuming on a model trained against a group composition that has since dissolved. The pass is driven here rather than through a batch because no batch can reach it: an empty batch is answered before scoring begins, and at every capacity that brings a context to life the competitive cells divide the whole domain between them, so an observation lands inside one wherever it is aimed. |
 
 pub mod cusum;
 pub mod staging;
@@ -378,7 +384,7 @@ where
         let unit_delta = V::from_f64(1.0);
 
         #[cfg(debug_assertions)]
-        let pre_observe_sum = self.graph.total_sum().to_f64_approx();
+        let pre_observe_sum = self.graph.total_sum();
 
         for &value in values {
             self.graph.observe(value, unit_delta);
@@ -386,11 +392,20 @@ where
 
         #[cfg(debug_assertions)]
         {
-            #[allow(clippy::cast_precision_loss)]
-            let expected_sum = pre_observe_sum + values.len() as f64;
-            let actual_sum = self.graph.total_sum().to_f64_approx();
+            // Compare in the accumulator's own domain rather than through a
+            // floating-point projection. The projection is lossy by its own
+            // documentation, and past the point where the spacing between
+            // representable values exceeds one it cannot express a difference
+            // of a single observation at all: an exactly correct total then
+            // lands more than the tolerance away from its projected
+            // expectation, and the assertion fires on arithmetic that was
+            // never wrong. Adding the unit delta once per observation
+            // reproduces exactly what the loop above did, so the comparison
+            // is against the accumulator's own notion of the sum.
+            let expected_sum = values.iter().fold(pre_observe_sum, |acc, _| acc.add(unit_delta));
+            let actual_sum = self.graph.total_sum();
             debug_assert!(
-                (actual_sum - expected_sum).abs() < 1.0,
+                actual_sum == expected_sum,
                 "feed-forward invariant violated: total_sum should increase by exactly n"
             );
         }
@@ -917,10 +932,6 @@ where
 
             staging.retain_in_set(&new_gnodes);
 
-            // Update cached volumes from the graph so the background
-            // thread can prioritise correctly (Step 3.2c).
-            staging.update_volumes(&self.graph);
-
             // Enqueue entered cells into the staging area (Step 2.1).
             for entry in new_set.full() {
                 if self.cells.contains_key(&entry.gnode) || staging.contains(entry.gnode) {
@@ -955,6 +966,18 @@ where
                 let rounds = self.config.noise_schedule.rounds_for_depth(entry.depth as usize);
                 staging.enqueue(entry.gnode, cell, rounds);
             }
+
+            // Update cached volumes from the graph so both warm-up paths
+            // can prioritise correctly (Step 3.2c). This runs after the
+            // enqueue loop rather than before it: a cell enqueued above
+            // starts at zero volume, and refreshing beforehand leaves every
+            // newly entered cell holding that zero until some later pass.
+            // The priority rule is highest volume first, so a field of
+            // zeroes is decided entirely by the tie-break — which favours
+            // the newest and deepest cell, the exact inverse of the
+            // documented rule that a busy ancestor is warmed before the
+            // cells beneath it.
+            staging.update_volumes(&self.graph);
 
             // ── Warm-up dispatch ────────────────────────────
             if self.warming_thread.is_none() {
@@ -1121,7 +1144,16 @@ where
 
         // Build the pruned coordination tree (§5.3).
         let Some(tree) = Self::build_coordination_tree(&self.graph, &competitive_gnodes, self.root_gnode) else {
-            // No competitive cells with scores ⇒ no coordination.
+            // No competitive cell supplied a score, so no context is active
+            // and every context that was active has just become stale. That
+            // still has to be recorded: returning without pruning leaves the
+            // old contexts standing, where they go on being reported as
+            // active, and — worse — a node that becomes active again later
+            // finds a model already present and skips the baseline warm-up,
+            // so it resumes on a model trained against a group composition
+            // that no longer exists. Pruning against an empty active set is
+            // the same operation every other pass performs.
+            self.coordination.clear();
             return Vec::new();
         };
 
@@ -1761,3 +1793,65 @@ const _: () = {
     const fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<SpectralSentinel<u128, u64, 128>>();
 };
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::NoiseSchedule;
+
+    /// Values confined to one leading nibble, so two calls with different
+    /// nibbles populate two well-separated regions of the domain.
+    fn values(nibble: u128, count: u128) -> Vec<u128> {
+        (1..=count).map(|i| (nibble << 124) | i).collect()
+    }
+
+    /// A scoring pass that receives no competitive scores retires every
+    /// context, rather than returning while they stand. Contexts are pruned
+    /// against the set that is active in the pass, and a pass in which nothing
+    /// scored makes that set empty — which is a reason to prune all of them,
+    /// not a reason to skip pruning. Left standing they are wrong twice over:
+    /// the health figure goes on counting contexts that describe nothing, and
+    /// a node that becomes active again later finds a model already in place
+    /// and so skips the baseline warm-up it would otherwise be given,
+    /// resuming on a model trained against a group composition that has since
+    /// dissolved. The pass is driven here rather than through a batch because
+    /// no batch can reach it: an empty batch is answered before scoring
+    /// begins, and at every capacity that brings a context to life the
+    /// competitive cells divide the whole domain between them, so an
+    /// observation lands inside one wherever it is aimed.
+    ///
+    /// ´claim:coordination:a-scoring-pass-that-receives-no-competitive-scores-retires-every-context´
+    /// ´test:unit:a-scoring-pass-with-no-competitive-scores-retires-every-context´
+    #[test]
+    fn a_scoring_pass_with_no_competitive_scores_retires_every_context() {
+        let cfg = SentinelConfig::<u64> {
+            max_rank: 4,
+            forgetting_factor: 0.90,
+            analysis_k: 16,
+            split_threshold: 10,
+            noise_schedule: NoiseSchedule::Explicit(vec![5]),
+            noise_batch_size: 4,
+            noise_seed: Some(42),
+            background_warming: false,
+            ..SentinelConfig::<u64>::default()
+        };
+        let mut sentinel: SpectralSentinel<u128, u64, 128> = SpectralSentinel::new(cfg).unwrap();
+
+        let batch = [values(0xF, 4), values(0x1, 4)].concat();
+        let mut fired = false;
+        for _ in 0..40 {
+            if sentinel.ingest(&batch).health.active_coordination_contexts > 0 {
+                fired = true;
+                break;
+            }
+        }
+        assert!(fired, "the fixture must bring at least one context to life");
+        assert!(!sentinel.coordination.is_empty());
+
+        let reports = sentinel.propagate_coordination_from_root(&BTreeMap::new());
+
+        assert!(reports.is_empty(), "nothing scored, so no context reports");
+        assert!(sentinel.coordination.is_empty(), "every stale context is retired");
+        assert_eq!(sentinel.health().active_coordination_contexts, 0);
+    }
+}

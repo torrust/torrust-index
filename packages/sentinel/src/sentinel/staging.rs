@@ -47,6 +47,8 @@
 //! | [`warm_one_batch_picks_highest_volume`] | staging | When several cells are waiting, the step spends its round on the one carrying the most traffic, leaving the quieter cell still warming. Volume is the cached importance of the backing graph node, so the cells the host is most likely to be asking about come online first, and — because a busy ancestor outweighs its own descendants — ancestors tend to arrive before the cells beneath them. |
 //! | [`contains_checks_both_warming_and_ready`] | staging | Presence is answered across every state a staged cell can occupy: a cell still warming and a cell already waiting to be promoted both answer yes. The caller asking is deciding whether a cell needs creating, and it must not be told "absent" merely because the cell has moved on within the staging area. |
 //! | [`take_highest_priority_moves_to_in_flight`] | staging | Checking a cell out for background work takes the busiest waiting cell and marks it in flight, leaving the others warming; while it is away it still counts as present in the staging area. That is what makes the expensive noise injection safe to do without holding the lock: the main thread can see the cell is spoken for even though the warming map no longer holds it. |
+//! | [`equal_volumes_take_the_shallower_cell_first`] | staging | Equal volumes resolve to the shallower cell rather than the deeper one. A tie is the ordinary case for a pair of siblings the moment they are created, and the rule the queue exists to serve is that a busy ancestor is warmed before the cells beneath it. Identifiers are handed out as the tree grows downward, so the larger of two is always the newer and deeper cell, and resolving a tie toward it inverts the rule exactly. This path and the synchronous drain are two ways of serving one queue, so they must not disagree about which cell comes next. |
+//! | [`a_newly_queued_cell_carries_its_volume`] | staging | A cell joining the queue carries its volume with it instead of waiting for a later pass to supply one. The queue is served highest volume first, so a cell admitted at zero is indistinguishable from a cell with no traffic behind it, and a field of zeroes is decided entirely by the tie-break — which puts the newest and deepest cell first, the inverse of what the queue is for. Refreshing the cached volumes before the new cells are added rather than after leaves every one of them in exactly that state until some later pass happens to refresh again. |
 //! | [`return_warming_restores_cell`] | staging | A cell handed back unfinished rejoins the warming set and stops being in flight, with its accumulated rounds intact. Background warming can therefore be interrupted between rounds — the thread need not carry a cell to completion once it has taken it. |
 //! | [`finish_warming_moves_to_ready`] | staging | A cell handed back finished joins the ready queue instead of the warming set, and is no longer in flight. Which of the two return paths the background thread takes is what decides the cell's fate, so completion is declared by the worker that did the rounds rather than re-derived by the staging area. |
 //! | [`eviction_of_in_flight_cell_discards_on_return`] | staging | A cell evicted while a background thread was working on it is discarded when it comes back, not resurrected: the eviction sweep removes its in-flight mark, and a return with no mark to clear keeps nothing. The warming work already spent is lost, which is the deliberate trade — a cell that has left the analysis set must not reappear in it because a thread happened to be holding it. |
@@ -168,12 +170,20 @@ impl<C: Coordinate> StagingArea<C> {
     /// responsible for returning it via [`return_warming`] or
     /// [`finish_warming`].
     ///
-    /// Priority is by cached `volume` (largest first).
+    /// Priority is by cached `volume` (largest first), ties resolving to the
+    /// smaller `GNodeId` — the shallower, earlier-allocated cell — so that
+    /// this path and the synchronous drain order equal-volume cells the same
+    /// way, ancestors before the cells beneath them.
     pub fn take_highest_priority(&mut self) -> Option<(GNodeId, WarmingCell<C>)> {
-        let (&gnode, _) = self
-            .warming
-            .iter()
-            .max_by(|(_, a), (_, b)| a.volume.partial_cmp(&b.volume).unwrap_or(std::cmp::Ordering::Equal))?;
+        let (&gnode, _) = self.warming.iter().max_by(|(a_gnode, a), (b_gnode, b)| {
+            a.volume
+                .partial_cmp(&b.volume)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                // Reversed, because `max_by` keeps the last of equal maxima
+                // and the map iterates in ascending id order: comparing ids
+                // backwards makes the smallest id the maximum.
+                .then_with(|| b_gnode.cmp(a_gnode))
+        })?;
         let wc = self.warming.remove(&gnode)?;
         self.in_flight.insert(gnode);
         Some((gnode, wc))
@@ -837,6 +847,83 @@ mod tests {
         assert_eq!(staging.warming_count(), 1); // left remains
         assert_eq!(staging.in_flight_count(), 1);
         assert!(staging.contains(right)); // still logically present
+    }
+
+    /// Equal volumes resolve to the shallower cell rather than the deeper one.
+    /// A tie is the ordinary case for a pair of siblings the moment they are
+    /// created, and the rule the queue exists to serve is that a busy ancestor
+    /// is warmed before the cells beneath it. Identifiers are handed out as the
+    /// tree grows downward, so the larger of two is always the newer and deeper
+    /// cell, and resolving a tie toward it inverts the rule exactly. This path
+    /// and the synchronous drain are two ways of serving one queue, so they
+    /// must not disagree about which cell comes next.
+    ///
+    /// ´claim:staging:equal-volumes-resolve-to-the-shallower-cell-so-both-drains-agree´
+    /// ´test:unit:equal-volumes-take-the-shallower-cell-first´
+    #[test]
+    fn equal_volumes_take_the_shallower_cell_first() {
+        let mut staging = StagingArea::<u128>::new();
+        let (_, _, left, right) = split_graph();
+        let (earlier, later) = if left < right { (left, right) } else { (right, left) };
+
+        staging.enqueue(left, make_cell(1), 3);
+        staging.enqueue(right, make_cell(1), 3);
+        staging.warming.get_mut(&left).unwrap().volume = 42.0;
+        staging.warming.get_mut(&right).unwrap().volume = 42.0;
+
+        let (gnode, _wc) = staging.take_highest_priority().unwrap();
+        assert_eq!(gnode, earlier, "a tie goes to the earlier, shallower identifier");
+        assert_ne!(gnode, later);
+    }
+
+    /// A cell joining the queue carries its volume with it instead of waiting
+    /// for a later pass to supply one. The queue is served highest volume
+    /// first, so a cell admitted at zero is indistinguishable from a cell with
+    /// no traffic behind it, and a field of zeroes is decided entirely by the
+    /// tie-break — which puts the newest and deepest cell first, the inverse of
+    /// what the queue is for. Refreshing the cached volumes before the new
+    /// cells are added rather than after leaves every one of them in exactly
+    /// that state until some later pass happens to refresh again.
+    ///
+    /// ´claim:staging:a-cell-joins-the-queue-carrying-its-volume-rather-than-a-zero´
+    /// ´test:unit:a-newly-queued-cell-carries-its-volume´
+    #[test]
+    fn a_newly_queued_cell_carries_its_volume() {
+        use crate::config::NoiseSchedule;
+        use crate::sentinel::SpectralSentinel;
+
+        // Depth zero takes no rounds, so construction is immediate; every
+        // deeper cell takes a long schedule, so cells linger in the queue
+        // while the background thread works through them.
+        let cfg = SentinelConfig::<u64> {
+            split_threshold: 5,
+            noise_schedule: NoiseSchedule::Explicit(vec![0, 500]),
+            noise_batch_size: 2,
+            background_warming: true,
+            ..SentinelConfig::<u64>::default()
+        };
+        let mut s: SpectralSentinel<u128, u64, 128> = SpectralSentinel::new(cfg).unwrap();
+
+        let batch: Vec<u128> = (0..40u128).map(|i| (0xA_u128 << 124) | i).collect();
+        for _ in 0..10 {
+            s.ingest(&batch);
+        }
+
+        let staged = s.staging.lock().expect("staging mutex poisoned");
+        assert!(
+            !staged.warming.is_empty(),
+            "the long schedule must leave cells waiting in the queue"
+        );
+
+        for (&gnode, wc) in &staged.warming {
+            let node_volume = s.graph.gnode_info(gnode).map_or(0.0, |info| info.sum.to_f64_approx());
+            if node_volume > 0.0 {
+                assert!(
+                    wc.volume > 0.0,
+                    "a queued cell whose node carries traffic must carry it into the queue too"
+                );
+            }
+        }
     }
 
     /// A cell handed back unfinished rejoins the warming set and stops being
