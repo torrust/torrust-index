@@ -161,7 +161,7 @@ The root tracker at depth 0 ($w = N$) is permanent — never destroyed (§ALGO S
 
 ### 2.4 Determinism · `sec:sentinel:implementation-architecture-determinism`
 
-All collection types use `BTreeMap` for deterministic iteration order ([ADR-S-005](../adr/005-deterministic-order-and-thread-safety.md)). Given a fixed `noise_seed`, the sentinel is fully reproducible. `SpectralSentinel<C, V, N>` is `Send + Sync`.
+All collection types use `BTreeMap` for deterministic iteration order ([ADR-S-005](../adr/005-deterministic-order-and-thread-safety.md)). Given a fixed `noise_seed`, the sentinel is fully reproducible with `background_warming` disabled and on a fixed build — one target and one set of dependency versions; the generator behind the noise is chosen for speed and is portable across neither. Under background warming the same seed and the same traffic still give the same graph, the same investment set and the same ascending-handle report order, but neither the baselines a tracker starts from nor the ingest cycle on which it first scores: the warming worker draws from its own generator and takes whichever staged cell leads on volume when it looks. `SpectralSentinel<C, V, N>` is `Send + Sync`.
 
 ---
 
