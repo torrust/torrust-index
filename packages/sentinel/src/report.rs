@@ -472,8 +472,9 @@ pub struct HealthReport {
     /// Total live G-nodes in the G-V Graph.
     pub total_g_nodes: usize,
 
-    /// Number of semi-internal G-nodes.
-    // TODO ´todo:code:semi-internal-g-node-count-field´: semi-internal G-node count field is never populated from the graph.
+    /// Number of semi-internal G-nodes — those with one subdivided half and
+    /// one that still accumulates locally. They sit on the contour alongside
+    /// the terminals.
     pub semi_internal_count: usize,
 
     /// Number of active cell trackers (total).

@@ -52,6 +52,8 @@
 //! | Test | Area | Claim |
 //! |------|------|-------|
 //! | [`a_scoring_pass_with_no_competitive_scores_retires_every_context`] | coordination | A scoring pass that receives no competitive scores retires every context, rather than returning while they stand. Contexts are pruned against the set that is active in the pass, and a pass in which nothing scored makes that set empty — which is a reason to prune all of them, not a reason to skip pruning. Left standing they are wrong twice over: the health figure goes on counting contexts that describe nothing, and a node that becomes active again later finds a model already in place and so skips the baseline warm-up it would otherwise be given, resuming on a model trained against a group composition that has since dissolved. The pass is driven here rather than through a batch because no batch can reach it: an empty batch is answered before scoring begins, and at every capacity that brings a context to life the competitive cells divide the whole domain between them, so an observation lands inside one wherever it is aimed. |
+//! | [`active_counts_exclude_cells_still_warming`] | health | The active tracker counts describe the cells that are online, not the cells the selector has decided to pay for. The two differ whenever a cell is still warming: the selection names it, but it has no tracker yet and cannot have produced anything, so counting it active reports a cell as working for as many batches as its warm-up lasts. Reading the figures from the selection made that the normal case under background warming, where the drain no longer happens inside the ingest that created the cell. |
+//! | [`the_semi_internal_count_follows_the_graph`] | health | The semi-internal count is read from the graph rather than left at a constant. Semi-internal nodes are a reachable state — an eviction that takes one child of a pair leaves the parent with a single subdivided half — and they sit on the contour, so a figure fixed at zero is wrong exactly when the structure is being reshaped, which is when a reader would look at it. |
 
 pub mod cusum;
 pub mod staging;
@@ -440,7 +442,8 @@ where
             net_removals_since_last_report: net_removals,
         };
 
-        let mut analysis_set_summary = self.analysis_set.summary();
+        let online: BTreeSet<GNodeId> = self.cells.keys().copied().collect();
+        let mut analysis_set_summary = self.analysis_set.summary_online(&online);
         analysis_set_summary.degenerate_cells_skipped = self.degenerate_cells_skipped;
         // Investment set = online cells + warming cells (ADR-S-019).
         let warming_count = self.staging.lock().expect("staging mutex poisoned").total_count();
@@ -472,9 +475,20 @@ where
     #[must_use]
     #[allow(clippy::too_many_lines)]
     pub fn health(&self) -> HealthReport {
-        let competitive_count = self.analysis_set.competitive_count();
-        let total_cells = self.analysis_set.total_count();
+        // The producing sets are the online ones. The analysis set is the
+        // investment set: it names every cell the selector has decided to pay
+        // for, including those still warming in staging, which have no tracker
+        // yet and cannot have produced anything. Reading the counts from it
+        // reported a cell as active for as many batches as its warm-up took.
+        // The cells map holds exactly the cells that are online, and each
+        // carries the competitive flag the last reconciliation gave it.
         let active_trackers = self.cells.len();
+        let competitive_count = self.cells.values().filter(|cell| cell.is_competitive).count();
+        let ancestor_count = self
+            .cells
+            .iter()
+            .filter(|&(&gnode, cell)| !cell.is_competitive && gnode != self.root_gnode)
+            .count();
         let coord_health = self.coordination_health();
 
         // Query staging area for investment/warming counts (ADR-S-019).
@@ -487,8 +501,7 @@ where
         if active_trackers == 0 {
             return HealthReport {
                 total_g_nodes: self.graph.node_count() as usize,
-                // TODO ´todo:code:empty-tracker-health-branch-hardcodes-semi´: empty-tracker health branch hardcodes semi-internal count.
-                semi_internal_count: 0,
+                semi_internal_count: self.graph.semi_internal_count() as usize,
                 active_trackers: 0,
                 active_competitive_trackers: 0,
                 active_ancestor_trackers: 0,
@@ -583,11 +596,10 @@ where
 
         HealthReport {
             total_g_nodes: self.graph.node_count() as usize,
-            // TODO ´todo:code:active-tracker-health-branch-hardcodes-semi´: active-tracker health branch hardcodes semi-internal count.
-            semi_internal_count: 0,
+            semi_internal_count: self.graph.semi_internal_count() as usize,
             active_trackers,
             active_competitive_trackers: competitive_count,
-            active_ancestor_trackers: total_cells.saturating_sub(competitive_count + 1),
+            active_ancestor_trackers: ancestor_count,
             active_coordination_contexts: self.coordination.len(),
             investment_set_size,
             warming_trackers: warming_total,
@@ -1535,7 +1547,8 @@ where
     /// delta rather than a double-count.
     fn empty_report(&mut self) -> BatchReport<C> {
         let health = self.health();
-        let mut summary = self.analysis_set.summary();
+        let online: BTreeSet<GNodeId> = self.cells.keys().copied().collect();
+        let mut summary = self.analysis_set.summary_online(&online);
         let warming_count = self.staging.lock().expect("staging mutex poisoned").total_count();
         summary.investment_set_size = self.cells.len() + warming_count;
         summary.degenerate_cells_skipped = self.degenerate_cells_skipped;
@@ -1853,5 +1866,114 @@ mod tests {
         assert!(reports.is_empty(), "nothing scored, so no context reports");
         assert!(sentinel.coordination.is_empty(), "every stale context is retired");
         assert_eq!(sentinel.health().active_coordination_contexts, 0);
+    }
+
+    /// The active tracker counts describe the cells that are online, not the
+    /// cells the selector has decided to pay for. The two differ whenever a
+    /// cell is still warming: the selection names it, but it has no tracker
+    /// yet and cannot have produced anything, so counting it active reports a
+    /// cell as working for as many batches as its warm-up lasts. Reading the
+    /// figures from the selection made that the normal case under background
+    /// warming, where the drain no longer happens inside the ingest that
+    /// created the cell.
+    ///
+    /// ´claim:health:the-active-counts-describe-the-online-cells-and-not-the-cells-the-selector-has-paid-for´
+    /// ´test:unit:active-counts-exclude-cells-still-warming´
+    #[test]
+    fn active_counts_exclude_cells_still_warming() {
+        let cfg = SentinelConfig::<u64> {
+            max_rank: 4,
+            forgetting_factor: 0.90,
+            analysis_k: 16,
+            split_threshold: 10,
+            noise_schedule: NoiseSchedule::Explicit(vec![0, 400]),
+            noise_batch_size: 2,
+            noise_seed: Some(42),
+            background_warming: true,
+            ..SentinelConfig::<u64>::default()
+        };
+        let mut sentinel: SpectralSentinel<u128, u64, 128> = SpectralSentinel::new(cfg).unwrap();
+
+        let batch = [values(0xF, 4), values(0x1, 4)].concat();
+        for _ in 0..12 {
+            sentinel.ingest(&batch);
+        }
+
+        let health = sentinel.health();
+        assert!(
+            health.warming_trackers > 0,
+            "the long schedule must leave cells warming for this comparison to mean anything"
+        );
+
+        // Every counted tracker is one of the online cells.
+        assert_eq!(health.active_trackers, sentinel.cells.len());
+        assert_eq!(
+            health.active_competitive_trackers + health.active_ancestor_trackers + 1,
+            health.active_trackers,
+            "the online cells are the competitive ones, the ancestors, and the root"
+        );
+
+        // And the selection is strictly larger, because it also names the
+        // cells that are still being warmed.
+        assert!(
+            sentinel.analysis_set.competitive_count() > health.active_competitive_trackers,
+            "a cell still warming is named by the selection and is not yet active"
+        );
+        assert!(health.investment_set_size > health.active_trackers);
+    }
+
+    /// The semi-internal count is read from the graph rather than left at a
+    /// constant. Semi-internal nodes are a reachable state — an eviction that
+    /// takes one child of a pair leaves the parent with a single subdivided
+    /// half — and they sit on the contour, so a figure fixed at zero is wrong
+    /// exactly when the structure is being reshaped, which is when a reader
+    /// would look at it.
+    ///
+    /// ´claim:health:the-semi-internal-count-is-read-from-the-graph-rather-than-fixed-at-zero´
+    /// ´test:unit:the-semi-internal-count-follows-the-graph´
+    #[test]
+    fn the_semi_internal_count_follows_the_graph() {
+        let cfg = SentinelConfig::<u64> {
+            max_rank: 4,
+            forgetting_factor: 0.90,
+            analysis_k: 16,
+            split_threshold: 5,
+            budget: 200,
+            noise_schedule: NoiseSchedule::Explicit(vec![1]),
+            noise_batch_size: 2,
+            noise_seed: Some(42),
+            background_warming: false,
+            ..SentinelConfig::<u64>::default()
+        };
+        let mut sentinel: SpectralSentinel<u128, u64, 128> = SpectralSentinel::new(cfg).unwrap();
+
+        let mut saw_semi_internal = false;
+        let mut saw_removal = false;
+        for nibble in 0..16u128 {
+            // Spread within the nibble so the region is refined rather than
+            // merely visited, and keep the budget under pressure so the graph
+            // has to evict as well as split.
+            let batch: Vec<u128> = (0u128..500).map(|i| (nibble << 124) | (i << 100)).collect();
+            let report = sentinel.ingest(&batch);
+
+            assert_eq!(
+                report.health.semi_internal_count,
+                sentinel.graph.semi_internal_count() as usize,
+                "the reported figure is the graph's own count"
+            );
+            if report.health.semi_internal_count > 0 {
+                saw_semi_internal = true;
+            }
+            if report.contour.net_removals_since_last_report > 0 {
+                saw_removal = true;
+            }
+        }
+
+        assert!(saw_removal, "the budget must stay tight enough to evict");
+        assert!(
+            saw_semi_internal,
+            "an eviction that takes one child of a pair leaves a half-subdivided node, \
+             so the figure must be non-zero somewhere in this run"
+        );
     }
 }
