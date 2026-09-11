@@ -172,8 +172,10 @@ pub type Sentinel64 = SpectralSentinel<u64, u64, 64>;
 /// Minimum suffix width for a functional subspace tracker.
 ///
 /// At `dim < MIN_TRACKER_DIM`, the tracker cannot form a
-/// meaningful basis or compute residuals. Cells at or below
-/// this threshold are excluded from the analysis set.
+/// meaningful basis or compute residuals. Cells below this
+/// threshold are excluded from the analysis set; a cell at it
+/// is kept, which is what makes the value a minimum rather
+/// than a floor the analysis set sits above.
 ///
 /// The value 2 ensures at least one residual degree of freedom
 /// ($d - k \geq 1$ when $k = 1$). A tracker with `dim = 1` can
