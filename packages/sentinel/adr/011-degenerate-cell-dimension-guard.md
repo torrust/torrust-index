@@ -1,6 +1,6 @@
 # ADR-S-011: Degenerate Cell Dimension Guard · `rec:sentinel:exclude-and-report-degenerate-tracker-dimensions`
 
-**Status:** Proposed **Date:** 2026-03-10 **Spec:** §ALGO S-4.2 (analysis set closure), §ALGO S-5 (subspace tracker) **Relates to:** [ADR-S-004](004-config-validation-over-panic.md) (config validation over panic), [ADR-S-006](006-analysis-set-recomputation.md) (analysis set recomputation), [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection)
+**Status:** Implemented **Date:** 2026-03-10 **Spec:** §ALGO S-4.2 (analysis set closure), §ALGO S-5 (subspace tracker) **Relates to:** [ADR-S-004](004-config-validation-over-panic.md) (config validation over panic), [ADR-S-006](006-analysis-set-recomputation.md) (analysis set recomputation), [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection)
 
 ## Context · `sec:sentinel:dimguard-context`
 

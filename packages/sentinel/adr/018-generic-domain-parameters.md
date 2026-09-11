@@ -53,7 +53,7 @@ Existing consumers use `Sentinel128` or `Sentinel64` as appropriate for their do
 
 ### `CentredBitSource`: sentinel's bridge trait · `sec:sentinel:domainparams-centred-bit-source`
 
-The sentinel must convert coordinate values to centred bit vectors for subspace analysis (§ALGO S-3.2). This requires bit-level access that `Coordinate` does not provide. Rather than modify mudlark's trait surface, the sentinel defines a sealed internal trait:
+The sentinel must convert coordinate values to centred bit vectors for subspace analysis (§ALGO S-3.2). This requires bit-level access that `Coordinate` does not provide. Rather than modify mudlark's trait surface, the sentinel defines a bridge trait of its own:
 
 ```rust
 pub trait CentredBitSource: Coordinate {
