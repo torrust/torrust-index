@@ -19,6 +19,14 @@
 //! `GvGraph<C, V, N>` triple. Each cell tracker analyses the suffix bits
 //! `[d, N)` at width `w = N - d`, where `d` is the cell's G-tree depth.
 //!
+//! That width is bounded at both ends. Below, a tracker needs at least two
+//! dimensions before a residual means anything. Above, a coordinate value
+//! reaches its tracker as a centred bit vector, and [`CentredBits`] carries
+//! its values in a fixed array of 128 slots — so a width past that has
+//! nowhere to put its bits, and is refused at construction rather than
+//! modelled at whatever width the array happens to hold. [`Sentinel128`]
+//! sits exactly at that ceiling.
+//!
 //! The crate provides two convenience aliases:
 //!
 //! - [`Sentinel128`] — `SpectralSentinel<u128, u64, 128>`, the default
@@ -175,3 +183,19 @@ pub type Sentinel64 = SpectralSentinel<u64, u64, 64>;
 ///
 /// See ADR-S-011 for rationale.
 pub(crate) const MIN_TRACKER_DIM: usize = 2;
+
+/// Widest coordinate width the observation path can carry.
+///
+/// A coordinate value reaches a tracker as a centred bit vector, and
+/// [`CentredBits`] holds its values in a fixed array of this many slots.
+/// The bridge that produces those vectors, [`CentredBitSource`], is open to
+/// a coordinate type of any width, and the spatial layer asks only that `N`
+/// fit the coordinate type — so a wider type carrying a wider `N` would
+/// otherwise build an `N`-dimensional tracker fed from a vector that can
+/// never hold more than this many values. The columns past the end of that
+/// vector are not missing data the arithmetic would notice: they arrive as
+/// zeros, which centred bits never are, so novelty, residual and rank would
+/// all be computed over a constant the coordinate stream never produced.
+/// Cell depth travels the same path in a single byte, which this ceiling
+/// keeps honest as well.
+pub(crate) const MAX_TRACKER_DIM: usize = 128;

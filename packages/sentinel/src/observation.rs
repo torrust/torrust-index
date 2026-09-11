@@ -29,6 +29,15 @@ use torrust_mudlark::Coordinate;
 /// here are what a wrapper around one of those widths delegates to. This is
 /// the coordinate side of the generic parameters the sentinel is built on
 /// (´rec:sentinel:generic-coordinate-accumulator-and-domain-width´).
+///
+/// The set of implementations is open; the width they can serve is not. Every
+/// conversion returns a [`CentredBits`], which carries its values in a fixed
+/// array of 128 slots, so a coordinate type wider than that has no vector to
+/// return past the first 128 bits. An implementor for such a type is free to
+/// exist — what it cannot do is drive a sentinel wider than the vector:
+/// `SpectralSentinel::new` refuses a width above the ceiling rather than
+/// building trackers whose extra dimensions would be fed a constant the
+/// coordinate stream never produced.
 pub trait CentredBitSource: Coordinate {
     /// Convert `self` into a centred bit vector of length `n`.
     ///
@@ -88,6 +97,13 @@ impl CentredBitSource for u64 {
 ///
 /// This centring is critical: it ensures the data has zero mean
 /// per dimension, which the subspace tracker requires.
+///
+/// The backing array is fixed at 128 slots, which is the sentinel's coordinate
+/// width ceiling and not an implementation detail a wider coordinate type can
+/// work around: a centred bit is `±0.5` and never zero, so the slots past
+/// `len` are distinguishable from data and there is no honest way to present
+/// them as observations. A sentinel is refused at construction above that
+/// width for the same reason.
 #[derive(Debug, Clone)]
 pub struct CentredBits {
     /// The centred bit values, from MSB (index 0) to LSB (index `len - 1`).
@@ -120,7 +136,10 @@ impl CentredBits {
     /// narrower than the one the caller believes it built.
     #[must_use]
     pub const fn new(bits: [f64; 128], len: usize) -> Self {
-        assert!(len <= 128, "centred bit length exceeds the 128-slot backing array");
+        assert!(
+            len <= crate::MAX_TRACKER_DIM,
+            "centred bit length exceeds the 128-slot backing array"
+        );
         Self { bits, len }
     }
 

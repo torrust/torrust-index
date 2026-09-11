@@ -240,15 +240,24 @@ where
     ///
     /// Returns [`ConfigErrors`] if the
     /// configuration violates any invariant (see
-    /// [`SentinelConfig::validate`]), or if the coordinate width `N` is
-    /// narrower than the smallest dimension a subspace tracker can model.
-    /// Both faults are collected in one pass.
+    /// [`SentinelConfig::validate`]), or if the coordinate width `N` lies
+    /// outside the range the observation path can model — narrower than the
+    /// smallest dimension a subspace tracker can work in, or wider than the
+    /// centred bit vector that feeds it can carry. Every such fault is
+    /// collected in one pass.
     pub fn new(config: SentinelConfig<V>) -> Result<Self, ConfigErrors> {
         // The root tracker spans the whole coordinate width, so a width the
         // tracker cannot model is refused here rather than left to build a
         // root whose lone basis vector spans its own space and therefore
-        // reports no novelty at all. This is the only place the width can be
-        // judged: it is a parameter of the type, not a field of the
+        // reports no novelty at all. The same holds at the other end: the
+        // bridge that turns a coordinate into centred bits is open to a
+        // coordinate type of any width, and the spatial layer asks only that
+        // the width fit that type, so a wider type with a wider N would build
+        // trackers of that width over a vector that can never carry it — the
+        // dimensions past the vector's end arriving as zeros, which centred
+        // bits never are, and being modelled as though the stream had
+        // produced them. This is the only place either bound can be judged:
+        // the width is a parameter of the type, not a field of the
         // configuration, so validation of the configuration alone can never
         // see it.
         let mut errors = Vec::new();
@@ -256,6 +265,12 @@ where
             errors.push(ConfigError::TrackerDimensionTooSmall {
                 width: N,
                 minimum: crate::MIN_TRACKER_DIM,
+            });
+        }
+        if (N as usize) > crate::MAX_TRACKER_DIM {
+            errors.push(ConfigError::TrackerDimensionTooLarge {
+                width: N,
+                maximum: crate::MAX_TRACKER_DIM,
             });
         }
         if let Err(ConfigErrors(config_errors)) = config.validate() {
