@@ -18,7 +18,7 @@
 
 use torrust_mudlark::Coordinate;
 
-// ─── CentredBitSource trait (§ADR-S-018 Part A) ──────────────
+// ─── CentredBitSource trait ─────────────────────────────────
 
 /// Bridge trait: convert a coordinate value into centred bit form.
 ///
@@ -26,7 +26,9 @@ use torrust_mudlark::Coordinate;
 /// coordinate type that implements it as well: the trait is part of the
 /// published surface, so nothing closes the set of implementations. An
 /// implementor supplies `to_centred_bits` for its own width, and the two impls
-/// here are what a wrapper around one of those widths delegates to.
+/// here are what a wrapper around one of those widths delegates to. This is
+/// the coordinate side of the generic parameters the sentinel is built on
+/// (´rec:sentinel:generic-coordinate-accumulator-and-domain-width´).
 pub trait CentredBitSource: Coordinate {
     /// Convert `self` into a centred bit vector of length `n`.
     ///

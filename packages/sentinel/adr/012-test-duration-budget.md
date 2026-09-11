@@ -1,6 +1,6 @@
 # ADR-S-012: Test Duration Budget · `rec:sentinel:individual-release-test-five-second-budget`
 
-**Status:** Accepted **Date:** 2026-03-12 **Spec:** §TEST M-(testing guidelines) **Relates to:** [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection — warm-up costs), [ADR-S-013](013-warm-up-convergence-benchmark.md) (convergence benchmark — empirical iteration counts)
+**Status:** Accepted **Date:** 2026-03-12 **Spec:** — (test-suite discipline, with no section in the algorithm specification) **Relates to:** [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection — warm-up costs), [ADR-S-013](013-warm-up-convergence-benchmark.md) (convergence benchmark — empirical iteration counts)
 
 ## Context · `sec:sentinel:testbudget-context`
 

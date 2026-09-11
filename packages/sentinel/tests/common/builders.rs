@@ -20,7 +20,7 @@ pub fn seeded_sentinel() -> Sentinel128 {
     s
 }
 
-// ─── §9.1.1 — ScenarioBuilder ──────────────────────────────
+// ─── ScenarioBuilder ───────────────────────────────────────
 
 /// Builder for common test scenarios.
 ///

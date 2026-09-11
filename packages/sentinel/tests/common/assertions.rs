@@ -7,7 +7,7 @@ use std::collections::HashSet;
 
 use torrust_sentinel::{BatchReport, Sentinel128};
 
-// ─── §9.1.2 — assert_invariants() ──────────────────────────
+// ─── assert_invariants() ───────────────────────────────────
 
 /// Assert all structural invariants on a sentinel and its last report.
 ///
