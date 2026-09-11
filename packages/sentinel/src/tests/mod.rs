@@ -25,3 +25,4 @@ mod observation;
 mod report;
 mod tracker;
 mod variance_formula;
+mod warming_thread;
