@@ -612,7 +612,11 @@ fn a_single_arrival_outlives_the_projection_only_in_the_accumulator() {
     let two_more: u64 = total + 2;
 
     // The projection cannot tell one arrival from none at this magnitude.
-    assert_eq!(total.to_f64_approx(), one_more.to_f64_approx());
+    assert_eq!(
+        total.to_f64_approx().to_bits(),
+        one_more.to_f64_approx().to_bits(),
+        "the projection separated one arrival"
+    );
     // The accumulator's own comparison can.
     assert_ne!(total, one_more);
 
