@@ -22,6 +22,7 @@
 //! | [`cells_tracked_always_at_least_one`] | invariant | At no point in a sentinel's life is it tracking nothing: not at birth before any traffic, not through a run of ingestion, and not after ageing severe enough to strip away everything that had accumulated. There is always at least the root, so the question "what does the sentinel make of this value" always has an answer. |
 //! | [`assert_invariants_under_random_traffic`] | invariant | Traffic with no structure at all — values scattered across the whole domain, in batches whose size changes from one to the next — leaves every structural property standing, checked after each batch. The guarantees are not conditioned on the traffic being well behaved or on batches being uniform, which is the whole point of calling them guarantees. |
 //! | [`assert_invariants_after_decay_regrowth`] | invariant | A sentinel whose tree has been collapsed by severe ageing and then made to regrow under traffic spread across the ranges satisfies every structural property throughout the regrowth, batch by batch. The transient state of a system rebuilding itself is exactly where a bound is likeliest to slip, so the guarantees are asserted while it is in motion rather than once it has settled. |
+//! | [`a_single_arrival_outlives_the_projection_only_in_the_accumulator`] | invariant | The feed-forward count is checked in the accumulator's own domain rather than through a floating-point projection, because past a certain magnitude the projection cannot express a single arrival. The projection is lossy by its own documentation, and at the first magnitude where consecutive integers stop being separately representable, a total and that same total plus one arrival land on the same number while a total plus two lands two away. A check that projects both sides and allows them to differ by less than one arrival therefore rejects arithmetic that is exactly right. The accumulator keeps the distinction the projection loses, so the comparison belongs there; this test pins the property the choice rests on rather than the failure itself, which is some nine quadrillion observations away and not reachable by a test. |
 
 //! Integration tests for the properties the sentinel is required to hold at
 //! **all times, whatever the traffic** — the statements a reader of any report
@@ -55,6 +56,7 @@
 mod common;
 
 use common::{ScenarioBuilder, anomalous_values, assert_invariants, cell_values, integration_config, max_cusum, test_config};
+use torrust_mudlark::Inspectable;
 use torrust_sentinel::{NoiseSchedule, Sentinel128, SentinelConfig};
 
 // ── G1: Feed-forward invariant ──────────────────────────────
@@ -584,4 +586,37 @@ fn assert_invariants_after_decay_regrowth() {
         let report = s.ingest(&cell_values(i % 16, 20));
         assert_invariants(&s, &report);
     }
+}
+
+/// The feed-forward count is checked in the accumulator's own domain rather
+/// than through a floating-point projection, because past a certain magnitude
+/// the projection cannot express a single arrival. The projection is lossy by
+/// its own documentation, and at the first magnitude where consecutive
+/// integers stop being separately representable, a total and that same total
+/// plus one arrival land on the same number while a total plus two lands two
+/// away. A check that projects both sides and allows them to differ by less
+/// than one arrival therefore rejects arithmetic that is exactly right. The
+/// accumulator keeps the distinction the projection loses, so the comparison
+/// belongs there; this test pins the property the choice rests on rather than
+/// the failure itself, which is some nine quadrillion observations away and
+/// not reachable by a test.
+///
+/// ´claim:invariant:the-feed-forward-count-is-compared-in-the-accumulator-domain-because-the-projection-loses-a-single-arrival´
+/// ´test:integration:a-single-arrival-outlives-the-projection-only-in-the-accumulator´
+#[test]
+fn a_single_arrival_outlives_the_projection_only_in_the_accumulator() {
+    // The first magnitude at which consecutive integers stop being separately
+    // representable in the projection's format.
+    let total: u64 = 1u64 << 53;
+    let one_more: u64 = total + 1;
+    let two_more: u64 = total + 2;
+
+    // The projection cannot tell one arrival from none at this magnitude.
+    assert_eq!(total.to_f64_approx(), one_more.to_f64_approx());
+    // The accumulator's own comparison can.
+    assert_ne!(total, one_more);
+
+    // And the gap the projection does report can exceed a single arrival, so
+    // an absolute tolerance of one arrival is not a safe reading of it.
+    assert!((two_more.to_f64_approx() - one_more.to_f64_approx()).abs() > 1.0);
 }
