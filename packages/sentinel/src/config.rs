@@ -487,8 +487,9 @@ pub enum ConfigError {
     NoiseScheduleDecayOutOfRange(f64),
     /// `NoiseSchedule::Geometric::root` must be > 0 when `min` > 0.
     NoiseScheduleRootZero,
-    /// The gap between `d_create` and `d_evict` implies a headroom
-    /// requirement too large to represent, so no budget can satisfy it.
+    /// The headroom requirement the depth pair implies — a power of three in
+    /// the gap between the two depths, or twice the depth at which cells are
+    /// created — is too large to represent, so no budget can satisfy it.
     DepthBufferTooLarge { d_create: u32, d_evict: u32 },
     /// The coordinate width `N` is below the smallest width a subspace
     /// tracker can model.
@@ -556,9 +557,9 @@ impl std::fmt::Display for ConfigError {
             Self::DepthBufferTooLarge { d_create, d_evict } => {
                 write!(
                     f,
-                    "the depth buffer d_evict ({d_evict}) - d_create ({d_create}) implies a \
-                     headroom of 3^(buffer+1) that exceeds the addressable range, so no budget \
-                     can satisfy it"
+                    "the depth pair d_create ({d_create}) / d_evict ({d_evict}) implies a headroom \
+                     requirement — max(3^(buffer+1), 2*(d_create-1)) — that exceeds the \
+                     addressable range, so no budget can satisfy it"
                 )
             }
             Self::TrackerDimensionTooSmall { width, minimum } => {
@@ -636,6 +637,28 @@ impl std::fmt::Display for ConfigWarning {
     }
 }
 
+/// The node budget the depth pair demands, or `None` when the requirement
+/// cannot be represented.
+///
+/// Mudlark's headroom requirement is `max(3^(buffer+1), 2*(d_create-1))`,
+/// where `buffer = d_evict - d_create`. Every step is computed in checked
+/// form, not the power alone: the exponent is one past a buffer that can
+/// already be the widest number its type holds, and the convergence term
+/// doubles a depth that on a thirty-two-bit target can be half the address
+/// space. A step that cannot be represented leaves no representable budget
+/// that could clear the requirement, so the caller refuses the depth pair on
+/// its own terms rather than measuring a budget against a figure that wrapped
+/// — and the validation that promises to hand back every fault hands them
+/// back, rather than aborting on the arithmetic of a pair that is already
+/// faulty for other reasons.
+fn headroom_requirement(d_create: u32, d_evict: u32) -> Option<usize> {
+    let buffer = d_evict.checked_sub(d_create)?;
+    let exponent = buffer.checked_add(1)?;
+    let headroom = 3usize.checked_pow(exponent)?;
+    let convergence = (d_create as usize).saturating_sub(1).checked_mul(2)?;
+    Some(headroom.max(convergence))
+}
+
 impl<V: Inspectable> SentinelConfig<V> {
     /// Validate all invariants.
     ///
@@ -711,29 +734,24 @@ impl<V: Inspectable> SentinelConfig<V> {
         if self.budget == 0 {
             errors.push(ConfigError::BudgetZero);
         }
-        // Mudlark's headroom requirement: budget must exceed
-        // max(3^(buffer+1), 2*(d_create-1)) where buffer = d_evict - d_create.
-        // Only check when d_evict > d_create (otherwise the earlier check fails).
+        // The budget must exceed the headroom the depth gates imply. Only
+        // checked when d_evict > d_create, since otherwise the pair is already
+        // refused above and the requirement would describe nothing.
         if self.budget > 0 && self.d_evict > self.d_create {
-            let buffer = self.d_evict - self.d_create;
-            // A buffer wide enough to overflow the exponent leaves no
-            // representable budget that could clear the requirement, so the
-            // depth pair is refused on its own terms rather than measured
-            // against a wrapped figure.
-            if let Some(headroom) = 3usize.checked_pow(buffer + 1) {
-                let convergence = 2 * (self.d_create as usize).saturating_sub(1);
-                let required = headroom.max(convergence);
-                if self.budget <= required {
+            match headroom_requirement(self.d_create, self.d_evict) {
+                Some(required) if self.budget <= required => {
                     errors.push(ConfigError::BudgetTooSmall {
                         budget: self.budget,
                         required_minimum: required,
                     });
                 }
-            } else {
-                errors.push(ConfigError::DepthBufferTooLarge {
-                    d_create: self.d_create,
-                    d_evict: self.d_evict,
-                });
+                Some(_) => {}
+                None => {
+                    errors.push(ConfigError::DepthBufferTooLarge {
+                        d_create: self.d_create,
+                        d_evict: self.d_evict,
+                    });
+                }
             }
         }
 
