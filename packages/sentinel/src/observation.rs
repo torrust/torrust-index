@@ -22,7 +22,11 @@ use torrust_mudlark::Coordinate;
 
 /// Bridge trait: convert a coordinate value into centred bit form.
 ///
-/// Sealed to the sentinel crate — only implemented for `u128` and `u64`.
+/// Implemented in this crate for `u128` and `u64`, and open to a downstream
+/// coordinate type that implements it as well: the trait is part of the
+/// published surface, so nothing closes the set of implementations. An
+/// implementor supplies `to_centred_bits` for its own width, and the two impls
+/// here are what a wrapper around one of those widths delegates to.
 pub trait CentredBitSource: Coordinate {
     /// Convert `self` into a centred bit vector of length `n`.
     fn to_centred_bits(&self, n: u32) -> CentredBits;
