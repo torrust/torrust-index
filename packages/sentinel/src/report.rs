@@ -509,7 +509,10 @@ pub struct HealthReport {
     /// Total real observations across the sentinel's lifetime.
     pub lifetime_observations: u64,
 
-    /// Number of cells in the analysis set.
+    /// Number of cells with a live tracker — the same figure as
+    /// `active_trackers`, kept because it is part of the published shape of
+    /// this report. It is not the size of the analysis set, which also
+    /// names cells still warming and is reported as `investment_set_size`.
     pub cells_tracked: usize,
 
     /// Distribution of ranks across all active trackers.
