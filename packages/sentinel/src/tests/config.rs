@@ -61,6 +61,8 @@
 //! | [`accepts_budget_just_above_headroom`] | config | cites (´claim:config:the-node-budget-must-exceed-the-headroom-the-depth-gates-imply-and-equalling-it-is-not-enough´) |
 //! | [`rejects_depth_buffer_whose_headroom_cannot_be_represented`] | config | Past a certain width the headroom the depth gates imply stops being a number the machine can hold, and the depth pair is refused on its own terms rather than measured against a figure that wrapped. The requirement grows as a power of three, so a buffer in the forties already exceeds the addressable range; computing it and comparing anyway would either abort the validation that promised to return its faults, or silently compare the budget against a small wrapped remainder and admit a configuration that cannot hold. The refusal names the two depths, since they are what the host must change. |
 //! | [`reports_a_shortfall_at_the_widest_representable_depth_buffer`] | config | cites (´claim:config:a-depth-buffer-whose-headroom-cannot-be-represented-is-refused-on-its-own-terms´) |
+//! | [`refuses_a_depth_pair_whose_headroom_exponent_cannot_be_represented`] | config | cites (´claim:config:a-depth-buffer-whose-headroom-cannot-be-represented-is-refused-on-its-own-terms´) |
+//! | [`accepts_the_widest_representable_depth_pair_a_budget_can_clear`] | config | cites (´claim:config:a-depth-buffer-whose-headroom-cannot-be-represented-is-refused-on-its-own-terms´) |
 //! | [`rejects_nan_in_every_floating_point_field`] | config | Every floating-point field refuses a non-number, because the ordered comparisons that police the other values cannot see one. A comparison against a non-number is false whichever way it is written, so a bound expressed as a pair of comparisons admits it silently — and the value then spreads, since every product and sum it enters returns a non-number too. A forgetting factor admitted this way reaches the baseline arithmetic and leaves every score afterwards unusable, with nothing in the report to say which field was responsible. The guard therefore sits ahead of the bound rather than inside it. |
 //! | [`accepts_infinite_clip_width_and_refuses_infinite_rates`] | config | An infinite value is admitted where the interval is one-sided, because there it names a real limit rather than the absence of one. An infinite clip width is the unclipped configuration — the control arm the package's own clipping study runs against — and it compares correctly against every bound it is checked with, which is precisely what a non-number does not do. The fields whose intervals are two-sided still refuse it, and they refuse it through the bound they already carry rather than through a separate guard. |
 //! | [`rejects_noise_batch_size_zero_when_enabled`] | config | A noise batch of no samples is a fault only when the schedule actually asks for rounds: with an active schedule the warm-up would run rounds that feed the tracker nothing. The check is conditional on the schedule rather than absolute, because zero samples per round is coherent when there are no rounds to run. |
@@ -738,6 +740,63 @@ fn reports_a_shortfall_at_the_widest_representable_depth_buffer() {
     let err = cfg.validate().unwrap_err();
     assert!(err.0.iter().any(|e| matches!(e, ConfigError::BudgetTooSmall { .. })));
     assert!(!err.0.iter().any(|e| matches!(e, ConfigError::DepthBufferTooLarge { .. })));
+}
+
+/// The requirement is refused as unrepresentable when any step of it is,
+/// including the step before the power. The exponent is one past the buffer,
+/// and the buffer is a difference of two depths, so a creation depth of zero
+/// against the widest eviction depth makes the exponent itself the step that
+/// cannot be held: computing it in unchecked form aborts the validation where
+/// arithmetic is checked, and wraps the exponent to zero where it is not —
+/// which would measure the budget against a requirement of one and admit a pair
+/// no budget can serve. A configuration already faulty for another reason is
+/// where this arises, and it is exactly where validation must still return
+/// faults rather than abort, so the zero creation depth comes back beside the
+/// refusal in the same pass.
+///
+/// (´claim:config:a-depth-buffer-whose-headroom-cannot-be-represented-is-refused-on-its-own-terms´)
+/// ´test:crate:refuses-a-depth-pair-whose-headroom-exponent-cannot-be-represented´
+#[test]
+fn refuses_a_depth_pair_whose_headroom_exponent_cannot_be_represented() {
+    let cfg = SentinelConfig::<u64> {
+        d_create: 0,
+        d_evict: u32::MAX,
+        budget: 1_000_000,
+        ..SentinelConfig::<u64>::default()
+    };
+    let err = cfg.validate().unwrap_err();
+    assert!(err.0.contains(&ConfigError::DepthBufferTooLarge {
+        d_create: 0,
+        d_evict: u32::MAX
+    }));
+    assert!(
+        err.0.contains(&ConfigError::DCreateZero),
+        "the fault that made the pair invalid is reported alongside, not lost to an abort"
+    );
+    assert!(
+        !err.0.iter().any(|e| matches!(e, ConfigError::BudgetTooSmall { .. })),
+        "a requirement no step of which could be computed is not reported as a budget shortfall"
+    );
+}
+
+/// The widest pair whose requirement can be computed is accepted when the
+/// budget clears it, which fixes the boundary from the accepting side: the
+/// refusals above say which pairs have no representable requirement, and this
+/// says the pair one step inside that edge is served by a budget the machine
+/// can hold. The particular depths are fixed by address arithmetic sixty-four
+/// bits wide, as are those of the shortfall at the same buffer.
+///
+/// (´claim:config:a-depth-buffer-whose-headroom-cannot-be-represented-is-refused-on-its-own-terms´)
+/// ´test:crate:accepts-the-widest-representable-depth-pair-a-budget-can-clear´
+#[test]
+fn accepts_the_widest_representable_depth_pair_a_budget_can_clear() {
+    let cfg = SentinelConfig::<u64> {
+        d_create: 1,
+        d_evict: 40,
+        budget: usize::MAX,
+        ..SentinelConfig::<u64>::default()
+    };
+    cfg.validate().unwrap();
 }
 
 // ── Per-field validation: non-numbers and infinities ────────
