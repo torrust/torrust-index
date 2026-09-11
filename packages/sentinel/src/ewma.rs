@@ -107,7 +107,16 @@ impl EwmaStats {
 
     /// Compute the z-score of a value against the current baseline.
     ///
-    /// Returns `(value - mean) / sqrt(variance + eps)`.
+    /// Returns `(value - mean) / (sqrt(variance) + eps)`.
+    ///
+    /// The stability constant sits outside the root rather than inside it, so
+    /// it floors the deviation the score is divided by rather than the
+    /// variance. The two readings differ exactly where the constant exists to
+    /// matter — a baseline whose variance is small beside it — and the
+    /// outside form is the one the package's own definition of this score
+    /// states. Flooring the standard deviation also keeps the constant in the
+    /// units of the quantity it guards, where flooring the variance would
+    /// make its effect on the divisor depend on its own square root.
     ///
     /// The caller supplies `eps` (typically
     /// [`SentinelConfig::eps`](crate::config::SentinelConfig::eps))

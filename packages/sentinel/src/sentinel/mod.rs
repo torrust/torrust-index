@@ -632,7 +632,10 @@ where
         }
     }
 
-    /// Number of cells in the full analysis set.
+    /// Number of cells with a live tracker.
+    ///
+    /// Not the size of the analysis set: that also names the cells still
+    /// warming in staging, which have no tracker yet.
     #[must_use]
     pub fn cells_tracked(&self) -> usize {
         self.cells.len()

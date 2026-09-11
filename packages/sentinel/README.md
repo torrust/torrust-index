@@ -510,7 +510,7 @@ Spectral Sentinel uses the same three-surface visibility model as Mudlark. Publi
 | `health()` | Snapshot active trackers, ranks, maturity, geometry, coordination, and clip pressure. |
 | `cell_gnodes()` | List live analysis-cell handles. |
 | `inspect_cell(gnode)` | Snapshot a specific cell tracker if it is currently live. |
-| `cells_tracked()` | Count live cell trackers in the analysis set. |
+| `cells_tracked()` | Count the cells that have a live tracker. |
 | `lifetime_observations()` | Count real observations processed since construction or reset. |
 | `degenerate_cells_skipped()` | Count cells excluded because suffix width is too small for tracking. |
 | `config()` | Read-only access to the validated configuration. |
