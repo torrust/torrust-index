@@ -29,6 +29,7 @@
 //! | [`from_u128_msb_first_ordering`] | bits | Bits are stored most significant first: a value carrying only its top bit puts that bit at index zero and nothing else anywhere. This ordering is what lets a cell at depth `d` take its working observation by skipping the first `d` entries, because those are exactly the bits routing fixed. |
 //! | [`u128_custom_width_populates_n_bits`] | bits | The vector is backed by a fixed hundred-and-twenty-eight-slot array, but the requested width is what counts as populated: asking for eight bits fills eight slots and leaves the remainder at zero, and the observation reports its length as eight rather than as the array's size. A domain narrower than the backing store is therefore not padded with fabricated structure. |
 //! | [`u128_zero_width_gives_empty`] | bits | cites (´claim:bits:a-requested-width-populates-exactly-that-many-slots-and-leaves-the-rest-zero´) |
+//! | [`u128_width_capped_at_128`] | bits | cites (´claim:bits:a-width-wider-than-the-coordinate-is-capped-at-the-coordinates-own-width´) |
 //! | [`u64_max_all_plus_half`] | bits | The centring rule is a property of the conversion, not of the coordinate type: a sixty-four-bit value with every bit set produces sixty-four slots of plus a half, exactly as the wider coordinate does. A host working in a narrower domain gets the same representation, so the engine above the boundary need not know which width it was fed. |
 //! | [`u64_width_capped_at_64`] | bits | Asking a sixty-four-bit coordinate for a wider observation does not invent bits: the width is capped at what the value actually holds. A sentinel configured for the wider domain can therefore be handed narrower coordinates without the shift going out of range or the tail of the vector filling with structure that was never observed. |
 //! | [`from_coord_delegates_correctly`] | bits | The generic entry point the engine actually calls produces the same observation, bit for bit and length for length, as calling the conversion on the value directly. There is one encoding rather than two that happen to agree, so nothing can drift between the path tests exercise and the path production code takes. |
@@ -141,6 +142,25 @@ fn u128_zero_width_gives_empty() {
     assert_eq!(cb.suffix(0).len(), 0);
     for &b in &cb.bits {
         assert!(b.abs() < f64::EPSILON, "all slots should be 0.0");
+    }
+}
+
+/// The cap is a property of the conversion rather than of the narrower
+/// coordinate: asking the wider type for more bits than it holds returns its
+/// own width, exactly as the narrower type does. The vector is backed by an
+/// array of that same width, so an uncapped request walks off the end of it —
+/// a host computing its width from a configured domain would get a panic out
+/// of the observation boundary instead of an observation.
+///
+/// (´claim:bits:a-width-wider-than-the-coordinate-is-capped-at-the-coordinates-own-width´)
+/// ´test:crate:u128-width-capped-at-128´
+#[test]
+fn u128_width_capped_at_128() {
+    // Requesting n=129 for a u128 should cap at 128.
+    let cb = u128::MAX.to_centred_bits(129);
+    assert_eq!(cb.suffix(0).len(), 128);
+    for (i, &b) in cb.bits.iter().enumerate() {
+        assert!((b - 0.5).abs() < f64::EPSILON, "bit {i}: expected +0.5, got {b}");
     }
 }
 

@@ -25,6 +25,8 @@
 //! | [`per_sample_scores_present_when_enabled`] | engine | Scores for individual values are attached to a cell's report only when the host asked for them, and then there is exactly one entry per observation in the batch. Per-sample detail costs memory proportional to the traffic, so it is opt-in rather than always paid for, and the one-to-one correspondence is what makes an entry attributable back to the value that produced it. |
 //! | [`per_sample_scores_absent_when_disabled`] | engine | cites (´claim:engine:per-sample-scores-appear-only-when-asked-for-and-then-carry-one-entry-per-observation´) |
 //! | [`reset_restores_initial_state`] | engine | Reset returns a used sentinel to the state it was constructed in: the spatial graph is rebuilt as a bare root, the observation counter is zero, and the root tracker alone is tracked. Learned structure is dropped wholesale rather than aged out, because reset exists for the case where the host knows the past no longer describes the future. The configuration is not part of what is cleared. |
+//! | [`centred_bits_built_from_raw_values`] | bits | The bit-vector type the conversion trait returns can be built from outside the crate, and what a caller builds is the same thing the crate's own conversion produces. The trait is published and open to a coordinate type the crate has never heard of, so an implementation of it has to be able to produce the value it is required to return: a type whose centred form is computed rather than shifted out of an integer has nothing here to delegate to, and without a constructor its implementation could not be written at all. |
+//! | [`centred_bits_refuses_a_length_past_the_array`] | bits | A length past the backing array is refused rather than clamped. The array is a hundred and twenty-eight slots and nothing wider can be represented, so an implementation asking for more has miscomputed its own width; handing back a shorter vector would let that mistake travel into the tracker as an observation narrower than the one its author believed it built. |
 
 //! Contract tests for the sentinel's public operational surface — the
 //! handful of methods a host actually calls: construct it, feed it batches,
@@ -51,7 +53,7 @@
 mod common;
 
 use common::{assert_invariants, cell_values, seeded_sentinel, test_config};
-use torrust_sentinel::{Sentinel128, SentinelConfig};
+use torrust_sentinel::{CentredBitSource, CentredBits, Sentinel128, SentinelConfig};
 
 // ═══════════════════════════════════════════════════════════
 //  Construction
@@ -436,4 +438,60 @@ fn reset_restores_initial_state() {
     assert_eq!(s.graph().total_sum(), 0u64);
     assert_eq!(s.lifetime_observations(), 0);
     assert_eq!(s.cells_tracked(), 1);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Observation boundary
+// ═══════════════════════════════════════════════════════════
+
+/// The bit-vector type the conversion trait returns can be built from
+/// outside the crate, and what a caller builds is the same thing the crate's
+/// own conversion produces. The trait is published and open to a coordinate
+/// type the crate has never heard of, so an implementation of it has to be
+/// able to produce the value it is required to return: a type whose centred
+/// form is computed rather than shifted out of an integer has nothing here to
+/// delegate to, and without a constructor its implementation could not be
+/// written at all.
+///
+/// ´claim:bits:the-published-bit-vector-can-be-built-from-outside-and-matches-the-crates-own-conversion´
+/// ´test:integration:centred-bits-built-from-raw-values´
+#[test]
+fn centred_bits_built_from_raw_values() {
+    // 0b1010_1010 at width eight: set bits at the even positions, reading
+    // most significant first.
+    let mut raw = [0.0_f64; 128];
+    for (i, slot) in raw[..8].iter_mut().enumerate() {
+        *slot = if i % 2 == 0 { 0.5 } else { -0.5 };
+    }
+
+    let built = CentredBits::new(raw, 8);
+    assert_eq!(built.len(), 8);
+    assert!(!built.is_empty());
+    assert_eq!(built.suffix(0).len(), 8);
+
+    let converted = 0b1010_1010_u128.to_centred_bits(8);
+    for (i, (&b, &c)) in built.suffix(0).iter().zip(converted.suffix(0).iter()).enumerate() {
+        assert!(
+            (b - c).abs() < f64::EPSILON,
+            "bit {i}: built {b}, converted {c} — the two constructions disagree"
+        );
+    }
+
+    let empty = CentredBits::new([0.0_f64; 128], 0);
+    assert!(empty.is_empty());
+    assert_eq!(empty.suffix(0).len(), 0);
+}
+
+/// A length past the backing array is refused rather than clamped. The array
+/// is a hundred and twenty-eight slots and nothing wider can be represented,
+/// so an implementation asking for more has miscomputed its own width; handing
+/// back a shorter vector would let that mistake travel into the tracker as an
+/// observation narrower than the one its author believed it built.
+///
+/// ´claim:bits:a-length-past-the-backing-array-is-refused-rather-than-clamped´
+/// ´test:integration:centred-bits-refuses-a-length-past-the-array´
+#[test]
+#[should_panic(expected = "centred bit length exceeds the 128-slot backing array")]
+fn centred_bits_refuses_a_length_past_the_array() {
+    let _refused = CentredBits::new([0.0_f64; 128], 129);
 }
