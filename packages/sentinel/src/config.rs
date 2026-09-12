@@ -441,9 +441,26 @@ impl<V: Inspectable> Default for SentinelConfig<V> {
     }
 }
 
-/// Validation errors for [`SentinelConfig`].
+/// A reason a [`SentinelConfig`] cannot produce a working sentinel.
+///
+/// Most variants are constraint violations that
+/// [`validate`](SentinelConfig::validate) finds by reading the configuration
+/// alone, and they are collected in one pass so a caller sees every fault at
+/// once. A few cannot be reached that way, because what they report is a
+/// resource the configuration asks the environment for rather than a value it
+/// carries; those are raised where the request is actually made, and arrive on
+/// their own.
+///
+/// The enumeration is marked as one that grows. Each engine capability a
+/// configuration can ask for is one more way the request can be refused, and a
+/// caller that matched exhaustively would have to be edited for a refusal it
+/// had no opinion about. A wildcard arm reporting the [`Display`] text is the
+/// handling this type is designed for.
+///
+/// [`Display`]: std::fmt::Display
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[non_exhaustive]
 pub enum ConfigError {
     /// `max_rank` must be at least 1.
     MaxRankZero,
@@ -497,6 +514,18 @@ pub enum ConfigError {
     /// The coordinate width `N` is above the widest width the centred bit
     /// vector that feeds the trackers can carry.
     TrackerDimensionTooLarge { width: u32, maximum: usize },
+    /// `background_warming` was asked for and the environment refused the
+    /// thread it runs on.
+    ///
+    /// Nothing in the configuration is wrong. A thread is granted by the
+    /// operating system, and the grant can be refused at any moment for
+    /// reasons outside this process — which is why this fault is reported
+    /// where the thread is asked for rather than alongside the constraint
+    /// violations, and why it arrives alone.
+    BackgroundWarmingThreadUnavailable {
+        /// The operating system's own account of the refusal.
+        reason: String,
+    },
 }
 
 impl std::fmt::Display for ConfigError {
@@ -578,6 +607,14 @@ impl std::fmt::Display for ConfigError {
                     "coordinate width N ({width}) is above the maximum tracker dimension \
                      ({maximum}); a centred bit vector cannot carry a wider observation, and the \
                      dimensions past it would be modelled over a constant the data never produced"
+                )
+            }
+            Self::BackgroundWarmingThreadUnavailable { reason } => {
+                write!(
+                    f,
+                    "background_warming was requested but the environment refused the warming \
+                     thread ({reason}); the configuration is sound and the request can be retried \
+                     or made synchronously"
                 )
             }
         }

@@ -109,6 +109,7 @@
 //! | [`collects_a_width_fault_alongside_a_configuration_fault`] | config | cites (´claim:config:a-coordinate-width-below-the-tracker-minimum-is-refused-at-construction´) |
 //! | [`refuses_a_coordinate_width_above_the_centred_bit_ceiling`] | config | A coordinate width above what the centred bit vector can carry is refused at construction, the same way a width below the tracker minimum is. The bridge that turns a coordinate into centred bits is open to any implementor, and the spatial layer asks only that the width fit the coordinate type, so a host whose coordinates are wider than the vector can otherwise ask for a sentinel wider than the vector that feeds it. Nothing would fault: the slots past the vector's length come back as zeros, a centred bit is ±0.5 and never zero, and every dimension past the end would be modelled over a constant the coordinate stream never produced — a settled reading of data that does not exist, mixed into novelty, residual and rank alike. The refusal names the width and the ceiling, since those are what the host must reconcile. |
 //! | [`accepts_the_widest_modellable_coordinate_width`] | config | cites (´claim:config:a-coordinate-width-above-the-centred-bit-ceiling-is-refused-at-construction´) |
+//! | [`warming_thread_refusal_names_the_setting_and_the_environment`] | config | The refusal a host receives when the environment will not give the engine a warming thread names the setting that asked for one and quotes the operating system's own account of the refusal. Nothing in the configuration is wrong in that case, so a message that said only that a configuration was invalid would send an operator searching values that are all correct: naming the setting says which request to withdraw, and quoting the environment says whether withdrawing it is the right answer at all or whether the machine is simply out of threads. |
 
 use crate::config::*;
 
@@ -1841,5 +1842,36 @@ fn accepts_the_widest_modellable_coordinate_width() {
         sentinel.cells_tracked(),
         1,
         "the root tracker is built at the widest modellable width"
+    );
+}
+
+// ── Construction refusal: the warming thread ────────────────
+
+/// The refusal a host receives when the environment will not give the engine a
+/// warming thread names the setting that asked for one and quotes the
+/// operating system's own account of the refusal. Nothing in the configuration
+/// is wrong in that case, so a message that said only that a configuration was
+/// invalid would send an operator searching values that are all correct:
+/// naming the setting says which request to withdraw, and quoting the
+/// environment says whether withdrawing it is the right answer at all or
+/// whether the machine is simply out of threads.
+///
+/// ´claim:config:the-warming-thread-refusal-names-the-setting-that-asked-for-one-and-quotes-the-environment´
+/// ´test:crate:warming-thread-refusal-names-the-setting-and-the-environment´
+#[test]
+fn warming_thread_refusal_names_the_setting_and_the_environment() {
+    let refusal = ConfigError::BackgroundWarmingThreadUnavailable {
+        reason: "Resource temporarily unavailable (os error 11)".to_owned(),
+    };
+
+    let rendered = refusal.to_string();
+
+    assert!(
+        rendered.contains("background_warming"),
+        "the refusal must name the setting that asked for the thread, got: {rendered}"
+    );
+    assert!(
+        rendered.contains("Resource temporarily unavailable (os error 11)"),
+        "the refusal must quote the environment's own account, got: {rendered}"
     );
 }
