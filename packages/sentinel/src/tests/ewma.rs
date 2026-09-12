@@ -14,6 +14,7 @@
 //! | [`reset_cold_allows_re_warming`] | ewma | After a reset the next batch is adopted outright, exactly as the very first one was: the mean lands on the new batch's value with nothing of the discarded baseline pulling it back. Resetting therefore genuinely re-starts the baseline rather than leaving it to decay out of its old position. |
 //! | [`seed_from_copies_warm_state`] | ewma | Seeding transfers both what a baseline learned and the fact that it learned it: the receiver takes the source's mean and spread and becomes warm. This is how a slow baseline is started from a fast one that has already converged, so the pair begin in agreement instead of the slow one spending its warm-up disagreeing with a baseline that is already right. |
 //! | [`seed_from_cold_source_does_not_warm_target`] | ewma | Warmth is never manufactured by seeding. A cold source hands over its placeholder numbers but leaves the receiver cold, so a baseline seeded before anything was learned still takes the cold path on its own first batch rather than blending against values nothing measured. |
+//! | [`seed_from_cold_source_withdraws_warmth_from_a_warm_receiver`] | ewma | A receiver that had learned something and is then seeded from a source that had not comes back cold, rather than keeping its own warmth over the placeholders it has just been handed. Warmth belongs to the baseline being transferred and not to the receiver: it is what says whether those two numbers were measured or were the pair a fresh baseline starts from. A receiver left warm over them would clip and score against a notion of normal nothing had observed, and the cold path that exists to replace exactly that state would never run again. |
 //! | [`update_empty_is_noop`] | ewma | A batch with nothing in it leaves both the mean and the spread exactly where they were. An idle interval is therefore not a data point: the baseline does not drift simply because time passed without observations. |
 //! | [`outliers_are_rejected`] | ewma | A warm baseline refuses values above its own ceiling before it learns anything, and a batch consisting entirely of such values moves it not at all. This is the poisoning defence: an attacker cannot walk the notion of normal upward by feeding extremes, because the extremes are precisely what never reaches the baseline. |
 //! | [`update_single_value_does_not_update_variance`] | ewma | cites (´claim:ewma:a-batch-of-one-carries-no-spread-so-the-variance-is-left-untouched´) |
@@ -211,6 +212,39 @@ fn seed_from_cold_source_does_not_warm_target() {
     // Still copies the placeholder values
     assert!((target.mean() - 1.0).abs() < f64::EPSILON);
     assert!((target.variance() - 1.0).abs() < f64::EPSILON);
+}
+
+/// A receiver that had learned something and is then seeded from a source that
+/// had not comes back cold, rather than keeping its own warmth over the
+/// placeholders it has just been handed. Warmth belongs to the baseline being
+/// transferred and not to the receiver: it is what says whether those two
+/// numbers were measured or were the pair a fresh baseline starts from. A
+/// receiver left warm over them would clip and score against a notion of
+/// normal nothing had observed, and the cold path that exists to replace
+/// exactly that state would never run again.
+///
+/// ´claim:ewma:seeding-from-a-cold-source-withdraws-the-receivers-warmth-instead-of-leaving-it-over-placeholders´
+/// ´test:crate:seed-from-cold-source-withdraws-warmth-from-a-warm-receiver´
+#[test]
+fn seed_from_cold_source_withdraws_warmth_from_a_warm_receiver() {
+    let source = EwmaStats::new(0.99); // never updated — cold
+
+    let mut target = EwmaStats::new(0.99);
+    target.update(&[10.0, 20.0, 30.0], 3.0);
+    assert!(target.is_warm(), "the receiver is warm before it is seeded");
+
+    target.seed_from(&source);
+
+    assert!(!target.is_warm(), "a cold source leaves the receiver cold");
+    assert!((target.mean() - 1.0).abs() < f64::EPSILON);
+    assert!((target.variance() - 1.0).abs() < f64::EPSILON);
+
+    // The cold path runs on the next batch: it is adopted outright rather
+    // than blended into the placeholders it would otherwise have decayed
+    // away from.
+    target.update(&[42.0, 42.0, 42.0], 3.0);
+    assert!(target.is_warm());
+    assert!((target.mean() - 42.0).abs() < f64::EPSILON);
 }
 
 // ── update() — clipped updates ──────────────────────────────
