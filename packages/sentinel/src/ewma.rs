@@ -96,13 +96,18 @@ impl EwmaStats {
     /// accumulator is seeded from the fast EWMA's converged
     /// baseline so the two start in agreement.
     ///
-    /// Marks the receiver as warm if the source is warm.
+    /// The receiver takes the source's warmth along with its numbers, in
+    /// both directions. Warmth is not a separate fact about the receiver but
+    /// part of what the baseline being handed over *is*: it says whether
+    /// those two numbers were measured or are the placeholders a fresh
+    /// tracker starts from. A receiver left warm over a cold source's
+    /// placeholders would clip and score against a notion of normal that
+    /// nothing observed, and the cold path that exists to replace exactly
+    /// that state would never run again.
     pub const fn seed_from(&mut self, source: &Self) {
         self.mean = source.mean;
         self.variance = source.variance;
-        if source.warm {
-            self.warm = true;
-        }
+        self.warm = source.warm;
     }
 
     /// Compute the z-score of a value against the current baseline.
