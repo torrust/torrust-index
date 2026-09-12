@@ -84,7 +84,17 @@ impl<C: Coordinate> WarmingThreadHandle<C> {
     /// - `noise_seed` — if `Some`, the thread's RNG is seeded
     ///   deterministically from `seed + 1`. If `None`, seeded from
     ///   system entropy.
-    pub fn spawn(staging: &Arc<Mutex<StagingArea<C>>>, batch_size: usize, noise_seed: Option<u64>) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns the operating system's own error when it refuses the thread.
+    /// A thread is granted by the environment rather than implied by the
+    /// arguments, so the refusal reaches callers whose parameters are
+    /// entirely sound — a process or user thread limit already reached, an
+    /// address space with no room for another stack — and it is handed back
+    /// rather than raised, because the caller is the only party that knows
+    /// what a sentinel without a warming thread is worth to it.
+    pub fn spawn(staging: &Arc<Mutex<StagingArea<C>>>, batch_size: usize, noise_seed: Option<u64>) -> std::io::Result<Self> {
         let shutdown = Arc::new(AtomicBool::new(false));
         let condvar = Arc::new(Condvar::new());
 
@@ -98,19 +108,16 @@ impl<C: Coordinate> WarmingThreadHandle<C> {
             |s| SmallRng::seed_from_u64(s.wrapping_add(1)),
         );
 
-        let handle = std::thread::Builder::new()
-            .name("sentinel-warming".into())
-            .spawn(move || {
-                warming_loop(thread_staging, thread_condvar, thread_shutdown, batch_size, rng);
-            })
-            .expect("failed to spawn sentinel warming thread");
+        let handle = std::thread::Builder::new().name("sentinel-warming".into()).spawn(move || {
+            warming_loop(thread_staging, thread_condvar, thread_shutdown, batch_size, rng);
+        })?;
 
-        Self {
+        Ok(Self {
             shutdown,
             condvar,
             staging: Arc::clone(staging),
             handle: Mutex::new(Some(handle)),
-        }
+        })
     }
 
     /// Wake the background thread (call after enqueueing new cells).

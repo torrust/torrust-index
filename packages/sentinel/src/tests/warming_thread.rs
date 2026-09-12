@@ -63,7 +63,7 @@ fn shutdown_returns_under_repeated_spawn_and_stop_cycles() {
     let cycles = std::thread::spawn(move || {
         for _ in 0..CYCLES {
             let staging = Arc::new(Mutex::new(StagingArea::<u128>::new()));
-            let handle = WarmingThreadHandle::spawn(&staging, 4, Some(7));
+            let handle = WarmingThreadHandle::spawn(&staging, 4, Some(7)).expect("the environment must grant a warming thread");
             handle.shutdown();
         }
         // The receiver is gone only if the witness has already reported the

@@ -245,6 +245,12 @@ where
     /// smallest dimension a subspace tracker can work in, or wider than the
     /// centred bit vector that feeds it can carry. Every such fault is
     /// collected in one pass.
+    ///
+    /// Also returns [`ConfigErrors`] when the configuration asked for
+    /// background warming and the environment refused the thread it runs on.
+    /// That fault arrives alone rather than among the others: the thread is
+    /// requested only once the configuration has been accepted, so by the
+    /// time it can be refused there is nothing left to collect it with.
     pub fn new(config: SentinelConfig<V>) -> Result<Self, ConfigErrors> {
         // The root tracker spans the whole coordinate width, so a width the
         // tracker cannot model is refused here rather than left to build a
@@ -322,12 +328,24 @@ where
         let staging = Arc::new(Mutex::new(staging::StagingArea::<C>::new()));
 
         // ── Background warming thread (Step 3) ─────────
+        //
+        // A refused thread is reported rather than raised. Construction is
+        // the one place in this engine's life where the caller is still
+        // holding an error channel, and the alternative — aborting the
+        // process the sentinel was built to protect, over a resource limit
+        // that has nothing to do with the configuration's correctness — is
+        // exactly what the crate's policy on panics reserves for programmer
+        // error. Degrading quietly to synchronous warming is not open here
+        // either: a caller that can be told what it got should be.
         let warming_thread = if config.background_warming {
-            Some(warming_thread::WarmingThreadHandle::<C>::spawn(
-                &staging,
-                config.noise_batch_size,
-                config.noise_seed,
-            ))
+            match warming_thread::WarmingThreadHandle::<C>::spawn(&staging, config.noise_batch_size, config.noise_seed) {
+                Ok(handle) => Some(handle),
+                Err(refusal) => {
+                    return Err(ConfigErrors(vec![ConfigError::BackgroundWarmingThreadUnavailable {
+                        reason: refusal.to_string(),
+                    }]));
+                }
+            }
         } else {
             None
         };
@@ -698,6 +716,18 @@ where
     /// re-initialises the G-V Graph, and zeroes all counters.
     /// The configuration is preserved.
     ///
+    /// Under `background_warming` the warming thread is stopped and started
+    /// again. If the environment refuses the new thread, the sentinel keeps
+    /// running and warms cells synchronously instead, the way a sentinel
+    /// configured without background warming always does, and records the
+    /// refusal as a warning. The choice is forced: this method has no error
+    /// channel, and the two alternatives are worse — aborting the host over
+    /// a resource limit, which is what the crate's policy on panics exists
+    /// to prevent, or leaving the flag standing over a sentinel that has no
+    /// thread to honour it. What the caller loses is the latency the mode
+    /// was enabled for; what it keeps is every report, and the stronger
+    /// reproducibility that synchronous warming carries.
+    ///
     /// # Panics
     ///
     /// Panics if the staging area mutex is poisoned.
@@ -766,13 +796,31 @@ where
         self.analysis_set = AnalysisSet::recompute::<N>(&self.graph, self.config.analysis_k, self.config.analysis_depth_cutoff);
 
         // Restart background thread if configured (Step 3.4).
-        if self.config.background_warming {
-            self.warming_thread = Some(warming_thread::WarmingThreadHandle::<C>::spawn(
+        //
+        // The dispatch in `reconcile_analysis_set` keys on whether a thread
+        // is present, not on the flag that asked for one, so leaving the
+        // field empty is a complete fallback rather than a half-state: every
+        // staged cell is drained inline and every report is produced as it
+        // would have been. The warning is the only channel a method with no
+        // return value has.
+        self.warming_thread = if self.config.background_warming {
+            match warming_thread::WarmingThreadHandle::<C>::spawn(
                 &self.staging,
                 self.config.noise_batch_size,
                 self.config.noise_seed,
-            ));
-        }
+            ) {
+                Ok(handle) => Some(handle),
+                Err(refusal) => {
+                    tracing::warn!(
+                        %refusal,
+                        "the environment refused the warming thread on reset — warming cells synchronously instead"
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
     }
 
     /// Apply spatial decay to the entire G-V Graph.
