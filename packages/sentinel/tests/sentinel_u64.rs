@@ -39,7 +39,7 @@
 //! | [`analysis_widths_are_64_minus_depth`] | width | Every cell in the report, competitive or ancestor, analyses a width equal to the domain width less its own depth — here the narrower domain's width, at whatever depths the traffic reached. The bits routing has already resolved are constant within the cell and so carry no information for its tracker; what remains is the suffix, and its length is fixed by the depth. The width is read from the sentinel's type parameter rather than assumed, which is what makes the same arithmetic hold for either alias. |
 //! | [`cell_reports_are_competitive`] | engine | A report separates the cells that earned their modelling from the ones carried along to complete an ancestor chain, and the first vector holds only the former. The distinction is what tells a reader which measurements reflect a deliberate investment, so it is expressed as two vectors rather than as a flag to be filtered on. |
 //! | [`ancestor_reports_are_non_competitive`] | engine | cites (´claim:engine:cell-reports-hold-only-competitive-cells-and-ancestor-reports-only-non-competitive-ones´) |
-//! | [`reports_sorted_by_gnode_id`] | determinism | cites (´claim:determinism:every-report-vector-is-ordered-by-node-handle-so-a-reader-never-depends-on-visit-order´) |
+//! | [`reports_sorted_by_gnode_id`] | determinism | cites (´claim:determinism:every-report-vector-comes-out-in-the-order-its-contract-states-so-a-reader-never-depends-on-visit-order´) |
 //! | [`no_nan_in_scores`] | engine | Every reported score on every axis is a real number. The axes are ratios and standardised departures, so a variance that had collapsed to nothing or a basis that spanned no direction would surface as a non-number rather than as an obviously wrong value — which is why the absence of one is worth asserting across all four axes and both report vectors. |
 //! | [`creates_cells_on_split`] | engine | cites (´claim:engine:traffic-in-separate-regions-splits-the-domain-so-more-than-the-root-is-tracked´) |
 //! | [`cells_tracked_never_below_one`] | engine | The root tracker is permanent, before any traffic and after it. It is not selected on merit and cannot be displaced by the competition, because every ancestor chain has to terminate somewhere — so the tracked count has a floor of one and a host never meets a sentinel with nothing to report against. |
@@ -262,7 +262,7 @@ fn ancestor_reports_are_non_competitive() {
 /// ascending, so a reader compares runs positionally here exactly as it does
 /// at the wider one.
 ///
-/// (´claim:determinism:every-report-vector-is-ordered-by-node-handle-so-a-reader-never-depends-on-visit-order´)
+/// (´claim:determinism:every-report-vector-comes-out-in-the-order-its-contract-states-so-a-reader-never-depends-on-visit-order´)
 /// ´test:integration:reports-sorted-by-gnode-id´
 #[test]
 fn reports_sorted_by_gnode_id() {

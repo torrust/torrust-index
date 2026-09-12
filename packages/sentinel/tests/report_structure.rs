@@ -11,7 +11,7 @@
 //! | [`cell_and_ancestor_cover_all_reported_cells`] | readout | cites (´claim:readout:the-report-partitions-cells-by-how-they-earned-their-place-rather-than-listing-them-together´) |
 //! | [`cell_reports_sorted_by_gnode_id`] | readout | Cell reports come back in strictly ascending handle order, never merely grouped. Nothing about the order reflects the sequence observations arrived in or how the internal maps happened to iterate, so two sentinels fed the same stream emit comparable reports and a difference between two readouts is a difference in the system. |
 //! | [`ancestor_reports_sorted_by_gnode_id`] | readout | cites (´claim:readout:report-lists-are-ordered-by-cell-handle-so-identical-runs-produce-identical-readouts´) |
-//! | [`coordination_reports_sorted_by_gnode_id`] | readout | cites (´claim:readout:report-lists-are-ordered-by-cell-handle-so-identical-runs-produce-identical-readouts´) |
+//! | [`coordination_reports_sorted_by_depth_then_gnode_id`] | readout | The tier above the cells is ordered too, but on a key of its own: coordination reports come shallowest first, with the node handle breaking ties among contexts at equal depth. Handles are recycled as cells are evicted and restored, so a correctly ordered run can carry a lower handle at a greater depth — which is why depth leads, and why an assertion on the handle alone would reject a readout that was right. Determinism is imposed on the readout as a whole rather than recovered separately wherever a list happens to be built, but each list states which order it is in. |
 //! | [`coordination_reports_have_unique_gnodes`] | readout | Each coordination context appears at most once in a batch. The contexts are found by walking a tree in which a node can be reached from several selected descendants, so uniqueness is a real obligation: without it a busy subtree would report the same group finding repeatedly and a host counting elevated contexts would over-count it. |
 //! | [`no_nan_in_score_fields`] | readout | Every score the readout carries is a number, on all four axes and across both competitive and ancestor cells. The scoring formulae divide by quantities that can legitimately reach zero — residual degrees of freedom, rank, baseline spread — so producing a number at the boundary is something the engine must arrange. A single non-number would poison every comparison a host makes downstream, silently rather than loudly. |
 //! | [`report_structure_per_sample_scores_present_when_enabled`] | readout | Per-observation detail is present in every cell report exactly when the host configured it, rather than appearing only where the engine found it convenient. The detail costs memory proportional to the batch, so it is optional — but an option that were honoured unevenly would be worse than none, since a host could not tell an absent field from an unremarkable cell. |
@@ -45,7 +45,9 @@
 //! competitively selected on one side, drawn in by ancestor closure on the
 //! other — because the two were chosen for different reasons and a host
 //! weighing a finding needs to know which it is reading. Every list is
-//! ordered by cell handle, so two sentinels fed the same stream emit
+//! ordered by a key of its own rather than by whatever order a walk produced
+//! — the two cell lists by handle, the cross-cell contexts shallowest first
+//! with the handle breaking ties — so two sentinels fed the same stream emit
 //! byte-comparable output and a diff between reports means a difference in
 //! the system rather than in iteration order.
 //!
@@ -237,23 +239,29 @@ fn ancestor_reports_sorted_by_gnode_id() {
     }
 }
 
-/// The same holds one tier up: coordination reports, which come from a walk
-/// over internal nodes rather than from a cell list, are ordered by handle
-/// too. Determinism is imposed on the readout as a whole, not recovered
-/// separately wherever a list happens to be built.
+/// The tier above the cells is ordered too, but on a key of its own:
+/// coordination reports come shallowest first, with the node handle breaking
+/// ties among contexts at equal depth. Handles are recycled as cells are
+/// evicted and restored, so a correctly ordered run can carry a lower handle
+/// at a greater depth — which is why depth leads, and why an assertion on the
+/// handle alone would reject a readout that was right. Determinism is imposed
+/// on the readout as a whole rather than recovered separately wherever a list
+/// happens to be built, but each list states which order it is in.
 ///
-/// (´claim:readout:report-lists-are-ordered-by-cell-handle-so-identical-runs-produce-identical-readouts´)
-/// ´test:integration:coordination-reports-sorted-by-gnode-id´
+/// ´claim:readout:coordination-reports-come-shallowest-first-with-the-handle-breaking-ties´
+/// ´test:integration:coordination-reports-sorted-by-depth-then-gnode-id´
 #[test]
-fn coordination_reports_sorted_by_gnode_id() {
+fn coordination_reports_sorted_by_depth_then_gnode_id() {
     let mut s = multi_cell_sentinel();
     let report = s.ingest(&cell_values(0xF, 4));
 
     for window in report.coordination_reports.windows(2) {
         assert!(
-            window[0].gnode_id < window[1].gnode_id,
-            "coordination_reports not sorted: {:?} >= {:?}",
+            (window[0].depth, window[0].gnode_id) < (window[1].depth, window[1].gnode_id),
+            "coordination_reports not in (depth, handle) order: ({}, {:?}) >= ({}, {:?})",
+            window[0].depth,
             window[0].gnode_id,
+            window[1].depth,
             window[1].gnode_id,
         );
     }

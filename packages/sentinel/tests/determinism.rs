@@ -5,7 +5,7 @@
 //!
 //! | Test | Area | Claim |
 //! |------|------|-------|
-//! | [`identical_seed_produces_identical_reports`] | determinism | Two sentinels built from one configuration with one seed, and stepped through the same batches, agree at every step — the same number of cells, the same ancestors, the same cross-cell contexts, and score means whose floating-point bit patterns are equal rather than merely near. Agreement is checked batch by batch and not only at the end, so a divergence could not open and close again unnoticed. |
+//! | [`identical_seed_produces_identical_reports`] | determinism | Two sentinels built from one configuration with one seed, and stepped through the same batches, produce the same report at every step: the same cells and the same cross-cell contexts in the same positions, carrying the same handles, intervals, depths, counts and ranks, and every figure they advertise equal in its bit pattern rather than merely near — each of the four axes with its extremes, its mean, both z-scores, its baseline, its drift evidence and its rejection rate, alongside the contour, the health section and the summary of what the sentinel is investing in. Comparing counts and a mean or two would pass two runs that had modelled different regions of the domain in the same number of cells. Agreement is checked batch by batch and not only at the end, so a divergence could not open and close again unnoticed. The one figure held out is the age of the oldest observation, which measures how long a batch waited rather than anything computed from it. |
 //! | [`deterministic_across_repeated_runs`] | engine | cites (´claim:engine:the-root-tracker-receives-every-observation-in-every-batch´) |
 //! | [`different_seeds_produce_different_scores`] | determinism | The seed is an input with observable consequences, not a formality: two sentinels differing only in their seed, fed identical values, disagree in at least one of the root's score means. The warming noise a tracker is primed with shapes the subspace it starts from, and that starting point is still visible in what the tracker measures once real traffic arrives — which is why reproducibility has to be stated in terms of the seed rather than of the data alone. |
 //! | [`report_ordering_is_deterministic`] | determinism | All three report vectors come out in the order their contract states rather than in the order the walk produced: the competitive cells and the ancestors ascend by node handle, and the cross-cell contexts come shallowest first with ties broken by the handle. Depth leads there because handles are recycled as cells are evicted and restored, so a correctly ordered run can carry a lower handle at a greater depth. Neither ordering is a property of traversal or of when a cell was created, so two runs list the same entries in the same positions and a reader may compare them index by index. Splitting is forced aggressively here so that each vector holds several entries and the ordering is actually put to the question. |
@@ -19,10 +19,21 @@
 //! warm a tracker before real traffic can teach it anything — is drawn from
 //! a generator the configuration seeds. Two sentinels built from the same
 //! configuration and fed the same values are therefore not merely close but
-//! identical, down to the bit patterns of the reported means. That is what
-//! makes a report worth comparing across runs at all: a difference between
-//! two runs is a difference in what they were given, never in the order the
-//! machine happened to visit things.
+//! identical, down to the bit pattern of every figure they report. That is
+//! what makes a report worth comparing across runs at all: a difference
+//! between two runs is a difference in what they were given, never in the
+//! order the machine happened to visit things.
+//!
+//! The seed settles the whole of it only with `background_warming` disabled
+//! and on a fixed build — one target and one set of dependency versions —
+//! because the generator behind the noise is chosen for speed rather than for
+//! portability. The configuration these tests share leaves background warming
+//! off, so what they exercise is the guarantee exactly as it is stated. Under
+//! background warming the same seed and the same traffic still give the same
+//! graph, the same investment set and the same report order, but neither the
+//! baselines a tracker starts from nor the ingest cycle on which it first
+//! scores: the warming worker draws from its own generator and takes
+//! whichever staged cell leads on volume when it looks.
 //!
 //! For that guarantee to have content the seed has to be a real input.
 //! Different seeds draw different warming noise, and the difference survives
@@ -30,7 +41,9 @@
 //! seed is choosing a particular run and not merely satisfying a parameter.
 //!
 //! Ordering belongs to the same promise. Every vector in a report is emitted
-//! in ascending node-handle order, so a reader compares two runs positionally
+//! in the order its own contract states — the competitive and ancestor lists
+//! by ascending node handle, the cross-cell contexts shallowest first with
+//! the handle breaking ties — so a reader compares two runs positionally
 //! without depending on the order cells were visited in. Thread-safety is a
 //! different kind of statement altogether — a property of the type rather
 //! than of any run — and it is discharged by the compiler: the engine holds
@@ -39,17 +52,25 @@
 
 mod common;
 
-use common::{ScenarioBuilder, assert_invariants, cell_values, test_config};
+use common::{ScenarioBuilder, assert_invariants, assert_reports_identical, cell_values, test_config};
 use torrust_sentinel::{Sentinel128, SentinelConfig};
 
 // ── Reproducibility ─────────────────────────────────────────
 
 /// Two sentinels built from one configuration with one seed, and stepped
-/// through the same batches, agree at every step — the same number of cells,
-/// the same ancestors, the same cross-cell contexts, and score means whose
-/// floating-point bit patterns are equal rather than merely near. Agreement
-/// is checked batch by batch and not only at the end, so a divergence could
-/// not open and close again unnoticed.
+/// through the same batches, produce the same report at every step: the same
+/// cells and the same cross-cell contexts in the same positions, carrying the
+/// same handles, intervals, depths, counts and ranks, and every figure they
+/// advertise equal in its bit pattern rather than merely near — each of the
+/// four axes with its extremes, its mean, both z-scores, its baseline, its
+/// drift evidence and its rejection rate, alongside the contour, the health
+/// section and the summary of what the sentinel is investing in. Comparing
+/// counts and a mean or two would pass two runs that had modelled different
+/// regions of the domain in the same number of cells. Agreement is checked
+/// batch by batch and not only at the end, so a divergence could not open and
+/// close again unnoticed. The one figure held out is the age of the oldest
+/// observation, which measures how long a batch waited rather than anything
+/// computed from it.
 ///
 /// ´claim:determinism:the-same-seed-and-the-same-data-reproduce-the-same-reports´
 /// ´test:integration:identical-seed-produces-identical-reports´
@@ -72,32 +93,7 @@ fn identical_seed_produces_identical_reports() {
         assert_invariants(&s1, &r1);
         assert_invariants(&s2, &r2);
 
-        assert_eq!(r1.cell_reports.len(), r2.cell_reports.len());
-        assert_eq!(r1.ancestor_reports.len(), r2.ancestor_reports.len());
-        assert_eq!(r1.coordination_reports.len(), r2.coordination_reports.len());
-        assert_eq!(r1.health.lifetime_observations, r2.health.lifetime_observations);
-
-        // Compare score values exactly (all operations are deterministic).
-        for (c1, c2) in r1.cell_reports.iter().zip(&r2.cell_reports) {
-            assert_eq!(
-                c1.scores.novelty.mean.to_bits(),
-                c2.scores.novelty.mean.to_bits(),
-                "novelty mean mismatch"
-            );
-            assert_eq!(
-                c1.scores.displacement.mean.to_bits(),
-                c2.scores.displacement.mean.to_bits(),
-                "displacement mean mismatch"
-            );
-        }
-
-        for (a1, a2) in r1.ancestor_reports.iter().zip(&r2.ancestor_reports) {
-            assert_eq!(
-                a1.scores.novelty.mean.to_bits(),
-                a2.scores.novelty.mean.to_bits(),
-                "ancestor novelty mean mismatch"
-            );
-        }
+        assert_reports_identical(&r1, &r2);
     }
 }
 
@@ -194,7 +190,7 @@ fn different_seeds_produce_different_scores() {
 /// by index. Splitting is forced aggressively here so that each vector holds
 /// several entries and the ordering is actually put to the question.
 ///
-/// ´claim:determinism:every-report-vector-is-ordered-by-node-handle-so-a-reader-never-depends-on-visit-order´
+/// ´claim:determinism:every-report-vector-comes-out-in-the-order-its-contract-states-so-a-reader-never-depends-on-visit-order´
 /// ´test:integration:report-ordering-is-deterministic´
 #[test]
 fn report_ordering_is_deterministic() {
