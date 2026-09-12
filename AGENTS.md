@@ -80,6 +80,7 @@ prefix.
 | `T-`   | Torrust (root crate) |                                          |
 | `M-`   | Mudlark              | `packages/mudlark/docs/idea.md`          |
 | `S-`   | Sentinel             | `packages/sentinel/docs/algorithm.md`    |
+| `A-`   | Assayer              | `packages/assayer/docs/spec.md`          |
 | `R-`   | render-text-as-image | `packages/render-text-as-image/`         |
 
 Helper crates (`index-health-check`, `index-auth-keypair`,

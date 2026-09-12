@@ -1,6 +1,7 @@
 [workspace]
 members = [
     ".",
+    "packages/assayer",
     "packages/index-auth-keypair",
     "packages/index-cli-common",
     "packages/index-config",

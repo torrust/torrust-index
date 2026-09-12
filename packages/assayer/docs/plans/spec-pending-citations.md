@@ -1,0 +1,24 @@
+# The Assayer Specification: Pending Forward Citations · `reg:assayer:forward-citation-debt`
+
+The rewrite lands the specification Part by Part in document order (`spec:spec:measurement-judgement-interpreter`), so a part written early may need to reference a concept whose environment a later part will mint. The discipline fixed at the phase's activation admits exactly one way of doing that: the reference is written as a display span, participating in nothing, and its debt is recorded here. This register is that record. It burns to zero inside (`spec:spec:measurement-judgement-interpreter`), where every row must have become a real citation — no forward reference may dangle at the end of the phase, and none may be silently forgotten in the meantime.
+
+Rows are added by the wave that writes the citing part and removed by the wave that mints the target, in the same commit that converts the display span into a citation. A row surviving into the concatenation gate is a defect of the phase, not of the part that wrote it.
+
+The document practices the discipline it serves. The label at its head is its mint, and a parenthesized label in running text is a same-owner citation. While rows stood, every target label below stood in a double-backtick span and participated in nothing: those were labels the specification planned and had not yet minted, and a register that cited them would have been asserting the very resolution it exists to track.
+
+**Register (Pending forward citations)** · `reg:assayer:spec-pending-citations`
+
+**No rows. The phase's forward-citation debt is closed.** Every span this register ever carried has become an ordinary citation, in the commit that minted its target, and the table below is empty because there is nothing left to record rather than because nothing was recorded.
+
+The whole of the debt, for the record. One hundred and fifty-four rows were opened across the phase and one hundred and fifty-four were retired. The wave that wrote Part III retired sixteen, the wave that wrote Part IV retired five, the wave that wrote Parts V and VI together retired twenty-four, the wave that wrote Part VII retired nineteen, the wave that wrote Part VIII retired seventy-one, and the wave that wrote the front matter and the appendices retired the last nineteen.
+
+The Part VIII retirement was the one the register spent most of the phase waiting for, and it was larger than every other retirement combined. Its seventy-one rows carried seventy-three spans — the extra two being the two targets the monitoring chapter names twice, the discrimination lag and the regime mimicry — and reached fifty-three distinct targets: forty-one rows into the limitation register, nineteen into the guarantees register, seven into the configuration chapter's tables, and four into the output-structures chapter, which is the whole of the health-report family that four environments across two Parts send a reader to.
+
+The final retirement was the smallest and the one the discipline was written for, because by then there was nowhere left for a dangling reference to hide. Its nineteen rows carried twenty-four spans — the five extra being the configuration chapter's rendering table, which names three of its targets once per row — and reached fifteen distinct targets, every one of them in the appendices. Twelve rows named the rendering appendix, whose display constants three landscape chapters and the configuration chapter all pointed at from outside, and they retired with that appendix; two named the extraction reference and the dimensional summary and retired with the reference tables; one named the honest-notes register and retired with its disposition; and the last four named the interface map, two of its tables and one terminology convention, and retired with the interface appendices.
+
+| Citing part | Target label | Context |
+| --- | --- | --- |
+
+Every row is a reference forward out of the Part that wrote it into a Part not yet written; references forward *within* a landed Part were ordinary citations and were never recorded here, the calculus resolving them across files without regard to the order in which the parts were authored. The same held across files that landed together, whether or not they belonged to one Part: the five parts of Part IV landed together, and so did Part V's single part, Part VI's five, Part VII's four, Part VIII's three and the appendices, so a citation from the configuration chapter into the guarantees register was an ordinary citation and not a row.
+
+The register is kept rather than deleted. It is the phase's evidence that the discipline held: a reader asking whether any forward reference was quietly dropped can see the arithmetic close, wave by wave, and an empty table that was never populated would prove nothing at all.
