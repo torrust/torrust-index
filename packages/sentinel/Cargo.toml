@@ -1,0 +1,53 @@
+[package]
+categories = ["algorithms", "network-programming"]
+description = "Hierarchical online subspace anomaly detection for positionally structured observation streams."
+keywords = ["anomaly-detection", "online-learning", "spectral", "streaming", "subspace"]
+name = "torrust-sentinel"
+readme = "README.md"
+version = "1.0.0"
+
+authors.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+serde = ["dep:serde", "torrust-mudlark/serde"]
+
+[dependencies]
+# Held to the 0.24 line. A bare `0` is the widest range cargo can be given for a
+# pre-1.0 crate: it admits every breaking 0.x release, so a routine compatible
+# lock refresh could carry the crate across an API break with no manifest edit
+# and no review.
+faer = "0.24"
+rand = "0.10"
+rand_distr = "0.6"
+serde = { version = "1", features = ["derive"], optional = true }
+torrust-mudlark = { version = "1.0.0", path = "../mudlark", default-features = false, features = ["dynamic-contour-tracking"] }
+# Held to the 0.1 line: a bare `0` would admit every breaking 0.x release.
+tracing = "0.1"
+
+[dev-dependencies]
+# Held to the 0.8 line: a bare `0` would admit every breaking 0.x release.
+criterion = { version = "0.8", features = ["html_reports"] }
+serde_json = "1"
+tracing-subscriber = { version = "0.3", features = ["registry", "env-filter"] }
+
+[[bench]]
+harness = false
+name = "sentinel"
+
+[[test]]
+harness = false
+name = "pedagogy"
+
+[[test]]
+harness = false
+name = "pedagogy_advanced"

@@ -1,0 +1,12 @@
+## Unit test matrix · `tab:assayer:report-unit-test-matrix`
+
+**Table (Unit test matrix)**
+
+| Test | Area | Claim |
+|------|------|-------|
+| (`test:unit:make-ledger-key-normal`) | dossier | A Ledger key is nothing more than the pair a cell already reports: its start coordinate and its depth, carried through unchanged. Keying on the reported interval rather than on a hash of the cell's contents is what lets the same physical region be recognised across successive reports. |
+| (`test:unit:make-ledger-key-overflow`) | dossier | A depth beyond 128 cannot occur in a well-formed report, so it is data-quality input rather than data: the key construction clamps it to 128, in every build profile alike. Clamping matters because the narrowing to `u8` would otherwise wrap a depth of 200 round to 72 and silently file the cell against a real but wrong region of the space — and the cell extraction reports the same clamp through its degraded flag, so the sanitisation is counted rather than silent. |
+| (`test:unit:ingestion-config-default`) | dossier | Out of the box a cell must go missing from three consecutive reports before its Ledger entry is discarded. A threshold above one is what makes the cell set tolerant of a single report in which a region happened not to be competitive, rather than forgetting its history at the first gap. |
+| (`test:unit:dyadic-full-range`) | dossier | Depth zero is the whole coordinate space: the single interval running from zero to the largest representable coordinate is dyadic there. The root is therefore not a special case bolted onto the hierarchy but its first member, which is why every coordinate has somewhere to land. |
+| (`test:unit:dyadic-half-range`) | dossier | Each descent halves: at depth one both the lower and the upper half of the space qualify, and nothing between them does. The two halves partition the space exactly, so a coordinate has one ancestor per depth rather than a choice of overlapping candidates. |
+| (`test:unit:non-dyadic-misaligned`) | dossier | An interval that does not begin on a boundary of its claimed depth is not dyadic, however plausible its endpoints look on their own: starting one past zero disqualifies it at depth eight. Alignment is what makes a cell's ancestry computable by masking bits, so an unaligned interval could not be placed in the hierarchy at all. |

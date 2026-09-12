@@ -219,7 +219,12 @@ impl<V: Accumulator> Config<V> {
         );
         if let Some(budget) = self.budget {
             let buffer = self.depth_evict - self.depth_create;
-            let headroom = 3usize.pow(buffer + 1);
+            // Saturating rather than wrapping: a buffer wide enough to
+            // overflow the exponent leaves no representable budget that
+            // could clear the requirement, and the saturated figure carries
+            // exactly that verdict into the assertion below. A wrapped
+            // figure would admit or refuse arbitrarily instead.
+            let headroom = 3usize.checked_pow(buffer + 1).unwrap_or(usize::MAX);
             let convergence = 2 * (self.depth_create as usize).saturating_sub(1);
             let required = headroom.max(convergence);
             assert!(
@@ -522,11 +527,20 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
         let live_depth_evict = config.depth_evict;
         let live_depth_create = config.depth_create;
         let depth_buffer = config.depth_evict - config.depth_create;
-        let headroom = 3usize.pow(depth_buffer + 1);
+        // Saturating for the same reason as in the configuration check, and
+        // reachable here even when that check stood down: a budgetless
+        // configuration skips the headroom assertion entirely, yet still
+        // computes and stores this figure.
+        let headroom = 3usize.checked_pow(depth_buffer + 1).unwrap_or(usize::MAX);
         let convergence_bound = 2 * (live_depth_create as usize).saturating_sub(1);
         let required_headroom = headroom.max(convergence_bound);
         let soft_limit = config.budget.map(|b| {
-            let s = b - required_headroom;
+            // Saturating so a budget below the requirement lands on the
+            // assertion that names it rather than wrapping into a soft limit
+            // near the top of the range. The configuration check has already
+            // refused this pairing, so the floor is a second line, not the
+            // first.
+            let s = b.saturating_sub(required_headroom);
             assert!(s >= 1, "soft_limit must be >= 1 (budget={b}, headroom={required_headroom})");
             s
         });
@@ -643,6 +657,41 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     #[inline]
     pub const fn terminal_count(&self) -> u32 {
         self.terminal_count
+    }
+
+    /// Number of semi-internal G-nodes — those carrying exactly one G-child.
+    ///
+    /// Semi-internal nodes are part of the observation-receiving contour: the
+    /// half that was never subdivided still accumulates locally, so the node
+    /// is a cell in its own right as well as an ancestor.
+    ///
+    /// Counted by scanning the live nodes rather than maintained
+    /// incrementally, because the transitions that create and remove a
+    /// semi-internal node are spread across splitting, eviction and
+    /// restoration; a counter threaded through all of them would have to be
+    /// right at every site to be trustworthy at any. The scan is linear in the
+    /// number of live nodes, which the budget bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use torrust_mudlark::{Config, GvGraph};
+    /// # let cfg = Config {
+    /// #     split_threshold: 5u64,
+    /// #     depth_create: 3,
+    /// #     depth_evict: 6,
+    /// #     budget: None,
+    /// #     alpha_relax: 0.75,
+    /// #     bounded_eviction: true,
+    /// # };
+    /// # let g = GvGraph::<u64, u64, 8>::new(cfg);
+    /// // A fresh graph is a single terminal root, so no node is half subdivided.
+    /// assert_eq!(g.semi_internal_count(), 0);
+    /// ```
+    #[must_use]
+    pub fn semi_internal_count(&self) -> u32 {
+        let live = self.gnodes.iter_occupied().filter(|(_, g)| g.is_semi_internal()).count();
+        u32::try_from(live).unwrap_or(u32::MAX)
     }
 
     // Plateau tracking methods (plateaus, build_plateaus, plateau_basis,
@@ -960,6 +1009,11 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// $3^{(\text{buffer}+1)}$ entries can reside between the root
     /// and `D_evict`.  These entries are not evictable, so any
     /// configured budget must exceed this value.
+    ///
+    /// A depth buffer wide enough to overflow the exponent saturates the
+    /// figure at the top of the range instead of wrapping, so the reading
+    /// stays a ceiling no budget can clear rather than becoming a small
+    /// number a budget could accidentally satisfy.
     ///
     /// # Examples
     ///

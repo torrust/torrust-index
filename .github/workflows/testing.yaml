@@ -115,6 +115,10 @@ jobs:
         name: Run Lint Checks
         run: cargo clippy --workspace --all-targets --all-features
 
+      - id: assayer-lint
+        name: Run Assayer Feed-Forward Lints
+        run: ./packages/assayer/ci/lint_assayer.sh
+
       - id: docs
         name: Lint Documentation
         env:

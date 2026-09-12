@@ -1,0 +1,81 @@
+[package]
+categories = ["algorithms", "network-programming"]
+description = "An online-learning dynamically resizing linear risk estimation model for Torrust Index."
+keywords = ["online-learning", "risk-estimation", "linear-model", "bayesian", "machine-learning"]
+name = "torrust-assayer"
+readme = "README.md"
+version = "0.1.0"
+
+authors.workspace = true
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+serde = ["dep:serde", "dep:postcard", "torrust-mudlark/serde", "indexmap/serde"]
+# Exposes the integration-test surface: the `testing` harness module, the
+# numerics and signal export modules, and the shared-state trait. Enabled
+# by the crate's own test builds through the self dev-dependency below,
+# and never by a host — the four runtime call surfaces are the whole
+# application-facing API (´dec:surface:guidance-opacity´).
+#
+# The subscriber the harness installs for a scenario's tracing span rides on
+# this feature rather than on the dev-dependency table, because the harness now
+# lives in the library and a dev-dependency is not on the library's path. It is
+# the same crate the suite already linked, reached from where the code that
+# needs it now stands; a host build, which never turns the feature on, still
+# does not compile it.
+test-support = ["dep:tracing-subscriber"]
+
+[dependencies]
+# Concurrency
+arc-swap = "1"
+# Held to the 0.5 line. A bare `0` is the widest range cargo can be given for a
+# pre-1.0 crate: it admits every breaking 0.x release, so a routine compatible
+# lock refresh could carry the crate across an API break with no manifest edit
+# and no review.
+crossbeam-channel = "0.5"
+
+# Linear algebra backend
+# Held to the 0.24 line: a bare `0` would admit every breaking 0.x release.
+faer = "0.24"
+
+# Data structures
+dashmap = "6"
+indexmap = "2"
+# Held to the 0.18 line: a bare `0` would admit every breaking 0.x release.
+lru = "0.18"
+smallvec = "1"
+
+# Serialisation
+crc32fast = "1"
+postcard = { version = "1", default-features = false, features = ["alloc"], optional = true }
+serde = { version = "1", features = ["derive", "rc"], optional = true }
+
+# Logging
+# Held to the 0.1 line: a bare `0` would admit every breaking 0.x release.
+tracing = "0.1"
+# Held to the 0.3 line: a bare `0` would admit every breaking 0.x release.
+tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = true }
+
+# Workspace dependencies
+torrust-mudlark = { version = "1.0.0", path = "../mudlark", default-features = false, features = ["dynamic-contour-tracking"] }
+torrust-sentinel = { version = "1.0.0", path = "../sentinel", default-features = false }
+
+[dev-dependencies]
+# Self dev-dependency: every test build of this crate — unit and
+# integration alike — links the library with `test-support` on, so the
+# tests enable the harness surface and a host build never carries it.
+torrust-assayer = { path = ".", features = ["test-support"] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
