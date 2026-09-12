@@ -201,8 +201,7 @@ where
     /// lifetime.
     lifetime_observations: u64,
 
-    /// Number of G-tree nodes excluded from tracking because their
-    /// suffix width was below `MIN_TRACKER_DIM` (ADR-S-011).
+    /// Number of G-tree nodes excluded while producing the current analysis-set snapshot because their suffix width was below `MIN_TRACKER_DIM` (ADR-S-011).
     degenerate_cells_skipped: usize,
 
     /// Persistent RNG for noise injection (§ALGO S-11.1).
@@ -685,8 +684,9 @@ where
         self.lifetime_observations
     }
 
-    /// Number of G-tree nodes excluded from tracking because their
-    /// suffix width was below `MIN_TRACKER_DIM` (ADR-S-011).
+    /// Number of G-tree nodes excluded while producing the current analysis-set snapshot because their suffix width was below `MIN_TRACKER_DIM` (ADR-S-011).
+    ///
+    /// Recomputed with selection; this is not a lifetime total.
     #[must_use]
     pub const fn degenerate_cells_skipped(&self) -> usize {
         self.degenerate_cells_skipped
@@ -994,6 +994,7 @@ where
     /// remove the drain loop.
     fn reconcile_analysis_set(&mut self) {
         let new_set = AnalysisSet::recompute::<N>(&self.graph, self.config.analysis_k, self.config.analysis_depth_cutoff);
+        self.degenerate_cells_skipped = new_set.degenerate_cells_skipped();
 
         // ── Identify entries and exits ──────────────────────
         let old_gnodes: BTreeSet<GNodeId> = self.cells.keys().copied().collect();
@@ -1032,7 +1033,6 @@ where
                         width,
                         "skipping degenerate cell (width < MIN_TRACKER_DIM)"
                     );
-                    self.degenerate_cells_skipped += 1;
                     continue;
                 }
 

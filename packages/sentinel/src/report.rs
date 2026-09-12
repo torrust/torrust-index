@@ -813,11 +813,9 @@ pub struct AnalysisSetSummary {
     /// significant. `(0, 0)` when `competitive_size == 0`.
     pub v_depth_range: (usize, usize),
 
-    /// Number of G-tree nodes excluded from tracking because their
-    /// suffix width was below `MIN_TRACKER_DIM`.
+    /// Number of G-tree nodes excluded while producing the current analysis-set snapshot because their suffix width was below `MIN_TRACKER_DIM`.
     ///
-    /// A persistently non-zero count may indicate the
-    /// `split_threshold` is too low for the traffic mix.
+    /// Recomputed with selection rather than accumulated over the sentinel's lifetime. A persistently non-zero count may indicate the `split_threshold` is too low for the traffic mix.
     /// See ADR-S-011.
     pub degenerate_cells_skipped: usize,
 }

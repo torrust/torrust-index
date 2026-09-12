@@ -40,10 +40,11 @@
 //! | [`contour_snapshot_fields`] | readout | A contour snapshot carries the spatial shape, the accumulated volume, and the structural churn since the previous report side by side. Standing state and change-since-last-time are different questions about the spatial layer, and the snapshot answers both at once so a host need not difference successive reports to see the graph move. |
 //! | [`analysis_set_summary_empty`] | readout | A summary describing an analysis set with nothing selected still reports every field, its ranges zeroed rather than omitted, and still counts the root as a member of the full set. The shape a host parses does not change with how busy the sentinel is, and the permanent root tracker is visible even at the quietest extreme. |
 //! | [`analysis_set_summary_populated`] | readout | A populated summary reports its depth and importance spans as ordered pairs, low end first, and its three sizes widen as the definition of membership loosens: the cells that won the competition, the full set their ancestry closes over, and the investment set that also holds cells still warming. The nesting is what lets a host read the price of analysing a cell as well as the choice to analyse it. |
-//! | [`analysis_set_summary_with_degenerate_skips`] | readout | Cells too narrow to support a tracker are counted in the summary rather than quietly dropped. The count is a configuration signal in disguise: a persistently non-zero figure tells the host that the split threshold is carving the domain finer than the models can follow, which is invisible unless the skipping is reported. |
+//! | [`analysis_set_summary_with_degenerate_skips`] | readout | Cells too narrow to support a tracker are counted in the current selection snapshot rather than quietly dropped. Recomputing replaces the count instead of accumulating it, so the report describes the graph the host can inspect now while still exposing a persistently narrow configuration. |
 //! | [`member_score_has_cell_identity`] | readout | A member score names the cell it came from — a well-ordered interval and a depth — alongside a real number on each of the four axes and its standardised counterpart. Coordination scores describe a group, so without the identity a host could see that the group behaved oddly but not which part of the domain to look at. |
 
 use crate::report::*;
+use crate::{NoiseSchedule, SentinelConfig, SpectralSentinel};
 
 // ── TrackerMaturity ─────────────────────────────────────────
 
@@ -237,26 +238,33 @@ fn analysis_set_summary_populated() {
     assert!(summary.importance_range.0 < summary.importance_range.1);
 }
 
-/// Cells too narrow to support a tracker are counted in the summary rather
-/// than quietly dropped. The count is a configuration signal in disguise: a
-/// persistently non-zero figure tells the host that the split threshold is
-/// carving the domain finer than the models can follow, which is invisible
-/// unless the skipping is reported.
+/// Cells too narrow to support a tracker are counted in the current selection snapshot rather than quietly dropped. Recomputing replaces the count instead of accumulating it, so the report describes the graph the host can inspect now while still exposing a persistently narrow configuration.
 ///
 /// ´claim:readout:cells-too-narrow-to-track-are-counted-rather-than-silently-dropped´
 /// ´test:crate:analysis-set-summary-with-degenerate-skips´
 #[test]
 fn analysis_set_summary_with_degenerate_skips() {
-    let summary = AnalysisSetSummary {
-        competitive_size: 3,
-        full_size: 8,
-        investment_set_size: 10,
-        depth_range: (0, 6),
-        importance_range: (50.0, 2000.0),
-        v_depth_range: (1, 2),
-        degenerate_cells_skipped: 4,
+    let config = SentinelConfig::<u64> {
+        analysis_k: 32,
+        analysis_depth_cutoff: 16,
+        split_threshold: 1,
+        d_create: 8,
+        d_evict: 16,
+        noise_schedule: NoiseSchedule::Explicit(Vec::new()),
+        ..SentinelConfig::default()
     };
-    assert_eq!(summary.degenerate_cells_skipped, 4);
+    let mut sentinel = SpectralSentinel::<u64, u64, 4>::new(config).unwrap();
+
+    let report = sentinel.ingest(&[0; 64]);
+    let expected = sentinel
+        .graph()
+        .layers_to(16)
+        .filter(|(_, node)| (4u32.saturating_sub(node.depth) as usize) < crate::MIN_TRACKER_DIM)
+        .count();
+
+    assert!(expected > 0, "fixture must create narrow selection candidates");
+    assert_eq!(report.analysis_set_summary.degenerate_cells_skipped, expected);
+    assert_eq!(sentinel.degenerate_cells_skipped(), expected);
 }
 
 // ── MemberScore ─────────────────────────────────────────────

@@ -69,6 +69,9 @@ pub struct AnalysisSet<C: Coordinate, V: Accumulator> {
     /// subsets, which this type cannot see and the orchestrator derives.
     /// Ordered by `GNodeId` for deterministic iteration (ADR-S-005).
     full: Vec<AnalysisEntry<C, V>>,
+
+    /// Number of G-tree nodes excluded while producing this selection snapshot because their suffix width was below `MIN_TRACKER_DIM`.
+    degenerate_cells_skipped: usize,
 }
 
 impl<C: Coordinate, V: Inspectable> AnalysisSet<C, V> {
@@ -97,20 +100,25 @@ impl<C: Coordinate, V: Inspectable> AnalysisSet<C, V> {
         // Eligibility: V-depth ≤ cutoff AND analysis width w ≥ 2
         // (§ALGO S-8.1).  The depth limit is enforced by the BFS
         // itself (ADR-M-041), not a post-hoc filter.
+        let mut degenerate_cells_skipped = 0;
         let mut candidates: Vec<AnalysisEntry<C, V>> = graph
             .layers_to(depth_cutoff)
-            .filter(|(_, node)| {
+            .filter_map(|(v_depth, node)| {
                 // w = N - depth ≥ MIN_TRACKER_DIM (§ALGO S-8.1, §ALGO S-4.1).
-                N.saturating_sub(node.depth) as usize >= crate::MIN_TRACKER_DIM
-            })
-            .map(|(v_depth, node)| AnalysisEntry {
-                gnode: node.gnode_id,
-                depth: node.depth,
-                v_depth,
-                importance: node.own,
-                start: node.start,
-                end: node.end,
-                is_competitive: true,
+                if N.saturating_sub(node.depth) as usize >= crate::MIN_TRACKER_DIM {
+                    Some(AnalysisEntry {
+                        gnode: node.gnode_id,
+                        depth: node.depth,
+                        v_depth,
+                        importance: node.own,
+                        start: node.start,
+                        end: node.end,
+                        is_competitive: true,
+                    })
+                } else {
+                    degenerate_cells_skipped += 1;
+                    None
+                }
             })
             .collect();
 
@@ -196,7 +204,11 @@ impl<C: Coordinate, V: Inspectable> AnalysisSet<C, V> {
 
         let full: Vec<AnalysisEntry<C, V>> = full_set.into_values().collect();
 
-        Self { competitive, full }
+        Self {
+            competitive,
+            full,
+            degenerate_cells_skipped,
+        }
     }
 }
 
@@ -223,6 +235,11 @@ impl<C: Coordinate, V: Accumulator> AnalysisSet<C, V> {
     #[must_use]
     pub const fn total_count(&self) -> usize {
         self.full.len()
+    }
+
+    /// Number of narrow candidates excluded while producing this selection snapshot.
+    pub(crate) const fn degenerate_cells_skipped(&self) -> usize {
+        self.degenerate_cells_skipped
     }
 
     /// Whether a given `GNodeId` is in the full analysis set.
@@ -321,7 +338,7 @@ impl<C: Coordinate, V: Inspectable> AnalysisSet<C, V> {
             depth_range,
             importance_range,
             v_depth_range,
-            degenerate_cells_skipped: 0,
+            degenerate_cells_skipped: self.degenerate_cells_skipped,
         }
     }
 }
