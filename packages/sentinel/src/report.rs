@@ -834,7 +834,7 @@ pub struct MemberScore<C: Copy + Debug> {
     /// Lower bound of the scored cell's dyadic interval (inclusive).
     pub cell_start: C,
 
-    /// Upper bound of the scored cell's dyadic interval (exclusive).
+    /// Upper bound of the scored cell's dyadic interval, exclusive everywhere except at the top of the domain: the cell whose bound is the domain maximum owns that maximum, because a coordinate width filling the coordinate type leaves no value above it to be excluded.
     pub cell_end: C,
 
     /// G-tree depth of the scored cell.

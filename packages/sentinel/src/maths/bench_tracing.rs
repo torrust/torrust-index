@@ -8,11 +8,13 @@
 //! # Usage
 //!
 //! ```ignore
-//! let timing = SpanTiming::install();
+//! let (timing, _guard) = SpanTiming::install();
 //! // ... run observe() calls ...
 //! let naive_ns = timing.total_ns("svd_naive");
 //! let brand_ns = timing.total_ns("svd_brand");
 //! ```
+//!
+//! The example remains ignored because this benchmark-only module is private and compiled only with the crate's tests, so an external doctest cannot name `SpanTiming`.
 //!
 //! The layer stores enter/exit timestamps per span instance in an
 //! `RwLock<HashMap>` and aggregates into cumulative nanoseconds on
