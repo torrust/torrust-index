@@ -9,6 +9,7 @@ members = [
     "packages/index-health-check",
     "packages/mudlark",
     "packages/render-text-as-image",
+    "packages/sentinel",
 ]
 
 [package]
