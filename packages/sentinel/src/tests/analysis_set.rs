@@ -13,6 +13,7 @@
 //! | [`a_larger_budget_fills_every_slot_with_selectable_cells`] | selection | cites (´claim:selection:the-root-leaves-the-field-before-the-cut-so-every-slot-goes-to-a-selectable-cell´) |
 //! | [`k_zero_yields_no_competitive_entries`] | selection | cites (´claim:selection:the-competitive-set-never-exceeds-the-budget-it-was-asked-for´) |
 //! | [`depth_cutoff_zero_excludes_all_non_root`] | selection | The depth cutoff bounds the V-depth of every competitive cell: with the cutoff at zero, no selected cell sits deeper than zero however busy the graph. The bound is enforced while the tree is being walked rather than by discarding candidates afterwards, so the cutoff limits the work done as well as the cells returned. |
+//! | [`overdeep_float_cells_are_excluded`] | selection | A floating-coordinate graph can contain cells deeper than its model width because splitting is gated by V-tree depth. Their modeled suffix has no remaining width, so selection excludes them rather than overflowing the width subtraction or admitting them as enormous candidates. |
 //! | [`tie_breaking_is_deterministic`] | selection | Recomputing over an unchanged graph selects the same cells in the same order. Nothing in selection depends on iteration order, hashing, or timing, so two sentinels fed identical observations reach identical analysis sets — the foundation the reproducibility of every downstream score rests on. |
 //! | [`competitive_ordering_by_importance_then_start`] | selection | Competitive cells come back in a total order: importance descending, and among cells of equal importance, interval start ascending. Ties are therefore settled by a property of the coordinate domain rather than by whatever order the tree walk happened to produce, which is what makes the ordering reproducible and not merely stable within one run. |
 //! | [`internal_nodes_eligible_for_competitive_set`] | selection | A graph driven hard enough to split still yields competitive cells. The selector ranks by V-Tree importance alone and applies no filter on G-tree state, so a cell that has since become internal keeps its V-Tree position and remains eligible. Splitting refines the spatial structure; it does not silently remove cells from consideration. |
@@ -221,6 +222,36 @@ fn depth_cutoff_zero_excludes_all_non_root() {
     for entry in set.competitive() {
         assert_eq!(entry.v_depth, 0, "depth_cutoff=0 should only admit v_depth=0");
     }
+}
+
+/// A floating-coordinate graph can contain cells deeper than its model width because splitting is gated by V-tree depth. Their modeled suffix has no remaining width, so selection excludes them rather than overflowing the width subtraction or admitting them as enormous candidates.
+///
+/// ´claim:selection:overdeep-float-cells-have-zero-remaining-width-and-are-excluded´
+/// ´test:crate:overdeep-float-cells-are-excluded´
+#[test]
+fn overdeep_float_cells_are_excluded() {
+    const MODEL_WIDTH: u32 = 4;
+    let cfg = GvConfig {
+        split_threshold: 5.0,
+        depth_create: 8,
+        depth_evict: 16,
+        budget: None,
+        alpha_relax: 0.75,
+        bounded_eviction: true,
+    };
+    let mut graph = GvGraph::<f64, f64, MODEL_WIDTH>::new(cfg);
+    for _ in 0..100 {
+        graph.observe(2.0, 10.0);
+    }
+
+    let deepest = graph.layers().map(|(_, node)| node.depth).max().unwrap_or_default();
+    assert!(deepest > MODEL_WIDTH, "the fixture must contain a node deeper than N");
+
+    let set = AnalysisSet::recompute(&graph, usize::MAX, usize::MAX);
+    assert!(
+        set.competitive().iter().all(|entry| entry.depth <= MODEL_WIDTH),
+        "selection must exclude every node deeper than N",
+    );
 }
 
 /// Recomputing over an unchanged graph selects the same cells in the same

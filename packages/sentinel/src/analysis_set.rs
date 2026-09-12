@@ -101,7 +101,7 @@ impl<C: Coordinate, V: Inspectable> AnalysisSet<C, V> {
             .layers_to(depth_cutoff)
             .filter(|(_, node)| {
                 // w = N - depth ≥ MIN_TRACKER_DIM (§ALGO S-8.1, §ALGO S-4.1).
-                (N - node.depth) as usize >= crate::MIN_TRACKER_DIM
+                N.saturating_sub(node.depth) as usize >= crate::MIN_TRACKER_DIM
             })
             .map(|(v_depth, node)| AnalysisEntry {
                 gnode: node.gnode_id,
