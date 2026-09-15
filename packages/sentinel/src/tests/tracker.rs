@@ -12,7 +12,8 @@
 //! | [`dim_and_cap_reflect_construction`] | subspace | A cell's rank ceiling is the lesser of the configured maximum and its own width: a wide cell is capped by policy, a narrow one by geometry. There are no more independent directions than dimensions to hold them, so the width binds where it is the smaller of the two, and one configuration can serve cells of every depth without being retuned per depth. |
 //! | [`scoring_geometry_matches_state`] | subspace | A model reports the geometry its scores were computed in: the width it works over, the ceiling it may grow to, and the residual degrees of freedom left after the claimed directions are removed. That last figure is the divisor novelty is normalised by, so publishing it lets a host compare scores from cells of different depths and ranks instead of comparing numbers whose scale it cannot see. |
 //! | [`observe_returns_correct_depth`] | subspace | A report carries back the depth it was given, unchanged, alongside the rank in force while the batch was scored — and that rank is the one the model held beforehand, since adaptation happens after scoring. The model has no idea which cell it serves, so the depth is a label it holds on the host's behalf, which is what lets a host attribute a report without keeping its own bookkeeping alongside every call. |
-//! | [`rank_change_report_describes_the_scoring_state`] | subspace | On a batch that changes rank, the report keeps the earlier rank and geometry that produced its scores while the tracker advances to the adapted rank for the next batch. The coherence value therefore remains paired with the single-axis state in which it was forced to zero instead of being published beside a rank where coherence exists. |
+//! | [`rank_change_report_describes_the_scoring_state`] | subspace | On a batch that changes rank, the report and the tracker's geometry snapshot keep the earlier rank and residual degrees of freedom that normalised novelty, while the current rank advances for the next batch. Multiplying novelty by the published residual degrees of freedom recovers the residual energy, so the geometry beside the score can be used to reconstruct its scale. |
+//! | [`non_adapting_batch_reports_current_rank_as_scoring_rank`] | subspace | When the adaptation interval does not fall on a batch, the current model and the scoring snapshot agree: the report rank equals the tracker's rank and its residual degrees of freedom are derived from that same rank. |
 //! | [`observe_per_sample_when_enabled`] | subspace | Per-row detail is produced only where a cell is configured to want it. Building it costs a standardisation of every axis for every row, which is worth paying when a host needs to know which observation in a batch was responsible and wasted when it only needs the batch's summary — so the choice is made per configuration rather than always. |
 //! | [`observe_no_per_sample_when_disabled`] | subspace | cites (´claim:subspace:per-row-detail-is-produced-only-where-it-is-configured-because-it-costs-work-per-row´) |
 //! | [`observe_report_batch_size_matches`] | subspace | Where per-row detail is produced there is exactly one entry for every row handed in, whether the batch was a single observation or many, and the same model gives both answers in turn. The correspondence is positional, so a host can attribute a score back to the observation that earned it without the model needing to know what that observation was. |
@@ -61,7 +62,7 @@
 //! assertion here reproducible: the same rows produce the same model, the same
 //! rank trajectory and the same scores on every run.
 
-use crate::config::SentinelConfig;
+use crate::config::{NoiseSchedule, SentinelConfig};
 use crate::sentinel::tracker::SubspaceTracker;
 
 // ════════════════════════════════════════════════════════════
@@ -253,11 +254,7 @@ fn observe_returns_correct_depth() {
     assert_eq!(report.rank, 1); // hasn't adapted yet
 }
 
-/// On a batch that changes rank, the report keeps the earlier rank and geometry
-/// that produced its scores while the tracker advances to the adapted rank for
-/// the next batch. The coherence value therefore remains paired with the
-/// single-axis state in which it was forced to zero instead of being published
-/// beside a rank where coherence exists.
+/// On a batch that changes rank, the report and the tracker's geometry snapshot keep the earlier rank and residual degrees of freedom that normalised novelty, while the current rank advances for the next batch. Multiplying novelty by the published residual degrees of freedom recovers the residual energy, so the geometry beside the score can be used to reconstruct its scale.
 ///
 /// ´claim:subspace:a-rank-change-report-describes-the-state-that-scored-the-batch´
 /// ´test:crate:rank-change-report-describes-the-scoring-state´
@@ -267,29 +264,74 @@ fn rank_change_report_describes_the_scoring_state() {
         max_rank: 4,
         rank_update_interval: 1,
         energy_threshold: 0.90,
-        ..cfg_per_sample()
+        noise_schedule: NoiseSchedule::Explicit(Vec::new()),
+        ..cfg_no_per_sample()
     };
     let mut tracker = SubspaceTracker::new(8, &cfg, 0.999);
-    let scoring_rank = tracker.rank();
+    let rows = centred_rows(&[0], 8);
+
+    let report = tracker.observe(&as_slices(&rows), 0, false);
     let scoring_geometry = tracker.scoring_geometry();
-    let rows = centred_rows(&[0xFF00_0000_0000_0000_0000_0000_0000_0000; 4], 8);
 
-    let report = tracker.observe(&as_slices(&rows), 8, false);
-
-    assert_eq!(scoring_rank, 1);
-    assert_eq!(tracker.rank(), 2, "the fixture must adapt the next batch to rank two");
-    assert_eq!(
-        report.rank, scoring_rank,
-        "the report rank must be the one that scored this batch"
-    );
+    assert_eq!(report.rank, 1, "the initial rank must score the first batch");
+    assert_eq!(tracker.rank(), 2, "adaptation must prepare rank two for the next batch");
+    assert_eq!(scoring_geometry.dim, 8);
+    assert_eq!(scoring_geometry.cap, 4);
+    assert_eq!(scoring_geometry.residual_dof, 7);
     assert_eq!(report.geometry.dim, scoring_geometry.dim);
     assert_eq!(report.geometry.cap, scoring_geometry.cap);
-    assert_eq!(report.geometry.residual_dof, scoring_geometry.residual_dof);
+    assert_eq!(
+        report.geometry.residual_dof, scoring_geometry.residual_dof,
+        "the tracker geometry snapshot must retain the scoring residual degrees of freedom"
+    );
+
+    let residual_dof = f64::from(u32::try_from(scoring_geometry.residual_dof).expect("the test geometry must fit in u32"));
+    let operation_scale = f64::from(u32::try_from(tracker.dim()).expect("the test dimension must fit in u32"));
+    let expected_novelty = 0.5_f64 * 0.5;
+    let expected_residual_energy = residual_dof * expected_novelty;
+    let tolerance = f64::EPSILON * operation_scale * expected_residual_energy.max(1.0);
+    let recovered_residual_energy = report.scores.novelty.mean * residual_dof;
+
+    assert!(
+        (report.scores.novelty.mean - expected_novelty).abs() <= tolerance,
+        "novelty must be residual energy divided by the seven scoring residual degrees of freedom"
+    );
+    assert!(
+        (recovered_residual_energy - expected_residual_energy).abs() <= tolerance,
+        "novelty times the reported scoring residual degrees of freedom must recover residual energy"
+    );
     assert_eq!(
         report.scores.coherence.mean.to_bits(),
         0.0_f64.to_bits(),
         "coherence does not exist at the scoring rank"
     );
+}
+
+/// When the adaptation interval does not fall on a batch, the current model and the scoring snapshot agree: the report rank equals the tracker's rank and its residual degrees of freedom are derived from that same rank.
+///
+/// ´claim:subspace:a-non-adapting-batch-reports-the-current-rank-as-its-scoring-rank´
+/// ´test:crate:non-adapting-batch-reports-current-rank-as-scoring-rank´
+#[test]
+fn non_adapting_batch_reports_current_rank_as_scoring_rank() {
+    let cfg = SentinelConfig {
+        max_rank: 4,
+        rank_update_interval: 2,
+        noise_schedule: NoiseSchedule::Explicit(Vec::new()),
+        ..cfg_no_per_sample()
+    };
+    let mut tracker = SubspaceTracker::new(8, &cfg, 0.999);
+    let rows = centred_rows(&[0], 8);
+
+    let report = tracker.observe(&as_slices(&rows), 0, false);
+    let scoring_geometry = tracker.scoring_geometry();
+
+    assert_eq!(
+        tracker.rank(),
+        report.rank,
+        "rank must stay unchanged between adaptation steps"
+    );
+    assert_eq!(scoring_geometry.residual_dof, tracker.dim() - tracker.rank());
+    assert_eq!(report.geometry.residual_dof, scoring_geometry.residual_dof);
 }
 
 /// Per-row detail is produced only where a cell is configured to want it.

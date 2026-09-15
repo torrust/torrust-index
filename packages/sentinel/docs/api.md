@@ -190,21 +190,21 @@ pub struct CellReport<C: Copy + Debug> {
 | `analysis_width`    | Suffix width: `N - depth`                            |
 | `is_competitive`    | `true` if competitively selected                     |
 | `sample_count`      | Observations in this batch routed to this cell       |
-| `rank`              | Current rank of the learned subspace                 |
-| `energy_ratio`      | Fraction of variance captured by current rank        |
+| `rank`              | Rank in force while this batch was scored             |
+| `energy_ratio`      | Fraction of variance captured by the reported rank    |
 | `top_singular_value`| Largest singular value                               |
 | `scores`            | Anomaly scores along all four axes                   |
 | `maturity`          | Tracker maturity (real vs noise observations)        |
-| `geometry`          | Geometric scoring properties                         |
+| `geometry`          | Geometry of the model that scored this batch          |
 | `per_sample`        | Per-sample scores (if `per_sample_scores` enabled)   |
 
 ### §4.3 Coordination Reports · `sec:sentinel:api-coordination-reports`
 
 #### `CoordinationReport<C>` — `Clone` · `sec:sentinel:api-coordination-report`
 
-Coordination analysis at a single G-tree internal node (§ALGO S-9.1).
+Coordination analysis at a single G-tree internal node (§ALGO S-7.1).
 
-The coordination tracker operates at $w = 4$, consuming running-mean-centred cell-score matrices as observations. The group consists of all competitive cells in this node's subtree that reported scores in this batch.
+The coordination tracker operates at $w = 4$, consuming running-mean-centred cell-score matrices as observations. The group consists of all competitive cells in this node's subtree that reported scores in this batch. Its `rank`, `energy_ratio`, and `geometry` describe the model that scored this batch; rank adaptation prepares the next batch.
 
 ```rust
 pub struct CoordinationReport<C: Copy + Debug> {
@@ -318,7 +318,7 @@ Methods: `cold() -> Self`, `total_observations() -> u64`.
 
 #### `ScoringGeometry` — `Copy` · `sec:sentinel:api-scoring-geometry`
 
-Geometric properties of the tracker's scoring state.
+Geometry of the model that scored the associated batch. In a cell inspection, it describes the most recent scored batch and can differ from the current rank after adaptation.
 
 ```rust
 pub struct ScoringGeometry {
@@ -472,7 +472,7 @@ pub struct CoordinationHealth {
 
 #### `CellInspection<C>` — `Clone` · `sec:sentinel:api-cell-inspection`
 
-Detailed snapshot of a cell's tracker state. Returned by `SpectralSentinel::inspect_cell()`.
+Detailed snapshot of a cell's tracker state. Returned by `SpectralSentinel::inspect_cell()`. The `rank` is the current model rank for the next batch, while `geometry` describes the model that scored the most recent batch.
 
 ```rust
 pub struct CellInspection<C: Copy + Debug> {

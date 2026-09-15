@@ -38,7 +38,7 @@ pub struct BatchReport<C: Copy + Debug> {
     /// Ordered by `GNodeId`.
     pub ancestor_reports: Vec<CellReport<C>>,
 
-    /// Hierarchical coordination reports from the G-tree walk (§ALGO S-9.4).
+    /// Hierarchical coordination reports from the G-tree walk (§ALGO S-7.4).
     ///
     /// One report per active coordination context. Ordered shallowest first,
     /// ties broken by ascending `GNodeId`.
@@ -148,7 +148,7 @@ pub struct CellReport<C: Copy + Debug> {
 
 // ─── Coordination-level ───────────────────────────────────────
 
-/// Coordination analysis at a single G-tree internal node (§ALGO S-9.1).
+/// Coordination analysis at a single G-tree internal node (§ALGO S-7.1).
 ///
 /// Produced by a coordination tracker (`SubspaceTracker` at $w = 4$)
 /// that consumes running-mean-centred cell-score matrices as
@@ -408,7 +408,8 @@ impl TrackerMaturity {
 
 // ─── Scoring geometry ───────────────────────────────────────
 
-/// Geometric properties of the tracker's scoring state.
+/// Geometry of the model that scored the associated batch. In inspection
+/// snapshots, this is the geometry of the most recent scored batch.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ScoringGeometry {
@@ -418,7 +419,7 @@ pub struct ScoringGeometry {
     /// Maximum rank this tracker can reach: `min(dim, max_rank)`.
     pub cap: usize,
 
-    /// Residual degrees of freedom: `dim - rank`.
+    /// Residual degrees of freedom: `dim - scoring rank`.
     pub residual_dof: usize,
 }
 
@@ -695,7 +696,8 @@ pub struct CellInspection<C: Copy + Debug> {
     /// Maturity state.
     pub maturity: TrackerMaturity,
 
-    /// Geometric scoring properties.
+    /// Geometry of the model that scored this tracker's most recent batch.
+    /// This can differ from the current `rank` after adaptation.
     pub geometry: ScoringGeometry,
 
     /// Per-axis EWMA baseline snapshots (ADR-S-014).

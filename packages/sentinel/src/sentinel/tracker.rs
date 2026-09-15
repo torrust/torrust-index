@@ -77,8 +77,12 @@ pub struct SubspaceTracker {
     /// Hard ceiling on rank: `min(dim, max_rank)`.
     cap: usize,
 
-    /// Current active rank (number of basis vectors in use).
+    /// Current active rank (number of basis vectors in use for the next batch).
     rank: usize,
+
+    /// Geometry of the model that scored the most recent batch. Before the
+    /// first scored batch, this describes the initial rank-one model.
+    scoring_geometry: ScoringGeometry,
 
     /// Observation step counter (for rank adaptation timing).
     step: u64,
@@ -151,11 +155,17 @@ impl SubspaceTracker {
         }
 
         let fast_decay = cfg.forgetting_factor;
+        let scoring_geometry = ScoringGeometry {
+            dim,
+            cap,
+            residual_dof: dim.saturating_sub(1),
+        };
 
         Self {
             dim,
             cap,
             rank: 1,
+            scoring_geometry,
             step: 0,
             basis,
             sigmas: vec![0.01; cap],
@@ -196,6 +206,12 @@ impl SubspaceTracker {
         let d = self.dim;
         let k = self.rank;
         let eps = self.eps;
+        let scoring_geometry = ScoringGeometry {
+            dim: d,
+            cap: self.cap,
+            residual_dof: d.saturating_sub(k),
+        };
+        self.scoring_geometry = scoring_geometry;
 
         // Build X matrix (b × d).
         let x = Self::build_matrix(rows, b, d);
@@ -302,7 +318,6 @@ impl SubspaceTracker {
         // scores. Rank adaptation below prepares the next batch.
         let scoring_rank = k;
         let scoring_energy_ratio = self.energy_ratio();
-        let scoring_geometry = self.scoring_geometry();
 
         // ── Phase 5: Adapt rank ─────────────────────────
         self.step += 1;
@@ -373,7 +388,10 @@ impl SubspaceTracker {
         }
     }
 
-    /// Current rank.
+    /// Current rank of the evolved model that will score the next batch.
+    ///
+    /// Rank adaptation follows scoring, so this can differ from the rank paired
+    /// with [`scoring_geometry`](Self::scoring_geometry) for the previous batch.
     pub const fn rank(&self) -> usize {
         self.rank
     }
@@ -391,7 +409,7 @@ impl SubspaceTracker {
     /// Snapshot the current per-axis baseline means and variances.
     ///
     /// Used for coordination warm-up synthetic score generation
-    /// (§ALGO S-9.8).
+    /// (§ALGO S-11.7).
     pub const fn axis_baselines(&self) -> super::AxisBaselines {
         super::AxisBaselines {
             novelty_mean: self.novelty_bl.fast.mean(),
@@ -405,13 +423,12 @@ impl SubspaceTracker {
         }
     }
 
-    /// Geometric properties of the current scoring state.
+    /// Geometry of the model that scored the most recent batch.
+    ///
+    /// Before the first scored batch, this describes the initial rank-one model.
+    /// Rank adaptation prepares the next batch and does not rewrite this snapshot.
     pub const fn scoring_geometry(&self) -> ScoringGeometry {
-        ScoringGeometry {
-            dim: self.dim,
-            cap: self.cap,
-            residual_dof: self.dim.saturating_sub(self.rank),
-        }
+        self.scoring_geometry
     }
 
     /// Per-axis clip-pressure EWMA values [novelty, displacement, surprise, coherence].

@@ -1995,13 +1995,13 @@ One per axis per cell, summarising the batch and its relationship to baselines.
 
 ### 14.7 Scoring Geometry Record · `sec:sentinel:algorithm-output-scoring-geometry-record`
 
-One per cell or coordination tracker, describing the structural reliability of each scoring axis under the tracker's current rank and dimensionality.
+One per cell or coordination tracker, describing the geometry of the model that scored the associated batch. The report's rank and residual degrees of freedom therefore belong to the same scoring state even when rank adaptation has already prepared a different rank for the next batch. In an inspection snapshot, the record describes the most recent scored batch.
 
 | Field          | Type                 | Description                                              |
 | -------------- | -------------------- | -------------------------------------------------------- |
 | Analysis width | non-negative integer | Working dimensionality $w$ of this tracker's input space |
 | Capacity       | non-negative integer | Maximum reachable rank: $\text{cap} = \min(w, r_{\max})$ |
-| Residual DOF   | non-negative integer | Residual degrees of freedom: $w - k$                     |
+| Residual DOF   | non-negative integer | Residual degrees of freedom: $w - k$ for the scoring rank |
 
 Two derived predicates assist the host:
 
