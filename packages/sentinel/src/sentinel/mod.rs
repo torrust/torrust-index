@@ -373,8 +373,7 @@ where
         })
     }
 
-    /// Process a batch of raw `u128` observations and return a full
-    /// statistical report.
+    /// Process a batch of coordinate observations and return a full statistical report.
     ///
     /// Each value is fed to the G-V Graph, then routed to every
     /// analysis cell whose interval contains it. Multi-scale delivery

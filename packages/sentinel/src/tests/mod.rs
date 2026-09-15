@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
-//! Collected unit tests for the sentinel crate.
+//! Collected crate tests for the sentinel crate.
 //!
 //! Tests that formerly lived as inline `#[cfg(test)] mod tests { … }`
 //! blocks inside their parent modules are refactored here so the
