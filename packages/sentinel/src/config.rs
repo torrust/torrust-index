@@ -279,10 +279,14 @@ pub struct SentinelConfig<V: Accumulator> {
 
     /// Maximum number of competitive analysis cells (§ALGO S-4.1).
     ///
-    /// Controls the resource ceiling for the analysis tier. The total
-    /// tracker count is bounded by `2 × analysis_k` (Steiner tree
-    /// bound, §ALGO S-4.8) — `analysis_k` competitive cells plus at
-    /// most `analysis_k` ancestor cells.
+    /// Bounds the competitive targets, not the lengths of their ancestor
+    /// chains. For selected depths `d_i`, the current investment set has
+    /// at most `1 + sum(d_i)` cell trackers, including the permanent root.
+    /// Since supported engines have `N >= 2` and eligible targets have
+    /// `d_i <= N - 2`, this is at most `1 + analysis_k * (N - 2)`
+    /// (§ALGO S-8.2). Shared ancestors only reduce the count. This counts
+    /// selected online and warming cells; coordination trackers and an
+    /// evicted model still held by the warming worker are separate.
     ///
     /// Must be ≥ 1.
     ///

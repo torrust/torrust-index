@@ -629,8 +629,13 @@ impl SubspaceTracker {
             }
         }
 
-        // Runtime floor (ADR-S-021 §4, §ALGO S-4.2): defence-in-depth
-        // against degenerate streams.  Caps per-dimension surprise at 100.
+        // Runtime floor (ADR-S-021 §4, §ALGO S-4.2). For centred-bit cell
+        // inputs x in {-0.5, 0.5}^d and unit basis columns, Cauchy-Schwarz
+        // gives |z_j| <= sqrt(d)/2. The mean starts at zero and is seeded
+        // or convexly averaged from such coordinates, so |z_j-mu_j|^2 <= d.
+        // With variance >= 0.01 and eps > 0, each contribution, and their
+        // rank average, is <= d/(0.01+eps) <= 100*d, up to roundoff.
+        // This input bound does not apply to unbounded coordination scores.
         for lat_var in self.lat_var.iter_mut().take(k) {
             *lat_var = (*lat_var).max(1e-2);
         }

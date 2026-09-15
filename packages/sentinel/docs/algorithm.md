@@ -222,7 +222,7 @@ Both trees reference the same underlying nodes. A node exists simultaneously in 
 
 **Uncompressed materialisation.** The G-Tree is a fully materialised binary trie: every node on the path from a leaf to the root exists as a distinct materialised node. A cell at G-Tree depth $d$ has exactly $d$ materialised ancestors. Catalytic bisection (§3.5) creates children at depth $d + 1$; tip-only eviction (§3.12, property 5) removes leaves but never compresses interior chains. Ancestor walks — for sum propagation, investment-set closure (§8.2), and multi-scale delivery (§9.3) — visit every materialised level.
 
-> _Why trees stay shallow._ The competitive mechanism (§3.4) and the host-configured depth gate `depth_create` (typically 3) bound how deep the G-Tree grows in practice. Under typical parameters, competitive cells sit at G-Tree depths 2–8, so ancestor counts are inherently small — not because of path compression, but because the system rarely creates deep structure. The worst-case investment set size before sharing is $1 + K\bar{D}$ (§8.2), but the Steiner tree structure of the ancestor closure guarantees extensive sharing, and the practical size is dominated by $2K$.
+> _Ancestor cost._ A selected target at G-tree depth $d$ retains its complete path to the root. Sharing can reduce the union of these paths, but does not impose a depth-independent bound. For current selected depths $d_i$, the investment set has at most $1 + \sum_i d_i$ entries; supported engines further bound this by $1 + \texttt{analysis\_k}(N-2)$ (§8.2).
 
 ### 3.2 Domain and Spatial Partitioning · `sec:sentinel:algorithm-spatial-domain-and-partitioning`
 
@@ -485,7 +485,7 @@ $$\Gamma_{jl} \leftarrow \lambda\,\Gamma_{jl} + \alpha\,\frac{1}{b} \sum_{i=1}^{
 
 Only the upper triangle is stored.
 
-**Runtime floor.** After each update (including $t = 0$ seeding), clamp: $\nu^{(z)}_j \leftarrow \max(\nu^{(z)}_j, 10^{-2})$. This floor is $25\times$ below the null-hypothesis value and should never bind during correct operation. It exists as defence-in-depth against implementation defects (e.g., a tracker created without warm-up) or degenerate identical-observation streams where all $z_{ij}$ are identical across consecutive batches. When it does bind, the maximum per-dimension surprise contribution is $(z_j - \mu_j)^2 / 10^{-2} \leq 100$ — large but not the catastrophic $10^5$ that $\varepsilon$-floored variance produces.
+**Runtime floor.** After each update (including $t = 0$ seeding), clamp $\nu^{(z)}_j \leftarrow \max(\nu^{(z)}_j, 10^{-2})$. For centred-bit cell inputs $x \in \{-1/2,1/2\}^{d}$ and unit basis columns, Cauchy–Schwarz gives $|z_j| \leq \sqrt{d}/2$. A mean initialized at zero and then seeded or convexly averaged from these coordinates obeys the same bound, so $(z_j-\mu_j)^2 \leq d$. With $\varepsilon>0$ and variance at least $0.01$, each surprise contribution and their rank average are at most $d/(0.01+\varepsilon) \leq 100d$, up to floating-point roundoff. The floor may bind on degenerate streams; this finite input bound does not apply to unbounded coordination-score vectors.
 
 The inner $\max(\cdot, \varepsilon)$ and the runtime $\max(\cdot, 10^{-2})$ are complementary: the inner floor prevents a zero-energy EWMA _input_ (from identical observations within a batch); the runtime floor prevents the _accumulated EWMA value_ from being too small due to a prolonged sequence of near-$\varepsilon$ inputs. Neither is redundant.
 
@@ -1108,19 +1108,19 @@ The selection criteria use V-Tree ranking (depth and importance) as the sole com
 
 The **investment set** closes the competitive targets under spatial tree ancestry:
 
-$$\mathcal{I} = \mathcal{T} \;\cup\; \bigcup_{v \in \mathcal{T}} \text{Ancestors}(v.\text{node})$$
+$$\mathcal{I} = \{\mathrm{root}\} \;\cup\; \mathcal{T} \;\cup\; \bigcup_{v \in \mathcal{T}} \text{Ancestors}(v.\text{node})$$
 
 where $\text{Ancestors}(g)$ is the set of all materialised G-Tree nodes on the path from $g$ to the G-Tree root, inclusive. Since the G-Tree is fully materialised (§3.1), a target at depth $d$ contributes ancestors at depths $0, 1, \ldots, d - 1$. Every competitive target receives a **complete chain of allocated trackers** from itself to the root.
 
 The investment set determines resource commitment: every member of $\mathcal{I}$ has a tracker allocated and, if not yet online, is enqueued for warm-up. Not all members of $\mathcal{I}$ produce scores — only online members do (§8.3).
 
-The investment set forms a **Steiner tree** connecting the competitive targets to the root. Its size depends on how much the targets share ancestors and on the G-Tree depth of each target. By the Steiner tree property, the reduced tree (suppressing degree-2 path nodes) connecting $K$ leaves to a common root has at most $K - 1$ internal branching points, yielding at most $2K - 1$ reduced nodes. However, the full investment set includes all materialised intermediate nodes on the paths, which may exceed this.
+The investment set forms a **Steiner tree** connecting the competitive targets to the permanent root. Its full size includes every intermediate path node. A reduced tree that retains the root and marked targets but suppresses unmarked unary nodes has at most $2K$ nodes for $K \geq 1$ targets: at most $K-1$ branching nodes, $K$ targets and one root. The familiar $2K-1$ bound additionally assumes the root is already a branching node. Neither reduced bound limits the full investment set.
 
-**Size bound.** Each competitive target at G-Tree depth $d_i$ contributes $d_i$ ancestors; the root is shared by all. Before accounting for sharing:
+**Size bound.** For $K$ current competitive targets (at most `analysis_k`) at G-tree depths $d_i$, count the root once and at most $d_i$ non-root nodes along each target path:
 
 $$|\mathcal{I}| \leq 1 + \sum_{i=1}^{K} d_i = 1 + K\bar{D}$$
 
-with equality when all $K$ targets share only the root. The reduced Steiner tree connecting $K$ leaves to the root has at most $K - 1$ internal branching nodes and at most $2K - 1$ reduced nodes. The full materialised tree adds chain intermediaries — degree-2 nodes suppressed in the reduction — whose count depends on the depth profile. Under concentrated observation volume, extensive ancestor sharing absorbs chain intermediaries into the shared structure, and the practical investment set size approaches $2K$.
+The bound is attained when the target paths share only the root; further sharing only reduces it. The permanent root remains even when $K=0$, giving one entry. Eligibility requires suffix width $N-d_i \geq 2$, so supported engines satisfy $|\mathcal{I}| \leq 1 + \texttt{analysis\_k}(N-2)$. This counts selected online and warming cell trackers; coordination trackers and an evicted model still held by the background warming worker are separate resource commitments.
 
 **Example 1 (typical, `depth_create = 3`):**
 
@@ -1143,21 +1143,7 @@ Worst-case bound: 1 + 3×3 = 10;  actual: 8 (sharing root, /1-A, /2-A)
 
 Three targets, five unique ancestors. The worst-case bound gives $1 + 3 \times 3 = 10$; the actual count is 8 because the root, /1-A, and /2-A are each shared by multiple targets. The reduced Steiner tree has 5 nodes ($2K - 1$: root, /2-A, and the three targets); the full materialised tree adds 3 chain intermediaries (/1-A, /1-B, /2-C) for a total of 8.
 
-**Example 2 (deep concentration, 256-bit domain):**
-
-```
-Root /0
-│  ... 232 shared levels ...
-Depth 232 (hot region)
-├── branching: ≤ 999 internal nodes
-└── 1000 competitive targets at depth ~235
-
-Targets: 1000    D̄ ≈ 235    Sharing: 232 trunk + ≤999 branch
-Worst-case: 1 + 1000×235 = 235,001
-Actual: 1000 + 999 + 232 = 2231  (sharing absorbs 99%)
-```
-
-All 1000 targets share 232 trunk ancestors. The branching region adds at most $K - 1 = 999$ internal nodes, plus a few chain intermediaries per branch. Total investment: $\sim 2231$, dominated by $2K$. The trunk and branching structure are shared, not multiplied per target — concentration creates the depth that makes sharing inevitable.
+**Example 2 (shared trunk).** Suppose $T$ unary trunk nodes lie strictly above the first branching node, and the branching region is a full binary tree with $K$ target leaves and no further unary intermediates. Then $|\mathcal{I}| = T + 2K - 1$. Additional unary intermediates increase that count. Sharing prevents multiplying the trunk by $K$, but does not remove its trackers or bound its length in terms of $K$. For a single target at depth $d$, the full path still needs $d+1$ trackers.
 
 **Dimension guard.** Under the $w \geq 2$ eligibility predicate in §8.1, no member of $\mathcal{I}$ can have $w < 2$: every competitive target has $w \geq 2$ by eligibility, and every ancestor has $w' = N - d' > N - d \geq 2$ since ancestors sit at strictly shallower G-Tree depth. This guard is retained as defensive specification against future changes to the eligibility predicate: if any member of $\mathcal{I}$ were to have $w < 2$, no tracker would be allocated, and the exclusion would be reported as a degenerate-cell count (§14.11).
 
@@ -1228,7 +1214,7 @@ Destruction is **eager** — it occurs within the Step 3 reconciliation that dis
 
 The budget parameter $K$ governs the **competitive target** selection. Ancestor trackers are not counted against $K$.
 
-**Investment set size.** $|\mathcal{I}| \leq 1 + K\bar{D}$ before sharing (§8.2). The reduced Steiner tree has at most $2K - 1$ nodes; the full materialised tree adds chain intermediaries. Under concentrated observation volume, extensive ancestor sharing brings the practical size close to $2K$.
+**Investment set size.** $|\mathcal{I}| \leq 1 + \sum_i d_i \leq 1 + \texttt{analysis\_k}(N-2)$ for supported engines, including the permanent root (§8.2). This counts the current selected cell trackers, online or warming. The reduced Steiner tree suppresses unary intermediates that the implementation retains, so its bound cannot size the full investment set; coordination trackers and an evicted in-flight warming model are separate.
 
 **Producing set size.** $|\mathcal{A}^*| \leq |\mathcal{I}|$, with equality in steady state (no warming cells).
 
@@ -1786,7 +1772,7 @@ The SVD input $M \in \mathbb{R}^{w \times (k+b)}$ is a thin SVD whose cost depen
 
 **Ancestor chain cost.** Each observation is processed by every tracker on its ancestor path. The dominant term is the **root tracker**: it has the widest suffix ($w = N$) and sees the full ingestion batch ($b = n$). Its SVD input is $\mathbb{R}^{N \times (k_0 + n)}$. For $N = 128$, $k_0 = 16$, and $n = 64$, this is a $(128, 80)$ matrix — in the tall regime ($w > k + b$), costing $O(128 \times 80^2) \approx 819\text{K}$. At deeper competitive cells the SVD input is in the wide regime ($k + b > w$); for example, a depth-96 cell has $w = 32$, and with $k = 16$, $b = 64$, the $(32, 80)$ matrix costs $O(32^2 \times 80) \approx 82\text{K}$ — not $O(32 \times 80^2) \approx 205\text{K}$. Callers ingesting large batches ($n > N - k$) push even the root into the wide regime.
 
-Intermediate ancestor levels' costs are smaller (narrower suffixes, smaller batches — only observations routing through their spatial range) and partially amortised by sharing. The per-observation fan-out equals the target cell's G-Tree depth $d$ plus one (the cell itself). At typical operational depths ($d \approx 2\text{–}6$ under default parameters), this is a modest multiplier. At deeper operational depths, the cost grows linearly with $d$ but is bounded by $O(\log_2 |\text{domain}|)$ — each ancestor doubles the spatial coverage, so $d$ steps span the full dynamic range from a single cell to the entire domain. The total ancestor chain cost across all competitive targets is further reduced by sharing: the Steiner tree structure of the ancestor closure (§8.2) ensures that the aggregate unique ancestor count is far less than $K \times d$ — approaching $K$ under typical spatial concentration.
+Intermediate ancestor levels use narrower suffixes and see only observations in their spatial ranges. The per-observation fan-out is at most the target's G-tree depth plus one, with depth bounded by $N-2$ for eligible targets. Across targets, shared ancestors are counted once, giving the depth-dependent investment bound in §8.2; sharing alone does not guarantee a count proportional only to the number of targets.
 
 **Step 5 (coordination).** Per context: $O(m)$. Total useful work: $O(K \cdot \bar{d})$ where $\bar{d}$ is average coordination participation depth. The pseudocode (§7.4) visits the full spatial tree for clarity; an implementation walking the investment set's reduced Steiner tree (§8.2) achieves this bound with $O(|\mathcal{I}|)$ traversal overhead (approaching $O(K)$ under typical spatial clustering). Negligible relative to Step 4.
 
@@ -2592,7 +2578,7 @@ These values include a $\sim$13–15% margin above the measured worst-case conve
 | Producing full set ($\mathcal{A}^*$)      | Online members of the investment set; $\mathcal{I} \cap \text{Online}$                                                                                                           | §8.3           |
 | Root tracker                              | The permanent subspace tracker at the G-Tree root ($w = N$), seeing every observation                                                                                            | §8.4           |
 | Slow EWMA                                 | EWMA at decay $\lambda_s > \lambda$ providing a long-memory reference for the drift accumulator                                                                                  | §6.2           |
-| Steiner tree property                     | The ancestor closure forms a Steiner tree connecting $K$ competitive targets to the root; the reduced tree has at most $2K - 1$ nodes. The full materialised tree satisfies $    \| \mathcal{I}    \| \leq 1 + K\bar{D}$ before sharing; ancestor sharing under concentration brings the practical size close to $2K$ | §8.2, §8.6 |
+| Steiner tree property | The current investment set retains all ancestor paths and the permanent root: $\lVert\mathcal{I}\rVert \leq 1 + \sum_i d_i \leq 1 + \texttt{analysis\_k}(N-2)$ for supported engines. Suppressing unmarked unary intermediates yields at most $2K$ reduced nodes for $K \geq 1$ targets, but those intermediates still require cell trackers. | §8.2, §8.6 |
 | Subspace tracker                          | The per-cell statistical model maintaining a low-rank subspace, latent statistics, baselines, and drift accumulators                                                             | §4             |
 | Suffix                                    | The trailing $w = N - d$ bits of an observation's centred bit vector, after the $d$ routing prefix bits are removed                                                              | §2.4           |
 | Surprise                                  | Scoring axis measuring average diagonal Mahalanobis deviation of latent coordinates from their learned means                                                                     | §5.4           |

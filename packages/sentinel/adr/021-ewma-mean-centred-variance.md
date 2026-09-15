@@ -40,7 +40,7 @@ The spec also mandates:
 
 1. **Update order**: $\nu^{(z)}$ first (against pre-update $\mu$), then $\mu^{(z)}$, then $\Gamma$.  Variance sees the same $\mu$ that scoring (Phase 1) used.
 
-2. **Runtime floor**: $\nu^{(z)}_j \leftarrow \max(\nu^{(z)}_j, 10^{-2})$ after every update (including $t = 0$ seeding).  Defence-in-depth against degenerate streams; caps per-dimension surprise at 100.
+2. **Runtime floor**: $\nu^{(z)}_j \leftarrow \max(\nu^{(z)}_j, 10^{-2})$ after every update, including first-batch seeding. For centred-bit cell inputs and unit basis columns, each surprise contribution and their rank average are bounded by $d/(0.01+\varepsilon) \leq 100d$, up to roundoff; the derivation and scope are in §ALGO S-4.2.
 
 ### Why the EWMA-mean-centred formula eliminates the bias · `sec:sentinel:latentvar-bias-elimination`
 
@@ -140,7 +140,7 @@ The implementation has **5 gaps** between the current code and the amended spec:
    }
    ```
 
-   This is a new addition.  The floor is $25\times$ below the null-hypothesis value of $0.25$ and should never bind under correct operation.  It caps per-dimension surprise at 100.
+   The floor is $25\times$ below the null-hypothesis variance of $0.25$ and may bind on degenerate streams. For cell inputs in $\{-1/2,1/2\}^{d}$, unit basis columns give $|z_j| \leq \sqrt{d}/2$; a mean initialized at zero and subsequently seeded or convexly averaged from such coordinates obeys the same bound. Thus $(z_j-\mu_j)^2 \leq d$, giving each contribution and its rank average the bound $d/(0.01+\varepsilon) \leq 100d$ for $\varepsilon>0$, up to floating-point roundoff.
 
 5. **Test expectations.** Several existing tests assert against the old formula's behaviour:
 
@@ -204,4 +204,4 @@ No consumer code changes are required.  The surprise formula references $\nu^{(z
 
 - **Convergence benchmarks (ADR-S-013) may need updating.** Convergence times at $b_{\text{noise}} = 4$ may improve (the $-25\%$ bias that contributed to displacement bimodality is eliminated).  At $b_{\text{noise}} \geq 16$, changes are negligible.
 
-- **Runtime floor adds a hard safety bound.**  Under no circumstances can per-dimension surprise exceed 100.  This replaces the $\varepsilon$-floored worst case of $10^5$.
+- **Runtime floor gives a dimension-dependent bound for cell inputs.** With centred bits, unit basis columns and convex mean updates from an initial zero, each surprise contribution and their rank average are at most $d/(0.01+\varepsilon) \leq 100d$, up to roundoff. This replaces the corresponding $d/\varepsilon$ bound from an epsilon-only variance floor; it does not bound surprise for unbounded coordination-score vectors.

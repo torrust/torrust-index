@@ -528,7 +528,7 @@ Spectral Sentinel uses the same three-surface visibility model as Mudlark. Publi
 
 ## Resource model · `sec:sentinel:readme-resource-model`
 
-`analysis_k` is the primary analysis-tier budget. The competitive set is bounded by that value, and the full tracker set is the competitive cells plus the shared ancestor chain back to the root. The default configuration keeps this bounded by roughly `2 × analysis_k` in the common Steiner-tree case.
+`analysis_k` bounds the competitive targets. Their current investment set includes every intermediate ancestor and the permanent root: for selected depths `d_i`, its cell-tracker count is at most `1 + sum(d_i)`, hence at most `1 + analysis_k * (N - 2)` for supported engines (`N >= 2`, eligible suffix width at least two). Shared paths reduce this count; a reduced Steiner-tree bound does not count the retained chain nodes. This covers selected online and warming cells, with coordination trackers and any evicted model still held by the warming worker accounted for separately (§ALGO S-8.2).
 
 The Mudlark `budget` field is the hard ceiling on live spatial nodes. `split_threshold`, `d_create`, and `d_evict` determine how quickly the spatial substrate refines and how it contracts under pressure.
 
