@@ -252,7 +252,7 @@ The sentinel detects coordinated anomalies across cells using hierarchical G-tre
 
 ### 7.1 Coordination Contexts · `sec:sentinel:implementation-coordination-contexts`
 
-One `CoordContext` per internal G-node whose left and right subtrees both contribute competitive cells. Each context owns:
+One `CoordContext` per internal G-node whose left and right subtrees both contain online competitive cells. Each context owns:
 
 - A 4-dimensional `SubspaceTracker` (one dimension per scoring axis).
 - A running-mean centring reference $\mu^{(\text{in})}$ for de-meaning the input signal before feeding (§ALGO S-9.3).
@@ -267,7 +267,7 @@ After cell scoring, the coordination tier assembles score vectors bottom-up thro
 
 ### 7.3 Lifecycle · `sec:sentinel:implementation-coordination-lifecycle`
 
-`CoordContext` instances are created on first fire and pruned when their subtree loses all competitive cells. There is no manual API — lifecycle is fully automatic.
+`CoordContext` instances are created on first fire and pruned when either subtree loses its last online competitive cell. A quiet batch does not change membership, so it does not discard learned context state. There is no manual API — lifecycle is fully automatic.
 
 ### 7.4 Coordination Warm-Up (§ALGO S-9.8) · `sec:sentinel:implementation-coordination-warmup`
 

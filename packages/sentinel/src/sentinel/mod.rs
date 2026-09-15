@@ -51,7 +51,9 @@
 //!
 //! | Test | Area | Claim |
 //! |------|------|-------|
-//! | [`a_scoring_pass_with_no_competitive_scores_retires_every_context`] | coordination | A scoring pass that receives no competitive scores retires every context, rather than returning while they stand. Contexts are pruned against the set that is active in the pass, and a pass in which nothing scored makes that set empty — which is a reason to prune all of them, not a reason to skip pruning. Left standing they are wrong twice over: the health figure goes on counting contexts that describe nothing, and a node that becomes active again later finds a model already in place and so skips the baseline warm-up it would otherwise be given, resuming on a model trained against a group composition that has since dissolved. The pass is driven here rather than through a batch because no batch can reach it: an empty batch is answered before scoring begins, and at every capacity that brings a context to life the competitive cells divide the whole domain between them, so an observation lands inside one wherever it is aimed. |
+//! | [`a_scoreless_coordination_pass_keeps_contexts_while_membership_stands`] | coordination | A coordination pass with no cell scores fires no context, but it preserves every context whose two subtrees still contain online competitive cells. Learned coordination state belongs to that membership and survives a quiet batch. |
+//! | [`a_one_sided_scoring_pass_keeps_the_membership_context`] | coordination | When only one region contributes a score, the shared context does not fire but remains allocated because the competitive member in the quiet subtree is still online. A later two-sided batch resumes the same learned context instead of warming a replacement. |
+//! | [`a_context_is_destroyed_when_a_subtree_leaves_membership`] | coordination | A context is destroyed as soon as one of its subtrees contains no online competitive member. Retention follows the group that owns the learned state, so a topology that no longer represents that group cannot keep its tracker. |
 //! | [`active_counts_exclude_cells_still_warming`] | health | The active tracker counts describe the cells that are online, not the cells the selector has decided to pay for. The two differ whenever a cell is still warming: the selection names it, but it has no tracker yet and cannot have produced anything, so counting it active reports a cell as working for as many batches as its warm-up lasts. Reading the figures from the selection made that the normal case under background warming, where the drain no longer happens inside the ingest that created the cell. |
 //! | [`the_semi_internal_count_follows_the_graph`] | health | The semi-internal count is read from the graph rather than left at a constant. Semi-internal nodes are a reachable state — an eviction that takes one child of a pair leaves the parent with a single subdivided half — and they sit on the contour, so a figure fixed at zero is wrong exactly when the structure is being reshaped, which is when a reader would look at it. |
 
@@ -116,9 +118,9 @@ pub struct CellState<C: Coordinate> {
 
 /// Per-G-node coordination state (§ALGO S-9.1).
 ///
-/// Active when both subtrees of this G-node contain competitive
-/// cells that produced scores in at least one batch since
-/// activation.
+/// Active while both subtrees of this G-node contain online competitive
+/// cells. A context fires only when both subtrees also contribute scores
+/// in the current batch.
 struct CoordContext {
     /// Subspace tracker at w = 4, using `cusum_coord_slow_decay`.
     tracker: SubspaceTracker,
@@ -1253,28 +1255,18 @@ where
     ///
     /// Builds the pruned coordination topology, walks bottom-up, fires
     /// coordination at internal nodes where both subtrees contribute
-    /// competitive cell scores, and returns coordination reports for
-    /// all active contexts (§ALGO S-9.4).
+    /// competitive cell scores, and returns reports for the contexts
+    /// that fire in this batch (§ALGO S-9.4).
     fn propagate_coordination_from_root(&mut self, cell_scores: &BTreeMap<GNodeId, [f64; 4]>) -> Vec<CoordinationReport<C>> {
-        let competitive_gnodes: BTreeSet<GNodeId> = cell_scores.keys().copied().collect();
+        let scoring_gnodes: BTreeSet<GNodeId> = cell_scores.keys().copied().collect();
 
-        // Build the pruned coordination tree (§5.3).
-        let Some(tree) = Self::build_coordination_tree(&self.graph, &competitive_gnodes, self.root_gnode) else {
-            // No competitive cell supplied a score, so no context is active
-            // and every context that was active has just become stale. That
-            // still has to be recorded: returning without pruning leaves the
-            // old contexts standing, where they go on being reported as
-            // active, and — worse — a node that becomes active again later
-            // finds a model already present and skips the baseline warm-up,
-            // so it resumes on a model trained against a group composition
-            // that no longer exists. Pruning against an empty active set is
-            // the same operation every other pass performs.
-            self.coordination.clear();
-            return Vec::new();
-        };
-
-        // Walk bottom-up and fire coordination at active contexts.
-        let (mut reports, _cells) = self.walk_coordination(&tree, cell_scores);
+        // The score tree controls firing. A batch with fewer than two scoring
+        // regions produces no coordination reports, regardless of membership.
+        let mut reports =
+            Self::build_coordination_tree(&self.graph, &scoring_gnodes, self.root_gnode).map_or_else(Vec::new, |scoring_tree| {
+                let (reports, _cells) = self.walk_coordination(&scoring_tree, cell_scores);
+                reports
+            });
 
         // The walk emits in post-order, which puts the root last and is not
         // the order either record states. Sort shallowest first, ties by
@@ -1286,8 +1278,18 @@ where
         // reading that still means what it says.
         reports.sort_by(|a, b| a.depth.cmp(&b.depth).then_with(|| a.gnode_id.cmp(&b.gnode_id)));
 
-        // Prune stale coordination contexts (§5.5).
-        let active_gnodes = Self::collect_internal_gnodes(&tree);
+        // Membership controls retention (§ALGO S-7.7.2). A cell need not score
+        // in this batch to preserve the learned context for its unchanged
+        // competitive group; warming cells are absent from the online map.
+        let member_gnodes: BTreeSet<GNodeId> = self
+            .cells
+            .iter()
+            .filter_map(|(&gnode, cell)| cell.is_competitive.then_some(gnode))
+            .collect();
+        let active_gnodes = Self::build_coordination_tree(&self.graph, &member_gnodes, self.root_gnode)
+            .map_or_else(BTreeSet::new, |membership_tree| {
+                Self::collect_internal_gnodes(&membership_tree)
+            });
         self.coordination.retain(|gnode, _| active_gnodes.contains(gnode));
 
         reports
@@ -1528,8 +1530,8 @@ where
 
     /// Collect the `GNodeId`s of all `Internal` nodes in a coordination tree.
     ///
-    /// These are the nodes where coordination fires. Used for
-    /// pruning stale contexts (§5.5).
+    /// These are the nodes whose two subtrees are represented in the tree.
+    /// The membership tree uses them to prune stale contexts (§ALGO S-7.7.2).
     fn collect_internal_gnodes(node: &CoordNode<C>) -> BTreeSet<GNodeId> {
         let mut result = BTreeSet::new();
         Self::collect_internal_gnodes_inner(node, &mut result);
@@ -1882,7 +1884,7 @@ enum CoordNode<C: Coordinate> {
         is_competitive: bool,
         child: Box<Self>,
     },
-    /// Internal node with both relevant children: coordination fires here.
+    /// Internal node with both relevant children; a scoring tree fires coordination here.
     Internal {
         gnode: GNodeId,
         depth: u32,
@@ -1913,25 +1915,8 @@ mod tests {
         (1..=count).map(|i| (nibble << 124) | i).collect()
     }
 
-    /// A scoring pass that receives no competitive scores retires every
-    /// context, rather than returning while they stand. Contexts are pruned
-    /// against the set that is active in the pass, and a pass in which nothing
-    /// scored makes that set empty — which is a reason to prune all of them,
-    /// not a reason to skip pruning. Left standing they are wrong twice over:
-    /// the health figure goes on counting contexts that describe nothing, and
-    /// a node that becomes active again later finds a model already in place
-    /// and so skips the baseline warm-up it would otherwise be given,
-    /// resuming on a model trained against a group composition that has since
-    /// dissolved. The pass is driven here rather than through a batch because
-    /// no batch can reach it: an empty batch is answered before scoring
-    /// begins, and at every capacity that brings a context to life the
-    /// competitive cells divide the whole domain between them, so an
-    /// observation lands inside one wherever it is aimed.
-    ///
-    /// ´claim:coordination:a-scoring-pass-that-receives-no-competitive-scores-retires-every-context´
-    /// ´test:unit:a-scoring-pass-with-no-competitive-scores-retires-every-context´
-    #[test]
-    fn a_scoring_pass_with_no_competitive_scores_retires_every_context() {
+    /// Build a sentinel whose online competitive cells have fired at least one coordination context.
+    fn sentinel_with_coordination_context() -> SpectralSentinel<u128, u64, 128> {
         let cfg = SentinelConfig::<u64> {
             max_rank: 4,
             forgetting_factor: 0.90,
@@ -1943,24 +1928,97 @@ mod tests {
             background_warming: false,
             ..SentinelConfig::<u64>::default()
         };
-        let mut sentinel: SpectralSentinel<u128, u64, 128> = SpectralSentinel::new(cfg).unwrap();
-
+        let mut sentinel = SpectralSentinel::new(cfg).unwrap();
         let batch = [values(0xF, 4), values(0x1, 4)].concat();
-        let mut fired = false;
+
         for _ in 0..40 {
             if sentinel.ingest(&batch).health.active_coordination_contexts > 0 {
-                fired = true;
-                break;
+                return sentinel;
             }
         }
-        assert!(fired, "the fixture must bring at least one context to life");
-        assert!(!sentinel.coordination.is_empty());
+
+        panic!("the fixture must bring at least one context to life");
+    }
+
+    /// Return one live context, its two child subtrees, and one competitive member from each subtree.
+    fn context_branches(sentinel: &SpectralSentinel<u128, u64, 128>) -> (GNodeId, GNodeId, GNodeId, GNodeId, GNodeId) {
+        let context = *sentinel.coordination.keys().next().expect("the fixture has a context");
+        let children = sentinel.graph.gnode_children(context).expect("a context is internal");
+        let left = children.left.expect("a context has a left subtree");
+        let right = children.right.expect("a context has a right subtree");
+        let member_in = |subtree| {
+            sentinel
+                .cells
+                .iter()
+                .find_map(|(&gnode, cell)| {
+                    (cell.is_competitive && (gnode == subtree || sentinel.graph.is_ancestor_of(subtree, gnode))).then_some(gnode)
+                })
+                .expect("each context subtree has an online competitive member")
+        };
+
+        (context, left, right, member_in(left), member_in(right))
+    }
+
+    /// A coordination pass with no cell scores fires no context, but it preserves every context whose two subtrees still contain online competitive cells. Learned coordination state belongs to that membership and survives a quiet batch.
+    ///
+    /// ´claim:coordination:a-quiet-batch-preserves-contexts-while-their-competitive-membership-stands´
+    /// ´test:unit:a-scoreless-coordination-pass-keeps-contexts-while-membership-stands´
+    #[test]
+    fn a_scoreless_coordination_pass_keeps_contexts_while_membership_stands() {
+        let mut sentinel = sentinel_with_coordination_context();
+        let contexts_before: BTreeSet<_> = sentinel.coordination.keys().copied().collect();
 
         let reports = sentinel.propagate_coordination_from_root(&BTreeMap::new());
 
         assert!(reports.is_empty(), "nothing scored, so no context reports");
-        assert!(sentinel.coordination.is_empty(), "every stale context is retired");
-        assert_eq!(sentinel.health().active_coordination_contexts, 0);
+        assert_eq!(
+            sentinel.coordination.keys().copied().collect::<BTreeSet<_>>(),
+            contexts_before,
+            "quiet traffic does not change competitive membership",
+        );
+    }
+
+    /// When only one region contributes a score, the shared context does not fire but remains allocated because the competitive member in the quiet subtree is still online. A later two-sided batch resumes the same learned context instead of warming a replacement.
+    ///
+    /// ´claim:coordination:a-one-sided-batch-does-not-retire-a-context-owned-by-two-sided-membership´
+    /// ´test:unit:a-one-sided-scoring-pass-keeps-the-membership-context´
+    #[test]
+    fn a_one_sided_scoring_pass_keeps_the_membership_context() {
+        let mut sentinel = sentinel_with_coordination_context();
+        let (context, _left, _right, left_member, _right_member) = context_branches(&sentinel);
+        let scores = BTreeMap::from([(left_member, [0.25; 4])]);
+
+        let reports = sentinel.propagate_coordination_from_root(&scores);
+
+        assert!(reports.is_empty(), "one scoring subtree cannot fire the shared context");
+        assert!(
+            sentinel.coordination.contains_key(&context),
+            "the quiet subtree remains a member, so its context must retain learned state",
+        );
+    }
+
+    /// A context is destroyed as soon as one of its subtrees contains no online competitive member. Retention follows the group that owns the learned state, so a topology that no longer represents that group cannot keep its tracker.
+    ///
+    /// ´claim:coordination:a-context-is-destroyed-when-either-subtree-loses-its-last-online-competitive-member´
+    /// ´test:unit:a-context-is-destroyed-when-a-subtree-leaves-membership´
+    #[test]
+    fn a_context_is_destroyed_when_a_subtree_leaves_membership() {
+        let mut sentinel = sentinel_with_coordination_context();
+        let (context, _left, right, left_member, _right_member) = context_branches(&sentinel);
+        for (&gnode, cell) in &mut sentinel.cells {
+            if gnode == right || sentinel.graph.is_ancestor_of(right, gnode) {
+                cell.is_competitive = false;
+            }
+        }
+        let scores = BTreeMap::from([(left_member, [0.25; 4])]);
+
+        let reports = sentinel.propagate_coordination_from_root(&scores);
+
+        assert!(reports.is_empty(), "the departed subtree cannot contribute a report");
+        assert!(
+            !sentinel.coordination.contains_key(&context),
+            "a context cannot outlive the two-sided membership that owns it",
+        );
     }
 
     /// The active tracker counts describe the cells that are online, not the

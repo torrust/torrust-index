@@ -1615,7 +1615,7 @@ Observations destined for a warming cell are routed to the nearest online ancest
 
 #### 11.6.5 Coordination During Warm-Up · `sec:sentinel:algorithm-deferred-cell-warmup-coordination`
 
-Warming cells do **not** participate in coordination. Because coordination contexts are lazily materialised during the Step 5 coordination walk (§7.7.1), and only online competitive cells with scores contribute to the walk's Steiner tree, warming cells are structurally excluded — they produce no scores for the walk to discover. Their synthetic noise is never propagated through the coordination hierarchy, avoiding synthetic-on-synthetic artefacts during system formation.
+Warming cells do **not** participate in coordination. The firing tree contains only online competitive cells with scores, and the retention tree contains only online competitive cells from the producing set; warming cells belong to neither because they are not yet online. Their synthetic noise is never propagated through the coordination hierarchy, avoiding synthetic-on-synthetic artefacts during system formation.
 
 #### 11.6.6 Eviction Before Completion · `sec:sentinel:algorithm-deferred-cell-warmup-precompletion-eviction`
 

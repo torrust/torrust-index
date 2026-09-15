@@ -80,7 +80,7 @@ Source comments and `implementation.md` will be updated to use the new terms. No
 
 Two implementation patterns differ from the spec's pseudocode but are behaviourally equivalent:
 
-- **Lazy coordination lifecycle.** The spec's Step 3 pseudocode explicitly calls `ActivateCoordinationContexts` / `DeactivateCoordinationContexts`. The implementation creates and prunes coordination contexts on demand during `propagate_coordination_from_root()`. This is equivalent because contexts only affect output when their subtrees have contributing cells.
+- **Lazy coordination lifecycle.** The spec's Step 3 pseudocode explicitly calls `ActivateCoordinationContexts` / `DeactivateCoordinationContexts`. The implementation creates coordination contexts on the first scoring pass that needs them and prunes them during `propagate_coordination_from_root()` against online competitive membership. Contexts affect output only when both subtrees contribute scores, while their learned state persists across quiet batches for the same membership.
 
 - **Full recompute vs. incremental reconciliation.** The spec's pseudocode computes `OldInvestment \ NewInvestment` and `NewInvestment \ OldInvestment` incrementally. The implementation recomputes the full analysis set from scratch (ADR-S-006), then reconciles the diff at the orchestrator level. The result is identical.
 
