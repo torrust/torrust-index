@@ -83,4 +83,5 @@ Initial stable release. The public API surface documented in
 - **Full documentation** — `idea.md` (formal spec), `api.md`,
   `architecture.md`, `performance.md`, `testing.md`, `theory.md`.
 
+[1.0.1]: https://github.com/torrust/torrust-index/compare/mudlark-v1.0.0...mudlark-v1.0.1
 [1.0.0]: https://github.com/torrust/torrust-index/releases/tag/mudlark-v1.0.0
