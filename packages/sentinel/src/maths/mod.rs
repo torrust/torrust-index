@@ -212,270 +212,198 @@ pub fn evolve(
     if result.is_some() { result } else { other }
 }
 
-/// Compare two `SubspaceUpdate`s for approximate equality.
+/// Compare singular values and spectral projectors of two models.
 ///
-/// Singular values must match to high relative tolerance.
-/// Basis vectors may differ by sign (SVD sign ambiguity) so we
-/// compare `|uᵢᵀ vᵢ|` ≈ 1.0 for each column.
+/// # Panics
 ///
-/// Uses `assert!` (not `debug_assert!`) because this function is
-/// only called when the oracle is active — the gate is at the call
-/// site, not here.
+/// Panics when the models disagree beyond the precision budget. The caller
+/// enables this assertion only while the numerical oracle is active.
 fn compare_subspace_updates(
     update_a: &SubspaceUpdate,
     update_b: &SubspaceUpdate,
     strategy_a: SvdStrategy,
     strategy_b: SvdStrategy,
 ) {
-    /// Returns `true` when the pair of values should be considered
-    /// "effectively zero" and comparison skipped.
-    fn near_zero(va: f64, vb: f64, and_floor: f64, or_floor: f64) -> bool {
-        (va.abs() < and_floor && vb.abs() < and_floor) || (va.abs() < or_floor || vb.abs() < or_floor)
+    let rank = update_a.n;
+    assert_eq!(rank, update_b.n, "maths oracle: rank mismatch");
+    let dims = update_a.basis.nrows();
+    assert_eq!(dims, update_b.basis.nrows(), "maths oracle: dimension mismatch");
+    if rank == 0 {
+        return;
     }
 
-    let rank = update_a.n;
-    let dims = update_a.basis.nrows();
-
-    // ── Near-zero floors (shared by σ and basis checks) ──
-    //
-    // Two-tier skip logic prevents both false positives and false
-    // negatives when comparing near-zero singular values:
-    //
-    // • `and_floor` (1e-5, generous) — skip comparison when *both*
-    //   strategies agree the value is near-zero.  Covers the
-    //   practical noise floor: trailing singular values of rank-
-    //   deficient inputs routinely land at 1e-7 to 1e-16.  Brand's
-    //   incremental QR may accumulate slightly more residual than
-    //   the full SVD (e.g. 1.2e-6 vs 1.5e-9 after 1000 identical
-    //   observations), but both are "effectively zero."
-    //
-    // • `or_floor` (1e-12, strict) — skip comparison when *either*
-    //   strategy produces a value at (or near) machine-epsilon
-    //   level.  Catches exact-zero vs tiny-residual mismatches
-    //   without masking real discrepancies.
-    //
-    // The combined gate is:
-    //
-    //     (both < and_floor) ∨ (either < or_floor)
-    //
-    // If one value is O(1) and the other is 1e-9, neither gate
-    // fires and the assertion correctly catches the divergence.
-    let and_floor: f64 = 1e-5;
-    let or_floor: f64 = 1e-12;
-
-    // ── Singular values ─────────────────────────────────
-    let sv_tolerance = 1e-8;
+    // Require half-significand agreement with one guard bit: sqrt(epsilon)/2
+    // is 2^-27 for f64, tighter than the former 1e-8 relative sigma check.
+    // This is the oracle's accuracy requirement, not an error estimate fitted
+    // to an update trajectory. Both strategies receive the same prior state.
+    let relative = f64::EPSILON.sqrt() / 2.0;
+    let largest = update_a.sigmas[0].abs().max(update_b.sigmas[0].abs());
+    // A d-term dot product has relative rounding bound gamma_d=d*eps/(1-d*eps)
+    // without overflow or significant underflow (zeros are exact). Covariance
+    // noise at that scale corresponds to
+    // singular values sqrt(gamma_d)*sigma_max; only two values below this
+    // common absolute floor may be treated as unresolved.
+    let dimension = f64::from(u32::try_from(dims).expect("tracker dimension fits u32"));
+    let gamma = dimension * f64::EPSILON / dimension.mul_add(-f64::EPSILON, 1.0);
+    let zero_floor = gamma.sqrt() * largest;
     for idx in 0..rank {
-        let sa = update_a.sigmas[idx];
-        let sb = update_b.sigmas[idx];
-        if near_zero(sa, sb, and_floor, or_floor) {
-            continue;
-        }
-        let denom = sa.abs().max(sb.abs()).max(1e-15);
-        let rel = (sa - sb).abs() / denom;
+        let left = update_a.sigmas[idx];
+        let right = update_b.sigmas[idx];
+        assert!(left.is_finite() && right.is_finite() && left >= 0.0 && right >= 0.0);
+        let difference = (left - right).abs();
+        let unresolved = left.max(right) <= zero_floor && difference <= zero_floor;
         assert!(
-            rel < sv_tolerance,
-            "maths oracle: σ[{idx}] mismatch: {strategy_a:?}={sa:.12e}, {strategy_b:?}={sb:.12e}, rel={rel:.2e}"
+            unresolved || difference <= relative * left.max(right),
+            "maths oracle: sigma[{idx}] mismatch: {strategy_a:?}={left:.12e}, {strategy_b:?}={right:.12e}, zero_floor={zero_floor:.12e}"
         );
     }
 
-    // ── Basis columns (up to sign, with subspace clustering) ──
-    //
-    // Each column pair should satisfy |uᵢᵀ vᵢ| ≈ 1.0.
-    // SVD sign ambiguity means uᵢ and −uᵢ are both valid.
-    //
-    // When a singular value is near zero, the corresponding basis
-    // direction is numerically arbitrary — both strategies may
-    // legitimately return completely different unit vectors for the
-    // null-energy component.  Skip the cosine check in that case
-    // using the same two-tier gate.
-    //
-    // **Repeated singular values**: when σ[j] ≈ σ[j+1] (within
-    // `cluster_rtol`), the corresponding basis vectors span an
-    // invariant subspace — *any* orthonormal basis of that
-    // subspace is equally valid.  Comparing individual columns is
-    // meaningless; instead we compare the subspace via principal
-    // angles: form S = A_group^T · B_group, SVD it, and check
-    // that all singular values (= cos(θ_i)) ≈ 1.0.
-
-    // ── Gap-dependent basis tolerance (exact Wedin bound) ──
-    //
-    // For a singular vector with spectral gap δ to its nearest
-    // neighbour, the Wedin (1972) sin-θ theorem gives:
-    //
-    //   sin θ ≤ ‖E‖ / δ
-    //
-    // where δ is the **absolute** gap and
-    //   ‖E‖ ≈ σ_max · √(rel_perturbation_sq).
-    //
-    // Define `ratio_sq = (‖E‖/δ)²`.  The exact Wedin bound on
-    // the cosine is:
-    //
-    //   |cos θ| ≥ √(1 − ratio_sq)
-    //
-    // or equivalently:
-    //
-    //   1 − |cos θ| ≤ 1 − √(1 − ratio_sq)     (exact)
-    //
-    // Previous code used the Taylor approximation `ratio_sq / 2`,
-    // which underestimates the tolerance by >15% when ratio_sq
-    // exceeds 0.3 and >29% at 0.5, causing false oracle panics
-    // for poorly-conditioned columns.  Using the exact form
-    // eliminates this bias.
-    //
-    // When ratio_sq ≥ 1 the bound is vacuous: ‖E‖ ≥ δ means
-    // the perturbation can rotate the singular vector through
-    // *any* angle, so only the σ-value check (above) provides
-    // meaningful validation for that column.
-    //
-    // **Calibration**: Brand's incremental SVD accumulates
-    // truncation error over many rank-1 updates.  This error
-    // is *anisotropic* — it preferentially affects the weakest
-    // singular directions because truncation discards energy
-    // from the (k+1)-th component, which leaks into the k-th
-    // direction proportionally to 1/δ_k.
-    //
-    // Empirical calibration: 1600 updates at λ = 0.95 with a
-    // 2% relative gap produced |cos| = 0.588, giving
-    // (‖E‖/σ_max)² ≈ 3.3 × 10⁻⁴.  However, traffic patterns
-    // with high condition numbers (κ = σ_max/σ_min > 25) and
-    // diverse cell structure push the actual perturbation to
-    // ~5× the calibration value.  We budget 10× margin
-    // (rel_perturbation_sq = 0.003) to cover worst-case
-    // anisotropic error accumulation.
-    //
-    // The σ_max² factor is critical: when the condition number
-    // σ_max/σ_min is large, the perturbation ‖E‖ scales with
-    // σ_max but the gap δ scales with σ_min's neighbourhood.
-    // Without this factor, the tolerance is underestimated by
-    // (σ_max/σ_neighbor)² — up to 400× for condition number 20.
-    let basis_tol_floor = 1e-6;
-    let rel_perturbation_sq: f64 = 0.003;
-    let sv_max = f64::midpoint(update_a.sigmas[0].abs(), update_b.sigmas[0].abs());
-
-    // Cluster tolerance: any pair whose relative gap is smaller
-    // than 2× the perturbation scale must be compared as a
-    // subspace, because the Wedin bound's ‖E‖/δ ratio ≥ 1
-    // makes per-column cosine comparison meaningless there.
-    // Deriving cluster_rtol from rel_perturbation_sq eliminates
-    // the dead zone between "too close to cluster" and "too
-    // close for the Wedin bound to be tight."
-    let cluster_rtol = 2.0 * rel_perturbation_sq.sqrt();
-
-    // Group consecutive singular values that are nearly equal.
-    // Uses the average of both strategies' values for robustness.
-    let mut col = 0;
-    while col < rank {
-        // Find extent of cluster starting at col.
-        let mut end = col + 1;
-        while end < rank {
-            let prev_sv_a = update_a.sigmas[end - 1].abs();
-            let prev_sv_b = update_b.sigmas[end - 1].abs();
-            let curr_sv_a = update_a.sigmas[end].abs();
-            let curr_sv_b = update_b.sigmas[end].abs();
-            let avg = (prev_sv_a + prev_sv_b + curr_sv_a + curr_sv_b) * 0.25;
-            if avg < 1e-15 {
-                break; // all near-zero, stop clustering
-            }
-            let diff_a = (prev_sv_a - curr_sv_a).abs();
-            let diff_b = (prev_sv_b - curr_sv_b).abs();
-            if diff_a / avg > cluster_rtol || diff_b / avg > cluster_rtol {
-                break;
-            }
+    // The allowed normwise perturbation is eta=relative*sigma_max. Weyl's
+    // singular-value intervals of radius eta overlap at gaps <=2*eta, so
+    // compare those columns as a block. This budget must not be inferred
+    // merely from matching sigmas: the projector check tests its consequence.
+    let perturbation = relative * largest;
+    let mut start = 0;
+    while start < rank {
+        if update_a.sigmas[start].max(update_b.sigmas[start]) <= zero_floor {
+            break;
+        }
+        let mut end = start + 1;
+        while end < rank
+            && (update_a.sigmas[end - 1] - update_a.sigmas[end]).max(update_b.sigmas[end - 1] - update_b.sigmas[end])
+                <= 2.0 * perturbation
+        {
             end += 1;
         }
+        compare_projectors(update_a, update_b, start, end, perturbation, gamma);
+        start = end;
+    }
+}
 
-        let group_size = end - col;
+fn compare_projectors(left: &SubspaceUpdate, right: &SubspaceUpdate, start: usize, end: usize, perturbation: f64, gamma: f64) {
+    let rank = end - start;
+    let block_size = f64::from(u32::try_from(rank).expect("tracker rank fits u32"));
+    let mut gap = left.sigmas[end - 1].min(right.sigmas[end - 1]);
+    if start > 0 {
+        gap = gap.min((left.sigmas[start - 1] - left.sigmas[start]).min(right.sigmas[start - 1] - right.sigmas[start]));
+    }
+    if end < left.n {
+        gap = gap.min((left.sigmas[end - 1] - left.sigmas[end]).min(right.sigmas[end - 1] - right.sigmas[end]));
+    }
 
-        // Skip the whole group if sigmas are near-zero.
-        if near_zero(update_a.sigmas[col], update_b.sigmas[col], and_floor, or_floor) {
-            col = end;
-            continue;
+    // For orthonormal bases, ||P-Q||_F^2=2*(r-||A^T B||_F^2).
+    // Each overlap dot has error <=gamma_d; squaring adds at most
+    // 2*gamma_d+gamma_d^2, and summing r^2 terms adds gamma_(r^2).
+    // Include the final subtraction and factor two in the squared floor.
+    let sum_terms = block_size * block_size;
+    let sum_gamma = sum_terms * f64::EPSILON / sum_terms.mul_add(-f64::EPSILON, 1.0);
+    let rounding = 2.0
+        * f64::EPSILON.mul_add(
+            block_size,
+            sum_gamma.mul_add(block_size, sum_terms * gamma.mul_add(gamma, 2.0 * gamma)),
+        );
+    let mut overlap = 0.0;
+    for a_col in start..end {
+        for b_col in start..end {
+            let mut dot = 0.0;
+            for row in 0..left.basis.nrows() {
+                dot = left.basis[(row, a_col)].mul_add(right.basis[(row, b_col)], dot);
+            }
+            overlap = dot.mul_add(dot, overlap);
         }
+    }
+    let distance_sq = (2.0 * (block_size - overlap)).max(0.0);
+    // Wedin's combined left/right Frobenius sin-theta bound, with each
+    // residual <=sqrt(r)*eta, gives ||P-Q||_F <=2*sqrt(r)*eta/delta.
+    // Weyl reduces the available separation to delta=gap-eta. Include
+    // the omitted zero spectrum, so even a rank-one model checks its axis.
+    let separation = gap - perturbation;
+    assert!(separation > 0.0, "maths oracle: unresolved nonzero projector separation");
+    let tolerance_sq = (4.0 * block_size).mul_add((perturbation / separation).powi(2), rounding);
+    assert!(
+        distance_sq <= tolerance_sq,
+        "maths oracle: projector [{start}..{end}] mismatch: distance_sq={distance_sq:.12e}, tolerance_sq={tolerance_sq:.12e}, gap={gap:.12e}"
+    );
+}
 
-        if group_size == 1 {
-            // ── Singleton: gap-dependent cosine check ──
-            //
-            // Compute minimum absolute gap to the nearest neighbour.
-            // Singular values are sorted descending, so the immediate
-            // predecessor (col−1) and successor (col+1) are the closest
-            // candidates.  We average both strategies' values for
-            // robustness.
-            let sv_col = f64::midpoint(update_a.sigmas[col].abs(), update_b.sigmas[col].abs());
-            let mut min_abs_gap = f64::INFINITY;
-            if col > 0 {
-                let sv_prev = f64::midpoint(update_a.sigmas[col - 1].abs(), update_b.sigmas[col - 1].abs());
-                min_abs_gap = min_abs_gap.min((sv_col - sv_prev).abs());
-            }
-            if col + 1 < rank {
-                let sv_next = f64::midpoint(update_a.sigmas[col + 1].abs(), update_b.sigmas[col + 1].abs());
-                min_abs_gap = min_abs_gap.min((sv_col - sv_next).abs());
-            }
-
-            // Wedin-derived tolerance using the exact sin-θ bound
-            // (Wedin 1972):
-            //
-            //   sin θ ≤ ‖E‖/δ  ⟹  |cos θ| ≥ √(1 − (‖E‖/δ)²)
-            //
-            // Define ratio_sq = (‖E‖/δ)² = rel_perturbation_sq · σ_max²/δ².
-            //
-            // When ratio_sq ≥ 1 the Wedin bound is vacuous
-            // (‖E‖ ≥ δ) — the singular vector's direction is not
-            // constrained by theory.  Any cosine value, including 0,
-            // is consistent with both strategies being correct.  Skip
-            // the comparison entirely; only the σ-value check (above)
-            // provides meaningful validation for this column.
-            let effective_tol = if min_abs_gap.is_infinite() {
-                // Only one singular value — no neighbour to mix with.
-                Some(basis_tol_floor)
-            } else {
-                let denom = min_abs_gap.max(1e-15);
-                let ratio_sq = rel_perturbation_sq * sv_max * sv_max / (denom * denom);
-                if ratio_sq >= 1.0 {
-                    None // Wedin bound vacuous — skip cosine check.
-                } else {
-                    // Exact: 1 − |cos θ| ≤ 1 − √(1 − ratio_sq)
-                    let exact = 1.0 - (1.0 - ratio_sq).sqrt();
-                    Some(exact.max(basis_tol_floor))
-                }
-            };
-
-            if let Some(tol) = effective_tol {
-                let mut dot = 0.0;
-                for row in 0..dims {
-                    dot = update_a.basis[(row, col)].mul_add(update_b.basis[(row, col)], dot);
-                }
-                let cosine = dot.abs();
-                assert!(
-                    cosine > 1.0 - tol,
-                    "maths oracle: basis column {col} diverged: |cos| = {cosine:.8}, \
-                     effective_tol = {tol:.6e} (min_abs_gap = {min_abs_gap:.4}, σ_max = {sv_max:.4}), \
-                     σ_a={:.6e}, σ_b={:.6e}, \
-                     all_σ_a={:?}, all_σ_b={:?}, \
-                     {strategy_a:?} vs {strategy_b:?}",
-                    update_a.sigmas[col],
-                    update_b.sigmas[col],
-                    &update_a.sigmas[..rank],
-                    &update_b.sigmas[..rank],
-                );
-            }
-        } else {
-            // ── Cluster: degenerate eigenvalue group ──
-            //
-            // When singular values are repeated (σ[j] ≈ σ[j+1] …),
-            // the corresponding SVD eigenvectors are only defined up
-            // to an arbitrary rotation within the (potentially high-
-            // dimensional) eigenspace.  In ℝ^d with d ≫ g, the true
-            // eigenspace for this σ can be much larger than the g
-            // columns the SVD returns, so different implementations
-            // legitimately pick different g-dimensional slices.
-            //
-            // Per-column and even per-subspace comparison is
-            // meaningless.  The σ comparison already validates that
-            // the singular values match; skip the basis check for
-            // degenerate groups.
+// Resolve a repeated singular space before applying the rank cap. Project
+// coordinate axes in order and re-orthogonalise them twice, so a truncated
+// repeated block retains the same plane regardless of the SVD's basis choice.
+// Singletons and unresolved zero-energy columns retain their original basis.
+fn truncate_update(mut basis: Mat<f64>, sigmas: Vec<f64>, cap: usize) -> SubspaceUpdate {
+    let dims = basis.nrows();
+    let dimension = f64::from(u32::try_from(dims).expect("tracker dimension fits u32"));
+    let gamma = dimension * f64::EPSILON / dimension.mul_add(-f64::EPSILON, 1.0);
+    let largest = sigmas.first().copied().unwrap_or(0.0);
+    // Use the same intervals as the oracle: eta=sqrt(epsilon)*sigma_max/2,
+    // so numerical ties have overlapping intervals at gaps <=2*eta. The
+    // complete block must choose its basis before truncation, including a
+    // neighbouring value just beyond the cap. This is a precision policy,
+    // not a measured error bound on the SVD backend.
+    let tie_gap = f64::EPSILON.sqrt() * largest;
+    let mut start = 0;
+    while start < sigmas.len() && sigmas[start] > gamma.sqrt() * largest {
+        let mut end = start + 1;
+        while end < sigmas.len() && sigmas[end - 1] - sigmas[end] <= tie_gap {
+            end += 1;
         }
+        if end - start > 1 {
+            canonicalize_cluster(&mut basis, start, end);
+        }
+        start = end;
+    }
+    let n = cap.min(sigmas.len());
+    SubspaceUpdate {
+        basis: basis.subcols(0, n).to_owned(),
+        sigmas: sigmas.into_iter().take(n).collect(),
+        n,
+    }
+}
 
-        col = end;
+fn canonicalize_cluster(basis: &mut Mat<f64>, start: usize, end: usize) {
+    let dims = basis.nrows();
+    let width = end - start;
+    let mut canonical = Mat::<f64>::zeros(dims, width);
+    let mut chosen = 0;
+    // For unit input columns, candidate construction uses d*r FMAs; two
+    // Gram-Schmidt passes use at most 2*r*(d FMAs + 2*d scalar updates),
+    // and the squared norm uses d FMAs: at most q=d*(7*r+1) roundings.
+    // Fusing the vector updates below only reduces this conservative count.
+    // Under finite arithmetic without significant underflow, gamma_q is
+    // the squared-energy resolution we require of a usable pivot. Tiny
+    // cancellation residues below that floor do not choose an arbitrary axis.
+    let terms = f64::from(u32::try_from(dims * (7 * width + 1)).expect("tracker operation count fits u32"));
+    let pivot_floor_sq = terms * f64::EPSILON / terms.mul_add(-f64::EPSILON, 1.0);
+    for axis in 0..dims {
+        let mut candidate: Vec<f64> = (0..dims)
+            .map(|row| (start..end).fold(0.0, |sum, col| basis[(row, col)].mul_add(basis[(axis, col)], sum)))
+            .collect();
+        for _ in 0..2 {
+            for col in 0..chosen {
+                let dot = candidate
+                    .iter()
+                    .enumerate()
+                    .fold(0.0, |sum, (row, value)| canonical[(row, col)].mul_add(*value, sum));
+                for (row, value) in candidate.iter_mut().enumerate() {
+                    *value = dot.mul_add(-canonical[(row, col)], *value);
+                }
+            }
+        }
+        let norm_sq = candidate.iter().fold(0.0, |sum, value| value.mul_add(*value, sum));
+        if norm_sq > pivot_floor_sq {
+            let norm = norm_sq.sqrt();
+            for (row, value) in candidate.into_iter().enumerate() {
+                canonical[(row, chosen)] = value / norm;
+            }
+            chosen += 1;
+            if chosen == width {
+                break;
+            }
+        }
+    }
+    // A numerically unresolved basis is left intact, so this normalization
+    // cannot hide a disagreement from the oracle or turn it into a fallback.
+    if chosen == width {
+        basis.subcols_mut(start, width).copy_from(&canonical);
     }
 }

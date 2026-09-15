@@ -82,23 +82,8 @@ pub fn evolve(
     // Thin SVD of M.
     let svd = m.thin_svd().ok()?;
 
-    let n = cols.min(d).min(cap);
-    let u_new = svd.U();
-    let s_new = svd.S().column_vector();
-
-    let mut basis = Mat::zeros(d, n);
-    let mut out_sigmas = Vec::with_capacity(n);
-
-    for j in 0..n {
-        for i in 0..d {
-            basis[(i, j)] = u_new[(i, j)];
-        }
-        out_sigmas.push(s_new[j]);
-    }
-
-    Some(SubspaceUpdate {
-        basis,
-        sigmas: out_sigmas,
-        n,
-    })
+    // Resolve repeated singular spaces using all available columns before
+    // the rank cap selects a slice of one (§ALGO S-4.2).
+    let sigmas = svd.S().column_vector().iter().copied().collect();
+    Some(super::truncate_update(svd.U().to_owned(), sigmas, cap))
 }

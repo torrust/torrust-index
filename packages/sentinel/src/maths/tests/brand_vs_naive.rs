@@ -23,6 +23,10 @@
 //! | [`deterministic_reproduction`] | svd | Given the same inputs, either path returns the same axes and the same values bit for bit — not close, identical. Nothing in the step draws on randomness, iteration order or timing, so two sentinels fed the same traffic hold the same model, and a difference between them is always evidence about the traffic rather than about the machine. |
 //! | [`equivalence_multi_step`] | svd | Agreement between the two paths is a property of a whole streaming run, not of one step in isolation. Each path is fed the same sequence but carries its own state forward, so any difference compounds through every later step — and over a long run the difference stays within a margin that grows only in step with the number of steps taken. Divergence is linear rather than explosive, which is what makes a cell that has been running for hours as trustworthy as one that has just started. |
 //! | [`reconstruction_error_equivalence`] | svd | The two paths do not merely agree on coordinates they were given; they explain data they have never seen equally well. Held-out rows projected onto either model leave the same amount unaccounted for, which is the property the sentinel actually depends on — novelty is measured from exactly that leftover, so equal reconstruction means equal scores whichever path produced the axes. |
+//! | [`oracle_rejects_orthogonal_clustered_planes`] | svd | Equal spectra do not make orthogonal planes the same model, including an exactly repeated spectrum. |
+//! | [`oracle_rejects_unit_singular_value_against_zero`] | svd | A zero component cannot suppress comparison with resolved unit energy. |
+//! | [`oracle_accepts_a_rotated_basis_of_the_same_cluster`] | svd | A basis rotation within a repeated-singular-value plane preserves the model. |
+//! | [`truncated_repeated_space_is_shared_between_strategies`] | svd | When the rank cap cuts through a repeated singular space, both strategies retain the same model. |
 
 //! Tests for the two subspace-evolution algorithms — the reference dense
 //! decomposition and the incremental one that runs in production.
@@ -962,4 +966,100 @@ fn reconstruction_error_equivalence() {
         rel < 1e-6,
         "reconstruction error diverged: naïve={naive_err:.8e}, brand={brand_err:.8e}, rel={rel:.2e}"
     );
+}
+
+#[test]
+fn oracle_rejects_orthogonal_clustered_planes() {
+    for sigmas in [[10.0, 9.9], [10.0, 10.0]] {
+        let left = SubspaceUpdate {
+            basis: Mat::from_fn(4, 2, |row, col| if row == col { 1.0 } else { 0.0 }),
+            sigmas: sigmas.to_vec(),
+            n: 2,
+        };
+        let right = SubspaceUpdate {
+            basis: Mat::from_fn(4, 2, |row, col| if row == col + 2 { 1.0 } else { 0.0 }),
+            sigmas: sigmas.to_vec(),
+            n: 2,
+        };
+        let comparison = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            crate::maths::compare_subspace_updates(
+                &left,
+                &right,
+                crate::maths::SvdStrategy::Brand,
+                crate::maths::SvdStrategy::Naive,
+            );
+        }));
+        assert!(comparison.is_err(), "orthogonal clustered planes must be rejected");
+    }
+}
+
+#[test]
+fn oracle_rejects_unit_singular_value_against_zero() {
+    let left = SubspaceUpdate {
+        basis: Mat::from_fn(2, 1, |row, _| if row == 0 { 1.0 } else { 0.0 }),
+        sigmas: vec![1.0],
+        n: 1,
+    };
+    let right = SubspaceUpdate {
+        sigmas: vec![0.0],
+        ..left.clone()
+    };
+    let comparison = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        crate::maths::compare_subspace_updates(
+            &left,
+            &right,
+            crate::maths::SvdStrategy::Brand,
+            crate::maths::SvdStrategy::Naive,
+        );
+    }));
+    assert!(comparison.is_err(), "a unit singular value against zero must be rejected");
+}
+
+#[test]
+fn oracle_accepts_a_rotated_basis_of_the_same_cluster() {
+    let left = SubspaceUpdate {
+        basis: Mat::from_fn(4, 2, |row, col| if row == col { 1.0 } else { 0.0 }),
+        sigmas: vec![10.0, 10.0],
+        n: 2,
+    };
+    let right = SubspaceUpdate {
+        basis: Mat::from_fn(4, 2, |row, col| if row == 1 - col { 1.0 } else { 0.0 }),
+        ..left.clone()
+    };
+    crate::maths::compare_subspace_updates(
+        &left,
+        &right,
+        crate::maths::SvdStrategy::Brand,
+        crate::maths::SvdStrategy::Naive,
+    );
+}
+
+#[test]
+fn truncated_repeated_space_is_shared_between_strategies() {
+    // The second spectrum's gap is half the oracle's relative precision
+    // budget sqrt(epsilon)/2, so it exercises a numerical tie, not only an
+    // exactly repeated value. No assertion tolerance is needed here.
+    for leading in [1.0, 1.0 + f64::EPSILON.sqrt() / 4.0] {
+        let basis = Mat::from_fn(8, 1, |row, _| if row == 7 { 1.0 } else { 0.0 });
+        let latent = Mat::zeros(4, 1);
+        let residual = Mat::from_fn(4, 8, |row, col| {
+            if row != col {
+                0.0
+            } else if row == 0 {
+                leading
+            } else {
+                1.0
+            }
+        });
+        let brand = brand_svd::evolve(&basis, &[0.0], &latent, &residual, 1.0, 1, 2).expect("Brand supports this shape");
+        let naive = naive_svd::evolve(&basis, &[0.0], &latent, &residual, 1.0, 1, 2).expect("the reference SVD converges");
+        assert_eq!(brand.n, 2);
+        assert_eq!(naive.n, 2);
+        crate::maths::compare_subspace_updates(
+            &brand,
+            &naive,
+            crate::maths::SvdStrategy::Brand,
+            crate::maths::SvdStrategy::Naive,
+        );
+    }
 }

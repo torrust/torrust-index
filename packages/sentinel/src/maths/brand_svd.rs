@@ -126,17 +126,16 @@ pub fn evolve(
     // ── Step 5: Small SVD of kernel ─────────────────────
     let svd = kernel.thin_svd().ok()?;
 
-    let n = c.min(d).min(cap);
-    let u_hat = svd.U(); // (c × c), we use columns [:n]
+    let u_hat = svd.U(); // (c × c), retain all columns through correction
     let s_hat = svd.S().column_vector();
 
-    // ── Step 6: Back-transform U_new = [U_k | Q⊥] · Û[:, :n]
+    // ── Step 6: Back-transform U_new = [U_k | Q⊥] · Û
     //
     // [U_k | Q⊥] is (d × c), Û[:, :n] is (c × n).
     // Compute column-by-column to avoid materialising the (d × c) join.
-    let mut basis = Mat::zeros(d, n);
+    let mut basis = Mat::zeros(d, c);
 
-    for col in 0..n {
+    for col in 0..c {
         for row in 0..d {
             let mut val = 0.0;
             // U_k block: columns 0..k of [U_k | Q⊥], rows of Û: 0..k
@@ -151,36 +150,26 @@ pub fn evolve(
         }
     }
 
-    // ── Step 7: Re-orthogonalise the output basis ───────
+    // ── Step 7: Re-orthogonalise before truncating ───────
     //
-    // Brand's incremental SVD accumulates orthogonality loss
-    // because the input basis U_k is itself the output of a
-    // previous back-transform step.  Over many iterations the
-    // columns of [U_k | Q⊥] drift from exact orthonormality,
-    // and the back-transform U_new = [U_k | Q⊥] · Û inherits
-    // that error.  Without correction, the accumulated
-    // perturbation eventually violates the Wedin bound for
-    // moderate spectral gaps (empirically observed at ~15% gap
-    // after hundreds of updates).
+    // [U_k | Q_perp] need not be orthogonal when the residual is rank
+    // deficient. Retaining only cap kernel vectors before this correction
+    // discards components in the wrong metric. Correct all c components,
+    // resolve repeated spaces, and only then apply the rank cap.
     //
-    // Fix: QR-factorise the output basis and absorb the small
-    // R factor into the singular values via a corrective SVD:
-    //
-    //   basis = Q · R            (thin QR, R is n × n, ≈ I)
-    //   R · diag(σ̂) = Uc · Σc · Vc^T   (small SVD)
-    //   corrected basis  = Q · Uc
-    //   corrected sigmas = diag(Σc)
-    //
-    // Cost: O(d · n²) for the QR + O(n³) for the small SVD,
-    // negligible compared to the existing O(d · b²) QR in step 3.
+    // QR-factorise the complete back-transform and absorb its metric:
+    // basis = Q*R, then SVD(R*diag(sigma)) supplies the corrected spectrum
+    // and directions. This preserves the original composite matrix even
+    // when a nearly zero residual gives Q_perp columns overlapping U_k.
+    // The cost is O(d*c^2 + c^3), still within the small-kernel regime.
     let qr_correction = basis.as_ref().qr();
-    let q_out = qr_correction.compute_thin_Q(); // (d × n)
-    let r_out = qr_correction.thin_R(); // (n × n)
+    let q_out = qr_correction.compute_thin_Q(); // (d × c)
+    let r_out = qr_correction.thin_R(); // (c × c)
 
-    // Form M = R · diag(σ̂), an n × n matrix.
-    let mut m_corr = Mat::zeros(n, n);
-    for i in 0..n {
-        for j in 0..n {
+    // Form M = R · diag(σ̂), a c × c matrix.
+    let mut m_corr = Mat::zeros(c, c);
+    for i in 0..c {
+        for j in 0..c {
             m_corr[(i, j)] = r_out[(i, j)] * s_hat[j];
         }
     }
@@ -198,26 +187,21 @@ pub fn evolve(
         // handle the dimensions at all.
         return None;
     };
-    let u_corr = corr_svd.U(); // (n × n)
+    let u_corr = corr_svd.U(); // (c × c)
     let s_corr = corr_svd.S().column_vector();
 
     // Final basis = Q_out · U_corr, final sigmas = diag(S_corr).
-    let mut final_basis = Mat::zeros(d, n);
-    for col in 0..n {
+    let mut final_basis = Mat::zeros(d, c);
+    for col in 0..c {
         for row in 0..d {
             let mut val = 0.0;
-            for j in 0..n {
+            for j in 0..c {
                 val = q_out[(row, j)].mul_add(u_corr[(j, col)], val);
             }
             final_basis[(row, col)] = val;
         }
     }
 
-    let out_sigmas: Vec<f64> = (0..n).map(|i| s_corr[i]).collect();
-
-    Some(SubspaceUpdate {
-        basis: final_basis,
-        sigmas: out_sigmas,
-        n,
-    })
+    let out_sigmas = (0..c).map(|i| s_corr[i]).collect();
+    Some(super::truncate_update(final_basis, out_sigmas, cap))
 }
