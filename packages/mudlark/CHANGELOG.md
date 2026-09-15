@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-09-15
+
 ### Fixed
 
-- Saturate budget-headroom arithmetic so oversized depth settings cannot wrap into an admissible configuration.
+- Saturate convergence headroom so oversized depth settings cannot wrap into an admissible configuration.
 
 ## [1.0.0] - 2026-03-21
 
