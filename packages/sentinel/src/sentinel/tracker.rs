@@ -745,7 +745,7 @@ impl SubspaceTracker {
             // Always called — the gap uses raw_batch_mean so CUSUM
             // accumulates even when all scores are clipped.  The slow
             // EWMA's update_raw() is a no-op on empty input.
-            bl.cusum.update_filtered(&retained, mean, cusum_allowance, eps);
+            bl.cusum.update_filtered(&retained, mean, cusum_allowance);
         }
         let cusum = bl.cusum.snapshot();
 

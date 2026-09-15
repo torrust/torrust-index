@@ -60,9 +60,9 @@ impl CusumAccumulator {
     /// `allowance_sigmas` is `κ_σ` from config — the noise tolerance
     /// in units of slow-baseline standard deviation.
     #[cfg(test)]
-    pub fn update(&mut self, scores: &[f64], batch_mean: f64, allowance_sigmas: f64, eps: f64, clip_sigmas: f64) {
+    pub fn update(&mut self, scores: &[f64], batch_mean: f64, allowance_sigmas: f64, clip_sigmas: f64) {
         let slow_mean = self.slow.mean();
-        let slow_std = (self.slow.variance() + eps).sqrt();
+        let slow_std = self.slow.variance().sqrt();
         let allowance = allowance_sigmas * slow_std;
 
         let gap = batch_mean - slow_mean - allowance;
@@ -117,9 +117,9 @@ impl CusumAccumulator {
     /// `raw_batch_mean` (the pre-clip mean of the full batch).
     ///
     /// Used by the shared-filter pipeline (§ALGO S-6.1.1 step 5).
-    pub fn update_filtered(&mut self, filtered: &[f64], raw_batch_mean: f64, allowance_sigmas: f64, eps: f64) {
+    pub fn update_filtered(&mut self, filtered: &[f64], raw_batch_mean: f64, allowance_sigmas: f64) {
         let slow_mean = self.slow.mean();
-        let slow_std = (self.slow.variance() + eps).sqrt();
+        let slow_std = self.slow.variance().sqrt();
         let allowance = allowance_sigmas * slow_std;
 
         let gap = raw_batch_mean - slow_mean - allowance;

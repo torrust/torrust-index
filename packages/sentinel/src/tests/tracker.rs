@@ -27,6 +27,7 @@
 //! | [`rank_stays_bounded_by_max_rank`] | subspace | However long a cell runs and however strongly its traffic is structured, rank stays within a floor of one axis and the ceiling it was built with. The ceiling is what bounds the cost of every later step — the work per batch grows with rank — and the floor is what keeps a model from disappearing entirely during a quiet stretch and having to be rebuilt from nothing. |
 //! | [`rank_acquires_buffer_dimension`] | subspace | A cell keeps one axis more than the energy threshold strictly demands. Fed a single dominant pattern, the leading direction alone already captures the required share, yet the model settles at two directions rather than one. The spare axis is where a genuinely new direction first shows up: without it, novel structure would have to displace the established pattern before the model could represent it at all, and the arrival would be invisible until it was already dominant. |
 //! | [`energy_ratio_and_top_singular_value_evolve`] | subspace | A model that has been fed traffic reports a leading direction with real strength behind it and an energy share that is positive and cannot exceed the whole. The share is what the claimed axes explain out of everything the model holds, so it is bounded above by construction, and a leading value at zero would mean the model had learned nothing — the two figures together are how a host reads whether a cell's model has substance. |
+//! | [`cusum_allowance_is_invariant_to_eps`] | subspace | Changing the denominator stability constant does not change a novelty CUSUM trajectory. The allowance belongs to the slow baseline variance alone, so two otherwise identical trackers accumulate the same drift even when their configured stability constants differ by the scale of that variance. |
 //! | [`cusum_reset_zeroes_steps`] | subspace | Clearing a cell's drift evidence restarts the count of batches that evidence was gathered over, so the very next batch is the first step of a new run rather than the next of an old one. Accumulated drift is only interpretable against how long it took to accumulate, and a fresh sum read against a stale count would look like a sudden collapse in drift rather than a deliberate acknowledgement of it. |
 //! | [`seed_cusum_slow_from_baselines_then_reset`] | subspace | Finishing warm-up is a two-step handover applied to every axis at once: the long-memory reference is seeded from the short-memory one that has already converged on the injected traffic, and only then is the evidence cleared. Done in that order, drift detection resumes from a state where the two references agree, so the first real batches are scored against a reference that is already current instead of registering the warm-up's own leftover gap as drift for as long as the slow memory takes to catch up. |
 //! | [`explicit_reset_clip_pressure`] | subspace | Clip pressure records how often a cell has lately been discarding scores as outliers, and it widens that cell's own outlier band while it is high. Warm-up is exactly when it runs high, since injected traffic is scored against a barely-formed model. Clearing it zeroes every axis together, so a cell entering production judges its first real batches by the ordinary band rather than by one still slackened by the noise it was taught with. |
@@ -701,6 +702,56 @@ fn energy_ratio_and_top_singular_value_evolve() {
 // ════════════════════════════════════════════════════════════
 //  CUSUM & clip-pressure lifecycle
 // ════════════════════════════════════════════════════════════
+
+/// Changing the denominator stability constant does not change a novelty CUSUM trajectory. The allowance belongs to the slow baseline variance alone, so two otherwise identical trackers accumulate the same drift even when their configured stability constants differ by the scale of that variance.
+///
+/// ´claim:subspace:the-cusum-allowance-does-not-depend-on-the-denominator-stability-constant´
+/// ´test:crate:cusum-allowance-is-invariant-to-eps´
+#[test]
+fn cusum_allowance_is_invariant_to_eps() {
+    let config = |eps| SentinelConfig::<u64> {
+        max_rank: 1,
+        rank_update_interval: u64::MAX,
+        eps,
+        per_sample_scores: false,
+        clip_sigmas: 1.0e6,
+        ..SentinelConfig::default()
+    };
+    let mut default_eps = SubspaceTracker::new(2, &config(1.0e-6), 0.999);
+    let mut variance_scale_eps = SubspaceTracker::new(2, &config(1.0), 0.999);
+    let ordinary = [vec![0.5, 0.0], vec![-0.5, 0.0]];
+    let elevated = [vec![0.0, 1.0], vec![0.0, -1.0]];
+    let batches = [&ordinary[..], &elevated[..], &elevated[..]];
+    let mut default_trajectory = Vec::new();
+    let mut variance_scale_trajectory = Vec::new();
+
+    for batch in batches {
+        let slices = as_slices(batch);
+        default_trajectory.push(
+            default_eps
+                .observe(&slices, 0, false)
+                .scores
+                .novelty
+                .cusum
+                .accumulator
+                .to_bits(),
+        );
+        variance_scale_trajectory.push(
+            variance_scale_eps
+                .observe(&slices, 0, false)
+                .scores
+                .novelty
+                .cusum
+                .accumulator
+                .to_bits(),
+        );
+    }
+
+    assert_eq!(
+        default_trajectory, variance_scale_trajectory,
+        "epsilon may stabilise denominators but must not widen the CUSUM allowance",
+    );
+}
 
 /// Clearing a cell's drift evidence restarts the count of batches that
 /// evidence was gathered over, so the very next batch is the first step of a

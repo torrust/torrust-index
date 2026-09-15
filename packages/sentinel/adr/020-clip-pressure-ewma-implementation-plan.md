@@ -265,10 +265,9 @@ pub fn update_filtered(
     filtered: &[f64],
     raw_batch_mean: f64,
     allowance_sigmas: f64,
-    eps: f64,
 ) {
     let slow_mean = self.slow.mean();
-    let slow_std = (self.slow.variance() + eps).sqrt();
+    let slow_std = self.slow.variance().sqrt();
     let allowance = allowance_sigmas * slow_std;
 
     let gap = raw_batch_mean - slow_mean - allowance;
@@ -293,8 +292,8 @@ fn update_filtered_matches_update_no_clip() {
     let scores = &[1.0, 1.1, 0.9, 1.05, 0.95];
     let mean = scores.iter().sum::<f64>() / scores.len() as f64;
 
-    a.update(scores, mean, 0.5, 1e-6, 100.0);
-    b.update_filtered(scores, mean, 0.5, 1e-6);
+    a.update(scores, mean, 0.5, 100.0);
+    b.update_filtered(scores, mean, 0.5);
 
     assert!((a.snapshot().accumulator - b.snapshot().accumulator).abs() < 1e-12);
 }
@@ -408,7 +407,7 @@ fn update_axis(
 
         // ── CUSUM: receives retained samples, raw batch mean ──
         if !retained.is_empty() {
-            bl.cusum.update_filtered(&retained, mean, cusum_allowance, eps);
+            bl.cusum.update_filtered(&retained, mean, cusum_allowance);
         }
     }
     let cusum = bl.cusum.snapshot();

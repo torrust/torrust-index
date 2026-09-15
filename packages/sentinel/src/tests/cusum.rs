@@ -10,6 +10,7 @@
 //! | [`steps_since_reset_increments`] | cusum | Every update advances the step count by exactly one, whatever the batch contained and whether or not the gap contributed anything. The count is how long evidence has been gathering, so a host can read an accumulator value against the number of chances it had to grow rather than against nothing. |
 //! | [`clamps_at_zero_when_below_baseline`] | cusum | A run of batches below the reference leaves the accumulator at zero rather than driving it negative. Quiet time banks no credit: the sum cannot go into debt during a lull and then have to be repaid before a genuine rise registers. Evidence of drift is always built from the present run, never netted against the past. |
 //! | [`allowance_absorbs_noise`] | cusum | The allowance is a dead band that ordinary variation does not cross: against a slow baseline with real spread, a generous allowance leaves slightly elevated batches accumulating essentially nothing. Because the band is scaled by the baseline's own deviation rather than being an absolute score, a noisy cell tolerates more before it counts as drifting than a quiet one does. |
+//! | [`allowance_uses_only_slow_variance`] | cusum | The dead band is exactly the configured sigma multiplier times the slow baseline's standard deviation. A known baseline therefore gives a known first step, with no unrelated stability constant widening the allowance. |
 //! | [`resets_to_zero`] | cusum | A reset discards the accumulated evidence and the count of steps that built it together. Neither outlives the other, so a host acknowledging a regime change is not left reading a fresh sum against a stale step count. |
 //! | [`reset_preserves_slow_baseline`] | cusum | What a reset does not touch is the slow baseline: its mean and spread come through unchanged. Acknowledging drift clears the evidence, not the reference the evidence was measured against — otherwise every acknowledgement would throw away a long-memory baseline that takes many batches to rebuild, and the axis would be blind while it re-converged. |
 //! | [`reset_cold_clears_everything`] | cusum | Clearing goes further than resetting: the evidence, the step count and the slow baseline all return to their freshly-constructed state, the baseline back to its placeholders rather than to whatever it had drifted to. This is the operation for an axis that has ceased to exist — coherence when the rank falls too low, say — where keeping a reference learned under a geometry that no longer holds would be worse than having none. |
@@ -71,13 +72,13 @@ fn accumulates_under_sustained_elevation() {
     let mut c = CusumAccumulator::new(0.999);
     // Warm the slow baseline with normal-ish scores.
     for _ in 0..20 {
-        c.update(&[1.0, 1.0, 1.0], 1.0, 0.5, 1e-6, 3.0);
+        c.update(&[1.0, 1.0, 1.0], 1.0, 0.5, 3.0);
     }
     let before = c.snapshot().accumulator;
 
     // Now feed consistently elevated scores.
     for _ in 0..10 {
-        c.update(&[5.0, 5.0, 5.0], 5.0, 0.5, 1e-6, 3.0);
+        c.update(&[5.0, 5.0, 5.0], 5.0, 0.5, 3.0);
     }
     assert!(
         c.snapshot().accumulator > before,
@@ -97,7 +98,7 @@ fn accumulates_under_sustained_elevation() {
 fn steps_since_reset_increments() {
     let mut c = CusumAccumulator::new(0.999);
     for i in 1..=5 {
-        c.update(&[1.0], 1.0, 0.5, 1e-6, 3.0);
+        c.update(&[1.0], 1.0, 0.5, 3.0);
         assert_eq!(c.snapshot().steps_since_reset, i);
     }
 }
@@ -117,13 +118,13 @@ fn clamps_at_zero_when_below_baseline() {
     let mut c = CusumAccumulator::new(0.999);
     // Warm with high values.
     for _ in 0..20 {
-        c.update(&[10.0, 10.0], 10.0, 0.5, 1e-6, 3.0);
+        c.update(&[10.0, 10.0], 10.0, 0.5, 3.0);
     }
     c.reset();
 
     // Feed low values — gap is negative, accumulator stays at zero.
     for _ in 0..10 {
-        c.update(&[0.1, 0.1], 0.1, 0.5, 1e-6, 3.0);
+        c.update(&[0.1, 0.1], 0.1, 0.5, 3.0);
     }
     assert!(
         (c.snapshot().accumulator).abs() < f64::EPSILON,
@@ -150,18 +151,35 @@ fn allowance_absorbs_noise() {
 
     // Warm with varied data so the slow baseline has real variance.
     for _ in 0..20 {
-        c.update(&[0.5, 1.0, 1.5], 1.0, 2.0, 1e-6, 3.0);
+        c.update(&[0.5, 1.0, 1.5], 1.0, 2.0, 3.0);
     }
     c.reset();
 
     // Feed slightly elevated scores — allowance should absorb them.
     for _ in 0..10 {
-        c.update(&[1.1, 1.2, 1.3], 1.2, 2.0, 1e-6, 3.0);
+        c.update(&[1.1, 1.2, 1.3], 1.2, 2.0, 3.0);
     }
     assert!(
         c.snapshot().accumulator < 0.1,
         "generous allowance should absorb small deviations, got {}",
         c.snapshot().accumulator,
+    );
+}
+
+/// The dead band is exactly the configured sigma multiplier times the slow baseline's standard deviation. A known baseline therefore gives a known first step, with no unrelated stability constant widening the allowance.
+///
+/// ´claim:cusum:the-allowance-is-exactly-the-sigma-multiplier-times-the-slow-baseline-standard-deviation´
+/// ´test:crate:allowance-uses-only-slow-variance´
+#[test]
+fn allowance_uses_only_slow_variance() {
+    let mut c = CusumAccumulator::new(0.999);
+
+    c.update_filtered(&[3.0, 3.0], 3.0, 0.5);
+
+    assert_eq!(
+        c.snapshot().accumulator.to_bits(),
+        1.5_f64.to_bits(),
+        "the cold slow baseline has mean one and variance one",
     );
 }
 
@@ -176,8 +194,8 @@ fn allowance_absorbs_noise() {
 #[test]
 fn resets_to_zero() {
     let mut c = CusumAccumulator::new(0.999);
-    c.update(&[5.0, 5.0], 5.0, 0.0, 1e-6, 3.0);
-    c.update(&[5.0, 5.0], 5.0, 0.0, 1e-6, 3.0);
+    c.update(&[5.0, 5.0], 5.0, 0.0, 3.0);
+    c.update(&[5.0, 5.0], 5.0, 0.0, 3.0);
     assert!(c.snapshot().accumulator > 0.0);
 
     c.reset();
@@ -197,7 +215,7 @@ fn resets_to_zero() {
 fn reset_preserves_slow_baseline() {
     let mut c = CusumAccumulator::new(0.999);
     for _ in 0..20 {
-        c.update(&[5.0, 5.0], 5.0, 0.5, 1e-6, 3.0);
+        c.update(&[5.0, 5.0], 5.0, 0.5, 3.0);
     }
     let baseline_before = c.snapshot().slow_baseline;
 
@@ -227,7 +245,7 @@ fn reset_preserves_slow_baseline() {
 fn reset_cold_clears_everything() {
     let mut c = CusumAccumulator::new(0.999);
     for _ in 0..20 {
-        c.update(&[5.0, 5.0], 5.0, 0.0, 1e-6, 3.0);
+        c.update(&[5.0, 5.0], 5.0, 0.0, 3.0);
     }
     assert!(c.snapshot().accumulator > 0.0);
     // Slow baseline should have drifted away from the cold defaults.
@@ -301,8 +319,8 @@ fn update_filtered_matches_update_no_clip() {
     #[allow(clippy::cast_precision_loss)]
     let mean = scores.iter().sum::<f64>() / scores.len() as f64;
 
-    a.update(scores, mean, 0.5, 1e-6, 100.0);
-    b.update_filtered(scores, mean, 0.5, 1e-6);
+    a.update(scores, mean, 0.5, 100.0);
+    b.update_filtered(scores, mean, 0.5);
 
     assert!((a.snapshot().accumulator - b.snapshot().accumulator).abs() < 1e-12);
 }
@@ -320,7 +338,7 @@ fn update_filtered_matches_update_no_clip() {
 fn snapshot_reports_slow_baseline() {
     let mut c = CusumAccumulator::new(0.999);
     for _ in 0..20 {
-        c.update(&[4.0, 4.0], 4.0, 0.5, 1e-6, 3.0);
+        c.update(&[4.0, 4.0], 4.0, 0.5, 3.0);
     }
 
     let snap = c.snapshot();
