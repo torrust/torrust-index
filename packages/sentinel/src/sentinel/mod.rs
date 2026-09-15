@@ -98,7 +98,10 @@ pub struct CellState<C: Coordinate> {
     /// Suffix width: `128 - depth`. Cached for convenience.
     pub width: usize,
 
-    /// Lower bound of the dyadic interval (inclusive).
+    /// Lower bound of the scoring interval (inclusive).
+    ///
+    /// At full integer width, interior scoring bounds are the successors of
+    /// the backing G-node bounds so the routing prefix is constant.
     pub start: C,
 
     /// Upper bound of the dyadic interval, exclusive everywhere except at the
@@ -980,6 +983,26 @@ where
     //  Private implementation
     // ════════════════════════════════════════════════════════
 
+    /// Convert a spatial bound to the corresponding scoring bound.
+    fn scoring_bound(bound: C) -> C {
+        // At full integer width Mudlark ends the root at MAX, not 2^N.
+        // Repeated floor midpoints therefore put every interior depth-d
+        // boundary at q * 2^(N-d) - 1. Its successor restores the binary
+        // prefix boundary at every depth. Route that one boundary value to
+        // the lower scoring cell: otherwise the uppermost cell contains
+        // 2^(N-d) + 1 values, which cannot fit in N-d binary suffix bits.
+        // Preserve the root's endpoints and its inclusive MAX exception.
+        // The unit interval is final for integer coordinates even at depth
+        // zero; continuous coordinates terminate by depth instead, so their
+        // bounds stay untouched and their unsupported successor is not used.
+        let full_width_integer = N == C::BITS && C::is_final(C::zero(), C::from_u64(1), 0, N);
+        if full_width_integer && bound != C::zero() && bound != C::domain_max(N) {
+            bound.next_value()
+        } else {
+            bound
+        }
+    }
+
     /// Reconcile the cells map with the current analysis set.
     ///
     /// Recomputes the analysis set from the V-Tree, creates trackers
@@ -1041,8 +1064,8 @@ where
                     tracker: SubspaceTracker::new(width, &self.config, self.config.cusum_slow_decay),
                     depth: entry.depth,
                     width,
-                    start: entry.start,
-                    end: entry.end,
+                    start: Self::scoring_bound(entry.start),
+                    end: Self::scoring_bound(entry.end),
                     is_competitive: entry.is_competitive,
                 };
 
@@ -1299,8 +1322,8 @@ where
             (Some(left), Some(right)) => Some(CoordNode::Internal {
                 gnode: root,
                 depth: info.depth,
-                start: info.start,
-                end: info.end,
+                start: Self::scoring_bound(info.start),
+                end: Self::scoring_bound(info.end),
                 is_competitive,
                 left: Box::new(left),
                 right: Box::new(right),

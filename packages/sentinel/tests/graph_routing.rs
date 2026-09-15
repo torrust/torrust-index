@@ -5,6 +5,8 @@
 //!
 //! | Test | Area | Claim |
 //! |------|------|-------|
+//! | [`full_width_u64_cells_keep_distinct_encodings`] | routing | Distinct values routed into one full-width cell have distinct suffix encodings. |
+//! | [`full_width_u128_cells_keep_distinct_encodings`] | routing | The full-width routing correction also holds at the widest supported coordinate width. |
 //! | [`fresh_graph_has_one_node`] | routing | Before anything is observed the graph is a single cell spanning the whole coordinate domain. There is no partition worth choosing until traffic says where the boundaries should fall, so the sentinel starts with the one cell it can justify and refines outward from there. |
 //! | [`fresh_graph_has_one_terminal`] | routing | cites (´claim:routing:a-fresh-graph-is-one-root-cell-covering-the-whole-domain-with-nothing-accumulated´) |
 //! | [`fresh_graph_has_zero_total_sum`] | routing | cites (´claim:routing:a-fresh-graph-is-one-root-cell-covering-the-whole-domain-with-nothing-accumulated´) |
@@ -371,4 +373,52 @@ fn an_ordinary_coordinate_still_lands_in_one_cell() {
         .map(|c| c.sample_count)
         .sum();
     assert_eq!(routed, 1, "one arrival is shown to one tracker");
+}
+
+/// Check the first full-width midpoint and the maximum in a fresh engine.
+fn assert_full_width_encodings<C: torrust_sentinel::CentredBitSource, const N: u32>() {
+    let config = SentinelConfig::<u64> {
+        split_threshold: 1,
+        d_create: 1,
+        d_evict: 2,
+        analysis_k: 16,
+        max_rank: 1,
+        noise_schedule: torrust_sentinel::NoiseSchedule::Explicit(Vec::new()),
+        ..SentinelConfig::default()
+    };
+    let top = C::domain_max(N);
+    let boundary = C::midpoint(C::zero(), top);
+    let mut sentinel = torrust_sentinel::SpectralSentinel::<C, u64, N>::new(config).unwrap();
+    let report = sentinel.ingest(&[boundary, top]);
+    let boundary_bits = boundary.to_centred_bits(N);
+    let top_bits = top.to_centred_bits(N);
+    let cells: Vec<_> = report.cell_reports.iter().chain(&report.ancestor_reports).collect();
+    assert!(cells.iter().any(|cell| cell.depth == 1), "the fixture must split the root");
+    for cell in cells {
+        if cell.sample_count == 2 {
+            let depth = u8::try_from(cell.depth).unwrap();
+            assert_ne!(
+                boundary_bits.suffix(depth),
+                top_bits.suffix(depth),
+                "distinct values in one cell must have distinct encodings at depth {depth}"
+            );
+        }
+    }
+}
+
+/// Distinct values routed into one full-width cell have distinct suffix encodings.
+///
+/// ´claim:routing:full-width-cells-keep-distinct-encodings´
+/// ´test:integration:full-width-u64-cells-keep-distinct-encodings´
+#[test]
+fn full_width_u64_cells_keep_distinct_encodings() {
+    assert_full_width_encodings::<u64, 64>();
+}
+
+/// The full-width routing correction also holds at the widest supported coordinate width.
+///
+/// ´test:integration:full-width-u128-cells-keep-distinct-encodings´
+#[test]
+fn full_width_u128_cells_keep_distinct_encodings() {
+    assert_full_width_encodings::<u128, 128>();
 }

@@ -93,7 +93,9 @@ Layer 3: Analysis Engine
 
 ### 2.1 The Domain · `sec:sentinel:algorithm-domain`
 
-The input domain is $[0, 2^N)$, where $N$ is the domain bit-width. The spatial layer partitions this into dyadic cells aligned with bit positions. A cell at spatial tree depth $d$ covers an interval of width $2^{N-d}$, corresponding to a $d$-bit prefix shared by all values in the cell.
+The input domain is $[0, 2^N)$, where $N$ is the domain bit-width. A scoring cell at spatial tree depth $d$ covers $2^{N-d}$ integer values, corresponding to a $d$-bit prefix shared by all values scored in that cell.
+
+At full integer coordinate width, Mudlark represents the root's upper bound by the integer maximum, $2^N-1$. Its floor midpoints place each interior depth-$d$ boundary at $q2^{N-d}-1$. Sentinel uses that boundary's successor for the scoring interval, routing the boundary value to the lower cell and restoring the constant binary prefix at every depth. Cell and coordination scoring reports carry these adjusted bounds; the root endpoints remain unchanged and the final cell includes the domain maximum. Mudlark's partition, importance accounting and selection entries retain their original bounds. At narrower integer widths the exclusive bound $2^N$ is representable and no adjustment is needed; continuous-coordinate bounds are also unchanged.
 
 **Example depths at $N = 128$:**
 
