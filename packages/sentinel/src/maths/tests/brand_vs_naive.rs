@@ -13,7 +13,7 @@
 //! | [`equivalence_saturated_rank`] | svd | cites (´claim:svd:the-incremental-update-reaches-the-same-answer-as-the-reference-decomposition´) |
 //! | [`equivalence_cap_larger_than_k`] | svd | How many axes a step produces is the smallest of three limits: what the old rank plus the batch could span, the ambient width, and the ceiling the cell is allowed. With capacity to spare the step fills it, widening the model beyond the rank it started from — and both paths widen it identically, to the same count and with columns that are still orthonormal. Spare capacity is real room to grow rather than padding. |
 //! | [`equivalence_identity_basis`] | svd | cites (´claim:svd:the-incremental-update-reaches-the-same-answer-as-the-reference-decomposition´) |
-//! | [`equivalence_near_zero_residual`] | svd | A batch that already lies inside the model's own axes leaves almost nothing unexplained, and the incremental path has to orthogonalise that almost- nothing anyway — a factorisation of a matrix that is numerically close to rank-deficient. Directions recovered from vanishing energy are arbitrary, so the two paths part company in the last few digits, but they still land on the same model. Precision degrades where there is nothing left to measure; agreement does not. |
+//! | [`equivalence_near_zero_residual`] | svd | A batch that already lies inside the model's own axes leaves almost nothing unexplained, and the incremental path has to orthogonalise that negligible residual anyway — a factorisation of a matrix that is numerically close to rank-deficient. Directions recovered from vanishing energy are arbitrary, so the two paths part company in the last few digits, but they still land on the same model. Precision degrades where there is nothing left to measure; agreement does not. |
 //! | [`equivalence_zero_initial_sigmas`] | svd | A model that has learned nothing yet carries no energy on any axis, so the remembered half of the step contributes exactly zero and the outcome is determined entirely by the arriving batch. The step is well defined there rather than degenerate: a cell's first real shape comes from its first real data, and both paths derive that shape identically. |
 //! | [`equivalence_large_singular_values`] | svd | When a model carries enormous accumulated energy, an ordinary batch is a vanishing perturbation of it, and the difference between the two paths scales with that energy rather than staying absolute. Agreement is therefore stated relatively: the singular values match to a proportion of themselves, not to a fixed margin, so a long-lived cell whose values have grown large is no less trustworthy than a fresh one. |
 //! | [`equivalence_equal_singular_values`] | svd | When every axis carries the same energy, nothing distinguishes one axis from another within the space they span: any rotation of them is an equally correct answer. The two paths still agree exactly on how much energy there is and on which space it occupies, while individual columns are compared only loosely, because insisting they coincide would be demanding an answer the mathematics does not define. |
@@ -544,8 +544,8 @@ fn equivalence_identity_basis() {
 }
 
 /// A batch that already lies inside the model's own axes leaves almost nothing
-/// unexplained, and the incremental path has to orthogonalise that almost-
-/// nothing anyway — a factorisation of a matrix that is numerically close to
+/// unexplained, and the incremental path has to orthogonalise that negligible
+/// residual anyway — a factorisation of a matrix that is numerically close to
 /// rank-deficient. Directions recovered from vanishing energy are arbitrary,
 /// so the two paths part company in the last few digits, but they still land
 /// on the same model. Precision degrades where there is nothing left to

@@ -1,10 +1,10 @@
 # ADR-S-007: Automatic Noise Injection · `rec:sentinel:automatic-internal-noise-injection`
 
-**Status:** Implemented — modified by ADR-S-015 (`noise_rounds` → `noise_schedule`) **Date:** 2026-03-09 **Spec:** §ALGO S-11.1 (noise generation), §ALGO S-11.2 (injection triggers), §ALGO S-11.4 (chained coordination warming) **Relates to:** [ADR-S-001](001-measures-not-opinions.md) (measures not opinions), [ADR-S-005](005-deterministic-order-and-thread-safety.md) (deterministic order), [ADR-S-006](006-analysis-set-recomputation.md) (analysis set lifecycle)
+**Status:** Implemented — modified by ADR-S-015 (`noise_rounds` → `noise_schedule`) and ADR-S-017 (deferred cell warm-up and lazy coordination warm-up) **Date:** 2026-03-09 **Spec:** §ALGO S-11.1 (noise generation), §ALGO S-11.2 (injection triggers), §ALGO S-11.6.5 (coordination exclusion during cell warm-up), §ALGO S-11.7 (coordination-specific warm-up) **Relates to:** [ADR-S-001](001-measures-not-opinions.md) (measures not opinions), [ADR-S-005](005-deterministic-order-and-thread-safety.md) (deterministic order), [ADR-S-006](006-analysis-set-recomputation.md) (analysis set lifecycle)
 
 ## Context · `sec:sentinel:autonoise-context`
 
-The spec (§ALGO S-11.2) requires noise injection to fire **automatically** on every new tracker creation — analysis set entry, split-induced creation, or legacy promotion. Chained coordination warming (§ALGO S-11.4) follows: synthetic score vectors from the warmed cell flow through the parent coordination tracker.
+The spec (§ALGO S-11.2) requires noise injection to fire **automatically** on every new tracker creation — analysis set entry, split-induced creation, or legacy promotion. The original coordination design chained synthetic cell scores into parent contexts; ADR-S-017 replaced that lifecycle when it deferred cell warm-up, because warming cells produce no reports and coordination contexts do not exist until online cells participate in a later scoring pass.
 
 Without noise injection, new trackers start with placeholder baselines (`mean = 1.0`, `variance = 1.0`). Early z-scores and CUSUM values are meaningless until enough real data has passed.
 
@@ -18,7 +18,7 @@ Without noise injection, new trackers start with placeholder baselines (`mean = 
 
 3. **Persistent RNG.** A `SmallRng` is stored on `SpectralSentinel`, seeded from `config.noise_seed` (or system entropy if `None`). With background warming disabled this generator is the whole of the engine's randomness, and a fixed seed fixes the noise for the sentinel's lifetime. With it enabled the warming worker holds a second generator, seeded one above the configured seed so the two streams do not coincide, and the cells it warms draw from that one instead.
 
-4. **Chained coordination warming.** After a cell is noise-warmed, its synthetic scores flow through `propagate_coordination()` to warm the parent coordination tracker (§ALGO S-11.4). The coordination tracker's CUSUM is then reset (§ALGO S-7.4).
+4. **Lazy coordination warm-up.** A cell's synthetic warm-up scores end with that cell; the staging paths do not propagate their reports. After promotion, a scoring pass materialises each newly active coordination context from the online competitive cells that participate there, warms it inline from synthetic score vectors sampled from those cells' baseline moments, resets its drift state, and then feeds it the first real group matrix (§ALGO S-11.6.5, §ALGO S-11.7).
 
 5. **No manual injection API.** Exposing a public `inject_noise()` method would allow double-injection and create an ordering hazard (host calling it after trackers already received auto-injection). The sentinel is the sole owner of the injection lifecycle.
 

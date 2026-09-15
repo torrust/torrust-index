@@ -8,7 +8,7 @@ The sentinel's `ingest()` call has **variable latency**. Most calls perform only
 
 ## Decision · `sec:sentinel:deferredwarmup-decision`
 
-**Noise injection is moved off the `ingest()` hot path.**
+**With background warming enabled, noise injection is moved off the `ingest()` hot path.** The same staging lifecycle remains in synchronous mode, but `reconcile_analysis_set()` drains it to completion before `ingest()` returns.
 
 New cells transition through a three-state lifecycle:
 

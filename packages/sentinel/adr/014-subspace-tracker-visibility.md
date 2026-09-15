@@ -163,7 +163,7 @@ The rationale:
 
 1. **`SubspaceTracker` is an implementation detail.**  Its constructor takes a `slow_decay: f64` parameter that only makes sense in the context of the sentinel's two-tier EWMA architecture.  Its `observe()` method has an `is_noise: bool` parameter whose correct usage depends on the injection lifecycle described in ADR-S-007.  Exposing these to external callers invites misuse without adding proportional value.
 
-2. **The one test that needs internal access is a unit test.** `noise_baselines_converge` exercises a single tracker's EWMA convergence — a textbook unit test.  Placing it in `#[cfg(test)]` inside `tracker.rs` is idiomatic Rust.
+2. **The convergence test that needs internal access is a crate test.** `noise_baselines_converge_within_bound` exercises a single tracker's EWMA convergence. It lives in the collected crate-test module `src/tests/convergence_noise.rs`, which has access to crate-private internals without placing test code inside `tracker.rs` or widening the tracker's visibility.
 
 3. **Enriching `CellInspection` is the right public API evolution.**  Baseline means and variances are legitimate observable state.  Hosts monitoring the sentinel in production will benefit from baseline visibility in `inspect_cell()` without needing to parse `BatchReport` arrays.  This is fully aligned with "the sentinel measures; the host decides" (ADR-S-001).
 
@@ -173,7 +173,7 @@ The rationale:
 
 ## Consequences · `sec:sentinel:trackervis-consequences`
 
-1. **`noise_baselines_converge`** is implemented as a `#[cfg(test)]` unit test in `src/sentinel/tracker.rs`.
+1. **`noise_baselines_converge_within_bound`** is implemented as a collected crate test in `src/tests/convergence_noise.rs`.
 
 2. **`CellInspection`** gains a `baselines: AxisBaselineSnapshots` field populated from the tracker's four `AxisBaseline` fast- EWMA snapshots.
 
@@ -193,7 +193,7 @@ The rationale:
 |------|--------|
 | `src/report.rs` | Add `AxisBaselineSnapshots` struct; add `baselines` field to `CellInspection` |
 | `src/sentinel/mod.rs` | Populate `baselines` in `inspect_cell()` |
-| `src/sentinel/tracker.rs` | Add `#[cfg(test)] mod convergence_tests` (noise_baselines_converge) — now in `src/tests/convergence_noise.rs` |
+| `src/tests/convergence_noise.rs` | Exercise tracker baseline convergence through crate-private access |
 
 ## Cross-References · `sec:sentinel:trackervis-cross-references`
 

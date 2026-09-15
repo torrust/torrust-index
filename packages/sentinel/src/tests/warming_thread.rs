@@ -24,9 +24,9 @@
 //!
 //! | Test | Area | Claim |
 //! |------|------|-------|
-//! | [`selection_refresh_survives_warming_handoffs`] | warmup | Waiting, in-flight and ready cells keep the latest selection flag across both worker return paths. |
 //! | [`shutdown_returns_under_repeated_spawn_and_stop_cycles`] | warmup | Shutting the warming thread down returns, every time, over a long run of spawn-and-stop cycles that does nothing else — the arrangement that puts the request at its most likely to land while the worker is between reading its predicate and sleeping on it. A shutdown that is lost in that window does not fail loudly: the worker sleeps on, the join waits for it, and the sentinel's own drop never completes, so what a host would see is a process that stops rather than an error it can act on. |
 //! | [`dropping_a_sentinel_consumes_a_failed_worker_join`] | warmup | A warming worker can fail before its owner is destroyed. Destruction still completes without unwinding, because the drop path records the failed join instead of turning a background failure into a destructor panic. |
+//! | [`selection_refresh_survives_warming_handoffs`] | warmup | Waiting, in-flight and ready cells keep the latest selection flag across both worker return paths. |
 
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
