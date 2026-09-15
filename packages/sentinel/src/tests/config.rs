@@ -80,6 +80,7 @@
 //! | [`geometric_rounds_very_small_decay`] | config | cites (´claim:config:a-geometric-schedule-tapers-with-depth-and-then-rests-on-its-floor´) |
 //! | [`geometric_rounds_rounding_half_values`] | config | Round counts are whole, and a fractional product is rounded to nearest with halves going away from zero rather than truncated toward it. Truncation would bias every depth downward and compound with the taper, so a cell an exact half-round short is warmed the extra round instead of losing it. |
 //! | [`geometric_rounds_large_depth`] | config | At the deepest levels the G-tree can reach, the decayed product has long since collapsed toward zero, and the schedule still answers with its floor rather than with a degenerate number. The depth argument is bounded by the tree's own width, and the arithmetic stays well defined right up to that bound. |
+//! | [`geometric_rounds_extreme_depths_reach_the_floor`] | config | A public schedule remains tapered at depths beyond the exponent type's range. Extreme depths reach the floor, never exceed the schedule ceiling, and preserve the non-increasing shape across the conversion boundary. |
 //! | [`geometric_rounds_decay_one_is_constant`] | config | A decay of exactly one leaves the root untouched at every depth, giving a flat schedule that warms deep cells as heavily as shallow ones. This is what makes the upper endpoint worth admitting: uniform warm-up is expressible inside the geometric variant instead of needing a form of its own. |
 //! | [`geometric_rounds_root_zero_min_zero`] | config | A geometric schedule with neither root nor floor asks for no rounds at any depth. The variant can therefore express a complete absence of warm-up without switching to the explicit form, and it does so with no special casing: the taper of nothing is nothing, and a floor of nothing lifts it nowhere. |
 //! | [`explicit_rounds_for_depth`] | config | An explicit schedule is a direct lookup by depth, and depths past the end of the vector reuse its last entry rather than falling to zero or failing. The tail is the host's statement about all remaining depths, so a short vector still describes an unbounded tree. |
@@ -1219,6 +1220,29 @@ fn geometric_rounds_large_depth() {
     assert_eq!(schedule.rounds_for_depth(126), 50);
     assert_eq!(schedule.rounds_for_depth(127), 50);
     assert_eq!(schedule.rounds_for_depth(128), 50);
+}
+
+/// A public schedule remains tapered at depths beyond the exponent type's range. Extreme depths reach the floor, never exceed the schedule ceiling, and preserve the non-increasing shape across the conversion boundary.
+///
+/// ´claim:config:a-geometric-schedule-reaches-its-floor-without-wrapping-at-any-public-depth´
+/// ´test:crate:geometric-rounds-extreme-depths-reach-the-floor´
+#[test]
+fn geometric_rounds_extreme_depths_reach_the_floor() {
+    let schedule = NoiseSchedule::default();
+    let signed_exponent_max = usize::try_from(i32::MAX).expect("the supported usize holds every non-negative i32");
+    let depths = [0, 1, 128, signed_exponent_max, signed_exponent_max + 1, usize::MAX];
+    let rounds: Vec<_> = depths.iter().map(|&depth| schedule.rounds_for_depth(depth)).collect();
+
+    assert_eq!(schedule.rounds_for_depth(usize::MAX), 50);
+    assert_eq!(schedule.rounds_for_depth(signed_exponent_max + 1), 50);
+    assert!(
+        rounds.windows(2).all(|pair| pair[0] >= pair[1]),
+        "the geometric schedule must remain non-increasing across the exponent boundary: {rounds:?}",
+    );
+    assert!(
+        rounds.iter().all(|&count| count <= schedule.max_rounds()),
+        "every scheduled count must stay within the declared maximum: {rounds:?}",
+    );
 }
 
 /// A decay of exactly one leaves the root untouched at every depth, giving a

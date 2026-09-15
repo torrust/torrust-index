@@ -117,10 +117,19 @@ Resolution at injection time:
 ```rust
 fn rounds_for_depth(&self, depth: usize) -> u32 {
     match self {
-        Geometric { root, decay, min } =>
-            (*min).max((*root as f64 * decay.powi(depth as i32)) as u32),
-        Explicit(v) =>
-            v[depth.min(v.len() - 1)],
+        Self::Geometric { root, decay, min } => {
+            let exp = i32::try_from(depth).unwrap_or(i32::MAX);
+            let raw = f64::from(*root) * decay.powi(exp);
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let rounded = raw.round() as u32;
+            rounded.max(*min)
+        }
+        Self::Explicit(v) => {
+            if v.is_empty() {
+                return 0;
+            }
+            v[depth.min(v.len() - 1)]
+        }
     }
 }
 ```

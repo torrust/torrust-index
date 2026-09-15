@@ -76,9 +76,7 @@ impl NoiseSchedule {
     pub fn rounds_for_depth(&self, depth: usize) -> u32 {
         match self {
             Self::Geometric { root, decay, min } => {
-                // depth is bounded by G-tree depth (≤ 128), safe to truncate.
-                #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-                let exp = depth as i32;
+                let exp = i32::try_from(depth).unwrap_or(i32::MAX);
                 let raw = f64::from(*root) * decay.powi(exp);
                 // raw is non-negative (root ≥ 0, decay > 0), safe to truncate.
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
