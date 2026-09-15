@@ -379,10 +379,11 @@ pub struct SentinelConfig<V: Accumulator> {
     /// Default: `16`
     pub noise_batch_size: usize,
 
-    /// RNG seed for deterministic noise generation (§ALGO S-13.5).
+    /// RNG seed for noise generation (§ALGO S-13.5).
     ///
-    /// `Some(seed)` → reproducible noise across restarts.
-    /// `None` → seeded from system entropy.
+    /// `Some(seed)` gives reproducible noise and reports for the same configuration and input with `background_warming` disabled, on a fixed build — one target and one set of dependency versions. The generator is chosen for speed rather than portability.
+    /// Background warming draws from its own generator and takes whichever staged cell leads on volume when it looks, so a seed alone does not fix the baselines or the ingest cycle on which a cell first scores.
+    /// `None` seeds the generators from system entropy.
     ///
     /// Default: `Some(42)`
     pub noise_seed: Option<u64>,
@@ -395,10 +396,7 @@ pub struct SentinelConfig<V: Accumulator> {
     /// accompanies cell creation at the cost of a short delay before
     /// new cells participate in scoring.
     ///
-    /// When `false`, warm-up runs synchronously within
-    /// `reconcile_analysis_set()` — identical to the Step 2 behaviour.
-    /// This mode is deterministic (given a fixed `noise_seed`) and is
-    /// used by the test suite.
+    /// When `false`, warm-up runs synchronously within `reconcile_analysis_set()` — identical to the Step 2 behaviour. This mode is deterministic for the same configuration and input with a fixed `noise_seed` on a fixed build, and is used by the test suite.
     ///
     /// Default: `false`  (opt-in; production deployments should enable)
     pub background_warming: bool,

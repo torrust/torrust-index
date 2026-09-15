@@ -95,8 +95,7 @@ impl CentredBitSource for u64 {
 /// - bit `1` → `+0.5`
 /// - bit `0` → `−0.5`
 ///
-/// This centring is critical: it ensures the data has zero mean
-/// per dimension, which the subspace tracker requires.
+/// The encoded levels are symmetric about zero. Each dimension has zero expected mean under a uniform bit distribution (§ALGO S-2.3); arbitrary traffic need not have balanced bits, so this encoding does not subtract its empirical mean.
 ///
 /// The backing array is fixed at 128 slots, which is the sentinel's coordinate
 /// width ceiling and not an implementation detail a wider coordinate type can

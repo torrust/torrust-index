@@ -4,13 +4,7 @@
 //! Tests for [`crate::observation`] — the boundary where a coordinate value
 //! becomes the vector the subspace engine works on.
 //!
-//! The conversion is fixed by two decisions. Bits are centred rather than
-//! taken raw — a set bit is plus a half and a clear bit minus a half — so
-//! that the data arrives at the tracker with zero mean per dimension, which
-//! is what the subspace update assumes. And bits are stored most-significant
-//! first, so that a cell's G-tree depth is a prefix length: the leading bits
-//! routing has already resolved sit at the front, and the suffix a tracker
-//! analyses is what remains behind them.
+//! The conversion is fixed by two decisions. A set bit is plus a half and a clear bit minus a half, so the encoded levels are symmetric about zero. Each dimension has zero expected mean under a uniform bit distribution (§ALGO S-2.3); arbitrary traffic need not have balanced bits. Bits are stored most-significant first, so that a cell's G-tree depth is a prefix length: the leading bits routing has already resolved sit at the front, and the suffix a tracker analyses is what remains behind them.
 //!
 //! Those two decisions together give the representation its one arithmetic
 //! regularity. Every centred bit has magnitude one half whatever the value,
@@ -23,7 +17,7 @@
 //!
 //! | Test | Area | Claim |
 //! |------|------|-------|
-//! | [`from_u128_zero_all_minus_half`] | bits | A bit is not carried into the model as zero or one but as minus or plus a half. A value with no bits set therefore becomes a vector of minus a half throughout, which is the centring the subspace tracker depends on: the representation has no mean to remove before the geometry means anything. |
+//! | [`from_u128_zero_all_minus_half`] | bits | A clear bit becomes minus a half and a set bit plus a half. An all-zero coordinate therefore becomes minus a half throughout: the encoding is symmetric, while zero expected mean requires balanced bits. |
 //! | [`from_u128_max_all_plus_half`] | bits | cites (´claim:bits:a-clear-bit-becomes-minus-a-half-and-a-set-bit-plus-a-half´) |
 //! | [`from_u128_one_only_lsb_set`] | bits | cites (´claim:bits:the-most-significant-bit-stands-at-index-zero´) |
 //! | [`from_u128_msb_first_ordering`] | bits | Bits are stored most significant first: a value carrying only its top bit puts that bit at index zero and nothing else anywhere. This ordering is what lets a cell at depth `d` take its working observation by skipping the first `d` entries, because those are exactly the bits routing fixed. |
@@ -43,10 +37,7 @@ use crate::observation::*;
 
 // ─── CentredBits::from_u128 ────────────────────────────────
 
-/// A bit is not carried into the model as zero or one but as minus or plus a
-/// half. A value with no bits set therefore becomes a vector of minus a half
-/// throughout, which is the centring the subspace tracker depends on: the
-/// representation has no mean to remove before the geometry means anything.
+/// A clear bit becomes minus a half and a set bit plus a half. An all-zero coordinate therefore becomes minus a half throughout: the encoding is symmetric, while zero expected mean requires balanced bits.
 ///
 /// ´claim:bits:a-clear-bit-becomes-minus-a-half-and-a-set-bit-plus-a-half´
 /// ´test:crate:from-u128-zero-all-minus-half´
