@@ -32,6 +32,8 @@
 //! | [`floor_prevents_excessive_tightening`] | repeated tightening bottoms out at the floor |
 //! | [`no_ceiling_relax_above_initial`] | relaxation can exceed initial config values |
 //! | [`noop_when_budget_is_none`] | adjustment is a no-op when `budget` is `None` |
+//! | [`dynamic_headroom_beyond_budget_fails_closed`] | oversized live depth cannot wrap the dynamic soft limit |
+//! | [`relaxation_at_maximum_evict_depth_preserves_buffer_invariant`] | relaxation at the maximum gate preserves D-I3 |
 //! | [`di3_maintained_through_full_tighten_relax_cycle`] | D-I3 (`D_create < D_evict`) holds across a full tighten→relax cycle |
 //!
 //! ## `check_evictions` / `check_evictions_bounded`
@@ -163,6 +165,30 @@ fn noop_when_budget_is_none() {
     g.adjust_depth_gates();
     assert_eq!(g.depth_evict(), 6);
     assert_eq!(g.depth_create(), 3);
+}
+
+#[test]
+#[should_panic(expected = "soft_limit must be >= 1")]
+fn dynamic_headroom_beyond_budget_fails_closed() {
+    let mut g: GvGraph<u64, u64, 32> = GvGraph::new(budget_config(100));
+    g.live_depth_create = u32::MAX;
+    g.adjust_depth_gates();
+}
+
+#[test]
+fn relaxation_at_maximum_evict_depth_preserves_buffer_invariant() {
+    let mut g: GvGraph<u64, u64, 32> = GvGraph::new(budget_config(100));
+    g.live_depth_evict = u32::MAX;
+    // Keep the pre-adjustment convergence term representable so the call
+    // reaches the saturated relaxation step under every pointer width.
+    g.live_depth_create = 3;
+    g.node_count = 1;
+
+    g.adjust_depth_gates();
+
+    assert_eq!(g.depth_evict(), u32::MAX);
+    assert!(g.depth_create() < g.depth_evict());
+    assert_eq!(g.depth_buffer(), g.depth_evict() - g.depth_create());
 }
 
 #[test]
