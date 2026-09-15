@@ -1726,12 +1726,6 @@ where
 
 // ─── Automatic noise injection (§ALGO S-11) ───────────────────
 
-/// Inject noise into a single cell tracker and reset its CUSUM.
-///
-/// Feeds `rounds` batches of `batch_size` random ±0.5 centred vectors
-/// through the tracker with `is_noise = true`, then resets all four
-/// CUSUM accumulators (§ALGO S-7.4, §ALGO S-11.1).
-///
 /// Generate a batch of random centred vectors (each entry ±0.5).
 fn generate_noise_batch(dim: usize, batch_size: usize, rng: &mut SmallRng) -> Vec<Vec<f64>> {
     (0..batch_size)
