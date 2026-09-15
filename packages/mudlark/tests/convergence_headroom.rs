@@ -9,6 +9,7 @@
 //! |------|-------|
 //! | [`budget_convergence_witness_preserves_64_bit_requirement`] | the executed witness retains its representable 64-bit requirement |
 
+#[cfg(target_pointer_width = "64")]
 use torrust_mudlark::{Config, GvGraph};
 
 #[cfg(target_pointer_width = "64")]
