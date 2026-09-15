@@ -23,9 +23,9 @@
 //! The sentinel sets `shutdown` to `true` **under the staging lock** and
 //! notifies the condvar. The thread finishes any in-progress batch, then
 //! exits. An explicit [`WarmingThreadHandle::shutdown`] joins the worker
-//! and surfaces a worker panic to its caller. During destruction the same
-//! handshake consumes a failed join and records it through `tracing`, because
-//! a destructor must not add a second panic to an unwind already in progress.
+//! and records a failed join through `tracing`. Destruction uses the same
+//! non-panicking policy, because a destructor must not add a second panic to an
+//! unwind already in progress.
 //!
 //! The lock is what makes the transition observable. The worker holds the
 //! staging mutex from the moment it reads the two predicates until
@@ -149,15 +149,19 @@ impl<C: Coordinate> WarmingThreadHandle<C> {
     /// mutex this call still holds.
     ///
     /// A poisoned staging mutex is taken as it stands rather than refused.
-    /// The lock is poisoned only when the worker panicked while holding it,
-    /// and that panic is reported by the join below; refusing here would
-    /// replace that report with a panic raised inside `Drop`.
+    /// The lock is poisoned only when the worker panicked while holding it.
+    /// A failed join is recorded through `tracing` rather than raised, matching
+    /// the sentinel's policy that a background resource failure must not abort
+    /// its host.
     pub fn shutdown(&self) {
         self.request_shutdown();
 
         let handle = self.handle.lock().expect("warming handle poisoned").take();
-        if let Some(handle) = handle {
-            handle.join().expect("warming thread panicked");
+        let Some(handle) = handle else {
+            return;
+        };
+        if handle.join().is_err() {
+            tracing::error!("warming thread panicked during sentinel shutdown");
         }
     }
 
@@ -185,6 +189,11 @@ impl<C: Coordinate> WarmingThreadHandle<C> {
             }
             std::thread::yield_now();
         }
+
+        // The poison made the worker fail, but it is not the condition these
+        // tests exercise after that failure. Clearing it isolates the failed
+        // join so reset and destruction can follow their ordinary paths.
+        self.staging.clear_poison();
     }
 }
 

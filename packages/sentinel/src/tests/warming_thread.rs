@@ -26,6 +26,7 @@
 //! |------|------|-------|
 //! | [`shutdown_returns_under_repeated_spawn_and_stop_cycles`] | warmup | Shutting the warming thread down returns, every time, over a long run of spawn-and-stop cycles that does nothing else — the arrangement that puts the request at its most likely to land while the worker is between reading its predicate and sleeping on it. A shutdown that is lost in that window does not fail loudly: the worker sleeps on, the join waits for it, and the sentinel's own drop never completes, so what a host would see is a process that stops rather than an error it can act on. |
 //! | [`dropping_a_sentinel_consumes_a_failed_worker_join`] | warmup | A warming worker can fail before its owner is destroyed. Destruction still completes without unwinding, because the drop path records the failed join instead of turning a background failure into a destructor panic. |
+//! | [`reset_consumes_a_failed_worker_join`] | warmup | Reset follows the same host-preserving policy as destruction: a worker that has already failed is joined and recorded, then reset rebuilds the sentinel instead of panicking over a failure that happened in the background. |
 //! | [`selection_refresh_survives_warming_handoffs`] | warmup | Waiting, in-flight and ready cells keep the latest selection flag across both worker return paths. |
 
 use std::sync::mpsc::{self, RecvTimeoutError};
@@ -109,6 +110,28 @@ fn dropping_a_sentinel_consumes_a_failed_worker_join() {
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(sentinel)));
 
     assert!(outcome.is_ok(), "dropping the sentinel must consume the failed worker join");
+}
+
+/// Reset follows the same host-preserving policy as destruction: a worker
+/// that has already failed is joined and recorded, then reset rebuilds the
+/// sentinel instead of panicking over a failure that happened in the
+/// background.
+///
+/// ´claim:warmup:sentinel-reset-consumes-a-failed-worker-join´
+/// ´test:crate:reset-consumes-a-failed-worker-join´
+#[test]
+fn reset_consumes_a_failed_worker_join() {
+    let config = SentinelConfig::<u64> {
+        noise_schedule: NoiseSchedule::Explicit(Vec::new()),
+        background_warming: true,
+        ..SentinelConfig::<u64>::default()
+    };
+    let mut sentinel = SpectralSentinel::<u128, u64, 128>::new(config).unwrap();
+    sentinel.fail_warming_worker_for_test();
+
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| sentinel.reset()));
+
+    assert!(outcome.is_ok(), "reset must consume the failed worker join");
 }
 
 /// Waiting, in-flight and ready cells keep the latest selection flag across both worker return paths.

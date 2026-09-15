@@ -705,8 +705,9 @@ where
         &self.config
     }
 
-    /// Fail the warming worker and wait until its join handle records the
-    /// failure, so destruction tests can exercise the failed-worker path.
+    /// Fail the warming worker, wait until its join handle records the
+    /// failure, and clear the deliberately poisoned staging lock so tests can
+    /// isolate the failed-worker path.
     #[cfg(test)]
     pub(crate) fn fail_warming_worker_for_test(&self) {
         self.warming_thread
