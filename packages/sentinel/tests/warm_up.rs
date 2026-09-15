@@ -21,7 +21,7 @@
 //! | [`stage4_health_maturity_distribution`] | warmup | The health snapshot aggregates what individual cells know about their own maturity, and in steady state it says two things: the average tracker is no longer purely synthetic, and no tracker anywhere is still cold — every cell in service has seen real data. A cold entry in a warmed sentinel would mean a cell was being scored on noise alone. |
 //! | [`cold_start_noise_influence_is_one`] | warmup | Turning the noise schedule off shows what the seed was doing. The root then begins at a synthetic share of exactly one — the value a tracker with no information at all reports — and only real data moves it. Warm-up is thus an optional head start, not a precondition: the sentinel still runs without it, and simply says that everything it knows is unearned. |
 
-//! §9.4 — **Warm-up sequence**: how a sentinel comes into service.
+//! §ALGO S-11.6 — **Warm-up sequence**: how a sentinel comes into service.
 //!
 //! A sentinel arrives knowing nothing. It begins as a single root cell
 //! covering the whole domain, and everything else — the division of that

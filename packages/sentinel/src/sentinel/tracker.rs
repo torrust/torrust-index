@@ -8,8 +8,8 @@
 //! axes (novelty, displacement, surprise, coherence), then evolves
 //! the model to incorporate the new data.
 //!
-//! See `docs/algorithm.md` §4.2 for the five-phase core loop and
-//! §5 for the four scoring axes.
+//! See `docs/algorithm.md` §ALGO S-4.2 for the five-phase core loop and
+//! §ALGO S-5 for the four scoring axes.
 //!
 //! This is the only module that depends on `faer`.
 
@@ -102,7 +102,7 @@ pub struct SubspaceTracker {
     ///
     /// Length: `cap * (cap - 1) / 2`.  When rank increases, new entries
     /// are already zero (the full triangle is pre-allocated at construction).
-    /// When rank decreases, outer entries are ignored but preserved (§4.2 Phase 3).
+    /// When rank decreases, outer entries are ignored but preserved (§ALGO S-4.2 Phase 3).
     cross_corr: Vec<f64>,
 
     // ── Score baselines (one per axis) ──────────────────
@@ -490,7 +490,7 @@ impl SubspaceTracker {
             // ── Coherence: (2/(k(k−1))) Σⱼ<ₗ (zᵢⱼ·zᵢₗ − Cⱼₗ)² ──
             //
             // Dividing by pairs = k(k−1)/2 is equivalent to multiplying
-            // by 2/(k(k−1)), matching the spec (§6.4).
+            // by 2/(k(k−1)), matching the spec (§ALGO S-5.5).
             coh_scores.push(if k >= 2 {
                 let pairs = (k * (k - 1)) / 2;
                 let mut coh = 0.0;
@@ -648,7 +648,7 @@ impl SubspaceTracker {
 
         // Pairwise cross-correlation: C[j][l] ← λ·C[j][l] + α·(1/b)·Σᵢ zᵢⱼ·zᵢₗ
         //
-        // Invariant (§4.2 Phase 3): when rank increases, new entries are
+        // Invariant (§ALGO S-4.2 Phase 3): when rank increases, new entries are
         // already zero from construction.  When rank decreases, outer
         // entries are ignored here but preserved in the vector.
         for j in 0..k {
@@ -782,7 +782,7 @@ impl SubspaceTracker {
 
         let old_rank = self.rank;
 
-        // Move by at most ±1 to avoid oscillation (§4.2 Phase 5).
+        // Move by at most ±1 to avoid oscillation (§ALGO S-4.2 Phase 5).
         if target > self.rank {
             self.rank = (self.rank + 1).min(self.cap);
         } else if target < self.rank {
@@ -830,7 +830,7 @@ impl SubspaceTracker {
     /// Update maturity counters after processing a batch.
     ///
     /// Noise influence decays as λⁿ for `n` real observations, or
-    /// converges toward 1.0 under noise (§11.5). Computed via `powi`
+    /// converges toward 1.0 under noise (§ALGO S-11.5). Computed via `powi`
     /// instead of an `n`-iteration loop.
     ///
     /// When η crosses below `WARMUP_THRESHOLD` (§ALGO S-11.4), all

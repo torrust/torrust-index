@@ -248,16 +248,16 @@ The root tracker is permanent and never participates in competitive selection (�
 
 ## 7. Hierarchical Coordination · `sec:sentinel:implementation-hierarchical-coordination`
 
-The sentinel detects coordinated anomalies across cells using hierarchical G-tree coordination (§ALGO S-9).
+The sentinel detects coordinated anomalies across cells using hierarchical G-tree coordination (§ALGO S-7).
 
 ### 7.1 Coordination Contexts · `sec:sentinel:implementation-coordination-contexts`
 
 One `CoordContext` per internal G-node whose left and right subtrees both contain online competitive cells. Each context owns:
 
 - A 4-dimensional `SubspaceTracker` (one dimension per scoring axis).
-- A running-mean centring reference $\mu^{(\text{in})}$ for de-meaning the input signal before feeding (§ALGO S-9.3).
+- A running-mean centring reference $\mu^{(\text{in})}$ for de-meaning the input signal before feeding (§ALGO S-7.3).
 
-### 7.2 Bottom-Up Assembly (§ALGO S-9.4) · `sec:sentinel:implementation-coordination-bottom-up-assembly`
+### 7.2 Bottom-Up Assembly (§ALGO S-7.4) · `sec:sentinel:implementation-coordination-bottom-up-assembly`
 
 After cell scoring, the coordination tier assembles score vectors bottom-up through the G-tree:
 
@@ -269,9 +269,9 @@ After cell scoring, the coordination tier assembles score vectors bottom-up thro
 
 `CoordContext` instances are created on first fire and pruned when either subtree loses its last online competitive cell. A quiet batch does not change membership, so it does not discard learned context state. There is no manual API — lifecycle is fully automatic.
 
-### 7.4 Coordination Warm-Up (§ALGO S-9.8) · `sec:sentinel:implementation-coordination-warmup`
+### 7.4 Coordination Warm-Up (§ALGO S-11.7) · `sec:sentinel:implementation-coordination-warmup`
 
-Coordination contexts are warmed with Gamma-sampled synthetic score vectors. This happens during the chained coordination warming phase (§ALGO S-11.4) whenever a new tracker is warmed — noise scores flow through the coordination tree just as real scores do.
+Coordination contexts are created lazily when the bottom-up walk first finds scored competitive cells in both subtrees, then warmed inline before their first real coordination observation (§ALGO S-11.7). Warm-up draws Gamma-sampled synthetic score vectors from the contributing cells' baseline moments; per-cell synthetic warm-up reports are discarded and never flow through the coordination tree.
 
 ---
 

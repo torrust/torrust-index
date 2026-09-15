@@ -215,7 +215,7 @@ fn per_axis_clip_pressure_in_cell_reports() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  Clean-traffic equilibrium (§11.2)
+//  Clean-traffic equilibrium (§ALGO S-6.4)
 // ═══════════════════════════════════════════════════════════
 
 /// Traffic that keeps its shape does not ratchet the rejection rate upward. Over
@@ -257,7 +257,7 @@ fn clip_pressure_stable_under_clean_traffic() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  Contamination dynamics (§11.1)
+//  Contamination dynamics (§ALGO S-6.4.4)
 // ═══════════════════════════════════════════════════════════
 
 /// Mixing a substantial minority of structurally novel values into an otherwise
@@ -406,7 +406,7 @@ fn faster_decay_recovers_sooner() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  Warm-up reset (§11.3)
+//  Warm-up reset (§ALGO S-11.4)
 // ═══════════════════════════════════════════════════════════
 
 /// Rejection accrued while a tracker still leaned on synthetic history is

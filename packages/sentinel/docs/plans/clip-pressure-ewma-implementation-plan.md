@@ -1,6 +1,6 @@
-# ADR-S-020 Implementation Plan: Clip-Pressure EWMA · `plan:sentinel:clip-pressure-ewma-implementation-plan`
+# Implementation Plan: Clip-Pressure EWMA · `plan:sentinel:clip-pressure-ewma-implementation-plan`
 
-Detailed, file-by-file implementation plan for the 11 gaps identified in [ADR-S-020](020-clip-pressure-ewma.md).
+Detailed, file-by-file implementation plan for the 11 gaps identified in ADR-S-020.
 
 ---
 
@@ -16,7 +16,7 @@ Before writing any code:
 
 ## Phase 1 — New Config Parameter · `sec:sentinel:clipplan-phase1-config-parameter`
 
-**File: `src/config.rs`**
+**File: ``src/config.rs``**
 
 ### Step 1.1 — Add field to `SentinelConfig` · `sec:sentinel:clipplan-step-1-1-config-field`
 
@@ -72,7 +72,7 @@ if self.clip_pressure_decay <= 0.0 || self.clip_pressure_decay >= 1.0 {
 
 ### Step 1.4 — Test · `sec:sentinel:clipplan-step-1-4-test`
 
-In `src/tests/config.rs`, add a test `rejects_clip_pressure_decay_out_of_range` paralleling `rejects_non_positive_clip_sigmas`:
+In ``src/tests/config.rs``, add a test `rejects_clip_pressure_decay_out_of_range` paralleling `rejects_non_positive_clip_sigmas`:
 
 ```rust
 #[test]
@@ -99,7 +99,7 @@ fn rejects_clip_pressure_decay_out_of_range() {
 
 ### Step 1.5 — Propagate to `SubspaceTracker` · `sec:sentinel:clipplan-step-1-5-propagate`
 
-In `src/sentinel/tracker.rs`, add a field:
+In ``src/sentinel/tracker.rs``, add a field:
 
 ```rust
 clip_pressure_decay: f64,
@@ -115,7 +115,7 @@ Initialise it from `cfg.clip_pressure_decay` in `SubspaceTracker::new()`.
 
 ## Phase 2 — Per-Axis Clip-Pressure State · `sec:sentinel:clipplan-phase2-axis-state`
 
-**File: `src/sentinel/tracker.rs`**
+**File: ``src/sentinel/tracker.rs``**
 
 ### Step 2.1 — Add field to `AxisBaseline` · `sec:sentinel:clipplan-step-2-1-baseline-field`
 
@@ -158,7 +158,7 @@ Compiles, all tests pass.  The field exists but is unused — no behavioural cha
 
 ## Phase 3 — Externalise Clipping from `EwmaStats` · `sec:sentinel:clipplan-phase3-externalise-clipping`
 
-**File: `src/ewma.rs`**
+**File: ``src/ewma.rs``**
 
 ### Step 3.1 — Add `update_raw()` method · `sec:sentinel:clipplan-step-3-1-update-raw`
 
@@ -247,7 +247,7 @@ Compiles, all tests pass.  No behavioural change to the hot path yet.
 
 ## Phase 4 — Adjust `CusumAccumulator` for Pre-Filtered Samples · `sec:sentinel:clipplan-phase4-cusum-prefiltered`
 
-**File: `src/sentinel/cusum.rs`**
+**File: ``src/sentinel/cusum.rs``**
 
 ### Step 4.1 — Add `update_filtered()` method · `sec:sentinel:clipplan-step-4-1-update-filtered`
 
@@ -307,7 +307,7 @@ Compiles, all tests pass.
 
 ## Phase 5 — Unified Clip + Clip-Pressure in `update_axis()` · `sec:sentinel:clipplan-phase5-unified-clip`
 
-**File: `src/sentinel/tracker.rs`**
+**File: ``src/sentinel/tracker.rs``**
 
 This is the **core change**.  The existing `update_axis()` delegates clipping to `EwmaStats::update()` and `CusumAccumulator::update()`, each applying their own independent filter.  After this step, `update_axis()` computes a **single shared clip filter** from the fast EWMA's ceiling, and both EWMAs receive the same retained set.
 
@@ -449,7 +449,7 @@ CARGO_PROFILE_DEV_OPT_LEVEL=3 cargo test --package torrust-sentinel convergence 
 
 ## Phase 6 — Reporting: `ScoreDistribution::clip_pressure` · `sec:sentinel:clipplan-phase6-score-distribution`
 
-**File: `src/report.rs`**
+**File: ``src/report.rs``**
 
 ### Step 6.1 — Add field to `ScoreDistribution` · `sec:sentinel:clipplan-step-6-1-distribution-field`
 
@@ -485,7 +485,7 @@ Compiles, all tests pass with the new field.
 
 ## Phase 7 — Reporting: `HealthReport` Clip-Pressure Distribution · `sec:sentinel:clipplan-phase7-health-report`
 
-**File: `src/report.rs`**
+**File: ``src/report.rs``**
 
 ### Step 7.1 — Add `ClipPressureDistribution` struct · `sec:sentinel:clipplan-step-7-1-distribution-struct`
 
@@ -514,7 +514,7 @@ pub clip_pressure_distribution: ClipPressureDistribution,
 
 ### Step 7.3 — Expose clip-pressure from `SubspaceTracker` · `sec:sentinel:clipplan-step-7-3-expose-from-tracker`
 
-**File: `src/sentinel/tracker.rs`**
+**File: ``src/sentinel/tracker.rs``**
 
 Add a helper to extract the four per-axis `clip_pressure` values:
 
@@ -532,7 +532,7 @@ pub(crate) fn clip_pressures(&self) -> [f64; 4] {
 
 ### Step 7.4 — Populate in `health()` · `sec:sentinel:clipplan-step-7-4-populate-health`
 
-**File: `src/sentinel/mod.rs`**
+**File: ``src/sentinel/mod.rs``**
 
 In the `health()` method, alongside the existing rank/maturity/geometry loops, accumulate clip-pressure min/max/sum across all 4 axes of all active trackers:
 
@@ -582,7 +582,7 @@ If the coordination tier's `HealthReport` / `CoordinationHealth` should also rep
 
 ### Step 8.2 — Warm-up completion reset (§ALGO S-11.4) · `sec:sentinel:clipplan-step-8-2-warm-up-reset`
 
-**File: `src/sentinel/tracker.rs`**
+**File: ``src/sentinel/tracker.rs``**
 
 The spec says: when noise influence crosses the warm-up threshold (η goes below some value), zero all four axes' `clip_pressure`.
 
@@ -624,12 +624,12 @@ pub fn reset_clip_pressure(&mut self) {
 }
 ```
 
-Called from `warm_inline()` in `sentinel/mod.rs` after `cell.tracker.reset_cusum()`.
+Called from `warm_inline()` in ``sentinel/mod.rs`` after `cell.tracker.reset_cusum()`.
 
 **Recommendation:** Use **both**.  Option B handles the explicit noise-injection completion path.  Option A catches edge cases where η decays through real-traffic dilution alone (e.g. if noise was partially skipped).
 
 The warm-up threshold constant (`0.01`) should either:
-- Be defined as `const WARMUP_THRESHOLD: f64 = 0.01` in `tracker.rs`, or
+- Be defined as `const WARMUP_THRESHOLD: f64 = 0.01` in ``tracker.rs``, or
 - Be configurable (a future config field).  For now, a constant is fine — the spec doesn't parameterise it.
 
 ### Checkpoint · `sec:sentinel:clipplan-phase8-checkpoint`
@@ -660,7 +660,7 @@ That's 7 depending on how you count.  With `clip_pressure` = **8**. 4 axes × 8 
 
 ### Step 9.2 — Update any doc comments · `sec:sentinel:clipplan-step-9-2-doc-comments`
 
-If `SubspaceTracker` or `AxisBaseline` has doc comments referencing memory accounting, update them.  Check `docs/algorithm.md` §4.3 if it's in-repo.
+If `SubspaceTracker` or `AxisBaseline` has doc comments referencing memory accounting, update them.  Check ``docs/algorithm.md`` §4.3 if it's in-repo.
 
 ### No code change needed here — just verification. · `sec:sentinel:clipplan-phase9-no-code-change`
 
@@ -668,7 +668,7 @@ If `SubspaceTracker` or `AxisBaseline` has doc comments referencing memory accou
 
 ## Phase 10 — Update Convergence Diagnostics · `sec:sentinel:clipplan-phase10-convergence-diagnostics`
 
-**File: `src/tests/convergence_diagnostics.rs`**
+**File: ``src/tests/convergence_diagnostics.rs``**
 
 The convergence diagnostic test currently computes `eff_clip` as:
 
@@ -691,7 +691,7 @@ Also update the column header in the diagnostic table to include `ρ̄`.
 
 ## Phase 11 — Integration Test: Contamination Self-Correction · `sec:sentinel:clipplan-phase11-contamination-test`
 
-**File:** **`tests/` (new test file or extend `tests/spray_resistance.rs`)**
+**Files:** ``tests/`` (new test file or extend ``tests/spray_resistance.rs``)
 
 This is the **acceptance test** that validates the core value proposition: sustained contamination in production (η ≈ 0) should widen the clip ceiling automatically.
 
@@ -740,11 +740,11 @@ fn warm_up_completion_resets_clip_pressure() {
 
 ### Step 12.1 — Serde roundtrip · `sec:sentinel:clipplan-step-12-1-serde-roundtrip`
 
-If `ScoreDistribution` is `Serialize/Deserialize`, the new field is automatically included.  Run `tests/serde_roundtrip.rs` to confirm.
+If `ScoreDistribution` is `Serialize/Deserialize`, the new field is automatically included.  Run ``tests/serde_roundtrip.rs`` to confirm.
 
 ### Step 12.2 — `AxisBaselineSnapshots` · `sec:sentinel:clipplan-step-12-2-baseline-snapshots`
 
-In `src/report.rs`, `AxisBaselineSnapshots` is used for convergence tests.  Consider adding per-axis `clip_pressure` fields if tests need them:
+In ``src/report.rs``, `AxisBaselineSnapshots` is used for convergence tests.  Consider adding per-axis `clip_pressure` fields if tests need them:
 
 ```rust
 pub struct AxisBaselineSnapshots {
@@ -759,7 +759,7 @@ pub struct AxisBaselineSnapshots {
 }
 ```
 
-Update `axis_baseline_snapshots()` in `tracker.rs` correspondingly.
+Update `axis_baseline_snapshots()` in ``tracker.rs`` correspondingly.
 
 Alternatively, provide a separate `clip_pressures()` method (done in Phase 7.3) and keep `AxisBaselineSnapshots` unchanged.  Prefer the separate method unless tests need both in a single struct.
 
@@ -822,16 +822,16 @@ Run the convergence benchmark before and after, compare round counts. The warm-u
 
 | Phase | Gap(s) | Files touched | Risk |
 |-------|--------|---------------|------|
-| 1 | 2 | `config.rs`, `tests/config.rs` | Low — additive |
-| 2 | 1 | `tracker.rs` | Low — unused field |
-| 3 | 4 (partial) | `ewma.rs` | Low — new method, old preserved |
-| 4 | 6 (partial) | `cusum.rs` | Low — new method, old preserved |
-| 5 | 3, 4, 5, 6 | `tracker.rs` | **High** — core behavioural change |
-| 6 | 7 | `report.rs` | Medium — struct change, many construction sites |
-| 7 | 8 | `report.rs`, `mod.rs` | Medium — new reporting pipeline |
-| 8 | 9, 10 | `tracker.rs`, `mod.rs` | Medium — lifecycle logic |
+| 1 | 2 | ``config.rs``, ``tests/config.rs`` | Low — additive |
+| 2 | 1 | ``tracker.rs`` | Low — unused field |
+| 3 | 4 (partial) | ``ewma.rs`` | Low — new method, old preserved |
+| 4 | 6 (partial) | ``cusum.rs`` | Low — new method, old preserved |
+| 5 | 3, 4, 5, 6 | ``tracker.rs`` | **High** — core behavioural change |
+| 6 | 7 | ``report.rs`` | Medium — struct change, many construction sites |
+| 7 | 8 | ``report.rs``, ``mod.rs`` | Medium — new reporting pipeline |
+| 8 | 9, 10 | ``tracker.rs``, ``mod.rs`` | Medium — lifecycle logic |
 | 9 | 11 | docs only | Low — verification |
-| 10 | — | `tests/convergence_diagnostics.rs` | Low — test update |
+| 10 | — | ``tests/convergence_diagnostics.rs`` | Low — test update |
 | 11 | — | `tests/` | Low — new tests |
 | 12 | — | various | Low — fixups |
 | 13 | — | — | Low — final validation |

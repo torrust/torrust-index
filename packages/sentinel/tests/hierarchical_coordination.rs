@@ -70,7 +70,7 @@ use common::{ScenarioBuilder, assert_invariants, cell_values, seeded_sentinel, t
 use torrust_sentinel::{GNodeId, Sentinel128, SentinelConfig};
 
 // ═══════════════════════════════════════════════════════════
-//  Activation & deactivation (§7.1)
+//  Activation & deactivation (§ALGO S-7.7)
 // ═══════════════════════════════════════════════════════════
 
 // ── no_coordination_on_empty_batch ──────────────────────────
@@ -234,7 +234,7 @@ fn context_deactivation_on_subtree_loss() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  Hierarchy & nesting (§7.1, §7.4)
+//  Hierarchy & nesting (§ALGO S-7.1 and §ALGO S-7.4)
 // ═══════════════════════════════════════════════════════════
 
 // ── nested_coordination_levels ──────────────────────────────
@@ -421,7 +421,7 @@ fn semi_internal_node_passthrough() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  Scoring & tracking (§7.2–7.5)
+//  Scoring & tracking (§§ALGO S-7.2–7.5)
 // ═══════════════════════════════════════════════════════════
 
 // ── coordination_tracker_operates_at_w4 ─────────────────────
@@ -604,7 +604,7 @@ fn cells_with_no_observations_excluded() {
     // cells get zero observations this batch.
     let report = s.ingest(&cell_values(0xF, 4));
 
-    // §7.2: cells with no observations are excluded. If only one
+    // §ALGO S-7.2: cells with no observations are excluded. If only one
     // subtree has observations, coordination should not fire.
     for cr in &report.coordination_reports {
         assert!(cr.cells_reporting >= 2, "coordination should need cells from both subtrees");
@@ -813,7 +813,7 @@ fn deterministic_report_order() {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  Invariants (§7.1)
+//  Invariants (§ALGO S-7.1)
 // ═══════════════════════════════════════════════════════════
 
 // ── context_count_bounded_by_k_minus_1 ──────────────────────

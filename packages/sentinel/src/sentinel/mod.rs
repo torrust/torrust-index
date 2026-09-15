@@ -248,7 +248,9 @@ where
     /// outside the range the observation path can model — narrower than the
     /// smallest dimension a subspace tracker can work in, or wider than the
     /// centred bit vector that feeds it can carry. Every such fault is
-    /// collected in one pass.
+    /// collected in one pass. The graph type separately enforces
+    /// `N <= C::BITS` at compile time; that type-level relationship can never
+    /// reach this runtime error channel.
     ///
     /// Also returns [`ConfigErrors`] when the configuration asked for
     /// background warming and the environment refused the thread it runs on.
@@ -269,7 +271,8 @@ where
         // produced them. This is the only place either bound can be judged:
         // the width is a parameter of the type, not a field of the
         // configuration, so validation of the configuration alone can never
-        // see it.
+        // see it. The graph constructor separately enforces N <=
+        // C::BITS at compile time, so it is not a runtime validation case.
         let mut errors = Vec::new();
         if (N as usize) < crate::MIN_TRACKER_DIM {
             errors.push(ConfigError::TrackerDimensionTooSmall {
@@ -1256,7 +1259,7 @@ where
     /// Builds the pruned coordination topology, walks bottom-up, fires
     /// coordination at internal nodes where both subtrees contribute
     /// competitive cell scores, and returns reports for the contexts
-    /// that fire in this batch (§ALGO S-9.4).
+    /// that fire in this batch (§ALGO S-7.4).
     fn propagate_coordination_from_root(&mut self, cell_scores: &BTreeMap<GNodeId, [f64; 4]>) -> Vec<CoordinationReport<C>> {
         let scoring_gnodes: BTreeSet<GNodeId> = cell_scores.keys().copied().collect();
 
