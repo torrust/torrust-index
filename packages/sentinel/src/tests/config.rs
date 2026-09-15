@@ -111,6 +111,10 @@
 //! | [`accepts_the_widest_modellable_coordinate_width`] | config | cites (´claim:config:a-coordinate-width-above-the-centred-bit-ceiling-is-refused-at-construction´) |
 //! | [`warming_thread_refusal_names_the_setting_and_the_environment`] | config | The refusal a host receives when the environment will not give the engine a warming thread names the setting that asked for one and quotes the operating system's own account of the refusal. Nothing in the configuration is wrong in that case, so a message that said only that a configuration was invalid would send an operator searching values that are all correct: naming the setting says which request to withdraw, and quoting the environment says whether withdrawing it is the right answer at all or whether the machine is simply out of threads. |
 
+//! | [`unrepresentable_noise_batch_is_rejected_before_construction`] | config | An enabled batch that cannot fit in the address space is rejected before construction can allocate it. |
+//! | [`rejects_noise_matrix_size_even_when_the_outer_vector_fits`] | config | Batch validation includes the supported matrix width, not just the outer row vector. |
+//! | [`ignores_unallocated_noise_batch_size_when_disabled`] | config | A disabled schedule never allocates its batch and therefore needs no allocation bound. |
+
 use crate::config::*;
 
 // ── Default config ──────────────────────────────────────────
@@ -1874,4 +1878,55 @@ fn warming_thread_refusal_names_the_setting_and_the_environment() {
         rendered.contains("Resource temporarily unavailable (os error 11)"),
         "the refusal must quote the environment's own account, got: {rendered}"
     );
+}
+
+#[test]
+fn unrepresentable_noise_batch_is_rejected_before_construction() {
+    let config = SentinelConfig::<u64> {
+        noise_schedule: NoiseSchedule::Explicit(vec![1]),
+        noise_batch_size: usize::MAX,
+        ..SentinelConfig::default()
+    };
+    let validation = config.validate();
+    // Keep construction before the assertions: the unvalidated configuration
+    // reaches the capacity-overflow panic in a constructor without this guard.
+    let construction = crate::SpectralSentinel::<u64, u64, 8>::new(config);
+    let errors = validation.expect_err("an unrepresentable noise batch must be rejected");
+    assert_eq!(errors.0.len(), 1);
+    assert_eq!(
+        errors.to_string(),
+        format!("noise_batch_size ({}) exceeds representable allocation bounds", usize::MAX)
+    );
+    assert!(
+        construction.is_err(),
+        "construction must return a structured configuration error"
+    );
+}
+
+#[test]
+fn rejects_noise_matrix_size_even_when_the_outer_vector_fits() {
+    // One more row than fits in an unpadded, maximum-width f64 matrix;
+    // the outer Vec's much smaller row descriptor still fits.
+    let batch_size = isize::MAX.unsigned_abs() / (crate::MAX_TRACKER_DIM * size_of::<f64>()) + 1;
+    assert!(
+        batch_size
+            .checked_mul(size_of::<Vec<f64>>())
+            .is_some_and(|bytes| bytes <= isize::MAX.unsigned_abs())
+    );
+    let config = SentinelConfig::<u64> {
+        noise_schedule: NoiseSchedule::Explicit(vec![1]),
+        noise_batch_size: batch_size,
+        ..SentinelConfig::default()
+    };
+    assert!(config.validate().is_err(), "matrix byte sizes must be representable");
+}
+
+#[test]
+fn ignores_unallocated_noise_batch_size_when_disabled() {
+    let config = SentinelConfig::<u64> {
+        noise_schedule: NoiseSchedule::Explicit(Vec::new()),
+        noise_batch_size: usize::MAX,
+        ..SentinelConfig::default()
+    };
+    assert!(config.validate().is_ok());
 }

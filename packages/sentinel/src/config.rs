@@ -369,7 +369,8 @@ pub struct SentinelConfig<V: Accumulator> {
     /// Each round feeds this many random ±0.5 centred vectors through
     /// the tracker's `observe()` path with `is_noise = true`.
     ///
-    /// Must be ≥ 1 when noise is enabled.
+    /// Must be ≥ 1 when noise is enabled, with all batch-sized allocations
+    /// representable at the supported tracker width and rank ceilings.
     ///
     /// Default: `16`
     pub noise_batch_size: usize,
@@ -500,6 +501,8 @@ pub enum ConfigError {
     BudgetTooSmall { budget: usize, required_minimum: usize },
     /// `noise_batch_size` must be ≥ 1 when noise is enabled.
     NoiseBatchSizeZero,
+    /// An enabled noise batch requires an allocation larger than the address space permits.
+    NoiseBatchSizeTooLarge { batch_size: usize },
     /// `NoiseSchedule::Geometric::decay` must be in `(0.0, 1.0]`.
     NoiseScheduleDecayOutOfRange(f64),
     /// `NoiseSchedule::Geometric::root` must be > 0 when `min` > 0.
@@ -580,6 +583,9 @@ impl std::fmt::Display for ConfigError {
             Self::NoiseBatchSizeZero => {
                 write!(f, "noise_batch_size must be >= 1 when noise is enabled")
             }
+            Self::NoiseBatchSizeTooLarge { batch_size } => {
+                write!(f, "noise_batch_size ({batch_size}) exceeds representable allocation bounds")
+            }
             Self::NoiseScheduleDecayOutOfRange(v) => {
                 write!(f, "noise_schedule geometric decay must be in (0.0, 1.0], got {v}")
             }
@@ -646,6 +652,67 @@ impl std::fmt::Display for ConfigErrors {
 }
 
 impl std::error::Error for ConfigErrors {}
+
+fn noise_batch_error(batch_size: usize, max_rank: usize) -> Option<ConfigError> {
+    if batch_size == 0 {
+        Some(ConfigError::NoiseBatchSizeZero)
+    } else if noise_allocation_bound(batch_size, max_rank).is_none_or(|bytes| bytes > isize::MAX.unsigned_abs()) {
+        Some(ConfigError::NoiseBatchSizeTooLarge { batch_size })
+    } else {
+        None
+    }
+}
+
+// Validation has no coordinate width, so use the supported ceiling D. With
+// b samples and k <= D, observe allocates b-by-d and b-by-k matrices; naive
+// SVD allocates d-by-(b+k) and thin factors with at most D columns. Brand's
+// kernel is used only when b+k+2 <= d, so its square allocations are smaller.
+// faer 0.24 pads f64 rows to 64-byte boundaries. Its tall thin-SVD workspace
+// contains one padded (b+k)-by-d matrix, two at-most-D-by-D matrices (QR's
+// block size is at most d), and a square-SVD workspace. The other SVD branch
+// has bounded dimensions here. Include alignment slack for the workspace.
+// This checks representability, not whether the machine has enough free RAM.
+fn noise_allocation_bound(batch_size: usize, max_rank: usize) -> Option<usize> {
+    use faer::linalg::svd::{ComputeSvdVectors, svd_scratch};
+
+    let dim = crate::MAX_TRACKER_DIM;
+    let scalar_bytes = size_of::<f64>();
+    let alignment = 64;
+    let columns = batch_size.checked_add(max_rank.min(dim))?;
+    let padded_rows = columns.checked_next_multiple_of(alignment / scalar_bytes)?;
+    let matrix_bytes = padded_rows.checked_mul(dim)?.checked_mul(scalar_bytes)?;
+    let square_bytes = dim.checked_mul(dim)?.checked_mul(scalar_bytes)?;
+    let square_workspace = (1..=dim)
+        .map(|width| {
+            svd_scratch::<f64>(
+                width,
+                width,
+                ComputeSvdVectors::Thin,
+                ComputeSvdVectors::Thin,
+                faer::get_global_parallelism(),
+                faer::Spec::default(),
+            )
+            .size_bytes()
+        })
+        .max()?;
+    let workspace_bytes = matrix_bytes
+        .checked_add(square_bytes.checked_mul(2)?)?
+        .checked_add(square_workspace)?
+        .checked_add(alignment - 1)?;
+
+    // The outer noise vector, borrowed row slices, score scratch vectors,
+    // and optional per-sample reports each have exactly b elements. The
+    // inner noise rows have d <= D f64 elements and are already covered.
+    let element_bytes = [
+        size_of::<Vec<f64>>(),
+        size_of::<&[f64]>(),
+        scalar_bytes,
+        size_of::<crate::report::SampleScore>(),
+    ]
+    .into_iter()
+    .max()?;
+    Some(workspace_bytes.max(batch_size.checked_mul(element_bytes)?))
+}
 
 /// Non-fatal diagnostic for parameter combinations that are technically
 /// valid but likely to produce poor results (§ALGO S-A.7).
@@ -804,8 +871,10 @@ impl<V: Inspectable> SentinelConfig<V> {
         }
 
         // ── Noise injection fields (§ALGO S-13.5, §ALGO S-18.2) ──
-        if !self.noise_schedule.is_disabled() && self.noise_batch_size == 0 {
-            errors.push(ConfigError::NoiseBatchSizeZero);
+        if !self.noise_schedule.is_disabled()
+            && let Some(error) = noise_batch_error(self.noise_batch_size, self.max_rank)
+        {
+            errors.push(error);
         }
         match &self.noise_schedule {
             NoiseSchedule::Geometric { root, decay, min } => {
