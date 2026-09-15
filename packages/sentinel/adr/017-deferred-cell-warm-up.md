@@ -1,6 +1,6 @@
 # ADR-S-017: Deferred Cell Warm-Up · `rec:sentinel:background-priority-warmup-off-ingest-path`
 
-**Status:** Implemented (synchronous fallback + background thread) **Date:** 2026-03-11 **Revised:** 2026-03-13 **Spec:** §ALGO S-18 (work variance and timing considerations) **Relates to:** [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection), [ADR-S-015](015-cell-creation-performance.md) (cell creation performance), [ADR-S-002](002-feed-forward-invariant.md) (feed-forward invariant), [ADR-S-005](005-deterministic-order-and-thread-safety.md) (deterministic order)
+**Status:** Implemented (synchronous fallback + background thread; "No Slot Reservation" superseded by ADR-S-019) **Date:** 2026-03-11 **Revised:** 2026-03-13 **Spec:** §ALGO S-18 (work variance and timing considerations) **Relates to:** [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection), [ADR-S-015](015-cell-creation-performance.md) (cell creation performance), [ADR-S-002](002-feed-forward-invariant.md) (feed-forward invariant), [ADR-S-005](005-deterministic-order-and-thread-safety.md) (deterministic order)
 
 ## Context · `sec:sentinel:deferredwarmup-context`
 
@@ -36,6 +36,8 @@ Observations destined for a warming cell are routed to the nearest **online** an
 Warming cells do not activate coordination contexts. Coordination activates only at promotion, at which point the cell's baselines are converged. Each newly activated coordination context runs a cheap inline warm-up (§ALGO S-9.8) using Gamma-sampled synthetic score vectors derived from the participating cells' mature baselines.
 
 ### No Slot Reservation · `sec:sentinel:deferredwarmup-no-slot-reservation`
+
+> **Superseded by ADR-S-019.** Warming cells are members of the investment set and hold investment slots because their trackers and warm-up resources have been allocated, but they do not enter the producing sets or hold production slots until they are online. The original paragraph below records the earlier lifecycle terminology.
 
 Warming cells do not hold competitive slots. The analysis set contains only online cells. If a warming cell's G-node is evicted before warm-up completes, the partial work is discarded — the G-V Graph determined the interval no longer warrants a node.
 

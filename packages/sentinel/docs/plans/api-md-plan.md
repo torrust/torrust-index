@@ -12,7 +12,7 @@ Mirror mudlark's seven-section layout, adapted for sentinel's domain:
 | --- | ------------------------------- | ---------------------------------------------------------------------- |
 | 1   | Design Principles               | "Measure, don't decide", feed-forward invariant, host policy control   |
 | 2   | Three-Layer Architecture        | Spatial Layer (mudlark), Analysis Selector, Analysis Engine            |
-| 3   | Crate Root Re-exports           | Type aliases, re-exported mudlark types, public modules                |
+| 3   | Crate Root Re-exports           | Flat public re-exports, type aliases, re-exported mudlark types        |
 | 4   | Surface 1 — Report Types        | Batch/cell/coordination reports, scores, maturity, geometry, snapshots |
 | 5   | Surface 2 — Operational Types   | `SpectralSentinel`, `SentinelConfig`, `NoiseSchedule`                  |
 | 6   | Surface 3 — Internal Machinery  | `pub(crate)` modules (tracker, staging, cusum, warming_thread, etc.)   |
@@ -53,25 +53,30 @@ Responsibility table (summarised from §ALGO S-1.5).
 
 ### §3 Crate Root Re-exports · `sec:sentinel:apiplan-crate-root-reexports`
 
-Document the `lib.rs` re-exports:
+Document the flat crate-root API that `lib.rs` ships. The modules remain crate-private, while their public types are re-exported from the crate root so downstream users have one canonical import path:
 
 ```rust
-// Type aliases (convenience).
-pub type Sentinel128 = SpectralSentinel<u128, u64, 128>;
-pub type Sentinel64 = SpectralSentinel<u64, u64, 64>;
+pub(crate) mod analysis_set;
+pub(crate) mod config;
+pub(crate) mod ewma;
+pub(crate) mod maths;
+pub(crate) mod observation;
+pub(crate) mod report;
+pub(crate) mod sentinel;
 
-// Re-exported from mudlark.
+pub use analysis_set::{AnalysisEntry, AnalysisSet};
+pub use config::{ConfigError, ConfigErrors, ConfigWarning, NoiseSchedule, SentinelConfig};
+pub use maths::SvdStrategy;
+pub use observation::{CentredBitSource, CentredBits};
+pub use report::{BatchReport, CellReport, CoordinationReport};
+pub use sentinel::SpectralSentinel;
 pub use torrust_mudlark::GNodeId;
 
-// Public modules.
-pub mod analysis_set;
-pub mod config;
-pub mod ewma;
-pub mod maths;
-pub mod observation;
-pub mod report;
-pub mod sentinel;
+pub type Sentinel128 = SpectralSentinel<u128, u64, 128>;
+pub type Sentinel64 = SpectralSentinel<u64, u64, 64>;
 ```
+
+The excerpt records the visibility pattern; §4 inventories the complete set of report types re-exported from the crate root. A few support types are also re-exported with `#[doc(hidden)]` for tests, diagnostics, and benchmarks, outside the ordinary downstream API surface.
 
 ### §4 Surface 1 — Report Types (module `report`) · `sec:sentinel:apiplan-report-types`
 
