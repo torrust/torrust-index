@@ -22,8 +22,10 @@
 //!
 //! The sentinel sets `shutdown` to `true` **under the staging lock** and
 //! notifies the condvar. The thread finishes any in-progress batch, then
-//! exits. The sentinel joins the thread in
-//! [`WarmingThreadHandle::shutdown`] (called from `Drop` or `reset()`).
+//! exits. An explicit [`WarmingThreadHandle::shutdown`] joins the worker
+//! and surfaces a worker panic to its caller. During destruction the same
+//! handshake consumes a failed join and records it through `tracing`, because
+//! a destructor must not add a second panic to an unwind already in progress.
 //!
 //! The lock is what makes the transition observable. The worker holds the
 //! staging mutex from the moment it reads the two predicates until
@@ -125,6 +127,15 @@ impl<C: Coordinate> WarmingThreadHandle<C> {
         self.condvar.notify_one();
     }
 
+    /// Signal the worker through the predicate guarded by the staging lock.
+    fn request_shutdown(&self) {
+        {
+            let _staging = self.staging.lock().unwrap_or_else(PoisonError::into_inner);
+            self.shutdown.store(true, Ordering::Release);
+        }
+        self.condvar.notify_one();
+    }
+
     /// Signal the thread to stop and wait for it to exit.
     ///
     /// Safe to call multiple times (subsequent calls are no-ops).
@@ -142,22 +153,51 @@ impl<C: Coordinate> WarmingThreadHandle<C> {
     /// and that panic is reported by the join below; refusing here would
     /// replace that report with a panic raised inside `Drop`.
     pub fn shutdown(&self) {
-        {
-            let _staging = self.staging.lock().unwrap_or_else(PoisonError::into_inner);
-            self.shutdown.store(true, Ordering::Release);
-        }
-        self.condvar.notify_one();
+        self.request_shutdown();
 
         let handle = self.handle.lock().expect("warming handle poisoned").take();
         if let Some(handle) = handle {
             handle.join().expect("warming thread panicked");
         }
     }
+
+    /// Make the worker fail through its ordinary poisoned-staging path and
+    /// wait until the failed thread can be joined by the owner.
+    #[cfg(test)]
+    pub(crate) fn fail_worker_for_test(&self) {
+        let staging = Arc::clone(&self.staging);
+        let poisoner = std::thread::spawn(move || {
+            let _guard = staging.lock().expect("test staging lock must start healthy");
+            panic!("test-requested staging poison");
+        });
+        assert!(poisoner.join().is_err(), "the staging poisoner must fail");
+        self.notify();
+
+        loop {
+            let finished = self
+                .handle
+                .lock()
+                .expect("warming handle poisoned")
+                .as_ref()
+                .is_none_or(JoinHandle::is_finished);
+            if finished {
+                break;
+            }
+            std::thread::yield_now();
+        }
+    }
 }
 
 impl<C: Coordinate> Drop for WarmingThreadHandle<C> {
     fn drop(&mut self) {
-        self.shutdown();
+        self.request_shutdown();
+
+        let Some(handle) = self.handle.get_mut().unwrap_or_else(PoisonError::into_inner).take() else {
+            return;
+        };
+        if handle.join().is_err() {
+            tracing::error!("warming thread panicked during sentinel destruction");
+        }
     }
 }
 

@@ -701,6 +701,16 @@ where
         &self.config
     }
 
+    /// Fail the warming worker and wait until its join handle records the
+    /// failure, so destruction tests can exercise the failed-worker path.
+    #[cfg(test)]
+    pub(crate) fn fail_warming_worker_for_test(&self) {
+        self.warming_thread
+            .as_ref()
+            .expect("the test sentinel must own a warming worker")
+            .fail_worker_for_test();
+    }
+
     /// Read-only access to the G-V Graph.
     #[must_use]
     pub const fn graph(&self) -> &GvGraph<C, V, N> {
