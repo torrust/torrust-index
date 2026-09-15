@@ -11,7 +11,7 @@
 use crate::graph::GvGraph;
 use crate::handle::GSlotPointer;
 use crate::traits::{Accumulator, Coordinate, Inspectable};
-use crate::{evict, rebalance, vtree};
+use crate::{evict, rebalance, required_headroom, vtree};
 
 impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N> {
     /// Handle new G-nodes created by `legacy_promote` during rebalance.
@@ -55,9 +55,9 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
 
         // Dynamic headroom: max(structural ceiling, convergence bound).
         // ADR-M-018: ensures S + 2(D_c − 1) ≤ H at every step.
-        let convergence_bound = 2 * (self.live_depth_create as usize).saturating_sub(1);
-        let required_headroom = self.headroom.max(convergence_bound);
-        let soft_limit = budget - required_headroom;
+        let convergence_steps = (self.live_depth_create as usize).saturating_sub(1);
+        let required_headroom = required_headroom(self.headroom, convergence_steps);
+        let soft_limit = budget.saturating_sub(required_headroom);
         assert!(
             soft_limit >= 1,
             "soft_limit must be >= 1 (budget={budget}, headroom={required_headroom}, \
@@ -88,7 +88,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
             let count_f = count as f64;
             if count_f < threshold {
                 // Relax: raise D_evict by 1 (no ceiling).
-                self.live_depth_evict += 1;
+                self.live_depth_evict = self.live_depth_evict.saturating_add(1);
                 self.live_depth_create = self.live_depth_evict - self.depth_buffer;
                 tracing::debug!(
                     new_d_evict = self.live_depth_evict,

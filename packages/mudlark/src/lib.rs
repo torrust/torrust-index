@@ -79,6 +79,24 @@
 //!   integration tests may call `assert_invariants()` and reuse
 //!   shared test infrastructure (config presets, plan runner, etc.).
 
+/// Maximum structural headroom implied by the fixed depth buffer.
+const fn structural_headroom(depth_buffer: u32) -> usize {
+    // Saturating rather than wrapping: an unrepresentable ceiling leaves no
+    // representable budget that could clear it, so the saturated figure
+    // carries that verdict into the configuration guard.
+    match 3usize.checked_pow(depth_buffer.saturating_add(1)) {
+        Some(headroom) => headroom,
+        None => usize::MAX,
+    }
+}
+
+/// Maximum of the structural ceiling and twice the remaining convergence steps.
+fn required_headroom(structural_headroom: usize, convergence_steps: usize) -> usize {
+    // The convergence term follows the structural term's saturation rule: an
+    // unrepresentable requirement cannot be cleared by a representable budget.
+    structural_headroom.max(convergence_steps.saturating_mul(2))
+}
+
 // ── Surface 1 — Prints (view types users hold and inspect) ──────
 //
 // Modules are private; types are re-exported flat from the crate

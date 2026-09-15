@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.0.1] - 2026-09-15
+
+### Fixed
+
+- Saturate convergence headroom so oversized depth settings cannot wrap into an admissible configuration.
+
 ## [1.0.0] - 2026-03-21
 
 Initial stable release. The public API surface documented in
@@ -75,4 +83,5 @@ Initial stable release. The public API surface documented in
 - **Full documentation** — `idea.md` (formal spec), `api.md`,
   `architecture.md`, `performance.md`, `testing.md`, `theory.md`.
 
+[1.0.1]: https://github.com/torrust/torrust-index/compare/mudlark-v1.0.0...mudlark-v1.0.1
 [1.0.0]: https://github.com/torrust/torrust-index/releases/tag/mudlark-v1.0.0

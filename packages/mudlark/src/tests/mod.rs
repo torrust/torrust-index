@@ -14,6 +14,7 @@ pub mod graph;
 pub mod graph_init;
 pub mod gtree;
 pub mod handle;
+pub mod headroom;
 pub mod invariant_self;
 pub mod observe;
 pub mod pewei;

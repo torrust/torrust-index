@@ -19,6 +19,7 @@ use crate::plateau::{BasisEdge, Plateau, PlateauBasis};
 use crate::traits::{Accumulator, Coordinate};
 use crate::view::Node;
 use crate::vnode::VNode;
+use crate::{required_headroom, structural_headroom};
 
 // ── Surface 1 view type (ADR-M-036 D2) ────────────────────────────
 
@@ -219,9 +220,9 @@ impl<V: Accumulator> Config<V> {
         );
         if let Some(budget) = self.budget {
             let buffer = self.depth_evict - self.depth_create;
-            let headroom = 3usize.pow(buffer + 1);
-            let convergence = 2 * (self.depth_create as usize).saturating_sub(1);
-            let required = headroom.max(convergence);
+            let headroom = structural_headroom(buffer);
+            let convergence_steps = (self.depth_create as usize).saturating_sub(1);
+            let required = required_headroom(headroom, convergence_steps);
             assert!(
                 budget > required,
                 "Config: budget ({budget}) must be > max(3^(buffer+1), 2*(D_c-1)) \
@@ -522,11 +523,16 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
         let live_depth_evict = config.depth_evict;
         let live_depth_create = config.depth_create;
         let depth_buffer = config.depth_evict - config.depth_create;
-        let headroom = 3usize.pow(depth_buffer + 1);
-        let convergence_bound = 2 * (live_depth_create as usize).saturating_sub(1);
-        let required_headroom = headroom.max(convergence_bound);
+        // This is reachable even when the budget check stands down, so retain
+        // the helper's saturated verdict in the stored headroom.
+        let headroom = structural_headroom(depth_buffer);
+        let convergence_steps = (live_depth_create as usize).saturating_sub(1);
+        let required_headroom = required_headroom(headroom, convergence_steps);
         let soft_limit = config.budget.map(|b| {
-            let s = b - required_headroom;
+            // The configuration guard has already refused an insufficient
+            // budget; saturation keeps this second line of defence from
+            // wrapping before its assertion can name the invariant failure.
+            let s = b.saturating_sub(required_headroom);
             assert!(s >= 1, "soft_limit must be >= 1 (budget={b}, headroom={required_headroom})");
             s
         });
