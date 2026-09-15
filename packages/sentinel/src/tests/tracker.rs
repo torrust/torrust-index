@@ -285,7 +285,8 @@ fn rank_change_report_describes_the_scoring_state() {
     assert_eq!(report.geometry.cap, scoring_geometry.cap);
     assert_eq!(report.geometry.residual_dof, scoring_geometry.residual_dof);
     assert_eq!(
-        report.scores.coherence.mean, 0.0,
+        report.scores.coherence.mean.to_bits(),
+        0.0_f64.to_bits(),
         "coherence does not exist at the scoring rank"
     );
 }
