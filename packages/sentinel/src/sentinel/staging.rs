@@ -50,7 +50,7 @@
 //! | [`equal_volumes_take_the_shallower_cell_first`] | staging | Equal volumes resolve to the shallower cell rather than the deeper one. A tie is the ordinary case for a pair of siblings the moment they are created, and the rule the queue exists to serve is that a busy ancestor is warmed before the cells beneath it. Identifiers are handed out as the tree grows downward, so the larger of two is always the newer and deeper cell, and resolving a tie toward it inverts the rule exactly. This path and the synchronous drain are two ways of serving one queue, so they must not disagree about which cell comes next. |
 //! | [`an_in_flight_cell_still_counts_as_a_competitive_target`] | staging | A cell checked out for background warming is still a warming cell, so it still counts among the competitive targets being warmed. Checking a cell out is how the expensive work is done off the lock, not a change in what the cell is; a count that dropped it would fall precisely when the work was happening, understating what is in progress by the number of cells actually in progress. The flag is recorded at checkout, so counting it needs nothing from a cell another thread is holding. |
 //! | [`an_in_flight_ancestor_cell_is_not_a_competitive_target`] | staging | cites (´claim:staging:a-cell-checked-out-for-warming-still-counts-among-the-competitive-targets´) |
-//! | [`a_newly_queued_cell_carries_its_volume`] | staging | A cell joining the queue carries its volume with it instead of waiting for a later pass to supply one. The queue is served highest volume first, so a cell admitted at zero is indistinguishable from a cell with no traffic behind it, and a field of zeroes is decided entirely by the tie-break — which puts the newest and deepest cell first, the inverse of what the queue is for. Refreshing the cached volumes before the new cells are added rather than after leaves every one of them in exactly that state until some later pass happens to refresh again. |
+//! | [`a_newly_queued_cell_carries_its_volume`] | staging | A cell joining the queue carries its volume immediately. The worker is stopped before enqueueing while deferred staging remains selected, so every queued cell is available for the volume assertions regardless of thread scheduling. |
 //! | [`return_warming_restores_cell`] | staging | A cell handed back unfinished rejoins the warming set and stops being in flight, with its accumulated rounds intact. Background warming can therefore be interrupted between rounds — the thread need not carry a cell to completion once it has taken it. |
 //! | [`finish_warming_moves_to_ready`] | staging | A cell handed back finished joins the ready queue instead of the warming set, and is no longer in flight. Which of the two return paths the background thread takes is what decides the cell's fate, so completion is declared by the worker that did the rounds rather than re-derived by the staging area. |
 //! | [`eviction_of_in_flight_cell_discards_on_return`] | staging | A cell evicted while a background thread was working on it is discarded when it comes back, not resurrected: the eviction sweep removes its in-flight mark, and a return with no mark to clear keeps nothing. The warming work already spent is lost, which is the deliberate trade — a cell that has left the analysis set must not reappear in it because a thread happened to be holding it. |
@@ -938,14 +938,9 @@ mod tests {
         assert_eq!(staging.warming_competitive_count(), 0);
     }
 
-    /// A cell joining the queue carries its volume with it instead of waiting
-    /// for a later pass to supply one. The queue is served highest volume
-    /// first, so a cell admitted at zero is indistinguishable from a cell with
-    /// no traffic behind it, and a field of zeroes is decided entirely by the
-    /// tie-break — which puts the newest and deepest cell first, the inverse of
-    /// what the queue is for. Refreshing the cached volumes before the new
-    /// cells are added rather than after leaves every one of them in exactly
-    /// that state until some later pass happens to refresh again.
+    /// A cell joining the queue carries its volume immediately. Refreshing cached volumes before enqueueing would leave new cells at zero until another reconciliation pass, preventing the queue from prioritising them by traffic.
+    ///
+    /// The worker is stopped through its shutdown handshake before traffic is queued, while its handle remains installed to select deferred staging. Every queued cell is therefore available for the volume assertions, without relying on the scheduler or the length of a noise schedule to leave cells waiting.
     ///
     /// ´claim:staging:a-cell-joins-the-queue-carrying-its-volume-rather-than-a-zero´
     /// ´test:unit:a-newly-queued-cell-carries-its-volume´
@@ -954,9 +949,8 @@ mod tests {
         use crate::config::NoiseSchedule;
         use crate::sentinel::SpectralSentinel;
 
-        // Depth zero takes no rounds, so construction is immediate; every
-        // deeper cell takes a long schedule, so cells linger in the queue
-        // while the background thread works through them.
+        // Depth zero takes no rounds, so construction queues no work.
+        // Deeper cells require warming and will enter deferred staging.
         let cfg = SentinelConfig::<u64> {
             split_threshold: 5,
             noise_schedule: NoiseSchedule::Explicit(vec![0, 500]),
@@ -965,6 +959,10 @@ mod tests {
             ..SentinelConfig::<u64>::default()
         };
         let mut s: SpectralSentinel<u128, u64, 128> = SpectralSentinel::new(cfg).unwrap();
+        // Keep the handle installed so reconciliation queues work instead
+        // of draining synchronously, but prevent the worker taking cells
+        // away before their cached volumes can be inspected.
+        s.warming_thread.as_ref().unwrap().shutdown();
 
         let batch: Vec<u128> = (0..40u128).map(|i| (0xA_u128 << 124) | i).collect();
         for _ in 0..10 {
@@ -974,7 +972,7 @@ mod tests {
         let staged = s.staging.lock().expect("staging mutex poisoned");
         assert!(
             !staged.warming.is_empty(),
-            "the long schedule must leave cells waiting in the queue"
+            "deferred cells must remain queued while the worker is stopped"
         );
 
         for (&gnode, wc) in &staged.warming {
