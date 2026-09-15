@@ -710,7 +710,7 @@ $$c_{\text{clip}} = \bar{s} + n_\sigma^{\text{eff}} \sqrt{\bar{v}}$$
 
 Retain samples with $s_i < c_{\text{clip}}$. Compute the batch clip ratio $\rho_t = n_{\text{clipped}} / b$.
 
-**If all samples are rejected**, the batch is processed without clipping (degenerate lockout guard — fires only during the first few batches of an extreme shift before $\bar{\rho}$ has risen sufficiently). Set $\rho_t = 1$.
+**If all samples are rejected**, hold both baselines unchanged and set $\rho_t = 1$. The clip-pressure term rises so the ceiling opens on subsequent batches; baseline updates resume when samples are retained. Learning the unclipped batch would let the baselines chase a sustained shift and stop the CUSUM from accumulating under a gradual anomaly. The `gradual_single_cell_cusum` case witnesses the detection contract that requires this accumulation.
 
 Update the clip-pressure EWMA:
 
@@ -718,7 +718,7 @@ $$\bar{\rho} \leftarrow \lambda_\rho \, \bar{\rho} + (1 - \lambda_\rho) \, \rho_
 
 The filter is **upper-tail only** because all four scoring axes are non-negative, right-skewed, and satisfy the polarity invariant (§5.1): anomalous departure inflates scores, never deflates. The clip ceiling prevents sustained high scores from poisoning the baseline upward.
 
-**2. Fast EWMA update.** Let $\bar{s}_{\text{batch}}$ be the mean of **retained** samples (or all samples if the degenerate guard fired).
+**2. Fast EWMA update.** When at least one sample is retained, let $\bar{s}_{\text{batch}}$ be the mean of **retained** samples and update the fast mean as follows. When no samples are retained, hold the fast mean unchanged.
 
 - _Uninitialised → initialised:_ $\bar{s} \leftarrow \bar{s}_{\text{batch}}$
 - _Subsequent:_ $\bar{s} \leftarrow \lambda \, \bar{s} + \alpha \, \bar{s}_{\text{batch}}$
@@ -740,7 +740,7 @@ The $10^{-4}$ floor prevents degenerate zero-variance baselines.
 >
 > Critically, the freeze window is **self-limiting** under the clip-pressure mechanism (§6.4): once $\bar{\rho}$ rises enough to widen the ceiling, more samples are retained and variance updates resume. The staleness duration is bounded by the clip-pressure recovery time ($\sim$20–40 batches at $\lambda_\rho = 0.95$), not by any property of the variance itself. During this window, detection sensitivity is calibrated to the _previous_ regime's spread. The host can observe this condition via the clip-pressure value ($\bar{\rho}$) in the per-axis report (§14.4).
 
-**4. Slow EWMA update.** Using the same **retained** samples from step 1 (single shared clip filter — see design note below), update slow mean and slow variance at rate $\lambda_s$ following the same rules as steps 2–3.
+**4. Slow EWMA update.** Using the same **retained** samples from step 1 (single shared clip filter — see design note below), update slow mean and slow variance at rate $\lambda_s$ following the same rules as steps 2–3. When no samples are retained, hold the slow mean and variance unchanged.
 
 **5. Drift accumulator update.** Using the **raw** batch mean $\bar{s}_{\text{raw}} = \frac{1}{b}\sum_{i=1}^b s_i$ (all $b$ samples, no clipping):
 
@@ -810,7 +810,7 @@ Under a regime shift that clips 100% of samples ($\rho_t = 1.0$ every batch), $\
 |      30 |         0.79 |                                          14 | Effectively unclipped      |
 |      40 |         0.87 |                                          23 | Baseline actively tracking |
 
-The degenerate lockout guard (§6.1.1, step 1) fires during the first few batches before $\bar{\rho}$ has risen enough to widen the ceiling. Once $\bar{\rho} > 0.3$, the graduated ceiling handles recovery without the guard.
+When all samples are rejected (§6.1.1, step 1), both baselines are held unchanged and $\rho_t = 1$ raises the clip-pressure term so the ceiling opens on subsequent batches. Baseline updates resume when samples are retained; the CUSUM continues to receive the raw batch mean throughout the lockout.
 
 #### 6.4.2 Transient Spike Recovery · `sec:sentinel:algorithm-clip-pressure-transient-spike-recovery`
 

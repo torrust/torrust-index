@@ -727,8 +727,10 @@ impl SubspaceTracker {
 
             // ── Fast EWMA: receives retained samples ────
             if retained.is_empty() {
-                // All outliers — learn nothing this round.
-                // clip_pressure was still updated above (it saw 100% clipping).
+                // Hold both baselines unchanged when all samples are rejected.
+                // With rho_t = 1, clip pressure rises so the ceiling opens on subsequent batches.
+                // Learning the unclipped batch would let the baselines chase a sustained shift
+                // and stop CUSUM accumulation under a gradual anomaly (§ALGO S-6.1.1).
             } else {
                 bl.fast.update_raw(&retained);
             }
