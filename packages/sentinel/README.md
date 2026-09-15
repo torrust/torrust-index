@@ -36,14 +36,14 @@ Or add it manually to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-torrust-sentinel = "0.1"
+torrust-sentinel = "1.0"
 ```
 
 The base build has no default feature flags. The `serde` feature is opt-in and enables serialisation for configuration, SVD strategy, and report snapshot types:
 
 ```toml
 [dependencies]
-torrust-sentinel = { version = "0.1", features = ["serde"] }
+torrust-sentinel = { version = "1.0", features = ["serde"] }
 ```
 
 ## Quick start · `sec:sentinel:readme-quick-start`

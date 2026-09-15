@@ -770,7 +770,8 @@ These modules implement the internal machinery. Their interfaces may change with
 
 ### §7.2 Thread Safety · `sec:sentinel:api-thread-safety`
 
-- `SpectralSentinel` is **not** `Sync` due to internal `Mutex<StagingArea>`.
+- `SpectralSentinel` is `Send + Sync`, as required by ADR-S-005 and enforced by the crate's static assertion. The staging mutex supports this contract: `Mutex<T>` is `Sync` when `T` is `Send`.
+- Ingestion requires exclusive access through `&mut self`; sharing an engine for ingestion therefore requires external synchronisation, such as `Arc<Mutex<_>>`.
 - `BatchReport` and all report types are `Send + Sync`.
 - Background warming thread (when `background_warming = true`) runs independently without blocking `ingest()`.
 
