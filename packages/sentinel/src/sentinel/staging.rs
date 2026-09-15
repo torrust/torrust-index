@@ -50,6 +50,7 @@
 //! | [`equal_volumes_take_the_shallower_cell_first`] | staging | Equal volumes resolve to the shallower cell rather than the deeper one. A tie is the ordinary case for a pair of siblings the moment they are created, and the rule the queue exists to serve is that a busy ancestor is warmed before the cells beneath it. Identifiers are handed out as the tree grows downward, so the larger of two is always the newer and deeper cell, and resolving a tie toward it inverts the rule exactly. This path and the synchronous drain are two ways of serving one queue, so they must not disagree about which cell comes next. |
 //! | [`an_in_flight_cell_still_counts_as_a_competitive_target`] | staging | A cell checked out for background warming is still a warming cell, so it still counts among the competitive targets being warmed. Checking a cell out is how the expensive work is done off the lock, not a change in what the cell is; a count that dropped it would fall precisely when the work was happening, understating what is in progress by the number of cells actually in progress. The flag is recorded at checkout, so counting it needs nothing from a cell another thread is holding. |
 //! | [`an_in_flight_ancestor_cell_is_not_a_competitive_target`] | staging | cites (´claim:staging:a-cell-checked-out-for-warming-still-counts-among-the-competitive-targets´) |
+//! | [`ready_competitive_target_stays_in_warming_count_until_promotion`] | staging | A completed competitive cell can reach the ready queue after an ingest has passed its promotion point. It remains inside the warm-up pipeline and outside the producing set until the next promotion, so both health counts continue to include it while it waits. |
 //! | [`a_newly_queued_cell_carries_its_volume`] | staging | A cell joining the queue carries its volume immediately. The worker is stopped before enqueueing while deferred staging remains selected, so every queued cell is available for the volume assertions regardless of thread scheduling. |
 //! | [`return_warming_restores_cell`] | staging | A cell handed back unfinished rejoins the warming set and stops being in flight, with its accumulated rounds intact. Background warming can therefore be interrupted between rounds — the thread need not carry a cell to completion once it has taken it. |
 //! | [`finish_warming_moves_to_ready`] | staging | A cell handed back finished joins the ready queue instead of the warming set, and is no longer in flight. Which of the two return paths the background thread takes is what decides the cell's fate, so completion is declared by the worker that did the rounds rather than re-derived by the staging area. |
@@ -416,8 +417,8 @@ impl<C: Coordinate> StagingArea<C> {
         self.warming.len() + self.ready.len() + self.in_flight.len()
     }
 
-    /// Number of warming cells, in-flight ones included, that are
-    /// competitive targets rather than ancestor-only.
+    /// Number of cells in the warm-up pipeline, ready and in-flight ones
+    /// included, that are competitive targets rather than ancestor-only.
     ///
     /// Used to populate `HealthReport::warming_competitive_targets`
     /// (§ALGO S-14.11, ADR-S-019).
@@ -430,8 +431,9 @@ impl<C: Coordinate> StagingArea<C> {
     /// nothing from a tracker another thread is holding.
     pub fn warming_competitive_count(&self) -> usize {
         let waiting = self.warming.values().filter(|wc| wc.cell.is_competitive).count();
+        let ready = self.ready.iter().filter(|(_, cell)| cell.is_competitive).count();
         let in_flight = self.in_flight.values().filter(|&&is_competitive| is_competitive).count();
-        waiting + in_flight
+        waiting + ready + in_flight
     }
 
     /// Whether there are any cells that need warming work.
@@ -936,6 +938,63 @@ mod tests {
 
         let (_gnode, _wc) = staging.take_highest_priority().unwrap();
         assert_eq!(staging.warming_competitive_count(), 0);
+    }
+
+    /// A completed competitive cell can reach the ready queue after an ingest
+    /// has passed its promotion point. It remains inside the warm-up pipeline
+    /// and outside the producing set until the next promotion, so both health
+    /// counts continue to include it while it waits. The worker transition is
+    /// performed directly here to fix that interleaving without sleeps.
+    ///
+    /// ´claim:staging:a-ready-competitive-cell-remains-a-warming-target-until-promotion´
+    /// ´test:unit:ready-competitive-target-stays-in-warming-count-until-promotion´
+    #[test]
+    fn ready_competitive_target_stays_in_warming_count_until_promotion() {
+        use crate::config::NoiseSchedule;
+        use crate::sentinel::SpectralSentinel;
+
+        let cfg = SentinelConfig::<u64> {
+            split_threshold: 5,
+            analysis_k: 16,
+            noise_schedule: NoiseSchedule::Explicit(vec![0, 500]),
+            noise_batch_size: 2,
+            background_warming: true,
+            ..SentinelConfig::<u64>::default()
+        };
+        let mut sentinel: SpectralSentinel<u128, u64, 128> = SpectralSentinel::new(cfg).unwrap();
+        sentinel.warming_thread.as_ref().unwrap().shutdown();
+
+        let batch: Vec<u128> = (0..40u128).map(|i| (0xA_u128 << 124) | i).collect();
+        for _ in 0..10 {
+            sentinel.ingest(&batch);
+        }
+
+        let (staged_total, staged_competitive) = {
+            let mut staging = sentinel.staging.lock().expect("staging mutex poisoned");
+            let competitive = staging
+                .warming
+                .iter()
+                .find_map(|(&gnode, cell)| cell.cell.is_competitive.then_some(gnode))
+                .expect("the fixture must leave a competitive cell awaiting warm-up");
+            staging.warming.get_mut(&competitive).unwrap().volume = f64::MAX;
+            let (gnode, cell) = staging.take_highest_priority().unwrap();
+            assert_eq!(gnode, competitive);
+            staging.finish_warming(gnode, cell.cell);
+
+            let ready_competitive = staging.ready.iter().filter(|(_, cell)| cell.is_competitive).count();
+            assert!(ready_competitive > 0, "the completed target must be awaiting promotion");
+            let competitive_total = staging.warming.values().filter(|cell| cell.cell.is_competitive).count()
+                + ready_competitive
+                + staging.in_flight.values().filter(|&&is_competitive| is_competitive).count();
+            (staging.total_count(), competitive_total)
+        };
+
+        let health = sentinel.health();
+        assert_eq!(health.warming_trackers, staged_total);
+        assert_eq!(
+            health.warming_competitive_targets, staged_competitive,
+            "a ready competitive target remains unpromoted and part of the warm-up pipeline"
+        );
     }
 
     /// A cell joining the queue carries its volume immediately. Refreshing cached volumes before enqueueing would leave new cells at zero until another reconciliation pass, preventing the queue from prioritising them by traffic.
