@@ -298,6 +298,12 @@ impl SubspaceTracker {
             k >= 2,
         );
 
+        // The report describes the geometry that produced this batch's
+        // scores. Rank adaptation below prepares the next batch.
+        let scoring_rank = k;
+        let scoring_energy_ratio = self.energy_ratio();
+        let scoring_geometry = self.scoring_geometry();
+
         // ── Phase 5: Adapt rank ─────────────────────────
         self.step += 1;
         if self.step.is_multiple_of(self.rank_update_interval) {
@@ -309,8 +315,8 @@ impl SubspaceTracker {
 
         TrackerReport {
             depth,
-            rank: self.rank,
-            energy_ratio: self.energy_ratio(),
+            rank: scoring_rank,
+            energy_ratio: scoring_energy_ratio,
             top_singular_value: self.sigmas.first().copied().unwrap_or(0.0),
             scores: AnomalyScores {
                 novelty: novelty_dist,
@@ -319,7 +325,7 @@ impl SubspaceTracker {
                 coherence: coherence_dist,
             },
             maturity: self.maturity(),
-            geometry: self.scoring_geometry(),
+            geometry: scoring_geometry,
             per_sample,
         }
     }

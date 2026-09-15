@@ -124,10 +124,10 @@ pub struct CellReport<C: Copy + Debug> {
     /// How many observations in this batch routed to this cell.
     pub sample_count: usize,
 
-    /// Current rank of the learned subspace.
+    /// Rank in force while this batch was scored.
     pub rank: usize,
 
-    /// Fraction of total variance captured by the current rank.
+    /// Fraction of total variance captured by the rank reported for this batch.
     pub energy_ratio: f64,
 
     /// Largest singular value of the learned subspace.
@@ -139,7 +139,7 @@ pub struct CellReport<C: Copy + Debug> {
     /// How mature is this tracker's learned model?
     pub maturity: TrackerMaturity,
 
-    /// Geometric properties of this tracker's current state.
+    /// Geometric properties in force while this batch was scored.
     pub geometry: ScoringGeometry,
 
     /// Per-sample scores, if enabled.
@@ -188,10 +188,10 @@ pub struct CoordinationReport<C: Copy + Debug> {
     /// score vectors this batch.
     pub cells_reporting: usize,
 
-    /// Current rank of the coordination tracker's learned subspace.
+    /// Rank in force while this coordination batch was scored.
     pub rank: usize,
 
-    /// Fraction of total variance captured by the rank.
+    /// Fraction of total variance captured by the rank reported for this batch.
     pub energy_ratio: f64,
 
     /// Largest singular value.
@@ -203,7 +203,7 @@ pub struct CoordinationReport<C: Copy + Debug> {
     /// How mature is this coordination tracker's model?
     pub maturity: TrackerMaturity,
 
-    /// Geometric properties of the coordination tracker.
+    /// Geometric properties in force while this coordination batch was scored.
     pub geometry: ScoringGeometry,
 
     /// Per-member scores, if
@@ -230,10 +230,10 @@ pub struct TrackerReport {
     /// at width `w = N − d` (§ALGO S-3.2).
     pub depth: u8,
 
-    /// Current rank of the learned subspace (number of active basis vectors).
+    /// Rank in force while this batch was scored (number of active basis vectors).
     pub rank: usize,
 
-    /// Fraction of total variance captured by the current rank.
+    /// Fraction of total variance captured by the rank reported for this batch.
     pub energy_ratio: f64,
 
     /// Largest singular value of the learned subspace.
@@ -245,8 +245,8 @@ pub struct TrackerReport {
     /// How mature is this tracker's learned model?
     pub maturity: TrackerMaturity,
 
-    /// Geometric properties that determine which scoring axes are
-    /// structurally meaningful at this tracker's current state.
+    /// Geometric properties that determined which scoring axes were
+    /// structurally meaningful while this batch was scored.
     pub geometry: ScoringGeometry,
 
     /// Per-sample scores, if enabled.

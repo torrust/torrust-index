@@ -12,6 +12,7 @@
 //! | [`dim_and_cap_reflect_construction`] | subspace | A cell's rank ceiling is the lesser of the configured maximum and its own width: a wide cell is capped by policy, a narrow one by geometry. There are no more independent directions than dimensions to hold them, so the width binds where it is the smaller of the two, and one configuration can serve cells of every depth without being retuned per depth. |
 //! | [`scoring_geometry_matches_state`] | subspace | A model reports the geometry its scores were computed in: the width it works over, the ceiling it may grow to, and the residual degrees of freedom left after the claimed directions are removed. That last figure is the divisor novelty is normalised by, so publishing it lets a host compare scores from cells of different depths and ranks instead of comparing numbers whose scale it cannot see. |
 //! | [`observe_returns_correct_depth`] | subspace | A report carries back the depth it was given, unchanged, alongside the rank in force while the batch was scored — and that rank is the one the model held beforehand, since adaptation happens after scoring. The model has no idea which cell it serves, so the depth is a label it holds on the host's behalf, which is what lets a host attribute a report without keeping its own bookkeeping alongside every call. |
+//! | [`rank_change_report_describes_the_scoring_state`] | subspace | On a batch that changes rank, the report keeps the earlier rank and geometry that produced its scores while the tracker advances to the adapted rank for the next batch. The coherence value therefore remains paired with the single-axis state in which it was forced to zero instead of being published beside a rank where coherence exists. |
 //! | [`observe_per_sample_when_enabled`] | subspace | Per-row detail is produced only where a cell is configured to want it. Building it costs a standardisation of every axis for every row, which is worth paying when a host needs to know which observation in a batch was responsible and wasted when it only needs the batch's summary — so the choice is made per configuration rather than always. |
 //! | [`observe_no_per_sample_when_disabled`] | subspace | cites (´claim:subspace:per-row-detail-is-produced-only-where-it-is-configured-because-it-costs-work-per-row´) |
 //! | [`observe_report_batch_size_matches`] | subspace | Where per-row detail is produced there is exactly one entry for every row handed in, whether the batch was a single observation or many, and the same model gives both answers in turn. The correspondence is positional, so a host can attribute a score back to the observation that earned it without the model needing to know what that observation was. |
@@ -249,6 +250,44 @@ fn observe_returns_correct_depth() {
 
     assert_eq!(report.depth, 8);
     assert_eq!(report.rank, 1); // hasn't adapted yet
+}
+
+/// On a batch that changes rank, the report keeps the earlier rank and geometry
+/// that produced its scores while the tracker advances to the adapted rank for
+/// the next batch. The coherence value therefore remains paired with the
+/// single-axis state in which it was forced to zero instead of being published
+/// beside a rank where coherence exists.
+///
+/// ´claim:subspace:a-rank-change-report-describes-the-state-that-scored-the-batch´
+/// ´test:crate:rank-change-report-describes-the-scoring-state´
+#[test]
+fn rank_change_report_describes_the_scoring_state() {
+    let cfg = SentinelConfig {
+        max_rank: 4,
+        rank_update_interval: 1,
+        energy_threshold: 0.90,
+        ..cfg_per_sample()
+    };
+    let mut tracker = SubspaceTracker::new(8, &cfg, 0.999);
+    let scoring_rank = tracker.rank();
+    let scoring_geometry = tracker.scoring_geometry();
+    let rows = centred_rows(&[0xFF00_0000_0000_0000_0000_0000_0000_0000; 4], 8);
+
+    let report = tracker.observe(&as_slices(&rows), 8, false);
+
+    assert_eq!(scoring_rank, 1);
+    assert_eq!(tracker.rank(), 2, "the fixture must adapt the next batch to rank two");
+    assert_eq!(
+        report.rank, scoring_rank,
+        "the report rank must be the one that scored this batch"
+    );
+    assert_eq!(report.geometry.dim, scoring_geometry.dim);
+    assert_eq!(report.geometry.cap, scoring_geometry.cap);
+    assert_eq!(report.geometry.residual_dof, scoring_geometry.residual_dof);
+    assert_eq!(
+        report.scores.coherence.mean, 0.0,
+        "coherence does not exist at the scoring rank"
+    );
 }
 
 /// Per-row detail is produced only where a cell is configured to want it.
