@@ -115,8 +115,8 @@ pub struct StagingArea<C: Coordinate> {
     /// work on them without holding the lock. [`contains`] and
     /// [`retain_in_set`] account for them.
     /// Cells checked out for background warming, each carrying the
-    /// competitive flag it held at checkout so the reported count of
-    /// competitive targets can include it while it is away.
+    /// latest competitive flag from reconciliation so the reported count of
+    /// competitive targets stays current while it is away.
     in_flight: BTreeMap<GNodeId, bool>,
 }
 
@@ -195,7 +195,9 @@ impl<C: Coordinate> StagingArea<C> {
     /// `in_flight` by [`retain_in_set`]), the cell is silently
     /// discarded — the work is wasted but correctness is preserved.
     pub fn return_warming(&mut self, gnode: GNodeId, wc: WarmingCell<C>) {
-        if self.in_flight.remove(&gnode).is_some() {
+        if let Some(is_competitive) = self.in_flight.remove(&gnode) {
+            let mut wc = wc;
+            wc.cell.is_competitive = is_competitive;
             self.warming.insert(gnode, wc);
         }
         // else: evicted while in-flight — discard.
@@ -206,7 +208,9 @@ impl<C: Coordinate> StagingArea<C> {
     /// If the cell was evicted while in-flight, it is silently
     /// discarded.
     pub fn finish_warming(&mut self, gnode: GNodeId, cell: CellState<C>) {
-        if self.in_flight.remove(&gnode).is_some() {
+        if let Some(is_competitive) = self.in_flight.remove(&gnode) {
+            let mut cell = cell;
+            cell.is_competitive = is_competitive;
             self.ready.push((gnode, cell));
         }
         // else: evicted while in-flight — discard.
@@ -317,6 +321,24 @@ impl<C: Coordinate> StagingArea<C> {
         self.in_flight.retain(|gnode, _| keep.contains(gnode));
     }
 
+    /// Refresh the selection flag wherever a retained cell is staged.
+    ///
+    /// An in-flight record owns the current flag while the worker owns the
+    /// tracker. Both return paths copy this flag back before keeping the cell.
+    pub(crate) fn update_competitive(&mut self, gnode: GNodeId, is_competitive: bool) {
+        if let Some(wc) = self.warming.get_mut(&gnode) {
+            wc.cell.is_competitive = is_competitive;
+        }
+        if let Some(flag) = self.in_flight.get_mut(&gnode) {
+            *flag = is_competitive;
+        }
+        for (ready_gnode, cell) in &mut self.ready {
+            if *ready_gnode == gnode {
+                cell.is_competitive = is_competitive;
+            }
+        }
+    }
+
     // ── Volume update ───────────────────────────────────
 
     /// Update cached volumes for warming cells from the G-V Graph.
@@ -404,8 +426,8 @@ impl<C: Coordinate> StagingArea<C> {
     /// is what it was taken for — so excluding it made the figure disagree
     /// with its own description and understate the work in progress by the
     /// number of cells actually being worked on. The flag is recorded at
-    /// checkout rather than read back afterwards, so the count needs nothing
-    /// from a cell another thread is holding.
+    /// checkout and refreshed during reconciliation, so the count needs
+    /// nothing from a tracker another thread is holding.
     pub fn warming_competitive_count(&self) -> usize {
         let waiting = self.warming.values().filter(|wc| wc.cell.is_competitive).count();
         let in_flight = self.in_flight.values().filter(|&&is_competitive| is_competitive).count();

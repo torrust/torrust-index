@@ -24,6 +24,7 @@
 //!
 //! | Test | Area | Claim |
 //! |------|------|-------|
+//! | [`selection_refresh_survives_warming_handoffs`] | warmup | Waiting, in-flight and ready cells keep the latest selection flag across both worker return paths. |
 //! | [`shutdown_returns_under_repeated_spawn_and_stop_cycles`] | warmup | Shutting the warming thread down returns, every time, over a long run of spawn-and-stop cycles that does nothing else — the arrangement that puts the request at its most likely to land while the worker is between reading its predicate and sleeping on it. A shutdown that is lost in that window does not fail loudly: the worker sleeps on, the join waits for it, and the sentinel's own drop never completes, so what a host would see is a process that stops rather than an error it can act on. |
 
 use std::sync::mpsc::{self, RecvTimeoutError};
@@ -84,4 +85,44 @@ fn shutdown_returns_under_repeated_spawn_and_stop_cycles() {
     }
 
     cycles.join().expect("cycling thread panicked");
+}
+
+/// Waiting, in-flight and ready cells keep the latest selection flag across both worker return paths.
+///
+/// ´claim:warmup:selection-refresh-survives-warming-handoffs´
+/// ´test:crate:selection-refresh-survives-warming-handoffs´
+#[test]
+fn selection_refresh_survives_warming_handoffs() {
+    let config = crate::SentinelConfig::<u64>::default();
+    let cell = crate::sentinel::CellState {
+        tracker: crate::sentinel::tracker::SubspaceTracker::new(4, &config, config.cusum_slow_decay),
+        depth: 1,
+        width: 4,
+        start: 0_u128,
+        end: 16,
+        is_competitive: false,
+    };
+    let gnode = torrust_mudlark::GNodeId::from_parts(1, 0);
+    let mut staging = StagingArea::new();
+    staging.enqueue(gnode, cell, 2);
+    staging.update_competitive(gnode, true);
+    assert_eq!(staging.warming_competitive_count(), 1);
+
+    let (_, warming) = staging.take_highest_priority().unwrap();
+    staging.update_competitive(gnode, false);
+    assert_eq!(staging.warming_competitive_count(), 0);
+    staging.return_warming(gnode, warming);
+    assert_eq!(staging.warming_competitive_count(), 0);
+
+    let (_, warming) = staging.take_highest_priority().unwrap();
+    assert!(!warming.cell.is_competitive);
+    staging.update_competitive(gnode, true);
+    assert_eq!(staging.warming_competitive_count(), 1);
+    staging.finish_warming(gnode, warming.cell);
+    let (_, ready) = staging.take_ready().pop().unwrap();
+    assert!(ready.is_competitive);
+
+    staging.enqueue(gnode, ready, 0);
+    staging.update_competitive(gnode, false);
+    assert!(!staging.take_ready().pop().unwrap().1.is_competitive);
 }

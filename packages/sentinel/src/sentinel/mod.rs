@@ -1018,6 +1018,7 @@ where
 
             // Enqueue entered cells into the staging area (Step 2.1).
             for entry in new_set.full() {
+                staging.update_competitive(entry.gnode, entry.is_competitive);
                 if self.cells.contains_key(&entry.gnode) || staging.contains(entry.gnode) {
                     continue;
                 }

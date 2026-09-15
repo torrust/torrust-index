@@ -31,6 +31,7 @@
 //!
 //! | Test | Area | Claim |
 //! |------|------|-------|
+//! | [`warming_targets_follow_current_selection`] | readout | Retained warming ancestors stop counting as competitive targets as soon as selection changes. |
 //! | [`cold_maturity_is_fully_noisy`] | readout | A tracker that has seen nothing reports no observations of either kind and a baseline owed entirely to noise. The cold state is not "unknown" but a definite statement: whatever this tracker would score against, none of it came from real traffic, so a host can discount its scores rather than having to guess how new the model is. |
 //! | [`total_observations_sums_real_and_noise`] | readout | Total experience is the real and injected observations added together, and both counts stay separately readable beside it. The sum says how much the model has absorbed; the split says how much of that was manufactured during warm-up — a host needs the second to interpret the first, so the report offers the convenience without collapsing the distinction. |
 //! | [`novelty_not_saturated_when_residual_dof_positive`] | readout | Novelty is degenerate exactly when no residual degrees of freedom remain, and with residual dimensions still unexplained by the learned subspace it is not. Novelty measures the energy the model failed to account for, so while there is somewhere for that energy to live the axis is measuring something real. |
@@ -298,4 +299,37 @@ fn member_score_has_cell_identity() {
     assert!(!ms.displacement.is_nan());
     assert!(!ms.surprise.is_nan());
     assert!(!ms.coherence.is_nan());
+}
+
+/// Retained warming ancestors stop counting as competitive targets as soon as selection changes.
+///
+/// ´claim:readout:warming-targets-follow-current-selection´
+/// ´test:crate:warming-targets-follow-current-selection´
+#[test]
+fn warming_targets_follow_current_selection() {
+    let config = SentinelConfig::<u64> {
+        analysis_k: 1,
+        split_threshold: 1,
+        d_create: 1,
+        d_evict: 2,
+        max_rank: 1,
+        noise_batch_size: 1,
+        noise_schedule: NoiseSchedule::Explicit(vec![0, 1_000_000]),
+        background_warming: true,
+        ..SentinelConfig::default()
+    };
+    let mut sentinel = SpectralSentinel::<u64, u64, 16>::new(config).unwrap();
+    for _ in 0..7 {
+        sentinel.ingest(&[0]);
+    }
+
+    let selected = sentinel.analysis_set().competitive_count();
+    let health = sentinel.health();
+    assert_eq!(selected, 1, "the fixture must select a competitive target");
+    let offline_competitive = selected - health.active_competitive_trackers;
+    assert!(offline_competitive > 0, "the long non-root schedule must still be warming");
+    assert_eq!(
+        health.warming_competitive_targets, offline_competitive,
+        "warming classifications must describe the current selection"
+    );
 }
