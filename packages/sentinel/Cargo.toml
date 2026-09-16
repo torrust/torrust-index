@@ -30,7 +30,7 @@ faer = "0.24"
 rand = "0.10"
 rand_distr = "0.6"
 serde = { version = "1", features = ["derive"], optional = true }
-torrust-mudlark = { version = "1.0.0", path = "../mudlark", default-features = false, features = ["dynamic-contour-tracking"] }
+torrust-mudlark = { version = "1.1.0", path = "../mudlark", default-features = false, features = ["dynamic-contour-tracking"] }
 # Held to the 0.1 line: a bare `0` would admit every breaking 0.x release.
 tracing = "0.1"
 

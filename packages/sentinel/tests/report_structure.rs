@@ -457,24 +457,19 @@ fn contour_cell_count_grows_with_distinct_regions() {
 #[test]
 fn contour_reports_splits_since_last_report() {
     let mut s = Sentinel128::new(test_config()).unwrap();
-    // test_config() has split_threshold = 100; send enough
-    // concentrated observations to trigger at least one split.
-    let r1 = s.ingest(&cell_values(0xA, 200));
-    assert!(
-        r1.contour.splits_since_last_report >= 1,
-        "expected at least 1 split from 200 observations, got {}",
-        r1.contour.splits_since_last_report,
-    );
+    // The threshold is 100 and the graph splits only above it, so the last
+    // observation creates exactly the root's two children.
+    let r1 = s.ingest(&cell_values(0xA, 101));
+    assert_eq!(r1.contour.splits_since_last_report, 2);
+    assert_eq!(r1.contour.net_removals_since_last_report, 0);
+    assert_eq!(s.graph().node_count(), 3);
+    assert_eq!(s.graph().terminal_count(), 2);
 
-    // Second ingest with minimal traffic — counters were reset.
-    let r2 = s.ingest(&cell_values(0xA, 1));
-    // May or may not split again, but the first batch's count is gone.
-    assert!(
-        r2.contour.splits_since_last_report < r1.contour.splits_since_last_report,
-        "split counter should reset between reports (r1={}, r2={})",
-        r1.contour.splits_since_last_report,
-        r2.contour.splits_since_last_report,
-    );
+    // A quiet interval has no spatial events and cannot inherit the first
+    // report's child-creation count.
+    let r2 = s.ingest(&[]);
+    assert_eq!(r2.contour.splits_since_last_report, 0);
+    assert_eq!(r2.contour.net_removals_since_last_report, 0);
 }
 
 /// The floor of the same rule, on a sentinel that has already been driven

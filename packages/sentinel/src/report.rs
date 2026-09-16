@@ -740,28 +740,20 @@ pub struct ContourSnapshot {
     /// Values above 2^53 may lose LSBs (acceptable for diagnostics).
     pub total_importance: f64,
 
-    /// Cells created by catalytic or bootstrap bisection since the
-    /// previous report.
+    /// Child cells created by catalytic or bootstrap bisection since the
+    /// previous report. A bisection that creates two children counts as two
+    /// splits. The value comes from the spatial layer's monotonic event counter.
     ///
-    /// Computed exactly from graph state deltas:
-    /// `splits = Δnode_count − Δterminal_count`.
-    ///
-    /// Saturates at [`u32::MAX`] in the (practically unreachable)
-    /// event of more than ~4 × 10⁹ splits between consecutive reports.
+    /// Saturates at [`u32::MAX`] when the interval contains more splits than
+    /// the field can represent.
     pub splits_since_last_report: u32,
 
     /// Net structural removals since the previous report:
     /// evictions minus restorations (legacy promotions).
     ///
-    /// Restorations are rare (they occur only when an eviction
-    /// leaves a semi-internal node); this value typically equals
-    /// the raw eviction count.
-    ///
-    /// Computed exactly from graph state deltas:
-    /// `net_removals = splits − Δterminal_count`.
-    ///
-    /// Saturates at [`u32::MAX`] under the same caveat as
-    /// [`Self::splits_since_last_report`].
+    /// The value comes from the spatial layer's monotonic event counters. An
+    /// interval with more restorations than evictions reports zero because this
+    /// field is unsigned, and a value above [`u32::MAX`] reports [`u32::MAX`].
     pub net_removals_since_last_report: u32,
 }
 

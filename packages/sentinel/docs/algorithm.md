@@ -2063,24 +2063,14 @@ The contour snapshot describes the G-Tree's observation-receiving surface — th
 | Plateau count                  | non-negative integer | Number of distinct plateaus in the current contour (§3.2)                        |
 | Cell count                     | non-negative integer | Total contour cells                                                              |
 | Total importance               | float                | Approximate total importance across all cells                                    |
-| Splits since last report       | `u32`                | Cells created by catalytic or bootstrap bisection since the previous report      |
-| Net removals since last report | `u32`                | Net structural removals (evictions minus restorations) since the previous report |
+| Splits since last report       | `u32`                | Child cells created by catalytic or bootstrap bisection since the previous report |
+| Net removals since last report | `u32`                | Net structural removals (evictions minus restorations) since the previous report  |
 
-**Structural mutation counts.** The two mutation fields are derived from `terminal_count()` and `node_count()` deltas between successive `ingest()` calls, using the identities:
+**Structural mutation counts.** The spatial layer maintains monotonic counters for child creation, eviction, and restoration. Each child created by a catalytic or bootstrap bisection counts as one split, so a bisection that creates both children adds two. Counting child creations keeps the total composable with a restoration, which creates one missing child.
 
-- Each split creates 2 nodes and net +1 terminal: $\Delta N = +2$, $\Delta T = +1$.
-- Each eviction removes 1 node and 1 terminal: $\Delta N = -1$, $\Delta T = -1$.
-- Each restoration creates 1 node and 1 terminal: $\Delta N = +1$, $\Delta T = +1$.
+At each report boundary, `splits_since_last_report` is the split-counter delta and `net_removals_since_last_report` is the eviction-counter delta minus the restoration-counter delta. The unsigned net-removal field reports zero when restorations exceed evictions during an interval, and either field reports `u32::MAX` when its result is larger than `u32` can represent.
 
-Solving:
-
-$$\text{splits} = \Delta N - \Delta T$$
-
-$$\text{net\_removals} = \text{splits} - \Delta T = \text{evictions} - \text{restorations}$$
-
-Both values are exact. Restorations (legacy promotions) are rare — they occur only when an eviction leaves a semi-internal node — so `net_removals` typically equals the raw eviction count.
-
-The implementation snapshots `terminal_count()` and `node_count()` at the end of each `ingest()` call and computes the deltas on the next call. No graph-internal event counters are required.
+The implementation snapshots the spatial counters immediately after graph construction or replacement and at every report boundary. A replacement therefore starts a new counter epoch and never appears as a synthetic interval mutation. Event counters are necessary because node and terminal population deltas do not identify every mutation: evicting the last child of a semi-internal parent removes a node while making the parent terminal, leaving the terminal count unchanged.
 
 ### 14.11 Health Report · `sec:sentinel:algorithm-output-health-report`
 

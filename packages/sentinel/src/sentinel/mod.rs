@@ -69,7 +69,7 @@ use std::time::Instant;
 use rand::rngs::SmallRng;
 use rand::{RngExt, SeedableRng};
 use rand_distr::{Distribution, Gamma};
-use torrust_mudlark::{Config as GvConfig, Coordinate, GNodeId, GvGraph, Inspectable};
+use torrust_mudlark::{Config as GvConfig, Coordinate, GNodeId, GvGraph, Inspectable, StructuralMutationCounts};
 
 use self::tracker::SubspaceTracker;
 use crate::{
@@ -219,14 +219,11 @@ where
     /// Handle to the background warming thread (Step 3).
     warming_thread: Option<warming_thread::WarmingThreadHandle<C>>,
 
-    /// Snapshot of `graph.terminal_count()` at the end of the
-    /// previous `ingest()`.  Used to derive structural mutation
-    /// counts without requiring graph-internal event counters.
-    prev_terminal_count: u32,
-
-    /// Snapshot of `graph.node_count()` at the end of the
-    /// previous `ingest()`.
-    prev_node_count: u32,
+    /// Spatial mutation totals at the previous report boundary.
+    ///
+    /// Construction and graph replacement snapshot the new graph immediately,
+    /// so a report never attributes replacement to the reporting interval.
+    prev_structural_mutation_counts: StructuralMutationCounts,
 }
 
 impl<C, V, const N: u32> SpectralSentinel<C, V, N>
@@ -357,8 +354,7 @@ where
             None
         };
 
-        let init_terminal = graph.terminal_count();
-        let init_node = graph.node_count();
+        let init_structural_mutation_counts = graph.structural_mutation_counts();
 
         Ok(Self {
             config,
@@ -373,8 +369,7 @@ where
             noise_rng,
             staging,
             warming_thread,
-            prev_terminal_count: init_terminal,
-            prev_node_count: init_node,
+            prev_structural_mutation_counts: init_structural_mutation_counts,
         })
     }
 
@@ -780,11 +775,10 @@ where
         self.graph = GvGraph::new(gv_config);
         self.root_gnode = self.graph.g_root();
 
-        // Re-baseline the structural mutation snapshots so the next
-        // report does not attribute the reset's teardown to splits
-        // or evictions.
-        self.prev_terminal_count = self.graph.terminal_count();
-        self.prev_node_count = self.graph.node_count();
+        // Begin a new counter epoch at the replacement graph's initial totals,
+        // so the next report cannot attribute the old graph's teardown or the
+        // replacement itself to its reporting interval.
+        self.prev_structural_mutation_counts = self.graph.structural_mutation_counts();
 
         // Recreate the root tracker with auto noise injection. The width
         // needs no second judgement here: it is fixed by the type, the sole
@@ -1695,47 +1689,29 @@ where
     }
 
     /// Compute `(splits, net_removals, terminal_count)` since the
-    /// previous report and advance the `prev_*` snapshots.
+    /// previous report and advance the spatial-counter snapshot.
     ///
-    /// Derived exactly from `terminal_count()` / `node_count()`
-    /// deltas via the identities (§ALGO S-14.10):
-    ///
-    /// - Each split:       `ΔN = +2`, `ΔT = +1`
-    /// - Each eviction:    `ΔN = −1`, `ΔT = −1`
-    /// - Each restoration: `ΔN = +1`, `ΔT = +1`
-    ///
-    /// ⟹ `splits = ΔN − ΔT` and
-    ///   `net_removals = splits − ΔT = evictions − restorations`.
-    ///
-    /// Both outputs are non-negative by construction; debug builds
-    /// assert this to catch identity violations (e.g. if a future
-    /// graph mutation path were to break the accounting).
-    /// Release builds saturate at `u32::MAX` on the astronomically
-    /// unlikely overflow path.
+    /// The graph counts each child creation as one split. Net removals are
+    /// evictions minus restorations, floored at zero because the report field is
+    /// unsigned. Both report values saturate at [`u32::MAX`]. Construction and
+    /// reset snapshot a new graph immediately, so replacement never creates a
+    /// synthetic interval delta (§ALGO S-14.10).
     fn take_structural_mutation_counts(&mut self) -> (u32, u32, u32) {
-        let terminal_count = self.graph.terminal_count();
-        let node_count = self.graph.node_count();
-        let delta_terminal = i64::from(terminal_count) - i64::from(self.prev_terminal_count);
-        let delta_node = i64::from(node_count) - i64::from(self.prev_node_count);
+        let current = self.graph.structural_mutation_counts();
+        let previous = self.prev_structural_mutation_counts;
 
-        let raw_splits = delta_node - delta_terminal;
-        debug_assert!(
-            raw_splits >= 0,
-            "split identity violated: ΔN ({delta_node}) < ΔT ({delta_terminal})",
-        );
-        let raw_net_removals = raw_splits - delta_terminal;
-        debug_assert!(
-            raw_net_removals >= 0,
-            "net-removal identity violated: splits ({raw_splits}) < ΔT ({delta_terminal})",
-        );
+        let raw_splits = current.splits.saturating_sub(previous.splits);
+        let raw_evictions = current.evictions.saturating_sub(previous.evictions);
+        let raw_restorations = current.restorations.saturating_sub(previous.restorations);
+        let raw_net_removals = raw_evictions.saturating_sub(raw_restorations);
 
-        let splits = u32::try_from(raw_splits.max(0)).unwrap_or(u32::MAX);
-        let net_removals = u32::try_from(raw_net_removals.max(0)).unwrap_or(u32::MAX);
+        self.prev_structural_mutation_counts = current;
 
-        self.prev_terminal_count = terminal_count;
-        self.prev_node_count = node_count;
-
-        (splits, net_removals, terminal_count)
+        (
+            u32::try_from(raw_splits).unwrap_or(u32::MAX),
+            u32::try_from(raw_net_removals).unwrap_or(u32::MAX),
+            self.graph.terminal_count(),
+        )
     }
 }
 
@@ -2090,6 +2066,76 @@ mod tests {
     /// ´test:unit:the-semi-internal-count-follows-the-graph´
     #[test]
     fn the_semi_internal_count_follows_the_graph() {
+        let collapse_cfg = SentinelConfig::<u64> {
+            split_threshold: 5,
+            d_create: 3,
+            d_evict: 4,
+            budget: 10,
+            noise_schedule: NoiseSchedule::Explicit(vec![]),
+            noise_seed: Some(42),
+            background_warming: false,
+            ..SentinelConfig::<u64>::default()
+        };
+        let mut counter_sentinel: SpectralSentinel<u64, u64, 8> = SpectralSentinel::new(collapse_cfg).unwrap();
+        let traffic = [(0, 6), (128, 6), (64, 6), (192, 6), (32, 6), (96, 6), (160, 6), (224, 6)];
+        let mut saw_split = false;
+        let mut saw_terminal_parent_collapse = false;
+
+        for (coord, delta) in traffic {
+            let nodes_before = counter_sentinel.graph.node_count();
+            let terminals_before = counter_sentinel.graph.terminal_count();
+            let mutations_before = counter_sentinel.graph.structural_mutation_counts();
+
+            counter_sentinel.graph.observe(coord, delta);
+
+            let nodes_after = counter_sentinel.graph.node_count();
+            let terminals_after = counter_sentinel.graph.terminal_count();
+            let mutations_after = counter_sentinel.graph.structural_mutation_counts();
+            let expected_splits = mutations_after.splits - mutations_before.splits;
+            let expected_evictions = mutations_after.evictions - mutations_before.evictions;
+            let expected_restorations = mutations_after.restorations - mutations_before.restorations;
+            let (splits, net_removals, reported_terminals) = counter_sentinel.take_structural_mutation_counts();
+
+            assert_eq!(splits, u32::try_from(expected_splits).unwrap_or(u32::MAX));
+            assert_eq!(
+                net_removals,
+                u32::try_from(expected_evictions.saturating_sub(expected_restorations)).unwrap_or(u32::MAX),
+            );
+            assert_eq!(reported_terminals, terminals_after);
+            saw_split |= expected_splits > 0;
+
+            let expected_nodes = i128::from(nodes_before) + i128::from(expected_splits) + i128::from(expected_restorations)
+                - i128::from(expected_evictions);
+            assert_eq!(i128::from(nodes_after), expected_nodes);
+
+            // Each bisection creates two children and adds one terminal. An
+            // eviction ordinarily removes one terminal, except when it removes
+            // the last child of a semi-internal parent and makes that parent a
+            // terminal. The difference below counts exactly those collapses.
+            let terminals_without_collapse =
+                i128::from(terminals_before) + i128::from(expected_splits / 2) + i128::from(expected_restorations)
+                    - i128::from(expected_evictions);
+            let collapsed_parents = i128::from(terminals_after) - terminals_without_collapse;
+            assert!(collapsed_parents >= 0);
+
+            if saw_split && collapsed_parents > 0 {
+                assert_eq!(collapsed_parents, 1, "this interval collapses one parent");
+                assert!(expected_evictions > 0);
+                saw_terminal_parent_collapse = true;
+                break;
+            }
+        }
+        assert!(
+            saw_terminal_parent_collapse,
+            "the tight budget must return a split parent to one terminal: \
+             split={saw_split}, nodes={}, terminals={}, depth_create={}, depth_evict={}, mutations={:?}",
+            counter_sentinel.graph.node_count(),
+            counter_sentinel.graph.terminal_count(),
+            counter_sentinel.graph.depth_create(),
+            counter_sentinel.graph.depth_evict(),
+            counter_sentinel.graph.structural_mutation_counts(),
+        );
+
         let cfg = SentinelConfig::<u64> {
             max_rank: 4,
             forgetting_factor: 0.90,
@@ -2103,7 +2149,6 @@ mod tests {
             ..SentinelConfig::<u64>::default()
         };
         let mut sentinel: SpectralSentinel<u128, u64, 128> = SpectralSentinel::new(cfg).unwrap();
-
         let mut saw_semi_internal = false;
         let mut saw_removal = false;
         for nibble in 0..16u128 {
