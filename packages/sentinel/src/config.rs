@@ -189,7 +189,8 @@ pub struct SentinelConfig<V: Accumulator> {
 
     /// Numerical stability constant.
     ///
-    /// Added to denominators to prevent division by zero.
+    /// Added to denominators to prevent division by zero. Must be finite and
+    /// positive so every score and energy denominator remains meaningful.
     ///
     /// Default: `1e-6`
     pub eps: f64,
@@ -473,6 +474,8 @@ pub enum ConfigError {
     AnalysisKZero,
     /// `energy_threshold` must be in `(0.0, 1.0)`.
     EnergyThresholdOutOfRange(f64),
+    /// `eps` must be finite.
+    EpsNotFinite(f64),
     /// `eps` must be positive.
     EpsNotPositive(f64),
     /// `cusum_slow_decay` must be in `(0.0, 1.0)`.
@@ -543,6 +546,7 @@ impl std::fmt::Display for ConfigError {
             Self::EnergyThresholdOutOfRange(v) => {
                 write!(f, "energy_threshold must be in (0.0, 1.0), got {v}")
             }
+            Self::EpsNotFinite(v) => write!(f, "eps must be finite, got {v}"),
             Self::EpsNotPositive(v) => write!(f, "eps must be positive, got {v}"),
             Self::CusumSlowDecayOutOfRange(v) => {
                 write!(f, "cusum_slow_decay must be in (0.0, 1.0), got {v}")
@@ -774,6 +778,14 @@ fn headroom_requirement(d_create: u32, d_evict: u32) -> Option<usize> {
     Some(headroom.max(convergence))
 }
 
+fn validate_eps(eps: f64, errors: &mut Vec<ConfigError>) {
+    if !eps.is_finite() {
+        errors.push(ConfigError::EpsNotFinite(eps));
+    } else if eps <= 0.0 {
+        errors.push(ConfigError::EpsNotPositive(eps));
+    }
+}
+
 impl<V: Inspectable> SentinelConfig<V> {
     /// Validate all invariants.
     ///
@@ -802,9 +814,7 @@ impl<V: Inspectable> SentinelConfig<V> {
         if self.energy_threshold.is_nan() || self.energy_threshold <= 0.0 || self.energy_threshold >= 1.0 {
             errors.push(ConfigError::EnergyThresholdOutOfRange(self.energy_threshold));
         }
-        if self.eps.is_nan() || self.eps <= 0.0 {
-            errors.push(ConfigError::EpsNotPositive(self.eps));
-        }
+        validate_eps(self.eps, &mut errors);
         if self.cusum_slow_decay.is_nan() || self.cusum_slow_decay <= 0.0 || self.cusum_slow_decay >= 1.0 {
             errors.push(ConfigError::CusumSlowDecayOutOfRange(self.cusum_slow_decay));
         }

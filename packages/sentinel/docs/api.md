@@ -763,6 +763,8 @@ These modules implement the internal machinery. Their interfaces may change with
 | `RankUpdateIntervalZero`       | `rank_update_interval` must be ≥ 1            |
 | `AnalysisKZero`                | `analysis_k` must be ≥ 1                      |
 | `EnergyThresholdOutOfRange`    | `energy_threshold` must be in `(0.0, 1.0)`    |
+| `EpsNotFinite`                 | `eps` must be finite                          |
+| `EpsNotPositive`               | `eps` must be positive                        |
 | `CusumSlowDecayOutOfRange`     | `cusum_slow_decay` must be in `(0.0, 1.0)`    |
 | `CusumSlowDecayTooLow`         | `cusum_slow_decay` must be > `forgetting_factor` |
 | `DEvictNotGreaterThanDCreate`  | `d_evict` must be > `d_create`                |

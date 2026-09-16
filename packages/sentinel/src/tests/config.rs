@@ -39,6 +39,7 @@
 //! | [`rejects_rank_update_interval_zero`] | config | cites (´claim:config:a-capacity-of-zero-is-refused-because-it-leaves-the-sentinel-nothing-to-work-with´) |
 //! | [`rejects_energy_threshold_out_of_range`] | config | cites (´claim:config:a-rate-must-lie-strictly-inside-the-unit-interval-and-the-refusal-names-the-value-it-saw´) |
 //! | [`rejects_eps_not_positive`] | config | The stability constant exists to keep denominators away from zero, so a value at or below zero defeats the only thing it is for. Both are refused, and the refusal reports the offending value rather than silently substituting a workable one. |
+//! | [`requires_finite_eps`] | config | A denominator guard must itself be finite: either infinity would collapse score and energy ratios rather than stabilise them, while the largest finite value remains a valid positive guard. |
 //! | [`rejects_cusum_slow_decay_out_of_range`] | config | cites (´claim:config:a-rate-must-lie-strictly-inside-the-unit-interval-and-the-refusal-names-the-value-it-saw´) |
 //! | [`rejects_cusum_slow_decay_below_forgetting`] | config | The CUSUM reference must have longer memory than the baseline it is measured against — strictly slower, not merely as slow. A reference adapting as fast as the baseline would follow a gradual drift instead of exposing it, and exposing exactly that drift is what the accumulator exists for. |
 //! | [`accepts_cusum_slow_decay_just_above_forgetting`] | config | cites (´claim:config:the-cusum-reference-must-decay-strictly-slower-than-the-baseline-it-judges´) |
@@ -311,6 +312,36 @@ fn rejects_eps_not_positive() {
             "expected EpsNotPositive for {bad}"
         );
     }
+}
+
+/// A denominator guard must itself be finite: either infinity would make every
+/// protected denominator infinite and collapse the resulting ratios to zero.
+/// The largest finite value remains positive and is therefore admitted; the
+/// validator enforces the stated domain without imposing a fitted upper bound.
+///
+/// ´claim:config:the-denominator-guard-is-finite-and-positive´
+/// ´test:crate:requires-finite-eps´
+#[test]
+fn requires_finite_eps() {
+    for &bad in &[f64::INFINITY, f64::NEG_INFINITY] {
+        let cfg = SentinelConfig::<u64> {
+            eps: bad,
+            ..SentinelConfig::<u64>::default()
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(
+            err.0
+                .iter()
+                .any(|e| matches!(e, ConfigError::EpsNotFinite(v) if v.to_bits() == bad.to_bits())),
+            "expected EpsNotFinite for {bad}"
+        );
+    }
+
+    let largest_finite = SentinelConfig::<u64> {
+        eps: f64::MAX,
+        ..SentinelConfig::<u64>::default()
+    };
+    assert_eq!(largest_finite.validate(), Ok(()));
 }
 
 // ── Per-field validation: CUSUM / EWMA fields ───────────────
