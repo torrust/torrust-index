@@ -101,17 +101,18 @@ fn noise_baselines_converge_within_bound() {
 
     // Per-axis tolerances for the block-mean comparison.
     //
-    // These are set to ~3× the expected block-mean fluctuation,
-    // which is CV_EWMA × √((1+λ)/(1−λ) / block_len).  With
-    // block_len = 100 and λ = 0.95, the inflation factor is
-    // √(31.4/100) ≈ 0.56, so block_CV ≈ 0.56 × EWMA_CV.
+    // The budgets use the two-block difference scale derived beside
+    // `block_mean_relative_error`. With block length 100 and λ = 0.95,
+    // one block has factor √(39/100) ≈ 0.62 and two widely separated blocks
+    // have difference factor √2 × 0.62 ≈ 0.88. The stochastic-axis budgets
+    // exceed that scale by at least 2.5; novelty keeps a wider fixed minimum.
     //
-    // Axis          | EWMA CV | block CV | 3σ bound | tolerance
-    // --------------|---------|---------|----------|----------
-    // Novelty       |  0.07%  |  0.04%  |   0.12%  |   2%
-    // Displacement  |  3.4%   |  1.9%   |   5.7%   |  10%
-    // Surprise      |  6.5%   |  3.6%   |  10.8%   |  15%
-    // Coherence     | 10.0%   |  5.6%   |  16.8%   |  25%
+    // Axis          | EWMA CV | difference CV | tolerance
+    // --------------|---------|---------------|----------
+    // Novelty       |  0.07%  |         0.06% |   2%
+    // Displacement  |  3.4%   |         3.00% |  10%
+    // Surprise      |  6.5%   |         5.73% |  15%
+    // Coherence     | 10.0%   |         8.83% |  25%
     let axis_names = ["novelty", "displacement", "surprise", "coherence"];
     let tolerances = [0.02, 0.10, 0.15, 0.25];
 

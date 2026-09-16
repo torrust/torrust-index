@@ -219,13 +219,17 @@ pub(super) fn rolling_mean(slice: &[f64]) -> f64 {
 /// late-block mean is non-negligible, or `None` if the late-block mean
 /// is effectively zero (axis inactive).
 ///
-/// The theoretical basis (§`noise_convergence.md` §1–§2): after the EWMA
-/// transient decays (λ^t < ε), the expected baseline mean equals the
-/// score distribution's expectation.  Two widely-separated block means
-/// from the same stationary process should agree within the statistical
-/// uncertainty of the block-mean estimator, which is of order
-/// `CV_EWMA × √((1+λ)/(1−λ) / block_len)`.  The per-axis tolerances
-/// passed by callers are set to ≥ 3× this quantity.
+/// The basis is derived here from the EWMA used by the tracker. For
+/// stationary, uncorrelated batch-score innovations, the initial-condition
+/// bias after `t` updates is proportional to `λ^t`; once that is below the
+/// chosen transient tolerance, the expected baseline mean agrees with the
+/// score distribution's expectation to the same tolerance. The stationary
+/// EWMA has lag-`h` correlation `λ^h`, so a block of `L` consecutive baseline
+/// snapshots has relative standard error approximately
+/// `CV_EWMA × √((1+λ) / ((1−λ) × L))`. Widely separated blocks have negligible
+/// cross-covariance, making the standard error of their difference `√2` times
+/// that value. Callers derive their per-axis budgets beside each tolerance
+/// from `CV_EWMA`, `λ`, the block length, and an explicit safety multiple.
 pub(super) fn block_mean_relative_error(
     traces: &[[f64; 4]],
     axis: usize,
