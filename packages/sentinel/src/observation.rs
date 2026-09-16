@@ -28,7 +28,7 @@ use torrust_mudlark::Coordinate;
 /// implementor supplies `to_centred_bits` for its own width, and the two impls
 /// here are what a wrapper around one of those widths delegates to. This is
 /// the coordinate side of the generic parameters the sentinel is built on
-/// (´rec:sentinel:generic-coordinate-accumulator-and-domain-width´).
+/// ([ADR-S-018](https://github.com/torrust/torrust-index/blob/develop/packages/sentinel/adr/018-generic-domain-parameters.md)).
 ///
 /// The set of implementations is open; the width they can serve is not. Every
 /// conversion returns a [`CentredBits`], which carries its values in a fixed

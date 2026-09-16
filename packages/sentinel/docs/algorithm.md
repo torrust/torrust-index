@@ -557,7 +557,7 @@ Each scoring axis maintains a fast EWMA, slow EWMA, drift accumulator, and clip-
 
 #### Phase 5 — Adapt Rank · `sec:sentinel:algorithm-core-loop-adapt-rank`
 
-Rank is recomputed every $T_{\text{rank}}$ steps (the rank update interval):
+Rank is recomputed every $T_{\text{rank}}$ tracker batches (the rank update interval):
 
 1. Compute cumulative energy fractions:
 

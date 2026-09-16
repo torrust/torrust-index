@@ -169,7 +169,7 @@ pub struct SentinelConfig<V: Accumulator> {
     /// Default: `0.99`
     pub forgetting_factor: f64,
 
-    /// How often (in observation steps) to reassess the rank of each tracker.
+    /// How often (in tracker batches) to reassess the rank of each tracker.
     ///
     /// Rank changes by at most ±1 per evaluation to avoid instability.
     ///

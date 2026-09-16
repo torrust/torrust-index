@@ -390,8 +390,7 @@ where
             return self.empty_report();
         }
 
-        // ── Arrival stamp ─────────────────────────────────
-        // (´sec:sentinel:algorithm-output-report-overview´)
+        // ── Arrival stamp (§ALGO S-14.1) ──────────────────
         // The batch arrives whole at this call boundary, so this one
         // instant is the arrival of every observation in it — the
         // oldest included. It is read back at emission and reported as

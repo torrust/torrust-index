@@ -356,7 +356,7 @@ All parameters from the algorithm spec (§ALGO S-13) are represented in `Sentine
 | ------------------------ | ------- | ------------------------------------------------------ |
 | `max_rank`               | 16      | Maximum subspace rank per tracker                      |
 | `forgetting_factor`      | 0.99    | Exponential decay factor $\lambda$                     |
-| `rank_update_interval`   | 100     | Steps between rank re-evaluations                      |
+| `rank_update_interval`   | 100     | Tracker batches between rank re-evaluations            |
 | `energy_threshold`       | 0.90    | Cumulative energy fraction for rank selection          |
 | `eps`                    | 1e-6    | Numerical stability constant                           |
 | `clip_sigmas`            | 3.0     | EWMA outlier clip width ($n_\sigma$)                   |

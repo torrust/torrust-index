@@ -783,7 +783,7 @@ impl SubspaceTracker {
 
     /// Phase 5: Adapt rank based on cumulative energy.
     ///
-    /// Every `rank_update_interval` steps, find the smallest rank
+    /// Every `rank_update_interval` tracker batches, find the smallest rank
     /// capturing `energy_threshold` of total variance.  Move by ±1.
     fn adapt_rank(&mut self) {
         let total_energy: f64 = self.sigmas.iter().map(|s| s * s).sum::<f64>() + self.eps;
