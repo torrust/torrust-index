@@ -9,7 +9,7 @@
 //! |-----------------|-------------------------------------------------------------|
 //! | [`assertions`]  | [`assert_invariants()`], [`assert_reports_identical()`], [`max_cusum()`], [`max_novelty_z()`], [`root_novelty_z()`] |
 //! | [`builders`]    | [`seeded_sentinel()`], [`ScenarioBuilder`]                  |
-//! | [`config`]      | [`test_config()`], [`cold_config()`], [`integration_config()`] |
+//! | [`config`]      | [`test_config()`], [`cold_config()`], [`integration_config()`], [`batches_to_maturity()`] |
 //! | [`generators`]  | [`cell_values()`], [`cell_values_prefix()`], [`anomalous_values()`] |
 
 // Each integration test file includes this module independently, so
@@ -23,5 +23,5 @@ mod generators;
 
 pub use assertions::{assert_invariants, assert_reports_identical, max_cusum, max_novelty_z, root_novelty_z};
 pub use builders::{ScenarioBuilder, seeded_sentinel};
-pub use config::{cold_config, integration_config, test_config};
+pub use config::{batches_to_maturity, cold_config, integration_config, test_config};
 pub use generators::{anomalous_values, cell_values, cell_values_prefix};

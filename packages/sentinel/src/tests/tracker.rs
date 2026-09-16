@@ -20,7 +20,7 @@
 //! | [`maturity_noise_only`] | subspace | Maturity is counted in observations rather than in calls: a batch of several injected rows advances the noise tally by that many and leaves the real tally untouched. Counting rows is what makes the figure comparable across cells fed at different batch sizes, and keeping the two tallies apart is what lets a host ask how much of what a cell knows it was taught deliberately. |
 //! | [`maturity_real_only`] | subspace | cites (´claim:subspace:maturity-counts-observations-row-by-row-and-keeps-the-injected-and-the-real-apart´) |
 //! | [`maturity_mixed_real_and_noise`] | subspace | cites (´claim:subspace:maturity-counts-observations-row-by-row-and-keeps-the-injected-and-the-real-apart´) |
-//! | [`noise_influence_decays_toward_zero_for_real`] | subspace | Sustained real traffic drives the noise influence to essentially nothing. The figure falls by the forgetting factor once per observation rather than once per batch, so it measures how much genuine data has passed rather than how often the host called — and once it is small enough, the cell has effectively declared that what it knows now came from the traffic and not from its warm-up. |
+//! | [`noise_influence_decays_toward_zero_for_real`] | subspace | Sustained real traffic drives noise influence below the maturity threshold one tracker batch at a time, matching the learned model's forgetting cadence regardless of the number of rows in each batch. |
 //! | [`noise_influence_converges_toward_one_for_noise`] | subspace | Warm-up is re-enterable. A cell pushed part-way down by real traffic climbs back toward full influence when injection resumes, by the same geometric step run in the other direction. Cells are re-warmed after splits and long silences, so a figure that could only fall would leave a re-taught cell wrongly claiming its knowledge came from traffic it never saw. |
 //! | [`novelty_low_for_repeated_pattern`] | subspace | Novelty is whatever the learned directions fail to explain, divided by the room left over after those directions are removed. A pattern the model has been trained on lies almost inside its own axes, so what is left is nearly nothing and the pattern scores as unremarkable — the model reports familiarity by having nothing to report. |
 //! | [`novelty_high_for_unseen_pattern`] | subspace | cites (´claim:subspace:novelty-is-what-the-learned-directions-fail-to-explain-so-a-familiar-pattern-scores-low´) |
@@ -52,8 +52,8 @@
 //! it never leaves the band between a single axis and the cell's ceiling. A
 //! cell that has only ever seen injected noise must be distinguishable from one
 //! taught by real traffic, so a noise-influence figure starts at full and
-//! decays toward nothing with each real observation — climbing back if noise
-//! resumes, because warm-up is re-enterable rather than a door that shuts once.
+//! decays toward nothing with each real batch — climbing back if noise resumes,
+//! because warm-up is re-enterable rather than a door that shuts once.
 //! And the tracker knows nothing about cells, coordinates or the host's
 //! domain: it takes rows of numbers and returns a report, which is what lets
 //! the same engine serve every depth of the tree.
@@ -105,6 +105,18 @@ fn centred_rows(values: &[u128], depth: usize) -> Vec<Vec<f64>> {
 
 fn as_slices(vecs: &[Vec<f64>]) -> Vec<&[f64]> {
     vecs.iter().map(Vec::as_slice).collect()
+}
+
+const MATURITY_THRESHOLD: f64 = 0.01;
+
+fn decay_crossing(initial: f64, lambda: f64) -> (usize, f64) {
+    (1_usize..=usize::MAX)
+        .scan(initial, |influence, batch| {
+            *influence *= lambda;
+            Some((batch, *influence))
+        })
+        .find(|(_, influence)| *influence < MATURITY_THRESHOLD)
+        .expect("a validated forgetting factor must cross the maturity threshold")
 }
 
 // ════════════════════════════════════════════════════════════
@@ -468,12 +480,10 @@ fn maturity_mixed_real_and_noise() {
     assert!(t.maturity().noise_influence < 1.0);
 }
 
-/// Sustained real traffic drives the noise influence to essentially nothing.
-/// The figure falls by the forgetting factor once per observation rather than
-/// once per batch, so it measures how much genuine data has passed rather than
-/// how often the host called — and once it is small enough, the cell has
-/// effectively declared that what it knows now came from the traffic and not
-/// from its warm-up.
+/// Sustained real traffic drives noise influence below the maturity threshold.
+/// The figure falls by the forgetting factor once per tracker batch, matching
+/// the model whose warm-up share it measures regardless of how many rows that
+/// batch carries.
 ///
 /// ´claim:subspace:sustained-real-traffic-drives-the-noise-influence-to-nothing-so-a-cell-can-declare-itself-warmed´
 /// ´test:crate:noise-influence-decays-toward-zero-for-real´
@@ -485,13 +495,13 @@ fn noise_influence_decays_toward_zero_for_real() {
     let rows = centred_rows(&[1, 2, 3, 4], 8);
     let slices = as_slices(&rows);
 
-    // η starts at 1.0; each real batch decays it by λⁿ.
-    for _ in 0..50 {
+    let (crossing_batch, _) = decay_crossing(t.maturity().noise_influence, cfg.forgetting_factor);
+    for _ in 0..crossing_batch {
         t.observe(&slices, 8, false);
     }
 
     assert!(
-        t.maturity().noise_influence < 0.01,
+        t.maturity().noise_influence < MATURITY_THRESHOLD,
         "η should decay toward 0 after many real batches, got {}",
         t.maturity().noise_influence,
     );
@@ -915,7 +925,7 @@ fn explicit_reset_clip_pressure() {
 /// ´test:crate:eta-threshold-crossing-zeros-clip-pressure´
 #[test]
 fn eta_threshold_crossing_zeros_clip_pressure() {
-    // When η crosses below WARMUP_THRESHOLD (0.01), clip-pressure
+    // When η crosses below MATURITY_THRESHOLD (0.01), clip-pressure
     // is automatically zeroed even without an explicit reset call.
     let cfg = SentinelConfig::<u64> {
         max_rank: 4,
@@ -942,7 +952,7 @@ fn eta_threshold_crossing_zeros_clip_pressure() {
         t.observe(&slices, 8, false);
         let new_eta = t.maturity().noise_influence;
 
-        if old_eta >= 0.01 && new_eta < 0.01 {
+        if old_eta >= MATURITY_THRESHOLD && new_eta < MATURITY_THRESHOLD {
             let cp = t.clip_pressures();
             for (i, &v) in cp.iter().enumerate() {
                 assert!(

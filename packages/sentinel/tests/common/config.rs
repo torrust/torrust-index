@@ -5,6 +5,20 @@
 
 use torrust_sentinel::{NoiseSchedule, SentinelConfig, SvdStrategy};
 
+const MATURITY_THRESHOLD: f64 = 0.01;
+
+/// Number of batch-indexed forgetting steps needed to leave warm-up.
+pub fn batches_to_maturity(lambda: f64) -> usize {
+    (1_usize..=usize::MAX)
+        .scan(1.0, |influence, batch| {
+            *influence *= lambda;
+            Some((batch, *influence))
+        })
+        .find(|(_, influence)| *influence < MATURITY_THRESHOLD)
+        .map(|(batch, _)| batch)
+        .expect("a validated forgetting factor must cross the maturity threshold")
+}
+
 /// Test config with faster EWMA parameters (ADR-S-012).
 ///
 /// Uses λ=0.90 (`forgetting_factor`) and `λ_s`=0.99 (`cusum_slow_decay`)

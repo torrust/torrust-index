@@ -558,7 +558,7 @@ pub struct SentinelConfig<V: Accumulator> {
 
 **Subspace parameters** (§ALGO S-4):
 - `max_rank`: Maximum basis vectors any tracker can use.
-- `forgetting_factor` (λ): Exponential decay rate. Half-life ≈ `ln(2) / ln(1/λ)`.
+- `forgetting_factor` (λ): Exponential decay rate per tracker batch. Half-life ≈ `ln(2) / ln(1/λ)` batches.
 - `rank_update_interval`: Reassess rank every N observations.
 - `energy_threshold` (τ): Cumulative energy threshold for rank adaptation.
 

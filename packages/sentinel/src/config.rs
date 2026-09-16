@@ -160,9 +160,9 @@ pub struct SentinelConfig<V: Accumulator> {
 
     /// Exponential forgetting factor (λ).
     ///
-    /// Controls how fast old observations fade from memory.
-    /// - `0.99` = long memory (~69 observations half-life)
-    /// - `0.95` = short memory (~14 observations half-life)
+    /// Controls how fast old tracker batches fade from memory.
+    /// - `0.99` = long memory (~69 batches half-life)
+    /// - `0.95` = short memory (~14 batches half-life)
     ///
     /// Must be in `(0.0, 1.0)`.
     ///

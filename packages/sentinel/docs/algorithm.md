@@ -1508,7 +1508,7 @@ Clip-width modulation during warm-up is handled by the unified clip-pressure mec
 
 $$n_\sigma^{\text{eff}} = n_\sigma\left(1 + \frac{p}{1 - p + \varepsilon}\right)$$
 
-During warm-up, $\eta \approx 1$ dominates and the ceiling is effectively open — preventing the positive feedback loop between tight clipping and low baselines that would otherwise extend convergence time by an order of magnitude. As $\eta$ decays with real observations, $\bar{\rho}$ takes over if the baselines become stale in production. The full mechanism, including dynamics tables and contamination analysis, is specified in §6.1.1 and §6.4.
+During warm-up, $\eta \approx 1$ dominates and the ceiling is effectively open — preventing the positive feedback loop between tight clipping and low baselines that would otherwise extend convergence time by an order of magnitude. As $\eta$ decays with real-observation batches, $\bar{\rho}$ takes over if the baselines become stale in production. The full mechanism, including dynamics tables and contamination analysis, is specified in §6.1.1 and §6.4.
 
 ### 11.4 Slow-From-Fast CUSUM Seeding · `sec:sentinel:algorithm-warmup-slow-from-fast-cusum-seeding`
 
@@ -1532,13 +1532,13 @@ Each tracker records:
 | Noise observations     | Count of synthetic observations processed             |
 | Noise influence $\eta$ | Fraction of baseline not yet established by real data |
 
-The noise influence decays exponentially with real observations:
+The noise influence advances once per tracker batch, at the same forgetting cadence as the SVD, latent statistics, and score baselines. Observation counters still advance by the number of rows in the batch:
 
-$$\eta_{t+1} = \begin{cases} \lambda \, \eta_t + (1 - \lambda) & \text{noise observation} \\ \lambda \, \eta_t & \text{real observation} \end{cases}$$
+$$\eta_{t+1} = \begin{cases} \lambda \, \eta_t + (1 - \lambda) & \text{noise batch} \\ \lambda \, \eta_t & \text{real batch} \end{cases}$$
 
-After $n$ real observations: $\eta_n = \lambda^n$. The system reports $\eta$ without interpretation. The host should treat scores from trackers with high $\eta$ (e.g., $> 0.5$) as preliminary.
+After $k$ real batches: $\eta_k = \lambda^k \eta_0$, independent of batch size. The system reports $\eta$ without interpretation. The host should treat scores from trackers with high $\eta$ (e.g., $> 0.5$) as preliminary.
 
-**Initial value.** $\eta_0 = 1.0$ at tracker creation, indicating that no real observations have yet established the baseline. After noise injection (which maintains $\eta \approx 1.0$) and $n$ real observations, $\eta_n \approx \lambda^n$.
+**Initial value.** $\eta_0 = 1.0$ at tracker creation, indicating that no real batch has yet displaced the warm-up state. Noise injection keeps $\eta \approx 1.0$; after $k$ real batches, $\eta_k \approx \lambda^k$.
 
 #### 11.5.1 Three Convergence Concepts · `sec:sentinel:algorithm-maturity-tracking-convergence-concepts`
 
@@ -1546,11 +1546,11 @@ The system has three distinct notions of convergence, operating at different tim
 
 | Convergence type                                        | Definition                                    | Timescale                                    | Notes                                                                       |
 | ------------------------------------------------------- | --------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------- |
-| **$\eta$-convergence** (maturity)                       | $\eta_n = \lambda^n < \epsilon$               | $\lceil\ln\epsilon/\ln\lambda\rceil$ batches | Exact closed-form                                                           |
+| **$\eta$-convergence** (maturity)                       | $\eta_k = \lambda^k < \epsilon$               | $\lceil\ln\epsilon/\ln\lambda\rceil$ batches | Exact closed-form                                                           |
 | **Trajectory convergence** (EWMA mean)                  | $\|\bar{\mu}_n - \bar{\mu}_\infty\| < \delta$ | Tens to hundreds of rounds                   | With clip-pressure modulation (§6.1.1, §6.4) and cold-start seeding (§11.2) |
 | **Distributional stationarity** (baseline distribution) | Windowed-mean comparison $< \epsilon$         | Per-axis; varies by batch size               | Baselines wander even at true steady state                                  |
 
-$\eta$-convergence is a **necessary but not sufficient** indicator of system readiness. EWMA baselines converge at a rate determined by cascaded EWMA interactions, clipping policy, batch size, and axis-specific score distributions — not by the simple exponential $\eta_n = \lambda^n$.
+$\eta$-convergence is a **necessary but not sufficient** indicator of system readiness. EWMA baselines follow the same per-batch decay but their observed convergence also depends on cascaded interactions, clipping policy, batch size, and axis-specific score distributions; $\eta_k = \lambda^k$ measures forgetting cadence rather than distributional stationarity.
 
 ### 11.6 Deferred Cell Warm-Up · `sec:sentinel:algorithm-deferred-cell-warmup`
 
@@ -2557,7 +2557,7 @@ These values include a $\sim$13–15% margin above the measured worst-case conve
 | g.sum                                     | A G-Tree node's total accumulation: its own value plus all descendant sums; used as warm-up priority                                                                             | §3.12, §11.6.2 |
 | Investment set ($\mathcal{I}$)            | Competitive targets closed under spatial ancestry; all members have allocated trackers regardless of online status                                                               | §8.2           |
 | Max-uncle constraint                      | The V-Tree invariant: no node may outrank all of its uncles                                                                                                                      | §3.4           |
-| Noise influence ($\eta$)                  | Fraction of a tracker's baseline not yet established by real observations; decays as $\lambda^n$                                                                                 | §11.5          |
+| Noise influence ($\eta$)                  | Fraction of a tracker's batch-updated model not yet established by real traffic; decays as $\lambda^k$ over real batches                                                        | §11.5          |
 | Noise injection                           | Feeding synthetic random centred bit vectors through a tracker to warm its baselines before real observations arrive                                                             | §11.1          |
 | Novelty                                   | Scoring axis measuring average residual energy per degree of freedom outside the learned subspace; degenerate when $k = w$                                                       | §5.2           |
 | Novelty-saturated                         | Condition where $k = w$ and the novelty axis is identically zero                                                                                                                 | §5.2, §14.7    |

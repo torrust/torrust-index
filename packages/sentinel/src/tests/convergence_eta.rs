@@ -5,21 +5,19 @@
 //!
 //! A cell is warmed on synthetic noise before it ever judges real traffic,
 //! and the noise share η is the tracker's own estimate of how much of its
-//! state that warming still accounts for. It is the same exponential
-//! forgetting the baselines use, applied to a single indicator: an
-//! injected sample pulls the share toward one, a real sample pulls it
-//! toward zero, and each is weighted exactly as that sample's contribution
-//! to the model will be. The share is therefore not a count of rounds but
-//! a statement about how much of the present model is still synthetic.
+//! state that warming still accounts for. It uses the same exponential
+//! forgetting cadence as the model: an injected batch pulls the share toward
+//! one and a real batch pulls it toward zero. Observation counters remain
+//! sample counts, while the influence states how much of the batch-updated
+//! model is still synthetic.
 //!
 //! Three properties make it usable rather than merely descriptive. It is
 //! a proportion under every workload, so a consumer never has to guard
 //! against a value that is not a fraction. It moves in one direction per
 //! kind of input, so a threshold crossing means the same thing whenever it
 //! happens — which is what lets the clip exemption and the end of warm-up
-//! be keyed to it. And it matches its closed form to the last digit,
-//! because a batch's decay is computed as one power rather than
-//! accumulated sample by sample.
+//! be keyed to it. It also matches its batch-indexed closed form exactly and
+//! is independent of the number of samples within each batch.
 //!
 //! The observation counters run alongside and answer a different question.
 //! They tally samples of each kind and never decay, so a host can still
@@ -37,12 +35,14 @@
 //! |------|------|-------|
 //! | [`eta_starts_at_one_for_cold_tracker`] | noise | A tracker that has seen nothing counts as entirely noise-taught. Everything it will learn first comes from injected traffic, so the honest starting position is that none of its state yet reflects real observations. |
 //! | [`counters_start_at_zero_for_cold_tracker`] | noise | A fresh tracker claims no observations of either kind, and the total is exactly the two counts together. The counters are a record of what was fed in rather than an estimate, so nothing may be presumed before anything arrives. |
-//! | [`eta_tracks_theory_exactly`] | noise | The noise share follows its closed form to the last digit through an injection phase and then a long run of real batches, because a batch's worth of decay is computed as a single power rather than accumulated a sample at a time. A quantity that gates clip width and decides when warm-up is over has to be reproducible, not merely approximately right. |
+//! | [`eta_tracks_theory_exactly`] | noise | After each real batch the noise share equals its initial value times the model's forgetting factor raised to the number of batches, exactly matching the state it measures. |
+//! | [`eta_decay_is_independent_of_batch_size`] | noise | One-sample and sixteen-sample batches apply the same decay to noise influence because each causes one model update. The observation counters still record their different sample counts. |
+//! | [`eta_maturity_threshold_uses_model_batch_count`] | noise | The maturity threshold is crossed on the first batch for which the model's repeated forgetting factor takes influence below the threshold, with the count derived from that recurrence. |
 //! | [`eta_decreases_monotonically_under_real_data`] | noise | Every real batch lowers the noise share and none raises it, so warm-up influence is spent and never regained by ordinary operation. Monotonicity is what makes the share usable as a maturity signal: a threshold crossing means the same thing whenever it happens. |
 //! | [`eta_increases_monotonically_under_noise`] | noise | Injection pushes the share back up from wherever real data drove it, batch by batch and without reversal. A cell whose model is re-warmed is therefore re-declared immature rather than left claiming a maturity its state no longer has. |
 //! | [`eta_stays_in_unit_interval`] | noise | The share is a proportion and stays one under any interleaving of injected and real batches. Both updates are convex steps toward an endpoint inside the interval, so no mixture of workloads can carry it out of range and no consumer has to guard against a value that is not a fraction. |
 //! | [`eta_converges_to_one_under_noise`] | noise | Indefinite injection holds the share at exactly one, its fixed point: noise cannot make a model more than entirely noise-taught. A long warm-up therefore has a stable end state rather than an accumulating one. |
-//! | [`eta_decays_toward_zero_under_real_only`] | noise | A long enough run of real data drives the share to effectively nothing, so a warm-up is eventually forgotten completely. The decay is geometric in the number of samples seen, which is why the threshold that ends warm-up is reached within a bounded number of batches rather than merely approached. |
+//! | [`eta_decays_toward_zero_under_real_only`] | noise | A long enough run of real batches drives the share below the maturity threshold, so warm-up is eventually forgotten on the same schedule as the model. |
 //! | [`observation_counters_mixed_sequence`] | noise | The counters tally samples rather than batches and keep the two kinds apart: a stretch of injection moves only the noise count, a stretch of real traffic only the other, and the total is their sum. A host can therefore still tell how much of a model's experience was synthetic long after the noise share itself has decayed away. |
 //! | [`counters_track_real_only_sequence`] | noise | cites (´claim:noise:the-counters-tally-samples-not-batches-and-keep-the-two-kinds-apart´) |
 
@@ -51,6 +51,18 @@ use rand::rngs::SmallRng;
 
 use super::convergence_common::{as_slices, cfg_test, generate_noise};
 use crate::sentinel::tracker::SubspaceTracker;
+
+const MATURITY_THRESHOLD: f64 = 0.01;
+
+fn decay_crossing(initial: f64, lambda: f64) -> (usize, f64) {
+    (1_usize..=usize::MAX)
+        .scan(initial, |influence, batch| {
+            *influence *= lambda;
+            Some((batch, *influence))
+        })
+        .find(|(_, influence)| *influence < MATURITY_THRESHOLD)
+        .expect("a validated forgetting factor must cross the maturity threshold")
+}
 
 // ════════════════════════════════════════════════════════════
 //  Initial conditions
@@ -90,63 +102,86 @@ fn counters_start_at_zero_for_cold_tracker() {
 //  η recurrence
 // ════════════════════════════════════════════════════════════
 
-/// The noise share follows its closed form to the last digit through an
-/// injection phase and then a long run of real batches, because a batch's worth
-/// of decay is computed as a single power rather than accumulated a sample at a
-/// time. A quantity that gates clip width and decides when warm-up is over has
-/// to be reproducible, not merely approximately right.
+/// The noise share follows the same recurrence as the model it describes. A
+/// real batch applies λ once, so after `k` batches the initial influence has
+/// been multiplied by λ exactly `k` times, independent of the rows in them.
 ///
-/// ´claim:noise:the-noise-share-matches-its-closed-form-because-a-batch-of-decay-is-one-power-not-a-loop´
+/// ´claim:noise:the-noise-share-follows-the-models-batch-indexed-recurrence´
 /// ´test:crate:eta-tracks-theory-exactly´
 #[test]
-#[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap, clippy::suboptimal_flops)]
 fn eta_tracks_theory_exactly() {
     let cfg = cfg_test();
-    let dim = 128;
     let lambda = cfg.forgetting_factor;
-    let noise_rounds = 10_usize;
-    let noise_batch_size = cfg.noise_batch_size;
-    let real_batch_size = 20_usize;
-    let total_real_batches = 50;
-
-    let mut tracker = SubspaceTracker::new(dim, &cfg, cfg.cusum_slow_decay);
+    let mut tracker = SubspaceTracker::new(128, &cfg, cfg.cusum_slow_decay);
     let mut rng = SmallRng::seed_from_u64(42);
+    let rows = generate_noise(128, 20, &mut rng);
+    let slices = as_slices(&rows);
+    let mut expected_eta = tracker.maturity().noise_influence;
 
-    // Phase 1: noise injection.
-    for _ in 0..noise_rounds {
-        let noise = generate_noise(dim, noise_batch_size, &mut rng);
-        tracker.observe(&as_slices(&noise), 0, true);
+    for batch in 1..=7 {
+        tracker.observe(&slices, 0, false);
+        expected_eta *= lambda;
+        assert_eq!(
+            tracker.maturity().noise_influence.to_bits(),
+            expected_eta.to_bits(),
+            "batch {batch} must apply one model-decay step"
+        );
     }
+}
 
-    let eta_after_noise = tracker.maturity().noise_influence;
+/// One-sample and sixteen-sample batches each evolve the learned model once,
+/// so they must also apply the same single decay to its warm-up influence. The
+/// separate observation counters continue to record how many rows arrived.
+///
+/// ´claim:noise:one-model-update-applies-one-noise-influence-decay-regardless-of-batch-size´
+/// ´test:crate:eta-decay-is-independent-of-batch-size´
+#[test]
+fn eta_decay_is_independent_of_batch_size() {
+    let cfg = cfg_test();
+    let mut one = SubspaceTracker::new(128, &cfg, cfg.cusum_slow_decay);
+    let mut sixteen = SubspaceTracker::new(128, &cfg, cfg.cusum_slow_decay);
+    let mut rng = SmallRng::seed_from_u64(43);
+    let one_row = generate_noise(128, 1, &mut rng);
+    let sixteen_rows = generate_noise(128, 16, &mut rng);
 
-    // Theoretical η after noise.
-    let mut eta_theory = 1.0_f64;
-    let lam_noise = lambda.powi(noise_batch_size as i32);
-    for _ in 0..noise_rounds {
-        eta_theory = lam_noise * eta_theory + (1.0 - lam_noise);
-    }
-    assert!(
-        (eta_after_noise - eta_theory).abs() < 1e-10,
-        "η after noise: got {eta_after_noise:.12}, theory {eta_theory:.12}"
+    one.observe(&as_slices(&one_row), 0, false);
+    sixteen.observe(&as_slices(&sixteen_rows), 0, false);
+
+    assert_eq!(one.maturity().noise_influence.to_bits(), cfg.forgetting_factor.to_bits());
+    assert_eq!(sixteen.maturity().noise_influence.to_bits(), cfg.forgetting_factor.to_bits());
+    assert_eq!(
+        one.maturity().noise_influence.to_bits(),
+        sixteen.maturity().noise_influence.to_bits()
     );
+    assert_eq!(one.maturity().real_observations, 1);
+    assert_eq!(sixteen.maturity().real_observations, 16);
+}
 
-    // Phase 2: real batches — η decays as λ^(bs·n).
-    let real_noise = generate_noise(dim, real_batch_size, &mut rng);
-    let real_slices = as_slices(&real_noise);
+/// The maturity crossing count comes directly from repeatedly applying the
+/// configured forgetting factor until influence is strictly below the same
+/// threshold the tracker uses. No observed run supplies the expected count.
+///
+/// ´claim:noise:maturity-crosses-when-the-models-batch-decay-crosses-the-threshold´
+/// ´test:crate:eta-maturity-threshold-uses-model-batch-count´
+#[test]
+fn eta_maturity_threshold_uses_model_batch_count() {
+    let cfg = cfg_test();
+    let (crossing_batch, expected_eta) = decay_crossing(1.0, cfg.forgetting_factor);
 
-    let mut max_error = 0.0_f64;
-    for n in 1..=total_real_batches {
-        tracker.observe(&real_slices, 0, false);
-        let eta = tracker.maturity().noise_influence;
-        let eta_real_theory = lambda.powi((real_batch_size * n) as i32) * eta_theory;
-        max_error = max_error.max((eta - eta_real_theory).abs());
+    let mut tracker = SubspaceTracker::new(128, &cfg, cfg.cusum_slow_decay);
+    let mut rng = SmallRng::seed_from_u64(44);
+    let rows = generate_noise(128, 16, &mut rng);
+    let slices = as_slices(&rows);
+
+    for batch in 1..=crossing_batch {
+        tracker.observe(&slices, 0, false);
+        if batch < crossing_batch {
+            assert!(tracker.maturity().noise_influence >= MATURITY_THRESHOLD);
+        }
     }
 
-    assert!(
-        max_error < 1e-10,
-        "η should match theory exactly (via powi), max error = {max_error:.2e}"
-    );
+    assert!(tracker.maturity().noise_influence < MATURITY_THRESHOLD);
+    assert_eq!(tracker.maturity().noise_influence.to_bits(), expected_eta.to_bits());
 }
 
 // ════════════════════════════════════════════════════════════
@@ -283,10 +318,9 @@ fn eta_converges_to_one_under_noise() {
     );
 }
 
-/// A long enough run of real data drives the share to effectively nothing, so a
-/// warm-up is eventually forgotten completely. The decay is geometric in the
-/// number of samples seen, which is why the threshold that ends warm-up is
-/// reached within a bounded number of batches rather than merely approached.
+/// A long enough run of real batches drives the share below the maturity
+/// threshold, so warm-up is forgotten on the same geometric cadence as the
+/// model rather than on a schedule determined by batch size.
 ///
 /// ´claim:noise:a-long-run-of-real-data-drives-the-noise-share-to-nothing´
 /// ´test:crate:eta-decays-toward-zero-under-real-only´
@@ -297,15 +331,16 @@ fn eta_decays_toward_zero_under_real_only() {
     let mut tracker = SubspaceTracker::new(dim, &cfg, cfg.cusum_slow_decay);
     let mut rng = SmallRng::seed_from_u64(77);
 
-    for _ in 0..200 {
+    let (crossing_batch, _) = decay_crossing(tracker.maturity().noise_influence, cfg.forgetting_factor);
+    for _ in 0..crossing_batch {
         let data = generate_noise(dim, 8, &mut rng);
         tracker.observe(&as_slices(&data), 0, false);
     }
 
     let final_eta = tracker.maturity().noise_influence;
     assert!(
-        final_eta < 1e-10,
-        "η should decay toward 0 under real-only data, got {final_eta:.2e}"
+        final_eta < MATURITY_THRESHOLD,
+        "η should cross the model's maturity threshold, got {final_eta:.2e}"
     );
 }
 

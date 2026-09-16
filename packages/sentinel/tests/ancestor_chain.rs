@@ -44,7 +44,7 @@
 
 mod common;
 
-use common::{ScenarioBuilder, anomalous_values, assert_invariants, cell_values, integration_config};
+use common::{ScenarioBuilder, anomalous_values, assert_invariants, batches_to_maturity, cell_values, integration_config};
 use torrust_sentinel::{Sentinel128, SentinelConfig};
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -354,16 +354,18 @@ fn global_anomaly_elevates_root_scores() {
 /// ´test:integration:global-anomaly-root-z-exceeds-local´
 #[test]
 fn global_anomaly_root_z_exceeds_local() {
+    let config = SentinelConfig::<u64> {
+        split_threshold: 10,
+        ..integration_config()
+    };
+    let warm_batches = batches_to_maturity(config.forgetting_factor);
     let mut s = ScenarioBuilder::new()
-        .config(SentinelConfig::<u64> {
-            split_threshold: 10,
-            ..integration_config()
-        })
+        .config(config)
         .seed_range(0xA, 20)
         .seed_range(0xB, 20)
         .seed_range(0xC, 20)
         .seed_range(0xD, 20)
-        .warm_batches(5)
+        .warm_batches(warm_batches)
         .build();
 
     // Localised anomaly: only range A.

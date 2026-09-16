@@ -21,6 +21,9 @@ use crate::ewma::EwmaStats;
 use crate::report::{AnomalyScores, SampleScore, ScoreDistribution, ScoringGeometry, TrackerMaturity, TrackerReport};
 use crate::sentinel::cusum::CusumAccumulator;
 
+/// Noise influence below this share no longer widens the clip ceiling.
+const WARMUP_THRESHOLD: f64 = 0.01;
+
 // ─── Per-axis baseline ──────────────────────────────────────
 
 /// Fast EWMA (z-scores) + CUSUM (drift detection) for one scoring axis.
@@ -846,33 +849,26 @@ impl SubspaceTracker {
 
     /// Update maturity counters after processing a batch.
     ///
-    /// Noise influence decays as λⁿ for `n` real observations, or
-    /// converges toward 1.0 under noise (§ALGO S-11.5). Computed via `powi`
-    /// instead of an `n`-iteration loop.
+    /// Observation counters advance by the number of rows, while noise
+    /// influence advances once per tracker batch at the same λ cadence as the
+    /// subspace, latent statistics, and score baselines (§ALGO S-11.5).
     ///
     /// When η crosses below `WARMUP_THRESHOLD` (§ALGO S-11.4), all
     /// per-axis clip-pressure EWMAs are zeroed to prevent warm-up
     /// contamination from echoing into production scoring.
     fn update_maturity(&mut self, batch_size: usize, is_noise: bool) {
-        /// η threshold below which warm-up is considered complete (§ALGO S-11.4).
-        const WARMUP_THRESHOLD: f64 = 0.01;
-
         let count = batch_size as u64;
-
-        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)] // batch_size ≪ 2^31
-        let n = batch_size as i32;
-        let lam_n = self.forgetting_factor.powi(n);
-
+        let lambda = self.forgetting_factor;
         let old_eta = self.noise_influence;
 
         if is_noise {
             self.noise_observations += count;
-            // η_{t+n} = λⁿ·η_t + (1 − λⁿ)  (geometric series of n EWMA steps toward 1.0)
-            self.noise_influence = lam_n.mul_add(self.noise_influence, 1.0 - lam_n);
+            // One noise batch moves η one model update toward 1.
+            self.noise_influence = lambda.mul_add(self.noise_influence, 1.0 - lambda);
         } else {
             self.real_observations += count;
-            // η_{t+n} = λⁿ·η_t
-            self.noise_influence *= lam_n;
+            // One real batch forgets the same share of warm-up as the model.
+            self.noise_influence *= lambda;
         }
 
         // §ALGO S-11.4: when η crosses the warm-up threshold, zero

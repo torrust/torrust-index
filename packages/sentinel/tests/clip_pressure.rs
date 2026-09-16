@@ -44,7 +44,7 @@
 
 mod common;
 
-use common::{cell_values, cold_config, test_config};
+use common::{batches_to_maturity, cell_values, cold_config, test_config};
 use torrust_sentinel::{Sentinel128, SentinelConfig};
 
 // ═══════════════════════════════════════════════════════════
@@ -104,10 +104,14 @@ fn clip_cold_config(decay: f64) -> SentinelConfig<u64> {
     }
 }
 
-/// Warm up a sentinel with `n` batches of diverse clean traffic on
-/// the given nibble, returning the sentinel.
+/// Advance a sentinel past maturity, then give it `n` diverse clean batches
+/// on the given nibble.
 fn warmed_sentinel(cfg: SentinelConfig<u64>, nibble: u128, batches: usize) -> Sentinel128 {
+    let maturity_batches = batches_to_maturity(cfg.forgetting_factor);
     let mut s = Sentinel128::new(cfg).unwrap();
+    for _ in 0..maturity_batches {
+        s.ingest(&diverse_cell_values(nibble, 16, 0));
+    }
     for batch_id in 0..batches {
         s.ingest(&diverse_cell_values(nibble, 16, batch_id));
     }
