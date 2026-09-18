@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-18
+
 ### Added
 
 - Expose monotonic structural mutation counters for child creation, eviction, and restoration.
@@ -88,5 +90,6 @@ Initial stable release. The public API surface documented in
 - **Full documentation** — `idea.md` (formal spec), `api.md`,
   `architecture.md`, `performance.md`, `testing.md`, `theory.md`.
 
+[1.1.0]: https://github.com/torrust/torrust-index/compare/mudlark-v1.0.1...mudlark-v1.1.0
 [1.0.1]: https://github.com/torrust/torrust-index/compare/mudlark-v1.0.0...mudlark-v1.0.1
 [1.0.0]: https://github.com/torrust/torrust-index/releases/tag/mudlark-v1.0.0
