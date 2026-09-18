@@ -268,6 +268,7 @@ fn make_graph_with_topology(build_tree: impl FnOnce(&mut Arena<GNode<u64, u64>>)
         violations: Vec::new(),
         node_count: count,
         terminal_count,
+        structural_mutation_counts: crate::graph::StructuralMutationCounts::default(),
         live_depth_evict: 6,
         live_depth_create: 3,
         depth_buffer,

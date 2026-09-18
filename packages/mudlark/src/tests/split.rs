@@ -41,13 +41,13 @@
 //!
 //! | Test | Focus |
 //! |------|-------|
-//! | [`bootstrap_split_creates_correct_structure`] | G-tree + V-tree shape after first split |
+//! | [`bootstrap_split_creates_correct_structure`] | root split creates two G-children and records both creations |
 //!
 //! ## Catalytic split (§IDEA M-10.2)
 //!
 //! | Test | Focus |
 //! |------|-------|
-//! | [`catalytic_split_after_bootstrap`] | structure after 2nd split |
+//! | [`catalytic_split_after_bootstrap`] | second split records two more child creations |
 //! | [`catalytic_split_is_violation_free`] | no max-uncle violations |
 //! | [`depth_gate_rejects_deep_split`] | `D_create` gate rejects too-deep entries |
 //! | [`preprocessing_contraction_before_catalytic_split`] | 3-node contraction before split |
@@ -180,8 +180,12 @@ fn bootstrap_split_creates_correct_structure() {
 
     attempt_split(&mut graph, root.slot());
 
-    // G-Tree: root + 2 children = 3 nodes.
+    // G-Tree: root + 2 children = 3 nodes, with one event per child.
     assert_eq!(graph.node_count(), 3);
+    let mutations = graph.structural_mutation_counts();
+    assert_eq!(mutations.splits, 2);
+    assert_eq!(mutations.evictions, 0);
+    assert_eq!(mutations.restorations, 0);
 
     // G-children cover correct ranges.
     let g = graph.gnodes.get(root.index());
@@ -275,6 +279,10 @@ fn catalytic_split_after_bootstrap() {
 
     // G-Tree: root + left + right + left.left + left.right = 5 nodes.
     assert_eq!(graph.node_count(), 5);
+    let mutations = graph.structural_mutation_counts();
+    assert_eq!(mutations.splits, 4);
+    assert_eq!(mutations.evictions, 0);
+    assert_eq!(mutations.restorations, u64::try_from(new_gnodes.len()).unwrap_or(u64::MAX));
 
     // Left child is no longer terminal.
     let left = graph.gnodes.get(left_id.index());

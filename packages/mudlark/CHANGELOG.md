@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Expose monotonic structural mutation counters for child creation, eviction, and restoration.
+- Expose `GvGraph::semi_internal_count()` for reading the live semi-internal population.
+
 ## [1.0.1] - 2026-09-15
 
 ### Fixed
