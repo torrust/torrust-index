@@ -103,7 +103,7 @@ jobs:
 
       - id: tools
         name: Install Tools
-        uses: taiki-e/install-action@v2.87.9
+        uses: taiki-e/install-action@v2.87.12
         with:
           tool: cargo-machete
 
