@@ -1061,6 +1061,11 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// and `D_evict`.  These entries are not evictable, so any
     /// configured budget must exceed this value.
     ///
+    /// A depth buffer wide enough to overflow the exponent saturates the
+    /// figure at the top of the range instead of wrapping, so the reading
+    /// stays a ceiling no budget can clear rather than becoming a small
+    /// number a budget could accidentally satisfy.
+    ///
     /// # Examples
     ///
     /// ```
