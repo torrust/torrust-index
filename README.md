@@ -2,7 +2,7 @@
 
 [![container_wf_b]][container_wf] [![coverage_wf_b]][coverage_wf] [![deployment_wf_b]][deployment_wf] [![testing_wf_b]][testing_wf] [![labels_wf_b]][labels_wf]
 
-__Torrust Index__ is a library for [BitTorrent][bittorrent] Files. Written in [Rust Language][rust] (edition 2024, MSRV 1.89) with the [Axum] web framework. ___This index aims to be respectful to established standards, (both [formal][BEP 00] and [otherwise][torrent_source_field]).___
+__Torrust Index__ is a library for [BitTorrent][bittorrent] Files. Written in [Rust Language][rust] (edition 2024, MSRV 1.90) with the [Axum] web framework. ___This index aims to be respectful to established standards, (both [formal][BEP 00] and [otherwise][torrent_source_field]).___
 
 > This is a [Torrust][torrust] project and is in active development. It is community supported as well as sponsored by [Nautilus Cyberneering][nautilus].
 
