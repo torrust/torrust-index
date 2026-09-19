@@ -42,6 +42,13 @@
 //! | [`terminal_count_unchanged_when_parent_becomes_terminal`] | semi-internal parent becomes terminal and records the second eviction |
 //! | [`legacy_promotion_records_a_restoration`] | a missing child is recreated and recorded separately from splits |
 //!
+//! ## `evict_tip` — `semi_internal_count` tracking
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`semi_internal_count_rises_when_one_child_is_evicted`] | a surviving sibling leaves the parent half subdivided |
+//! | [`semi_internal_count_returns_to_zero_on_restoration`] | legacy promotion makes the parent internal again |
+//!
 //! ## `evict_tip` — panics
 //!
 //! | Test | Focus |
@@ -382,6 +389,61 @@ fn legacy_promotion_records_a_restoration() {
     assert_eq!(after_restoration.evictions, 1);
     assert_eq!(after_restoration.restorations, 1);
     assert_eq!(graph.node_count(), 5);
+    assert_invariants(&graph);
+}
+
+// ── evict_tip — semi_internal_count tracking ────────────────────
+
+#[test]
+fn semi_internal_count_rises_when_one_child_is_evicted() {
+    // A bootstrap split gives the root both children, so the population
+    // of half-subdivided nodes starts empty.
+    let mut g = graph_with_split();
+    assert_eq!(g.semi_internal_count(), 0, "both children present: the root is internal");
+
+    let entry = left_entry(&g);
+    evict_and_rebalance(&mut g, entry);
+
+    // The root keeps its right child alone: the half that was never
+    // subdivided accumulates locally, so the root is a cell in its own
+    // right as well as an ancestor.
+    assert_eq!(g.node_count(), 2);
+    assert_eq!(g.semi_internal_count(), 1, "one child left: the root is half subdivided");
+    assert_invariants(&g);
+}
+
+#[test]
+fn semi_internal_count_returns_to_zero_on_restoration() {
+    let mut graph = graph_with_nested_split();
+    assert_eq!(graph.semi_internal_count(), 0, "every parent still carries both children");
+
+    let root = graph.g_root();
+    let parent = graph.gnodes.get(root.index()).left.expect("root must have a left child");
+    let child = graph
+        .gnodes
+        .get(parent.index())
+        .left
+        .expect("nested split must have a left child");
+    let child_entry = graph
+        .gnodes
+        .get(child.index())
+        .entry
+        .expect("nested child must have an entry");
+
+    evict_tip(&mut graph, child_entry);
+    assert_eq!(graph.semi_internal_count(), 1, "the parent lost one of its two children");
+
+    let parent_entry = graph
+        .gnodes
+        .get(parent.index())
+        .entry
+        .expect("semi-internal parent must retain its entry");
+    let restored_child = legacy_promote(&mut graph.vnodes, &mut graph.gnodes, parent_entry);
+    graph.handle_legacy_promotes(&[restored_child]);
+
+    // Restoration is the transition that ends the semi-internal state
+    // without removing the node, so the scan must fall back to zero.
+    assert_eq!(graph.semi_internal_count(), 0, "promotion recreated the missing child");
     assert_invariants(&graph);
 }
 
