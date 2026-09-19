@@ -49,6 +49,14 @@
 //! | [`semi_internal_count_rises_when_one_child_is_evicted`] | a surviving sibling leaves the parent half subdivided |
 //! | [`semi_internal_count_returns_to_zero_on_restoration`] | legacy promotion makes the parent internal again |
 //!
+//! ## Structural-mutation counter saturation
+//!
+//! | Test | Focus |
+//! |------|-------|
+//! | [`splits_saturate_at_the_ceiling`] | a bisection at the ceiling holds `splits` at `u64::MAX` |
+//! | [`evictions_saturate_at_the_ceiling`] | a tip eviction at the ceiling holds `evictions` at `u64::MAX` |
+//! | [`restorations_saturate_at_the_ceiling`] | a legacy promotion at the ceiling holds `restorations` at `u64::MAX` |
+//!
 //! ## `evict_tip` — panics
 //!
 //! | Test | Focus |
@@ -444,6 +452,100 @@ fn semi_internal_count_returns_to_zero_on_restoration() {
     // Restoration is the transition that ends the semi-internal state
     // without removing the node, so the scan must fall back to zero.
     assert_eq!(graph.semi_internal_count(), 0, "promotion recreated the missing child");
+    assert_invariants(&graph);
+}
+
+// ── structural-mutation counter saturation ──────────────────────
+
+#[test]
+fn splits_saturate_at_the_ceiling() {
+    // A bisection counts one split per child created, so `+2` from one
+    // below the ceiling crosses it in a single step: the saturating form
+    // holds at the ceiling where a wrapping one would read zero.
+    let mut graph = graph_with_nested_split();
+    graph.structural_mutation_counts.splits = u64::MAX - 1;
+
+    let root = graph.g_root();
+    let right = graph.gnodes.get(root.index()).right.expect("root must have a right child");
+    let entry = graph.gnodes.get(right.index()).entry.expect("right child must have an entry");
+
+    graph.gnodes.get_mut(right.index()).own = 10;
+    graph.gnodes.get_mut(right.index()).sum = 10;
+    graph.vnodes.get_mut(entry.index()).intensity = 10;
+    crate::gtree::recompute_g_sums(&mut graph.gnodes, right);
+    crate::vtree::update_parent_cached_intensity(&mut graph.vnodes, entry, 10);
+    crate::vtree::propagate_v_sums(&mut graph.vnodes, entry);
+    attempt_split(&mut graph, right);
+
+    assert_eq!(graph.node_count(), 7, "the bisection created both children");
+    let counts = graph.structural_mutation_counts();
+    assert_eq!(counts.splits, u64::MAX, "two more splits at the ceiling stay at the ceiling");
+    assert_eq!(counts.evictions, 0, "a bisection removes nothing");
+    assert_eq!(counts.restorations, 0, "a bisection recreates nothing");
+    assert_invariants(&graph);
+}
+
+#[test]
+fn evictions_saturate_at_the_ceiling() {
+    // An eviction counts one per terminal child removed, so the ceiling
+    // itself is the boundary: `+1` there must hold, where a wrapping
+    // form would read zero.
+    let mut g = graph_with_split();
+    g.structural_mutation_counts.evictions = u64::MAX;
+
+    let entry = left_entry(&g);
+    evict_and_rebalance(&mut g, entry);
+
+    assert_eq!(g.node_count(), 2, "the left tip was removed");
+    let counts = g.structural_mutation_counts();
+    assert_eq!(
+        counts.evictions,
+        u64::MAX,
+        "one more eviction at the ceiling stays at the ceiling"
+    );
+    assert_eq!(counts.splits, 2, "the bootstrap bisection is untouched");
+    assert_eq!(counts.restorations, 0, "the surviving sibling needs no recreation");
+    assert_invariants(&g);
+}
+
+#[test]
+fn restorations_saturate_at_the_ceiling() {
+    // A legacy promotion counts one per recreated child, so the ceiling
+    // itself is the boundary here too.
+    let mut graph = graph_with_nested_split();
+    let root = graph.g_root();
+    let parent = graph.gnodes.get(root.index()).left.expect("root must have a left child");
+    let child = graph
+        .gnodes
+        .get(parent.index())
+        .left
+        .expect("nested split must have a left child");
+    let child_entry = graph
+        .gnodes
+        .get(child.index())
+        .entry
+        .expect("nested child must have an entry");
+
+    evict_tip(&mut graph, child_entry);
+    graph.structural_mutation_counts.restorations = u64::MAX;
+
+    let parent_entry = graph
+        .gnodes
+        .get(parent.index())
+        .entry
+        .expect("semi-internal parent must retain its entry");
+    let restored_child = legacy_promote(&mut graph.vnodes, &mut graph.gnodes, parent_entry);
+    graph.handle_legacy_promotes(&[restored_child]);
+
+    assert_eq!(graph.node_count(), 5, "the missing child is back");
+    let counts = graph.structural_mutation_counts();
+    assert_eq!(
+        counts.restorations,
+        u64::MAX,
+        "one more restoration at the ceiling stays at the ceiling"
+    );
+    assert_eq!(counts.splits, 4, "a restoration is not a bisection");
+    assert_eq!(counts.evictions, 1, "the eviction that left the gap");
     assert_invariants(&graph);
 }
 
