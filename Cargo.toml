@@ -38,7 +38,7 @@ keywords = ["bittorrent", "file-sharing", "index", "peer-to-peer", "torrent"]
 license = "AGPL-3.0-only"
 publish = true
 repository = "https://github.com/torrust/torrust-index"
-rust-version = "1.89"
+rust-version = "1.90"
 
 [features]
 default = []

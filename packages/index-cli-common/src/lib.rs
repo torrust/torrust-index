@@ -58,7 +58,7 @@ impl CommandExit {
     }
 
     /// Return this class as a standard library [`ExitCode`].
-    #[must_use]
+    #[must_use = "the exit code carries the process status and is lost if it is not returned"]
     pub fn exit_code(self) -> ExitCode {
         ExitCode::from(self.code())
     }
@@ -254,7 +254,7 @@ impl CliExit {
     }
 
     /// Return this exit class as a standard library [`ExitCode`].
-    #[must_use]
+    #[must_use = "the exit code carries the process status and is lost if it is not returned"]
     pub fn exit_code(&self) -> ExitCode {
         self.exit.exit_code()
     }

@@ -27,7 +27,7 @@ The dependency-driven floor also conflates two separate questions that have sepa
 
 The floor is computed, not negotiated. It is a function of the calendar and the Rust release history alone: no dependency requirement, no feature wish, and no reviewer preference enters it. The floor only ever rises.
 
-### Computation on 2026-09-05
+### Worked example: the computation on 2026-09-05
 
 | Release | Published  | At least one year old on 2026-09-05? |
 | ------- | ---------- | ------------------------------------ |
@@ -41,7 +41,7 @@ The pin is therefore **1.89**, set once in `[workspace.package]` and inherited b
 - At every release of the workspace.
 - In any maintenance pass that touches dependencies or the toolchain.
 
-A recomputation that yields the current pin is a no-op and needs no record. A recomputation that raises the pin is recorded in the changelog as a breaking change, naming this policy as the reason. It does not need an ADR of its own: the rule was decided here, and applying a rule is not a decision.
+A recomputation that yields the current pin is a no-op and needs no record. A recomputation that raises the pin is recorded in the changelog as a breaking change, naming this policy as the reason. It does not need an ADR of its own: the rule was decided here, and applying a rule is not a decision. Because a raise leaves no new ADR behind, the current pin is read from the workspace manifest's `rust-version` field, not from the worked example above, and the changelog entries naming this policy are the record of every raise since.
 
 ### What the policy does not do
 
