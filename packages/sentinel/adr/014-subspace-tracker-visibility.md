@@ -1,6 +1,6 @@
 # ADR-S-014: SubspaceTracker Visibility · `rec:sentinel:private-tracker-with-public-baseline-snapshots`
 
-**Status:** Decided **Date:** 2026-03-10 **Spec:** §ALGO S-5 (subspace tracker), §ALGO S-11.1 (noise injection) **Relates to:** [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection), [ADR-S-013](013-warm-up-convergence-benchmark.md) (warm-up convergence benchmark), [ADR-S-001](001-measures-not-opinions.md) (measures not opinions)
+**Status:** Decided **Date:** 2026-03-10 **Spec:** §ALGO S-4 (subspace tracker), §ALGO S-11.1 (noise injection) **Relates to:** [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection), [ADR-S-013](013-warm-up-convergence-benchmark.md) (warm-up convergence benchmark), [ADR-S-001](001-measures-not-opinions.md) (measures not opinions)
 
 ## Context · `sec:sentinel:trackervis-context`
 
@@ -197,8 +197,8 @@ The rationale:
 
 ## Cross-References · `sec:sentinel:trackervis-cross-references`
 
-- §ALGO S-5 — Subspace tracker specification
-- §ALGO S-7.1 — EWMA baseline update rule
+- §ALGO S-4 — Subspace tracker specification
+- §ALGO S-6.1.1 — EWMA baseline update rule
 - §ALGO S-11.1–11.4 — Noise injection lifecycle
 - ADR-S-001 — Measures not opinions (API philosophy)
 - ADR-S-007 — Automatic noise injection (lifecycle ownership)

@@ -36,4 +36,4 @@ if report.scores.novelty.z_score > 4.0 && report.maturity.noise_influence < 0.1 
 - The sentinel has no policy parameters (no "alert threshold", no "sensitivity level").
 - Report types carry more fields than an appliance would expose, but each field has a precise statistical definition.
 - Integration tests assert statistical properties, not verdicts.
-- Higher polarity = more anomalous is a uniform convention across all four scoring axes (§ALGO S-6), ensuring the host can apply a single threshold logic to any axis.
+- Higher polarity = more anomalous is a uniform convention across all four scoring axes (§ALGO S-5.1), ensuring the host can apply a single threshold logic to any axis.

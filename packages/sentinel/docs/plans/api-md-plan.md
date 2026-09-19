@@ -186,7 +186,7 @@ Analysis set management (module `analysis_set`). Document:
 | `sentinel::tracker` | `SubspaceTracker` — SVD-based subspace model     |
 | `sentinel::cusum`   | CUSUM accumulator                                |
 | `sentinel::staging` | Deferred warm-up staging area (ADR-S-019)        |
-| `sentinel::warming_thread` | Background noise injection (§ALGO S-18.2) |
+| `sentinel::warming_thread` | Background noise injection (§ALGO S-11.6) |
 | `maths`             | SVD, matrix ops, Gamma distribution              |
 | `ewma`              | `EwmaStats` — exponential moving average         |
 | `observation`       | `CentredBits`, `CentredBitSource`                |

@@ -9,7 +9,7 @@
 //! slow baseline by more than a noise allowance, and resets to zero
 //! when the deviation reverses.
 //!
-//! See `docs/algorithm.md` §ALGO S-7.3 for the full specification.
+//! See `docs/algorithm.md` §ALGO S-6.3 for the full specification.
 //!
 //! Pure `f64` arithmetic — no `faer` dependency.
 

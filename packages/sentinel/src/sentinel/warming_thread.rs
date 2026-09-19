@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // SPDX-FileCopyrightText: 2026 Torrust project contributors
 
-//! Background warming thread (S1 async, §ALGO S-18.2 Step 3).
+//! Background warming thread (S1 async, §ALGO S-11.6).
 //!
 //! Runs the deferred cell warm-up loop on a dedicated thread, decoupling
 //! noise injection latency from the `ingest()` hot path.
@@ -72,7 +72,7 @@ pub struct WarmingThreadHandle<C: Coordinate> {
     /// predicate, which is what stops the notification from being lost.
     staging: Arc<Mutex<StagingArea<C>>>,
     /// The join handle is behind a `Mutex` so that `WarmingThreadHandle`
-    /// is `Sync` (§ALGO S-18.2 Step 3.5 — `SpectralSentinel: Send + Sync`).
+    /// is `Sync` (ADR-S-005 — `SpectralSentinel: Send + Sync`).
     handle: Mutex<Option<JoinHandle<()>>>,
 }
 

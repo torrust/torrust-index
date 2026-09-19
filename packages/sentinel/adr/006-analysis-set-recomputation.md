@@ -1,10 +1,10 @@
 # ADR-S-006: Analysis Set Recomputation Strategy · `rec:sentinel:full-analysis-set-recomputation-until-profiling`
 
-**Status:** Decided **Date:** 2026-03-09 **Spec:** §ALGO S-4.2 (analysis set definition), §ALGO S-4.3 (ancestor closure), §ALGO S-4.4 (multi-scale delivery) **Relates to:** [ADR-S-003](003-mudlark-integration.md) (graph parameterisation), [ADR-S-002](002-feed-forward-invariant.md) (feed-forward invariant)
+**Status:** Decided **Date:** 2026-03-09 **Spec:** §ALGO S-8.1 (analysis set definition), §ALGO S-8.2 (ancestor closure), §ALGO S-9.3 (multi-scale delivery) **Relates to:** [ADR-S-003](003-mudlark-integration.md) (graph parameterisation), [ADR-S-002](002-feed-forward-invariant.md) (feed-forward invariant)
 
 ## Context · `sec:sentinel:recompute-context`
 
-The analysis set ($\mathcal{A}$) is the top-$K$ V-Tree entries by importance with V-Tree depth $\leq L$, closed under G-tree ancestry (§ALGO S-4.2). It determines which cells own `SubspaceTracker`s and therefore controls the sentinel's resource usage.
+The analysis set ($\mathcal{A}$) is the top-$K$ V-Tree entries by importance with V-Tree depth $\leq L$, closed under G-tree ancestry (§ALGO S-8.1, §ALGO S-8.2). It determines which cells own `SubspaceTracker`s and therefore controls the sentinel's resource usage.
 
 After each batch of observations mutates the G-V Graph, the analysis set may change — cells split, merge, gain or lose importance. The sentinel must detect these changes, create trackers for new entries, and destroy trackers for evicted entries.
 

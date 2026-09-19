@@ -1,10 +1,10 @@
 # ADR-S-007: Automatic Noise Injection · `rec:sentinel:automatic-internal-noise-injection`
 
-**Status:** Implemented — modified by ADR-S-015 (`noise_rounds` → `noise_schedule`) and ADR-S-017 (deferred cell warm-up and lazy coordination warm-up) **Date:** 2026-03-09 **Spec:** §ALGO S-11.1 (noise generation), §ALGO S-11.2 (injection triggers), §ALGO S-11.6.5 (coordination exclusion during cell warm-up), §ALGO S-11.7 (coordination-specific warm-up) **Relates to:** [ADR-S-001](001-measures-not-opinions.md) (measures not opinions), [ADR-S-005](005-deterministic-order-and-thread-safety.md) (deterministic order), [ADR-S-006](006-analysis-set-recomputation.md) (analysis set lifecycle)
+**Status:** Implemented — modified by ADR-S-015 (`noise_rounds` → `noise_schedule`) and ADR-S-017 (deferred cell warm-up and lazy coordination warm-up) **Date:** 2026-03-09 **Spec:** §ALGO S-11.1 (noise generation), §ALGO S-11.1.2 (injection triggers), §ALGO S-11.6.5 (coordination exclusion during cell warm-up), §ALGO S-11.7 (coordination-specific warm-up) **Relates to:** [ADR-S-001](001-measures-not-opinions.md) (measures not opinions), [ADR-S-005](005-deterministic-order-and-thread-safety.md) (deterministic order), [ADR-S-006](006-analysis-set-recomputation.md) (analysis set lifecycle)
 
 ## Context · `sec:sentinel:autonoise-context`
 
-The spec (§ALGO S-11.2) requires noise injection to fire **automatically** on every new tracker creation — analysis set entry, split-induced creation, or legacy promotion. The original coordination design chained synthetic cell scores into parent contexts; ADR-S-017 replaced that lifecycle when it deferred cell warm-up, because warming cells produce no reports and coordination contexts do not exist until online cells participate in a later scoring pass.
+The spec (§ALGO S-11.1.2) requires noise injection to fire **automatically** on every new tracker creation — analysis set entry, split-induced creation, or legacy promotion. The original coordination design chained synthetic cell scores into parent contexts; ADR-S-017 replaced that lifecycle when it deferred cell warm-up, because warming cells produce no reports and coordination contexts do not exist until online cells participate in a later scoring pass.
 
 Without noise injection, new trackers start with placeholder baselines (`mean = 1.0`, `variance = 1.0`). Early z-scores and CUSUM values are meaningless until enough real data has passed.
 

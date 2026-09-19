@@ -1,12 +1,12 @@
 # ADR-S-016: Brand's Incremental SVD for Subspace Evolution · `rec:sentinel:brand-incremental-svd-for-subspace-evolution`
 
-**Status:** Implemented **Date:** 2026-03-10 **Spec:** §ALGO S-5.2 Phase 2 (subspace evolution) **Relates to:** [ADR-S-015](015-cell-creation-performance.md) (cell creation performance), [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection), [ADR-S-013](013-warm-up-convergence-benchmark.md) (warm-up convergence benchmark)
+**Status:** Implemented **Date:** 2026-03-10 **Spec:** §ALGO S-4.2 Phase 2 (subspace evolution) **Relates to:** [ADR-S-015](015-cell-creation-performance.md) (cell creation performance), [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection), [ADR-S-013](013-warm-up-convergence-benchmark.md) (warm-up convergence benchmark)
 
 ## Context · `sec:sentinel:brandsvd-context`
 
 ### The hot loop · `sec:sentinel:brandsvd-hot-loop`
 
-Every call to `SubspaceTracker::observe()` invokes `evolve_subspace()`, which performs Phase 2 of the five-phase core loop (§ALGO S-5.2).  Convergence benchmarks (ADR-S-015) show that **`observe()` accounts for 99.9% of wall-clock time**, and Phase 2 (the SVD) dominates `observe()`.
+Every call to `SubspaceTracker::observe()` invokes `evolve_subspace()`, which performs Phase 2 of the five-phase core loop (§ALGO S-4.2).  Convergence benchmarks (ADR-S-015) show that **`observe()` accounts for 99.9% of wall-clock time**, and Phase 2 (the SVD) dominates `observe()`.
 
 ### Previous implementation · `sec:sentinel:brandsvd-previous-implementation`
 

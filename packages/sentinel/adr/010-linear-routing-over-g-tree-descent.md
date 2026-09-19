@@ -1,10 +1,10 @@
 # ADR-S-010: Linear Routing Over G-Tree Descent · `rec:sentinel:linear-containment-routing-until-profiled`
 
-**Status:** Decided **Date:** 2026-03-10 **Spec:** §ALGO S-8.1 Step 4 (observation delivery) **Relates to:** [ADR-S-003](003-mudlark-integration.md) (mudlark integration), [ADR-S-006](006-analysis-set-recomputation.md) (analysis set recomputation)
+**Status:** Decided **Date:** 2026-03-10 **Spec:** §ALGO S-9.1 Step 4 (observation delivery) **Relates to:** [ADR-S-003](003-mudlark-integration.md) (mudlark integration), [ADR-S-006](006-analysis-set-recomputation.md) (analysis set recomputation)
 
 ## Context · `sec:sentinel:routing-context`
 
-During Step 4 of `ingest()` (§ALGO S-8.1), each observation must be delivered to every tracker on its G-tree ancestor path. Two routing strategies:
+During Step 4 of `ingest()` (§ALGO S-9.1), each observation must be delivered to every tracker on its G-tree ancestor path. Two routing strategies:
 
 - **A)** G-tree descent: use `graph.route(v)` to find the receiving cell, then walk G-tree parents. Requires a mudlark API for parent traversal that returns materialised G-node IDs matching the sentinel's `BTreeMap<GNodeId, CellState>` keys.
 - **B)** Linear scan: for each observation, iterate all cells in the analysis set and check interval containment (`cell.start <= v <

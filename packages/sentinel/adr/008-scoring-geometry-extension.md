@@ -4,7 +4,7 @@
 
 ## Context · `sec:sentinel:geometry-context`
 
-The four scoring axes (§ALGO S-6) have structural preconditions:
+The four scoring axes (§ALGO S-5) have structural preconditions:
 
 - **Novelty** degenerates when `rank == dim` — the subspace spans the full space, so every observation has zero residual. The novelty score is always 0.0.
 - **Coherence** is undefined when `rank < 2` — there are fewer than two latent dimensions, so pairwise cross-correlation has no pairs.

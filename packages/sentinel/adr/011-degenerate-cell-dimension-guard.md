@@ -1,6 +1,6 @@
 # ADR-S-011: Degenerate Cell Dimension Guard · `rec:sentinel:exclude-and-report-degenerate-tracker-dimensions`
 
-**Status:** Implemented **Date:** 2026-03-10 **Spec:** §ALGO S-4.2 (analysis set closure), §ALGO S-5 (subspace tracker) **Relates to:** [ADR-S-004](004-config-validation-over-panic.md) (config validation over panic), [ADR-S-006](006-analysis-set-recomputation.md) (analysis set recomputation), [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection)
+**Status:** Implemented **Date:** 2026-03-10 **Spec:** §ALGO S-8.2 (analysis set closure), §ALGO S-4 (subspace tracker) **Relates to:** [ADR-S-004](004-config-validation-over-panic.md) (config validation over panic), [ADR-S-006](006-analysis-set-recomputation.md) (analysis set recomputation), [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection)
 
 ## Context · `sec:sentinel:dimguard-context`
 
@@ -14,7 +14,7 @@
 - `basis` is a $0 \times 0$ matrix.
 - The first call to `observe()` attempts `self.basis.subcols(0, 1)` — extracting column 0..1 from a zero-column matrix — which **panics inside faer's SVD**.
 
-This is not a theoretical concern.  Under spray traffic with a low `split_threshold`, the G-tree creates very deep nodes.  The analysis set's ancestor closure (§ALGO S-4.2) can pull these deep nodes into the tracked set, where `reconcile_analysis_set()` creates `SubspaceTracker::new(0, ...)` and the next `observe()` panics.
+This is not a theoretical concern.  Under spray traffic with a low `split_threshold`, the G-tree creates very deep nodes.  The analysis set's ancestor closure (§ALGO S-8.2) can pull these deep nodes into the tracked set, where `reconcile_analysis_set()` creates `SubspaceTracker::new(0, ...)` and the next `observe()` panics.
 
 ### Why the existing guards are insufficient · `sec:sentinel:dimguard-existing-guards-insufficient`
 

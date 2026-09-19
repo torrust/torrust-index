@@ -1,6 +1,6 @@
 # ADR-S-005: Deterministic Order and Thread Safety · `rec:sentinel:ordered-maps-and-static-send-sync-assertion`
 
-**Status:** Implemented **Date:** 2026-03-08 **Spec:** §ALGO S-11.1 (noise injection), §ALGO S-11.3 (seed parameter) **Relates to:** mudlark [ADR-M-007](../../mudlark/adr/007-thread-safety.md) (mudlark thread safety)
+**Status:** Implemented **Date:** 2026-03-08 **Spec:** §ALGO S-11.1 (noise injection), §ALGO S-11.1.3 (seed parameter) **Relates to:** mudlark [ADR-M-007](../../mudlark/adr/007-thread-safety.md) (mudlark thread safety)
 
 ## Context · `sec:sentinel:determinism-context`
 

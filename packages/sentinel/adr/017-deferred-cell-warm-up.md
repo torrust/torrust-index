@@ -1,6 +1,6 @@
 # ADR-S-017: Deferred Cell Warm-Up · `rec:sentinel:background-priority-warmup-off-ingest-path`
 
-**Status:** Implemented (synchronous fallback + background thread; "No Slot Reservation" superseded by ADR-S-019) **Date:** 2026-03-11 **Revised:** 2026-03-13 **Spec:** §ALGO S-18 (work variance and timing considerations) **Relates to:** [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection), [ADR-S-015](015-cell-creation-performance.md) (cell creation performance), [ADR-S-002](002-feed-forward-invariant.md) (feed-forward invariant), [ADR-S-005](005-deterministic-order-and-thread-safety.md) (deterministic order)
+**Status:** Implemented (synchronous fallback + background thread; "No Slot Reservation" superseded by ADR-S-019) **Date:** 2026-03-11 **Revised:** 2026-03-13 **Spec:** §ALGO S-12.9 (work variance and timing considerations) **Relates to:** [ADR-S-007](007-automatic-noise-injection.md) (automatic noise injection), [ADR-S-015](015-cell-creation-performance.md) (cell creation performance), [ADR-S-002](002-feed-forward-invariant.md) (feed-forward invariant), [ADR-S-005](005-deterministic-order-and-thread-safety.md) (deterministic order)
 
 ## Context · `sec:sentinel:deferredwarmup-context`
 
@@ -49,7 +49,7 @@ The priority rule `g.sum` produces root-first ordering as a consequence — shal
 
 When `background_warming` is disabled, warm-up runs synchronously within `reconcile_analysis_set()`. This preserves deterministic single-threaded behaviour for testing.
 
-## Work Variance Bound (§ALGO S-18.4) · `sec:sentinel:deferredwarmup-work-variance-bound`
+## Work Variance Bound (§ALGO S-12.9) · `sec:sentinel:deferredwarmup-work-variance-bound`
 
 With warm-up deferred to the background worker, the per-call cost of `ingest()` is bounded by:
 
@@ -57,7 +57,7 @@ $$O\!\Big(n(d_{\text{geo}} + h_V) \;+\; |\mathcal{A}^*| \cdot w_{\max} \cdot (k 
 
 on every call. Cell creation and noise injection contribute zero cost. The remaining call-to-call variance (batch size, analysis set size, rank) changes slowly relative to call frequency.
 
-## Timing Protection Is Out of Scope (§ALGO S-18.5) · `sec:sentinel:deferredwarmup-timing-protection-out-of-scope`
+## Timing Protection Is Out of Scope (§ALGO S-12.9) · `sec:sentinel:deferredwarmup-timing-protection-out-of-scope`
 
 Deferred warm-up makes `ingest()` operationally predictable — bounded work per call with no structural spikes. It does **not** make `ingest()` constant-time. The remaining variance, though small, is observable to a sufficiently precise adversary. Adaptive timing pads and equalization are explicitly out of scope.
 
