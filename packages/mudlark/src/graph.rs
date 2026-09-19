@@ -704,12 +704,18 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// half that was never subdivided still accumulates locally, so the node
     /// is a cell in its own right as well as an ancestor.
     ///
-    /// Counted by scanning the live nodes rather than maintained
+    /// Counted by scanning the G-node arena rather than maintained
     /// incrementally, because the transitions that create and remove a
     /// semi-internal node are spread across splitting, eviction and
     /// restoration; a counter threaded through all of them would have to be
-    /// right at every site to be trustworthy at any. The scan is linear in the
-    /// number of live nodes, which the budget bounds.
+    /// right at every site to be trustworthy at any. The scan visits every
+    /// slot the arena has allocated and filters on occupancy, and freed slots
+    /// are kept on a free list for reuse rather than released, so the cost is
+    /// linear in the arena's slot length — the high-water mark of the live
+    /// node count — rather than in the current one: a graph that has shrunk
+    /// through eviction still pays for its peak. A configured `budget` is a
+    /// ceiling on the live count at every step, so it bounds that peak too;
+    /// without one neither is bounded.
     ///
     /// # Examples
     ///
