@@ -4283,7 +4283,7 @@ dependencies = [
 
 [[package]]
 name = "torrust-mudlark"
-version = "1.0.1"
+version = "1.1.0"
 dependencies = [
  "criterion",
  "rand 0.10.2",

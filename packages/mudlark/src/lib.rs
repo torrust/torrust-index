@@ -173,7 +173,7 @@ mod _readme {}
 //   view:     Cell, Node, Span    (spot readings)
 //
 // Surface 2 — Film (ADR-M-032 §S2, operational types):
-//   graph:    Config, GvGraph
+//   graph:    Config, GvGraph, StructuralMutationCounts
 //   traits:   Accumulator, Attenuatable, Coordinate, Inspectable,
 //             Observation, Proratable, Rng, SpatialRead,
 //             SpatialWrite, TemporalDecay, Weighable,
@@ -182,7 +182,7 @@ pub use contour_range::{BasisElement, ContourRange, ContourRangeEnergy};
 pub use gnode::GState;
 #[doc(hidden)]
 pub use graph::GNodeChildren;
-pub use graph::{Config, GvGraph};
+pub use graph::{Config, GvGraph, StructuralMutationCounts};
 pub use handle::GNodeId;
 pub use pewei::{Layer, Pewei, Terminal, Transition};
 pub use plateau::{BasisEdge, Plateau};

@@ -264,6 +264,7 @@ pub fn evict_tip<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(grap
 
     graph.gnodes.dealloc(gnode_id.index());
     graph.node_count -= 1;
+    graph.structural_mutation_counts.evictions = graph.structural_mutation_counts.evictions.saturating_add(1);
     // The evicted node was a terminal: −1.
     // If the parent is now terminal (both children gone): +1 → net 0.
     graph.terminal_count -= 1;

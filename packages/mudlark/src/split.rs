@@ -159,6 +159,7 @@ fn bootstrap_split<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(gr
     // Update graph state.
     graph.v_root = Some(root_s_id);
     graph.node_count += 2;
+    graph.structural_mutation_counts.splits = graph.structural_mutation_counts.splits.saturating_add(2);
     // +2 new terminals, −1 parent no longer terminal = net +1.
     graph.terminal_count += 1;
 
@@ -260,6 +261,7 @@ fn catalytic_split<C: Coordinate, V: Accumulator + Inspectable, const N: u32>(gr
 
     // Update node count.
     graph.node_count += 2;
+    graph.structural_mutation_counts.splits = graph.structural_mutation_counts.splits.saturating_add(2);
     // +2 new terminals, −1 parent no longer terminal = net +1.
     graph.terminal_count += 1;
 

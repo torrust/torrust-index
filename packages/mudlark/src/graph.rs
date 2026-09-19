@@ -41,6 +41,50 @@ pub struct GNodeChildren {
     pub right: Option<GNodeId>,
 }
 
+/// Monotonic totals for structural mutations performed by a [`GvGraph`].
+///
+/// A split is counted per child created, rather than per parent bisection. A
+/// bisection that creates both children therefore adds two splits, while a
+/// legacy promotion that recreates one missing child adds one restoration.
+/// Counting the individual structural changes makes every total composable
+/// across operations without reconstructing events from node-state deltas.
+///
+/// Evictions count terminal child removals. Restorations count missing-child
+/// recreation by legacy promotion. Each total saturates at [`u64::MAX`] rather
+/// than wrapping, so it never decreases during the graph's lifetime.
+///
+/// # Examples
+///
+/// ```
+/// use torrust_mudlark::{Config, GvGraph, StructuralMutationCounts};
+///
+/// let cfg = Config {
+///     split_threshold: 5u64,
+///     depth_create: 3,
+///     depth_evict: 6,
+///     budget: None,
+///     alpha_relax: 0.75,
+///     bounded_eviction: true,
+/// };
+/// let mut graph = GvGraph::<u64, u64, 8>::new(cfg);
+/// assert_eq!(graph.structural_mutation_counts(), StructuralMutationCounts::default());
+///
+/// graph.observe(42, 6u64);
+/// let counts = graph.structural_mutation_counts();
+/// assert_eq!(counts.splits, 2);
+/// assert_eq!(counts.evictions, 0);
+/// assert_eq!(counts.restorations, 0);
+/// ```
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StructuralMutationCounts {
+    /// Child nodes created by bootstrap or catalytic bisection.
+    pub splits: u64,
+    /// Terminal child nodes removed by eviction.
+    pub evictions: u64,
+    /// Missing child nodes recreated by legacy promotion.
+    pub restorations: u64,
+}
+
 /// Configure how a [`GvGraph`] grows, splits, and prunes
 ///
 /// Groups three concerns into a single value object:
@@ -400,6 +444,8 @@ pub struct GvGraph<C: Coordinate, V: Accumulator, const N: u32> {
     /// Live terminal G-node count (nodes with zero G-children).
     /// Maintained incrementally by split (+1 net) and evict (−1 or 0).
     pub(crate) terminal_count: u32,
+    /// Monotonic totals for structural changes made since construction.
+    pub(crate) structural_mutation_counts: StructuralMutationCounts,
     /// Live `D_evict` — adjusted by `adjust_depth_gates()` (ADR-M-017).
     /// Initialized to `config.depth_evict`.
     pub(crate) live_depth_evict: u32,
@@ -569,6 +615,7 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
             violations: Vec::new(),
             node_count: 1,
             terminal_count: 1,
+            structural_mutation_counts: StructuralMutationCounts::default(),
             live_depth_evict,
             live_depth_create,
             depth_buffer,
@@ -649,6 +696,59 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     #[inline]
     pub const fn terminal_count(&self) -> u32 {
         self.terminal_count
+    }
+
+    /// Number of semi-internal G-nodes — those carrying exactly one G-child.
+    ///
+    /// Semi-internal nodes are part of the observation-receiving contour: the
+    /// half that was never subdivided still accumulates locally, so the node
+    /// is a cell in its own right as well as an ancestor.
+    ///
+    /// Counted by scanning the G-node arena rather than maintained
+    /// incrementally, because the transitions that create and remove a
+    /// semi-internal node are spread across splitting, eviction and
+    /// restoration; a counter threaded through all of them would have to be
+    /// right at every site to be trustworthy at any. The scan visits every
+    /// slot the arena has allocated and filters on occupancy, and freed slots
+    /// are kept on a free list for reuse rather than released, so the cost is
+    /// linear in the arena's slot length — the high-water mark of the live
+    /// node count — rather than in the current one: a graph that has shrunk
+    /// through eviction still pays for its peak. A configured `budget` is a
+    /// ceiling on the live count at every step, so it bounds that peak too;
+    /// without one neither is bounded.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use torrust_mudlark::{Config, GvGraph};
+    /// # let cfg = Config {
+    /// #     split_threshold: 5u64,
+    /// #     depth_create: 3,
+    /// #     depth_evict: 6,
+    /// #     budget: None,
+    /// #     alpha_relax: 0.75,
+    /// #     bounded_eviction: true,
+    /// # };
+    /// # let g = GvGraph::<u64, u64, 8>::new(cfg);
+    /// // A fresh graph is a single terminal root, so no node is half subdivided.
+    /// assert_eq!(g.semi_internal_count(), 0);
+    /// ```
+    #[must_use]
+    pub fn semi_internal_count(&self) -> u32 {
+        let live = self.gnodes.iter_occupied().filter(|(_, g)| g.is_semi_internal()).count();
+        u32::try_from(live).unwrap_or(u32::MAX)
+    }
+
+    /// Return the monotonic structural-mutation totals for this graph.
+    ///
+    /// A fresh graph starts at zero. Replacing a graph with a newly constructed
+    /// one therefore establishes a new counter epoch; callers that report
+    /// interval deltas should snapshot this value immediately after construction
+    /// or replacement so the replacement itself is never reported as a mutation.
+    #[must_use]
+    #[inline]
+    pub const fn structural_mutation_counts(&self) -> StructuralMutationCounts {
+        self.structural_mutation_counts
     }
 
     // Plateau tracking methods (plateaus, build_plateaus, plateau_basis,
@@ -966,6 +1066,11 @@ impl<C: Coordinate, V: Accumulator, const N: u32> GvGraph<C, V, N> {
     /// $3^{(\text{buffer}+1)}$ entries can reside between the root
     /// and `D_evict`.  These entries are not evictable, so any
     /// configured budget must exceed this value.
+    ///
+    /// A depth buffer wide enough to overflow the exponent saturates the
+    /// figure at the top of the range instead of wrapping, so the reading
+    /// stays a ceiling no budget can clear rather than becoming a small
+    /// number a budget could accidentally satisfy.
     ///
     /// # Examples
     ///

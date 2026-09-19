@@ -29,6 +29,7 @@ impl<C: Coordinate, V: Accumulator + Inspectable, const N: u32> GvGraph<C, V, N>
     pub(crate) fn handle_legacy_promotes(&mut self, new_gnodes: &[GSlotPointer]) {
         for &_new_gid in new_gnodes {
             self.node_count += 1;
+            self.structural_mutation_counts.restorations = self.structural_mutation_counts.restorations.saturating_add(1);
             // Legacy promote creates a new terminal child and transitions
             // its parent from semi-internal → internal.  The parent was
             // not a terminal, so net terminal change = +1.
