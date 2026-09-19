@@ -558,7 +558,7 @@ canonical path per type.
 | `layers()`                         | Streaming V-Tree BFS yielding `(layer_index, Node)` — lazy, 𝒪(n) total where n = L (V-entries) + S (V-structural nodes) (requires `V: Inspectable`)   |
 | `decay(root, attenuation, q)`      | Subband-adaptive temporal decay (requires `V: Attenuatable + Inspectable`)                                                                            |
 | `check_evictions()`                | Manual eviction sweep (requires `V: Inspectable`)                                                                                                     |
-| Accessors (11)                     | `node_count`, `terminal_count`, `budget`, `total_sum`, `config`, `g_root`, `depth_evict`, `depth_create`, `depth_buffer`, `headroom`, `soft_limit`    |
+| Accessors (13)                     | `node_count`, `terminal_count`, `semi_internal_count` (𝒪(G) scan), `structural_mutation_counts`, `budget`, `total_sum`, `config`, `g_root`, `depth_evict`, `depth_create`, `depth_buffer`, `headroom`, `soft_limit`    |
 
 ### Traits
 

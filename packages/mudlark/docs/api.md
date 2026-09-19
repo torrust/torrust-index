@@ -67,7 +67,7 @@ pub use plateau::{BasisEdge, Plateau};
 pub use view::{Cell, Node, Span};
 
 // Surface 2 — Film (opaque operational types).
-pub use graph::{Config, GvGraph};
+pub use graph::{Config, GvGraph, StructuralMutationCounts};
 pub use traits::{Accumulator, Attenuatable, Coordinate, Inspectable,
                  Observation, Proratable, Rng, ScalableObservation,
                  SpatialRead, SpatialWrite, TemporalDecay, Weighable,
@@ -789,7 +789,7 @@ asymptotic cost at a glance.
 | `gnode_children`^[5]^         | —             | Introspection      | $O(1)$                                                         | Current child handles                                                                                            |
 | `build_plateaus`^[5]^         | `Insp`        | Diagnostic         | $O(G + B\log B)$                                               | Full plateau rebuild via DFS                                                                                     |
 | `debug_plateau_basis`^[5][7]^ | `Insp`        | Diagnostic         | $O(B)$                                                         | Per-plateau basis bookkeeping                                                                                    |
-| Accessors (11)                | —             | Accessor           | $O(1)$                                                         | `node_count`, `terminal_count`, `budget`, `total_sum`, `config`, `g_root`, depth gates, `headroom`, `soft_limit` |
+| Accessors (13)                | —             | Accessor           | $O(1)$ / $O(\lvert G\rvert)$^[8]^                              | `node_count`, `terminal_count`, `semi_internal_count`, `structural_mutation_counts`, `budget`, `total_sum`, `config`, `g_root`, depth gates, `headroom`, `soft_limit` |
 
 1. Core cost per call; budget-guarded eviction, when triggered, adds amortised $O(h_V)$ per eviction (§PERF M-3, §PERF M-7.1).
 2. $K$ = V-I3 violations created by scaling. Uniform decay on floats ($q = 0$): $K = 0$, cost simplifies to $O(\lvert G\rvert)$. Non-uniform or integer types: $K$ may be non-zero (§THEORY M-7.4).
@@ -798,6 +798,7 @@ asymptotic cost at a glance.
 5. `#[doc(hidden)]` — available but not part of the stable surface.
 6. Requires `dynamic-contour-tracking` feature (enabled by default).
 7. **Bound abbreviations:** `Insp` = `Inspectable`, `Att` = `Attenuatable`, `Pror` = `Proratable`, `Weigh` = `Weighable`. All methods additionally require the struct-level `V: Accumulator` bound.
+8. $O(\lvert G\rvert)$ applies to `semi_internal_count` alone: it scans the live G-nodes instead of reading a maintained counter, because the transitions that create and destroy a semi-internal node are spread across splitting, eviction and legacy promotion. Every other accessor is a field or counter read in $O(1)$.
 
 #### Construction
 
@@ -1254,6 +1255,12 @@ pub const fn terminal_count(&self) -> u32;     // leaf cells only
 pub const fn budget(&self) -> Option<usize>;   // shorthand for config().budget
 pub fn total_sum(&self) -> V;                  // G-root sum (aggregate of all observations)
 
+// Population by G-node state — scanned, not maintained.
+pub fn semi_internal_count(&self) -> u32;      // nodes carrying exactly one G-child
+
+// Structural history — monotonic totals since construction.
+pub const fn structural_mutation_counts(&self) -> StructuralMutationCounts;
+
 // Configuration.
 pub const fn config(&self) -> &Config<V>;
 
@@ -1275,6 +1282,32 @@ pub const fn soft_limit(&self) -> Option<usize>; // budget − max(headroom, 2(D
 values, which start at their `Config` counterparts and may diverge
 after budget-driven depth-gate adjustment (§IDEA M-7.4).
 `depth_buffer` is invariant — fixed at construction.
+
+`semi_internal_count` returns the number of G-nodes carrying exactly one G-child. These are the half-subdivided cells of the observation-receiving contour: the half that was never subdivided still accumulates locally, so the node is a cell in its own right as well as an ancestor. It is the one accessor that scans rather than reads, because splitting, eviction and legacy promotion all move nodes into and out of that state and a counter threaded through every one of those sites would have to be correct at all of them to be trustworthy at any. The scan is linear in the live node count, which `budget` bounds.
+
+`structural_mutation_counts` returns the monotonic totals specified immediately below. A fresh graph starts at zero, so replacing a graph opens a new counter epoch — callers that report interval deltas snapshot the value right after construction or replacement, otherwise the replacement itself reads as a collapse to zero.
+
+#### `StructuralMutationCounts` — `Copy`
+
+```rust
+pub struct StructuralMutationCounts {
+    pub splits: u64,
+    pub evictions: u64,
+    pub restorations: u64,
+}
+```
+
+`Debug`, `Clone`, `Copy`, `Default`, `PartialEq`, `Eq`.
+
+| Field          | Counts                             | Incremented by                                                                    |
+| -------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
+| `splits`       | child G-nodes created by bisection | every bootstrap or catalytic split, two per bisection                             |
+| `evictions`    | terminal child G-nodes removed     | every tip eviction, budget-guarded inside `observe` or swept by `check_evictions` |
+| `restorations` | missing child G-nodes recreated    | every legacy promotion performed during rebalance, one per recreated child        |
+
+A split is counted per child created rather than per parent bisection, so a bisection that creates both children adds two. Counting the individual structural changes is what makes the totals composable across operations: a caller can add the effect of two calls without reconstructing events from node-state deltas. Restoration is not a bisection — legacy promotion recreates a single missing child and adds one restoration, leaving `splits` untouched.
+
+Each total saturates at `u64::MAX` rather than wrapping, so none ever decreases during a graph's lifetime. `Default` is the all-zero value a fresh graph starts from, which makes `StructuralMutationCounts::default()` the comparison for "no structural mutation has happened yet".
 
 #### Three deterministic read decompositions
 
