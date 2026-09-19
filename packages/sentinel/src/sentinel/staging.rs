@@ -47,7 +47,9 @@
 //! | [`warm_one_batch_picks_highest_volume`] | staging | When several cells are waiting, the step spends its round on the one carrying the most traffic, leaving the quieter cell still warming. Volume is the cached importance of the backing graph node, so the cells the host is most likely to be asking about come online first, and — because a busy ancestor outweighs its own descendants — ancestors tend to arrive before the cells beneath them. |
 //! | [`contains_checks_both_warming_and_ready`] | staging | Presence is answered across every state a staged cell can occupy: a cell still warming and a cell already waiting to be promoted both answer yes. The caller asking is deciding whether a cell needs creating, and it must not be told "absent" merely because the cell has moved on within the staging area. |
 //! | [`take_highest_priority_moves_to_in_flight`] | staging | Checking a cell out for background work takes the busiest waiting cell and marks it in flight, leaving the others warming; while it is away it still counts as present in the staging area. That is what makes the expensive noise injection safe to do without holding the lock: the main thread can see the cell is spoken for even though the warming map no longer holds it. |
-//! | [`equal_volumes_take_the_shallower_cell_first`] | staging | Equal volumes resolve to the shallower cell rather than the deeper one. A tie is the ordinary case for a pair of siblings the moment they are created, and the rule the queue exists to serve is that a busy ancestor is warmed before the cells beneath it. Identifiers are handed out as the tree grows downward, so the larger of two is always the newer and deeper cell, and resolving a tie toward it inverts the rule exactly. This path and the synchronous drain are two ways of serving one queue, so they must not disagree about which cell comes next. |
+//! | [`equal_volumes_take_the_shallower_cell_first`] | staging | Equal volumes resolve to the shallower cell rather than the deeper one. A tie is the ordinary case for a pair of siblings the moment they are created, and the rule the queue exists to serve is that a busy ancestor is warmed before the cells beneath it. Identifiers cannot carry that rule on their own: the graph's arena hands a freed slot out again, so a cell created into a recycled slot holds a smaller identifier than an ancestor allocated before it. This path and the synchronous drain are two ways of serving one queue, so they must not disagree about which cell comes next. |
+//! | [`a_restored_descendant_does_not_overtake_its_warming_ancestor`] | staging | cites (´claim:staging:equal-volumes-resolve-to-the-shallower-cell-so-both-drains-agree´) |
+//! | [`the_synchronous_drain_warms_a_restored_descendants_ancestor_first`] | staging | cites (´claim:staging:equal-volumes-resolve-to-the-shallower-cell-so-both-drains-agree´) |
 //! | [`an_in_flight_cell_still_counts_as_a_competitive_target`] | staging | A cell checked out for background warming is still a warming cell, so it still counts among the competitive targets being warmed. Checking a cell out is how the expensive work is done off the lock, not a change in what the cell is; a count that dropped it would fall precisely when the work was happening, understating what is in progress by the number of cells actually in progress. The flag is recorded at checkout, so counting it needs nothing from a cell another thread is holding. |
 //! | [`an_in_flight_ancestor_cell_is_not_a_competitive_target`] | staging | cites (´claim:staging:a-cell-checked-out-for-warming-still-counts-among-the-competitive-targets´) |
 //! | [`ready_competitive_target_stays_in_warming_count_until_promotion`] | staging | A completed competitive cell can reach the ready queue after an ingest has passed its promotion point. It remains inside the warm-up pipeline and outside the producing set until the next promotion, so both health counts continue to include it while it waits. |
@@ -172,17 +174,24 @@ impl<C: Coordinate> StagingArea<C> {
     /// [`finish_warming`].
     ///
     /// Priority is by cached `volume` (largest first), ties resolving to the
-    /// smaller `GNodeId` — the shallower, earlier-allocated cell — so that
-    /// this path and the synchronous drain order equal-volume cells the same
-    /// way, ancestors before the cells beneath them.
+    /// shallower cell and then to the smaller `GNodeId`, so that this path and
+    /// the synchronous drain order equal-volume cells the same way, ancestors
+    /// before the cells beneath them.
+    ///
+    /// Depth carries that rule because the identifier cannot: the graph's
+    /// arena reuses freed slots, so a cell created into a recycled slot holds
+    /// a smaller identifier than an ancestor allocated before it, and an
+    /// identifier tie-break would warm such a descendant first.
     pub fn take_highest_priority(&mut self) -> Option<(GNodeId, WarmingCell<C>)> {
         let (&gnode, _) = self.warming.iter().max_by(|(a_gnode, a), (b_gnode, b)| {
             a.volume
                 .partial_cmp(&b.volume)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 // Reversed, because `max_by` keeps the last of equal maxima
-                // and the map iterates in ascending id order: comparing ids
-                // backwards makes the smallest id the maximum.
+                // and the map iterates in ascending id order: comparing
+                // backwards makes the shallowest cell — and among cells of
+                // one depth, the smallest id — the maximum.
+                .then_with(|| b.cell.depth.cmp(&a.cell.depth))
                 .then_with(|| b_gnode.cmp(a_gnode))
         })?;
         let wc = self.warming.remove(&gnode)?;
@@ -362,16 +371,23 @@ impl<C: Coordinate> StagingArea<C> {
     /// descendants even in synchronous mode.
     #[allow(clippy::cast_possible_truncation)] // depth ≤ 128, fits u8
     pub fn drain_all_synchronous(&mut self, batch_size: usize, rng: &mut SmallRng) {
-        // Sort by cached volume (g.sum) descending, then GNodeId for
-        // deterministic tie-breaking (ADR-S-005).
-        let mut gnodes: Vec<(GNodeId, f64)> = self.warming.iter().map(|(&gnode, wc)| (gnode, wc.volume)).collect();
+        // Sort by cached volume (g.sum) descending, then by depth so an
+        // ancestor is warmed before the cells beneath it — a recycled arena
+        // slot can give a descendant the smaller identifier — and then by
+        // GNodeId for deterministic tie-breaking (ADR-S-005).
+        let mut gnodes: Vec<(GNodeId, f64, u32)> = self
+            .warming
+            .iter()
+            .map(|(&gnode, wc)| (gnode, wc.volume, wc.cell.depth))
+            .collect();
         gnodes.sort_by(|a, b| {
             b.1.partial_cmp(&a.1)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.2.cmp(&b.2))
                 .then_with(|| a.0.cmp(&b.0))
         });
 
-        for (gnode, _) in gnodes {
+        for (gnode, _, _) in gnodes {
             let Some(mut wc) = self.warming.remove(&gnode) else {
                 continue;
             };
@@ -864,11 +880,12 @@ mod tests {
     /// Equal volumes resolve to the shallower cell rather than the deeper one.
     /// A tie is the ordinary case for a pair of siblings the moment they are
     /// created, and the rule the queue exists to serve is that a busy ancestor
-    /// is warmed before the cells beneath it. Identifiers are handed out as the
-    /// tree grows downward, so the larger of two is always the newer and deeper
-    /// cell, and resolving a tie toward it inverts the rule exactly. This path
-    /// and the synchronous drain are two ways of serving one queue, so they
-    /// must not disagree about which cell comes next.
+    /// is warmed before the cells beneath it. Identifiers cannot carry that
+    /// rule on their own: the graph's arena hands a freed slot out again, so a
+    /// cell created into a recycled slot holds a smaller identifier than an
+    /// ancestor allocated before it. This path and the synchronous drain are
+    /// two ways of serving one queue, so they must not disagree about which
+    /// cell comes next.
     ///
     /// ´claim:staging:equal-volumes-resolve-to-the-shallower-cell-so-both-drains-agree´
     /// ´test:unit:equal-volumes-take-the-shallower-cell-first´
@@ -886,6 +903,65 @@ mod tests {
         let (gnode, _wc) = staging.take_highest_priority().unwrap();
         assert_eq!(gnode, earlier, "a tie goes to the earlier, shallower identifier");
         assert_ne!(gnode, later);
+    }
+
+    /// A descendant holding a smaller identifier than its own ancestor still
+    /// warms after that ancestor when the two tie on volume. The tie is the
+    /// ordinary case for a path node whose whole volume comes from the single
+    /// cell below it, and the smaller identifier is what a recycled arena slot
+    /// produces, so the pair is reachable rather than contrived. Warming the
+    /// descendant first would promote it while the chain above it is still
+    /// warming, which is the gap the volume ordering exists to close.
+    ///
+    /// (´claim:staging:equal-volumes-resolve-to-the-shallower-cell-so-both-drains-agree´)
+    /// ´test:unit:a-restored-descendant-does-not-overtake-its-warming-ancestor´
+    #[test]
+    fn a_restored_descendant_does_not_overtake_its_warming_ancestor() {
+        let mut staging = StagingArea::<u128>::new();
+
+        // Slot 5 at its first generation is an ancestor allocated before the
+        // descendant; slot 2 at its second generation is a cell created into a
+        // slot the arena had freed, which is how a descendant comes to hold
+        // the smaller identifier.
+        let ancestor = GNodeId::from_parts(5, 0);
+        let descendant = GNodeId::from_parts(2, 1);
+        assert!(descendant < ancestor, "the descendant holds the smaller identifier");
+
+        staging.enqueue(ancestor, make_cell(1), 3);
+        staging.enqueue(descendant, make_cell(2), 3);
+        staging.warming.get_mut(&ancestor).unwrap().volume = 42.0;
+        staging.warming.get_mut(&descendant).unwrap().volume = 42.0;
+
+        let (gnode, _wc) = staging.take_highest_priority().unwrap();
+        assert_eq!(gnode, ancestor, "the ancestor is warmed before the cell beneath it");
+    }
+
+    /// The synchronous drain orders that same pair the same way, leaving the
+    /// ancestor ahead of the descendant on the ready queue. Promotion takes
+    /// the queue in order, so a drain that warmed the descendant first would
+    /// bring it online with an ancestor of its own still warming — the two
+    /// drains serve one queue and must agree about which cell comes next.
+    ///
+    /// (´claim:staging:equal-volumes-resolve-to-the-shallower-cell-so-both-drains-agree´)
+    /// ´test:unit:the-synchronous-drain-warms-a-restored-descendants-ancestor-first´
+    #[test]
+    fn the_synchronous_drain_warms_a_restored_descendants_ancestor_first() {
+        use rand::SeedableRng;
+
+        let mut staging = StagingArea::<u128>::new();
+        let ancestor = GNodeId::from_parts(5, 0);
+        let descendant = GNodeId::from_parts(2, 1);
+
+        staging.enqueue(ancestor, make_cell(1), 1);
+        staging.enqueue(descendant, make_cell(2), 1);
+        staging.warming.get_mut(&ancestor).unwrap().volume = 42.0;
+        staging.warming.get_mut(&descendant).unwrap().volume = 42.0;
+
+        let mut rng = SmallRng::seed_from_u64(42);
+        staging.drain_all_synchronous(8, &mut rng);
+
+        let order: Vec<GNodeId> = staging.take_ready().iter().map(|(gnode, _)| *gnode).collect();
+        assert_eq!(order, [ancestor, descendant], "the ancestor reaches the ready queue first");
     }
 
     /// A cell checked out for background warming is still a warming cell, so
