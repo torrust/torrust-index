@@ -89,6 +89,22 @@ the root crate and do not own separate ADRs or specification
 docs. They share the `T-` prefix for any cross-references
 that target them.
 
+### Labelled Corpora
+
+A package may keep its documentation and records as a labelled corpus; the Sentinel and Assayer packages do.
+
+In a labelled corpus, a head mints one label in a bare backtick span such as `` `kind:area:name` ``, running text cites within the owner with a parenthesis hugging that label alone such as ``(`kind:area:name`)``, and a citation crossing owners uses the imported bracketed form such as ``[PREFIX-kind:area:name]``.
+
+The registered imported-form prefixes are `INDEX` for the root crate, `ASSAYER` for Assayer, `MUDLARK` for Mudlark, and `SENTINEL` for Sentinel.
+
+A package may cite the root and a package it depends on, never the reverse.
+
+Fenced blocks and double-backtick spans exhibit a label without citing it.
+
+Within a labelled corpus the section-sign form is not written, and the package's conventions record states the grammar in full.
+
+The section-sign convention above continues to govern every document that uses it, with the ADR exemption unchanged; registering the labelled form retires nothing.
+
 ### General Rules
 
 - Use `§§` for ranges: e.g. `§§IDEA M-12.2–12.5`.

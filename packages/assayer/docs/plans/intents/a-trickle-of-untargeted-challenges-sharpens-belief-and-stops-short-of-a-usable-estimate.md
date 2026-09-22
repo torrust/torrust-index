@@ -1,0 +1,81 @@
+# A trickle sharpens belief without becoming sufficient · `plan:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate`
+
+Keeping (´claim:risk:a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate´) establishes that the shipped Companion turns a sparse, clocked stream into measurably narrower belief without misreporting that belief as sufficiently evidenced, and that a host override substitutes only for the estimate exposed to derivation while learning continues beneath it.
+
+## What the promise says precisely · `sec:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate-precision`
+
+The witness starts from the default uniform Beta prior, whose two pseudo-counts are one, whose mean is one half, and whose variance is one twelfth (´def:companion:prior´).
+
+A contributing label is an observed Pass or Fail result for a challenged adverse request, and each result adds one count to its own side after decay to the label timestamp (´alg:companion:update´). The untargeted population rate is `0.08` contributing labels per day, so a regular deterministic fixture places one contribution every `12.5` days, or three hundred hours, and reaches twenty arrivals at day two hundred and fifty (´data:companion:contributing-rate´).
+
+The default Companion retention factor is `0.9998` per hour and blends only the evidence above the prior back toward that prior (´def:companion:challenge-decay´) (´alg:companion:decay´). With twenty alternating Fail and Pass results at the stated cadence, the immediate day-two-hundred-and-fifty reading has about `11.9991` effective observations, total pseudo-count mass `13.9991`, variance `0.0166566`, and prior variance divided by observed variance `5.0030`.
+
+The independent finite-horizon oracle starts both evidence counts at zero and, before each arrival, replaces each count `x` with `decay_recurrence(x, 1.0, 0, gamma, 300.0)`, then adds one to the side named by that arrival. Adding the two prior counts yields the expected posterior. The production comparison uses `DEFAULT_TOLERANCES.default`; the semantic checks use only the rounding precision of the promise, namely half a unit around twelve and fourteen, half a thousandth around `0.017`, and half a unit around five (´tab:assayer:harness-scenario-tolerances´) (´dec:harness:oracle-tier´).
+
+At the same cadence the oracle retention for one interval is `decay_recurrence(1.0, 1.0, 0, gamma, 300.0)`, so the immediate-post-arrival effective-sample ceiling is its lost fraction's reciprocal, about `17.17`, and the total pseudo-count ceiling including the prior is about `19.17`. The default sufficiency floor is twenty effective observations, remains false at day two hundred and fifty, and is unreachable because the ceiling lies below it (´bound:companion:convergence´) (´dec:challenge:sufficiency-floor-owned-here´).
+
+An active override supplies the estimate and variance that cross the derivation boundary, while effective sample size remains a property of the underlying Beta state (´alg:companion:override´) (´tab:companion:health´). Contributions continue updating that state, and clearing the override exposes the exact conjugate posterior that includes them (´dec:challenge:override-accumulates´).
+
+## What the code offers today · `sec:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate-code-today`
+
+The public, host-owned Companion surface offers `ChallengeEffectivenessTracker::update`, `ChallengeEffectivenessTracker::estimate`, `ChallengeEffectivenessTracker::health_report`, `ChallengeEffectivenessTracker::set_override`, and `ChallengeEffectivenessTracker::clear_override` over explicit `PersistentTimestamp` values. `ChallengeEffectivenessProvider::challenge_posterior` returns exact decayed Beta counts when no override is active and a moment-matched posterior while one is active; `derive_landscape` accepts either form and carries it on `DecisionLandscape::posterior` (´claim:risk:the-shipped-tracker-answers-the-replacement-surface-with-its-exact-posterior-counts´) (´sig:companion:posterior´) (´dec:challenge:host-ownership´) (´dec:challenge:arrangement-final´).
+
+Existing integration coverage proves one direct tracker update and the separate `World::record_challenge_result` routing convenience (´test:integration:companion-tracker-records-challenge-result´) (´test:integration:world-routes-challenge-result-to-companion-tracker´). Existing crate and unit coverage pins the default sufficiency floor, read-time decay, health reporting, and replacement by an override (´test:crate:companion-sufficiency-floor-carries-its-ruled-value´) (´test:unit:estimate-decays-on-read-without-mutating´) (´test:unit:tracker-health-report-contains-channel´) (´test:unit:tracker-override-replaces-estimate-until-cleared´). The held-assessment purity witness separately establishes stable repeated derivation inputs (´test:integration:public-derive-landscape-and-render-resonances-bit-identical´). None composes the sparse cadence, finite-horizon sharpening, unreachable sufficiency ceiling, derivation-time override, and update beneath that override, so the promise remains unkept.
+
+The finished harness supplies one `Scenario` over one `World`, forward-only `World::advance` and `World::travel_to`, declarative `playback` over subject-owned `PlaybackRow` values under a `PlaybackBarrierPolicy`, `PlaybackCheckpoint` and `PlaybackProgress`, and the specification-formula `decay_recurrence` oracle with `OracleProvenance::SpecificationFormula` (´tab:assayer:harness-implementation-library-roster´) (´dec:harness:single-scenario´) (´dec:harness:declarative-playback´) (´dec:harness:oracle-tier´). This witness reads public owned `ChallengeHealthReport` and `ChallengePosterior` values, so it needs none of the `PublishedModelBlock`, `PublishedSlotMoments`, or `PendingEntryView` probes; it starts from the declared prior rather than a trained state, so it needs neither `TrainedStateFixture` nor `run_seeded_sweep`.
+
+**Entry (World owns the scenario's time verbs)** · `entry:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate-world-time-verbs`
+
+**DONE.** `World::advance` and `World::travel_to` now move both clock domains forward and settle the time-activated identity-maintenance and Ledger-GC work before returning; focused tests cover forward advance, targeted travel, and backward-travel refusal (´entry:assayer:harness-scenario-time´) (´test:crate:scenario-advance-moves-both-clock-domains-together´) (´test:crate:scenario-travel-targets-both-clock-domains-together´) (´test:crate:scenario-travel-refuses-a-backward-target-with-both-instants´).
+
+## The witness · `sec:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate-witness`
+
+The integration test uses `scenario` to construct one default `Scenario`, creates a host-owned `ChallengeEffectivenessTracker`, and calls `ChallengeEffectivenessTracker::insert_channel` with one `ChallengeEffectivenessState::with_defaults` for `ChannelId(0)` at a `PersistentTimestamp` constructed from `VirtualClock::EPOCH_SECS`. It holds one `RiskAssessment` produced by `World::request` and `World::assess` with one `ChannelPolicy::default` for every derivation comparison. The initial `ChallengeHealthReport` and `ChallengeEffectivenessProvider::challenge_posterior` must report zero effective samples, insufficiency at `ChallengeEffectivenessTracker::DEFAULT_SUFFICIENT_EVIDENCE_THRESHOLD`, mean one half, variance one twelfth, and the two unit prior counts.
+
+A subject-owned `PlaybackRow` carries one scheduled `PersistentTimestamp`, one alternating `ChallengeResult`, and the shared host tracker. Its `PlaybackRow::play` implementation first calls `World::advance` by three hundred hours and then calls `ChallengeEffectivenessTracker::update` at the scheduled persistent timestamp. Twenty such rows put the first contribution at hour three hundred and the twentieth at hour six thousand; the shared `playback` runner drives them with `PlaybackProgress::new`, `PlaybackBatchSize::default`, and `PlaybackBarrierPolicy::none` because the tracker update is synchronous and `World::advance` already crosses the queues activated by time movement (´cor:clock:harness-control´) (´dec:harness:no-ad-hoc-waits´) (´dec:harness:declarative-playback´) (´entry:assayer:harness-tape-runner´).
+
+A `PlaybackCheckpoint` after the twentieth row reads one owned `ChallengeHealthReport`, obtains the exact `ChallengePosterior` through `ChallengeEffectivenessProvider::challenge_posterior`, and derives the held assessment by passing that posterior to `derive_landscape`. The checkpoint compares both evidence counts with their stepwise `decay_recurrence` expectations, compares the health effective sample with their sum, derives total mass and variance from the returned counts, checks the promise's rounding intervals, and checks that `sufficient_evidence` is false and the computed effective-sample ceiling rounds to `17.17` below the floor (´entry:assayer:harness-oracle-tier´) (´test:crate:decay-oracle-applies-each-clock-as-a-recurrence´).
+
+The same checkpoint calls `ChallengeEffectivenessTracker::set_override` with a deliberately distinct point and explicit variance, obtains the moment-matched posterior, derives the held assessment again, and asserts that `DecisionLandscape::posterior` carries the override's moments while the health detail retains the raw effective sample and reports the override active. A final playback row advances one more interval and records one more result while the override stands; its checkpoint verifies that the reported estimate and derived posterior remain the override, while the raw effective sample has followed one more decay-and-increment step.
+
+The final checkpoint calls `ChallengeEffectivenessTracker::clear_override`, obtains the provider posterior again, and derives the same held assessment. `DecisionLandscape::posterior` must now be conjugate, its two counts must equal the independently advanced evidence counts plus the prior, and their effective mass must include the contribution received under the override rather than either the override values or the pre-override state.
+
+The fails-before is diagnostic. A decay-free implementation reports twenty effective samples, total mass twenty-two, variance around `0.011`, and sufficiency at day two hundred and fifty; an implementation that drops sparse evidence stays at the prior variance; an implementation that freezes under override returns the pre-override posterior after clearing; and an implementation that fails to substitute the override leaves the derived posterior conjugate while the override stands.
+
+## What is missing · `sec:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate-missing`
+
+No production or harness item is missing for this witness. The remaining work is the integration test, its module index entry, and its claim citation.
+
+**Entry (World needs no Companion control or health escape hatch)** · `entry:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate-world-companion-surface`
+
+The former proposal to add override and health methods to `World` is rejected by the finished shape rather than left pending. Companion state is host-owned, the public tracker already supplies its controls and owned health report, and the host passes `ChallengeEffectivenessProvider::challenge_posterior` explicitly to `derive_landscape`; widening `World` would duplicate those final surfaces and obscure the boundary the witness is meant to keep (´dec:challenge:host-ownership´) (´dec:challenge:arrangement-final´).
+
+## Risks and open questions · `sec:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate-risks`
+
+**Observation (The oracle separates arithmetic from the rounded promise)** · `obs:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate-oracle`
+
+The rounded values twelve, fourteen, `0.017`, five, and nineteen express the promise but are too coarse to catch many wrong recurrences. The test therefore compares the production counts with the shared stepwise `decay_recurrence` route at the declared default tolerance and separately checks intervals derived from the printed rounding precision; the exact and semantic checks answer different questions and neither fits a tolerance to the observed result (´dec:harness:oracle-tier´).
+
+**Observation (The first contribution lands after one interval)** · `obs:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate-arrival-phase`
+
+The first contribution occurs at hour three hundred and the twentieth at hour six thousand. Placing the first contribution at the epoch would describe twenty arrivals over only nineteen decay intervals and would no longer witness the stated two-hundred-and-fifty-day history.
+
+**Observation (The clocked Companion path is synchronous)** · `obs:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate-determinism`
+
+The host tracker updates and reads synchronously, so this playback policy names no queue barrier. Scenario time still moves only through `World::advance`, whose own contract settles the asynchronous work that movement activates; adding `flush_labels` would falsely imply that the witness submits a Core label, while a sleep or poll would violate the declared barrier discipline (´entry:assayer:harness-scenario-time´) (´dec:harness:no-ad-hoc-waits´).
+
+**Observation (The tracker owns the Companion decay rate)** · `obs:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate-decay-ownership`
+
+`WorldBuilder` still seeds its routing tracker from `ChannelPolicy::reward`, although the specification assigns the rate to Companion configuration. This witness avoids treating that coupling as authority by constructing the host tracker from `ChallengeEffectivenessState::DEFAULT_GAMMA_QT` and checking the value against the specified `0.9998`; the held `ChannelPolicy` affects only derivation (´def:companion:challenge-decay´).
+
+**Observation (Health and posterior expose different owned readings)** · `obs:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate-health-accessor-shape`
+
+`ChallengeHealthDetail` exposes effective sample size, sufficiency, reported moments, and override state but not the two raw counts. `ChallengeEffectivenessProvider::challenge_posterior` exposes the exact counts only without an override and moment-matches while one stands. The witness therefore reads raw sufficiency from health, exact counts before and after the override from the provider posterior, and proves accumulation during the override by the health sample change before clearing it (´tab:companion:health´) (´sig:companion:posterior´).
+
+## Acceptance · `sec:assayer:intent-a-trickle-of-untargeted-challenges-sharpens-belief-and-stops-short-of-a-usable-estimate-acceptance`
+
+Acceptance adds the integration target `label_integration` function `label_integration::untargeted_challenge_trickle_sharpens_without_sufficiency`, indexes its measurable statement in that target's module documentation, and cites the intent claim in the test documentation.
+
+The implementation report shows the finite-horizon effective sample, total mass, variance, sharpening ratio, sufficiency verdict, and analytic ceiling observed by the test, together with the override-visible moment-matched posterior and the post-clear conjugate posterior. It also identifies the assertion defeated by each decay-free, ignored-override, and frozen-under-override mutation.
+
+Acceptance requires deterministic time moved only through `World::advance`, declarative playback with its explicit no-queue barrier policy, no wall-clock sleep or poll, no widened general-purpose tolerance, no direct access to Core model state, and no assertion that twenty arrivals are twenty effective observations.

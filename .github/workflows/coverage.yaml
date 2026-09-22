@@ -49,7 +49,7 @@ jobs:
         name: Generate Coverage Report
         run: |
           cargo clean 
-          cargo llvm-cov --all-features --workspace --codecov --output-path ./codecov.json
+          cargo llvm-cov --all-features --workspace --exclude torrust-assayer --codecov --output-path ./codecov.json
 
       - id: upload
         name: Upload Coverage Report
